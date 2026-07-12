@@ -1,0 +1,286 @@
+/**
+ * Diplomacy — relations, treaties, and the diplomatic action set
+ * (docs/game-design.md §3.5).
+ *
+ * Relations are a pairwise scalar in −100..+100 that drifts toward neutral and
+ * shifts on actions (war, gifts, broken deals) and standing conditions (border
+ * friction). Treaties are a pairwise status (war / peace / nap / alliance).
+ * The action set is deliberately small but expressive: declare war, make peace,
+ * non-aggression pact, alliance, gift, demand tribute.
+ *
+ * All functions are pure over `GameState`. AI accept/reject decisions are
+ * deterministic functions of state (relations, relative power, personality), so
+ * player-initiated proposals resolve immediately without a pending queue.
+ */
+
+import { UNITS, type UnitType } from "@/data/units";
+import {
+  BARBARIAN_ID,
+  GIFT_RELATION,
+  HOSTILE_THRESHOLD,
+  RELATION_MAX,
+  RELATION_MIN,
+  RELATION_WAR_HIT,
+  armySize,
+  pairKey,
+  type GameState,
+  type TreatyStatus,
+} from "@/systems/state";
+
+// --- relations & treaties ---------------------------------------------------
+
+export function getRelation(state: GameState, a: number, b: number): number {
+  return state.relations[pairKey(a, b)] ?? 0;
+}
+
+export function setRelation(state: GameState, a: number, b: number, value: number): GameState {
+  const v = clamp(Math.round(value), RELATION_MIN, RELATION_MAX);
+  return { ...state, relations: { ...state.relations, [pairKey(a, b)]: v } };
+}
+
+export function adjustRelation(state: GameState, a: number, b: number, delta: number): GameState {
+  return setRelation(state, a, b, getRelation(state, a, b) + delta);
+}
+
+export function getTreaty(state: GameState, a: number, b: number): TreatyStatus {
+  return state.treaties[pairKey(a, b)] ?? "peace";
+}
+
+export function setTreaty(state: GameState, a: number, b: number, status: TreatyStatus): GameState {
+  return { ...state, treaties: { ...state.treaties, [pairKey(a, b)]: status } };
+}
+
+export function atWar(state: GameState, a: number, b: number): boolean {
+  return getTreaty(state, a, b) === "war";
+}
+
+// --- power & geography ------------------------------------------------------
+
+/** A crude power score: army strength + territory + treasury cushion. */
+export function nationPower(state: GameState, id: number): number {
+  let army = 0;
+  for (const a of state.armies) {
+    if (a.ownerId !== id) continue;
+    for (const t of Object.keys(a.units) as UnitType[]) {
+      army += a.units[t] * (UNITS[t].attack + UNITS[t].defense);
+    }
+  }
+  const regions = state.regions.filter((r) => r.ownerId === id).length;
+  const nation = state.nations.find((n) => n.id === id);
+  const treasury = nation ? Math.max(0, nation.stocks.gold) / 40 : 0;
+  return army + regions * 6 + treasury;
+}
+
+/** Number of adjacent region pairs bordering nations a and b. */
+export function sharedBorders(state: GameState, a: number, b: number): number {
+  let count = 0;
+  for (const r of state.regions) {
+    if (r.ownerId !== a) continue;
+    for (const n of r.adjacency) {
+      if (state.regions[n]?.ownerId === b) count++;
+    }
+  }
+  return count;
+}
+
+// --- actions ----------------------------------------------------------------
+
+export function declareWar(state: GameState, a: number, b: number): GameState {
+  let next = setTreaty(state, a, b, "war");
+  next = adjustRelation(next, a, b, -RELATION_WAR_HIT);
+  return { ...next, log: [...next.log, `${name(next, a)} declared war on ${name(next, b)}!`].slice(-50) };
+}
+
+export function makePeace(state: GameState, a: number, b: number): GameState {
+  let next = setTreaty(state, a, b, "peace");
+  next = adjustRelation(next, a, b, +10);
+  return { ...next, log: [...next.log, `${name(next, a)} and ${name(next, b)} made peace.`].slice(-50) };
+}
+
+export function setPact(
+  state: GameState,
+  a: number,
+  b: number,
+  status: "nap" | "alliance",
+): GameState {
+  let next = setTreaty(state, a, b, status);
+  next = adjustRelation(next, a, b, status === "alliance" ? +20 : +10);
+  const label = status === "alliance" ? "an alliance" : "a non-aggression pact";
+  return { ...next, log: [...next.log, `${name(next, a)} and ${name(next, b)} signed ${label}.`].slice(-50) };
+}
+
+/** Transfer gold as a gift, improving relations. */
+export function gift(state: GameState, from: number, to: number, gold: number): GameState {
+  const sender = state.nations.find((n) => n.id === from);
+  if (!sender || sender.stocks.gold < gold || gold <= 0) return state;
+  const nations = state.nations.map((n) => {
+    if (n.id === from) return { ...n, stocks: { ...n.stocks, gold: round1(n.stocks.gold - gold) } };
+    if (n.id === to) return { ...n, stocks: { ...n.stocks, gold: round1(n.stocks.gold + gold) } };
+    return n;
+  });
+  let next: GameState = { ...state, nations };
+  const bump = Math.min(25, Math.round(gold * GIFT_RELATION));
+  next = adjustRelation(next, from, to, bump);
+  return { ...next, log: [...next.log, `${name(next, from)} gifted ${gold}g to ${name(next, to)}.`].slice(-50) };
+}
+
+/**
+ * Whether nation `target` would accept a proposal from `proposer`. Deterministic
+ * from relations, relative power and (for the AI) personality.
+ */
+export function wouldAccept(
+  state: GameState,
+  proposer: number,
+  target: number,
+  type: "peace" | "nap" | "alliance" | "tribute",
+): boolean {
+  const targetNation = state.nations.find((n) => n.id === target);
+  if (!targetNation) return false;
+  // The player always decides for themselves via the UI; this is for AI targets.
+  if (targetNation.isPlayer || targetNation.isBarbarian) return false;
+
+  const rel = getRelation(state, proposer, target);
+  const powerRatio = nationPower(state, proposer) / (nationPower(state, target) || 1);
+  const p = targetNation.personality;
+  const trust = p?.trustworthiness ?? 0.5;
+  const aggression = p?.aggression ?? 0.5;
+
+  switch (type) {
+    case "peace":
+      // Accept peace when relations aren't terrible or when outmatched.
+      return rel > -60 || powerRatio > 1.3 || aggression < 0.4;
+    case "nap":
+      return rel > -10 - trust * 30;
+    case "alliance":
+      return rel > 45 - trust * 20 && powerRatio > 0.7;
+    case "tribute":
+      // Pay tribute only when clearly weaker and not too proud.
+      return powerRatio > 1.6 && aggression < 0.7;
+  }
+}
+
+/** Total gold upkeep-scaled strength lost/needed — helper for AI (re-exported). */
+export function armyStrengthOf(units: Record<UnitType, number>): number {
+  let s = 0;
+  for (const t of Object.keys(units) as UnitType[]) s += units[t] * (UNITS[t].attack + UNITS[t].defense);
+  return s;
+}
+
+// --- offers (AI → player, awaiting the player's decision) -------------------
+
+export function addOffer(
+  state: GameState,
+  from: number,
+  to: number,
+  type: "peace" | "nap" | "alliance" | "tribute",
+  gold?: number,
+): GameState {
+  // Avoid duplicate pending offers of the same kind.
+  if (state.offers.some((o) => o.from === from && o.to === to && o.type === type)) return state;
+  const offer = { id: state.nextOfferId, from, to, type, gold };
+  return { ...state, offers: [...state.offers, offer], nextOfferId: state.nextOfferId + 1 };
+}
+
+/** The player accepts an offer, applying its effect. */
+export function acceptOffer(state: GameState, offerId: number): GameState {
+  const offer = state.offers.find((o) => o.id === offerId);
+  if (!offer) return state;
+  let next = removeOffer(state, offerId);
+  switch (offer.type) {
+    case "peace":
+      next = makePeace(next, offer.from, offer.to);
+      break;
+    case "nap":
+      next = setPact(next, offer.from, offer.to, "nap");
+      break;
+    case "alliance":
+      next = setPact(next, offer.from, offer.to, "alliance");
+      break;
+    case "tribute":
+      // The player pays the demanding nation to avoid conflict.
+      next = gift(next, offer.to, offer.from, offer.gold ?? 0);
+      break;
+  }
+  return next;
+}
+
+export function rejectOffer(state: GameState, offerId: number): GameState {
+  const offer = state.offers.find((o) => o.id === offerId);
+  if (!offer) return state;
+  let next = removeOffer(state, offerId);
+  // Refusing a tribute demand sours relations.
+  if (offer.type === "tribute") next = adjustRelation(next, offer.from, offer.to, -10);
+  return next;
+}
+
+function removeOffer(state: GameState, offerId: number): GameState {
+  return { ...state, offers: state.offers.filter((o) => o.id !== offerId) };
+}
+
+/**
+ * Player-initiated proposal to an AI nation, resolved immediately by
+ * `wouldAccept`. Returns the new state; logs acceptance or refusal.
+ */
+export function playerPropose(
+  state: GameState,
+  target: number,
+  type: "peace" | "nap" | "alliance",
+): GameState {
+  const proposer = state.nations.find((n) => n.isPlayer)!.id;
+  if (wouldAccept(state, proposer, target, type)) {
+    if (type === "peace") return makePeace(state, proposer, target);
+    return setPact(state, proposer, target, type);
+  }
+  return { ...state, log: [...state.log, `${name(state, target)} refused your ${type}.`].slice(-50) };
+}
+
+// --- per-turn relations drift ----------------------------------------------
+
+/**
+ * Nudge all relations toward neutral, then apply standing pressures: border
+ * friction cools relations, alliances warm them. War keeps relations low.
+ */
+export function driftRelations(state: GameState): GameState {
+  const players = state.nations.filter((n) => !n.isBarbarian && n.alive);
+  let relations = { ...state.relations };
+  for (let i = 0; i < players.length; i++) {
+    for (let j = i + 1; j < players.length; j++) {
+      const a = players[i]!.id;
+      const b = players[j]!.id;
+      const key = pairKey(a, b);
+      let rel = relations[key] ?? 0;
+      const treaty = getTreaty(state, a, b);
+
+      // Drift toward neutral.
+      if (rel > 0) rel -= 1;
+      else if (rel < 0) rel += 1;
+
+      // Standing pressures.
+      const borders = sharedBorders(state, a, b);
+      rel -= borders * 0.5;
+      if (treaty === "alliance") rel += 2;
+      if (treaty === "war") rel = Math.min(rel, HOSTILE_THRESHOLD);
+
+      relations[key] = clamp(Math.round(rel), RELATION_MIN, RELATION_MAX);
+    }
+  }
+  return { ...state, relations };
+}
+
+// --- helpers ----------------------------------------------------------------
+
+function name(state: GameState, id: number): string {
+  if (id === BARBARIAN_ID) return "Free Peoples";
+  return state.nations.find((n) => n.id === id)?.name ?? `Nation ${id}`;
+}
+
+function clamp(v: number, lo: number, hi: number): number {
+  return v < lo ? lo : v > hi ? hi : v;
+}
+
+function round1(v: number): number {
+  return Math.round(v * 10) / 10;
+}
+
+/** Re-export for callers that need army size without importing state. */
+export { armySize };

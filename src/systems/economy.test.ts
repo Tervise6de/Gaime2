@@ -57,7 +57,7 @@ describe("region production", () => {
 describe("national production", () => {
   it("sums only regions the nation owns", () => {
     const state = {
-      taxRate: 0,
+      nations: [{ id: PLAYER_ID, taxRate: 0 }],
       regions: [
         region({ id: 0, terrain: "plains", population: 0, ownerId: PLAYER_ID }),
         region({ id: 1, terrain: "plains", population: 0, ownerId: PLAYER_ID }),

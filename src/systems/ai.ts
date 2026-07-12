@@ -1,0 +1,291 @@
+/**
+ * Rival AI — rule-based utility scoring with personality archetypes
+ * (docs/game-design.md §5).
+ *
+ * HARD CONSTRAINT: this is plain TypeScript that runs entirely in the browser.
+ * It makes no LLM/API calls, needs no key, and consumes no credits — playing is
+ * free and offline. Claude is used only at development time to write these rules.
+ *
+ * Each rival runs the same framework under the same scarcity as the player:
+ * assess the situation into scalars, score candidate actions weighted by its
+ * personality, and commit the affordable ones. It *feels* reactive because it
+ * responds to real state — attacking weakness, hesitating against strength,
+ * cooling toward armies on its border — not because of scripts.
+ *
+ * Pure over `GameState`; all randomness comes from the passed-in Rng.
+ */
+
+import type { UnitType } from "@/data/units";
+import type { BuildingId } from "@/data/buildings";
+import { sideStrength } from "@/systems/combat";
+import {
+  canRaiseUnit,
+  moveArmy,
+  raiseUnit,
+  strategicAccess,
+} from "@/systems/military";
+import {
+  addOffer,
+  atWar,
+  declareWar,
+  getRelation,
+  getTreaty,
+  gift,
+  makePeace,
+  nationPower,
+  setPact,
+  sharedBorders,
+} from "@/systems/diplomacy";
+import type { Rng } from "@/systems/rng";
+import {
+  BARBARIAN_ID,
+  PLAYER_ID,
+  armySize,
+  clampTax,
+  type GameState,
+  type Nation,
+} from "@/systems/state";
+
+/** Rivals leave the player alone for the opening turns (fair ramp-up). */
+const EARLY_PEACE_TURNS = 15;
+
+/** Run a rival nation's full turn. */
+export function runNationTurn(state: GameState, nationId: number, rng: Rng): GameState {
+  let s = state;
+  s = manageEconomy(s, nationId);
+  s = doDiplomacy(s, nationId, rng);
+  s = doMilitary(s, nationId, rng);
+  return s;
+}
+
+// --- economy ---------------------------------------------------------------
+
+function manageEconomy(state: GameState, nationId: number): GameState {
+  const nation = state.nations.find((n) => n.id === nationId);
+  if (!nation) return state;
+  const owned = state.regions.filter((r) => r.ownerId === nationId);
+  if (!owned.length) return state;
+
+  let s = state;
+
+  // Tax policy: aim higher when calm and poorer; ease off when unrest bites.
+  const avgUnrest = owned.reduce((a, r) => a + r.unrest, 0) / owned.length;
+  const p = nation.personality;
+  let target = 0.15 + (p?.economy ?? 0.5) * 0.1 + (p?.aggression ?? 0.4) * 0.1;
+  if (avgUnrest > 45) target -= 0.1;
+  if (nation.stocks.gold > 300) target -= 0.05;
+  s = setTax(s, nationId, target);
+
+  // Buildings: fill empty slots, prioritising order in restless regions and
+  // economy elsewhere (weighted by the economy trait).
+  for (const region of s.regions) {
+    if (region.ownerId !== nationId || region.construction) continue;
+    const choice = chooseBuilding(region);
+    if (choice) s = queueFor(s, region.id, choice, nationId);
+  }
+  return s;
+}
+
+function chooseBuilding(region: { unrest: number; buildings: BuildingId[] }): BuildingId | null {
+  const has = (b: BuildingId) => region.buildings.includes(b);
+  if (region.unrest > 35 && !has("temple")) return "temple";
+  const order: BuildingId[] = ["market", "workshop", "farm", "library", "temple"];
+  for (const b of order) if (!has(b)) return b;
+  return null;
+}
+
+// --- diplomacy --------------------------------------------------------------
+
+function doDiplomacy(state: GameState, nationId: number, rng: Rng): GameState {
+  const me = state.nations.find((n) => n.id === nationId);
+  if (!me) return state;
+  const p = me.personality;
+  const aggression = p?.aggression ?? 0.4;
+  const trust = p?.trustworthiness ?? 0.5;
+
+  const others = state.nations.filter(
+    (n) => !n.isBarbarian && n.alive && n.id !== nationId,
+  );
+  const myPower = nationPower(state, nationId);
+
+  let s = state;
+  let actions = 0;
+  for (const o of others) {
+    if (actions >= 1) break; // at most one diplomatic move per turn
+    const rel = getRelation(s, nationId, o.id);
+    const treaty = getTreaty(s, nationId, o.id);
+    const theirPower = nationPower(s, o.id) || 1;
+    const ratio = myPower / theirPower;
+    const border = sharedBorders(s, nationId, o.id) > 0;
+
+    if (treaty === "war") {
+      // Losing badly → sue for peace (more readily if unaggressive).
+      if (ratio < 0.7 - aggression * 0.2) {
+        s = suePeace(s, nationId, o);
+        actions++;
+      }
+      continue;
+    }
+
+    // Opportunistic war: hostile, bordering, and I'm stronger. Warlords pounce
+    // at worse odds; peaceful types need a big edge. The player gets an
+    // early-game grace period so a new realm isn't snuffed out immediately.
+    const earlyGraceForPlayer = o.isPlayer && s.turn < EARLY_PEACE_TURNS;
+    const warThreshold = 1.5 - aggression;
+    if (border && rel < -25 && ratio > warThreshold && !earlyGraceForPlayer) {
+      s = openWar(s, nationId, o);
+      actions++;
+      continue;
+    }
+
+    // Trustworthy types shore up relations with a pact or a gift.
+    if (trust > 0.55 && rel > 15 && treaty === "peace" && border) {
+      s = offerPact(s, nationId, o, rel > 45 ? "alliance" : "nap");
+      actions++;
+      continue;
+    }
+
+    // A merchant appeases a much stronger, unfriendly neighbour with a gift.
+    if ((p?.economy ?? 0) > 0.7 && ratio < 0.6 && rel < 0 && me.stocks.gold > 80) {
+      s = gift(s, nationId, o.id, 30);
+      actions++;
+    }
+  }
+  // Small random chance a warlord with no target still probes a neighbour.
+  void rng;
+  return s;
+}
+
+function openWar(state: GameState, from: number, target: Nation): GameState {
+  if (target.isPlayer) {
+    // War is declared immediately (no consent needed).
+    return declareWar(state, from, target.id);
+  }
+  return declareWar(state, from, target.id);
+}
+
+function suePeace(state: GameState, from: number, target: Nation): GameState {
+  if (target.isPlayer) return addOffer(state, from, target.id, "peace");
+  // AI-to-AI peace resolves immediately.
+  return makePeace(state, from, target.id);
+}
+
+function offerPact(
+  state: GameState,
+  from: number,
+  target: Nation,
+  kind: "nap" | "alliance",
+): GameState {
+  if (target.isPlayer) return addOffer(state, from, target.id, kind);
+  return setPact(state, from, target.id, kind);
+}
+
+// --- military ---------------------------------------------------------------
+
+function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
+  let s = state;
+  const nation = s.nations.find((n) => n.id === nationId);
+  if (!nation) return s;
+
+  // Recruit: keep an army if aggressive/at war and it's affordable.
+  s = recruit(s, nationId, rng);
+
+  // Move each army: attack the weakest reachable, winnable target.
+  for (const army of s.armies.filter((a) => a.ownerId === nationId)) {
+    const live = s.armies.find((a) => a.id === army.id);
+    if (!live || live.movesLeft <= 0) continue;
+    const target = bestTarget(s, live, nationId);
+    if (target !== null) s = moveArmy(s, live.id, target);
+  }
+  return s;
+}
+
+function recruit(state: GameState, nationId: number, rng: Rng): GameState {
+  const nation = state.nations.find((n) => n.id === nationId);
+  if (!nation) return state;
+  const p = nation.personality;
+  const aggression = p?.aggression ?? 0.4;
+  const atWarNow = state.nations.some(
+    (o) => !o.isBarbarian && o.id !== nationId && atWar(state, nationId, o.id),
+  );
+  const myUnits = state.armies
+    .filter((a) => a.ownerId === nationId)
+    .reduce((sum, a) => sum + armySize(a.units), 0);
+
+  // Warlords keep a bigger standing army; everyone raises more in wartime.
+  const wanted = 3 + Math.round(aggression * 6) + (atWarNow ? 3 : 0);
+  if (myUnits >= wanted) return state;
+  if (nation.stocks.gold < 30) return state;
+
+  // Recruit in the capital-ish region (first owned with an army, else first owned).
+  const home =
+    state.armies.find((a) => a.ownerId === nationId)?.regionId ??
+    state.regions.find((r) => r.ownerId === nationId)?.id;
+  if (home === undefined) return state;
+
+  const access = strategicAccess(state, nationId);
+  const pref: UnitType[] = ["infantry", "ranged", "militia"];
+  if (access.has("horses")) pref.unshift("cavalry");
+  const pick = pref.find((u) => canRaiseUnit(state, home, u, nationId).ok);
+  if (!pick) return state;
+  void rng;
+  return raiseUnit(state, home, pick, nationId);
+}
+
+/** The best adjacent region for an army to attack, or null to hold. */
+function bestTarget(state: GameState, army: { id: number; regionId: number; units: Record<UnitType, number> }, nationId: number): number | null {
+  const region = state.regions[army.regionId];
+  if (!region) return null;
+  const atk = sideStrength(army.units, zeroUnits(), "attack");
+
+  let best: number | null = null;
+  let bestScore = 0;
+  for (const nid of region.adjacency) {
+    const target = state.regions[nid];
+    if (!target || target.ownerId === nationId) continue;
+
+    const isBarb = target.ownerId === BARBARIAN_ID;
+    const isEnemy = target.ownerId !== null && !isBarb && atWar(state, nationId, target.ownerId);
+    if (!isBarb && !isEnemy) continue; // don't attack nations we're at peace with
+    // Honour the player's early-game grace: don't invade them before it lapses.
+    if (target.ownerId === PLAYER_ID && state.turn < EARLY_PEACE_TURNS) continue;
+
+    const defender = state.armies.find((a) => a.regionId === nid && a.ownerId !== nationId);
+    const def = defender
+      ? sideStrength(defender.units, army.units, "defense") * 1.2 + target.fortification * 3
+      : 0;
+
+    // Winnable if our attack clearly exceeds their defence.
+    if (atk > def * 1.1) {
+      // Prefer softer targets (bigger margin) and richer regions.
+      const score = atk - def + (isBarb ? 2 : 5);
+      if (score > bestScore) {
+        bestScore = score;
+        best = nid;
+      }
+    }
+  }
+  return best;
+}
+
+// --- small helpers ----------------------------------------------------------
+
+function setTax(state: GameState, nationId: number, rate: number): GameState {
+  const nations = state.nations.map((n) =>
+    n.id === nationId ? { ...n, taxRate: clampTax(rate) } : n,
+  );
+  return { ...state, nations };
+}
+
+function queueFor(state: GameState, regionId: number, building: BuildingId, ownerId: number): GameState {
+  const region = state.regions[regionId];
+  if (!region || region.ownerId !== ownerId || region.buildings.includes(building)) return state;
+  const regions = state.regions.map((r) =>
+    r.id === regionId ? { ...r, construction: { building, progress: 0 } } : r,
+  );
+  return { ...state, regions };
+}
+
+function zeroUnits(): Record<UnitType, number> {
+  return { militia: 0, infantry: 0, ranged: 0, cavalry: 0, siege: 0 };
+}

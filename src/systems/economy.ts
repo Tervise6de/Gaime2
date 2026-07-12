@@ -77,15 +77,16 @@ export function regionProduction(region: Region, taxRate: number): ResourceFlow 
   };
 }
 
-/** Sum of production across all regions a nation owns. */
+/** Sum of production across all regions a nation owns (at its own tax rate). */
 export function nationalProduction(
   state: GameState,
   ownerId: number,
 ): ResourceFlow {
+  const taxRate = state.nations.find((n) => n.id === ownerId)?.taxRate ?? 0;
   return state.regions
     .filter((r) => r.ownerId === ownerId)
     .reduce<ResourceFlow>((acc, region) => {
-      const flow = regionProduction(region, state.taxRate);
+      const flow = regionProduction(region, taxRate);
       return {
         food: round1(acc.food + flow.food),
         materials: round1(acc.materials + flow.materials),

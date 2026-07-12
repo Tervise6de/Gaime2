@@ -4,18 +4,21 @@ A browser-based **Kingdom Management / 4X-lite** strategy game. Depth comes
 from interacting systems — economy, population, military, diplomacy — rather
 than from art. Low-art, high-decision-density, runs anywhere a browser does.
 
-> **Status:** Milestone 3 — Military + Territorial conflict. On top of the M1
-> economy and M2 population/unrest/buildings: you start with a small realm
-> surrounded by **barbarian-held regions** to conquer. Raise five unit types in
-> a **rock-paper-scissors counter loop** (militia→cavalry→ranged→infantry→
-> militia, plus siege vs. forts), march **armies** along the region graph, and
-> fight **abstract combat** where composition, terrain defence and fortification
-> all matter. Cavalry and siege need **strategic resources** (horses / iron), so
-> specific territory is worth taking. Armies draw **gold upkeep** (bankruptcy
-> forces disbandment), and **conquest + overexpansion feed unrest** — the
-> anti-snowball brake. The full guns-vs-butter-vs-consolidation trade-off is
-> live. Click a region to develop or defend it; select an army and press
-> **Move / Attack** to march.
+> **Status:** Milestone 4 — AI Nations + Diplomacy. It's now a **4X game**. Two
+> **rival nations** run the very same economy, population, unrest, building and
+> military systems as you, driven by a **rule-based utility AI** with
+> personality archetypes (Warlord, Merchant, Builder, Opportunist). They expand,
+> raise armies, and fight — reacting to real state, not scripts. **Relations**
+> (−100…+100) drift and shift on your actions and proximity; a small but
+> expressive **diplomacy** set lets you declare war, sue for peace, sign
+> non-aggression pacts and alliances, gift gold, and field/answer offers. Attack
+> a rival and it's war; turtle forever and the external clock runs you down
+> (defeat if eliminated, victory if you're the last realm standing). Earlier
+> layers still apply: terrain economy, tax-vs-unrest, buildings, the unit
+> counter loop, strategic resources, upkeep and conquest unrest.
+>
+> **The rival AI is 100% local:** plain TypeScript running in your browser — no
+> LLM/API calls, no key, no credits. Free and offline to play.
 
 ## Tech stack
 
@@ -50,9 +53,10 @@ npm run test:watch # run tests in watch mode
 ```
 
 The simulation is a set of **pure functions** over a serialisable `GameState`
-(seeded RNG, deterministic turn pipeline — combat included), so the systems are
-covered by fast unit tests — 80 tests across the RNG, map generation, economy,
-population, stability, construction, combat, military, and turn resolution.
+(seeded RNG, deterministic turn pipeline — combat and AI included), so the
+systems are covered by fast unit tests — 104 tests across the RNG, map
+generation, economy, population, stability, construction, combat, military,
+diplomacy, rival AI, and turn resolution.
 
 ## Project structure
 

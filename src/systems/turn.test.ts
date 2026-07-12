@@ -3,7 +3,6 @@ import {
   createGame,
   resolveTurn,
   setTaxRate,
-  clampTax,
   queueBuilding,
   cancelConstruction,
   canQueueBuilding,
@@ -11,7 +10,7 @@ import {
 import { nationalProduction } from "@/systems/economy";
 import { totalUpkeep } from "@/systems/military";
 import { BUILDINGS } from "@/data/buildings";
-import { PLAYER_ID, TAX_MAX, TAX_MIN } from "@/systems/state";
+import { PLAYER_ID, TAX_MAX, TAX_MIN, clampTax, playerNation } from "@/systems/state";
 
 describe("createGame", () => {
   it("is deterministic for a seed", () => {
@@ -25,9 +24,11 @@ describe("createGame", () => {
     expect(owned.length).toBeGreaterThan(0);
     expect(owned.length).toBeLessThan(g.regions.length);
     expect(g.regions.some((r) => r.ownerId !== PLAYER_ID)).toBe(true);
-    expect(g.stocks.gold).toBeGreaterThan(0);
+    expect(playerNation(g).stocks.gold).toBeGreaterThan(0);
     // The player begins with a field army.
     expect(g.armies.some((a) => a.ownerId === PLAYER_ID)).toBe(true);
+    // Rival nations exist.
+    expect(g.nations.some((n) => !n.isPlayer && !n.isBarbarian)).toBe(true);
   });
 });
 
@@ -43,8 +44,8 @@ describe("setTaxRate", () => {
   it("returns a new state without mutating the input", () => {
     const g = createGame({ seed: 1 });
     const next = setTaxRate(g, 0.3);
-    expect(next.taxRate).toBe(0.3);
-    expect(g.taxRate).not.toBe(0.3);
+    expect(playerNation(next).taxRate).toBe(0.3);
+    expect(playerNation(g).taxRate).not.toBe(0.3);
     expect(next).not.toBe(g);
   });
 });
@@ -56,12 +57,14 @@ describe("resolveTurn", () => {
   });
 
   it("adds national production to stocks, net of army upkeep", () => {
-    const g = createGame({ seed: 1 });
+    const g = createGame({ seed: 1, rivals: 0 });
     const flow = nationalProduction(g, PLAYER_ID);
     const upkeep = totalUpkeep(g, PLAYER_ID);
     const next = resolveTurn(g);
-    expect(next.stocks.gold).toBeCloseTo(g.stocks.gold + flow.gold - upkeep, 5);
-    expect(next.stocks.materials).toBeCloseTo(g.stocks.materials + flow.materials, 5);
+    const p0 = playerNation(g);
+    const p1 = playerNation(next);
+    expect(p1.stocks.gold).toBeCloseTo(p0.stocks.gold + flow.gold - upkeep, 5);
+    expect(p1.stocks.materials).toBeCloseTo(p0.stocks.materials + flow.materials, 5);
   });
 
   it("does not mutate the input state", () => {
@@ -73,18 +76,18 @@ describe("resolveTurn", () => {
 
   it("is deterministic and reproducible over many turns", () => {
     const run = (): number => {
-      let s = createGame({ seed: 2024 });
+      let s = createGame({ seed: 2024, rivals: 0 });
       for (let i = 0; i < 30; i++) s = resolveTurn(s);
-      return s.stocks.gold;
+      return playerNation(s).stocks.gold;
     };
     expect(run()).toBe(run());
   });
 
   it("higher taxes yield more treasury over time", () => {
     const play = (tax: number): number => {
-      let s = setTaxRate(createGame({ seed: 5 }), tax);
+      let s = setTaxRate(createGame({ seed: 5, rivals: 0 }), tax);
       for (let i = 0; i < 10; i++) s = resolveTurn(s);
-      return s.stocks.gold;
+      return playerNation(s).stocks.gold;
     };
     expect(play(TAX_MAX)).toBeGreaterThan(play(TAX_MIN));
   });
@@ -96,7 +99,7 @@ describe("resolveTurn", () => {
   });
 
   it("grows player population over a calm game", () => {
-    let s = setTaxRate(createGame({ seed: 3 }), 0);
+    let s = setTaxRate(createGame({ seed: 3, rivals: 0 }), 0);
     const ownedPop = (g: typeof s) =>
       g.regions.filter((r) => r.ownerId === PLAYER_ID).reduce((a, r) => a + r.population, 0);
     const start = ownedPop(s);
@@ -105,7 +108,7 @@ describe("resolveTurn", () => {
   });
 
   it("raises unrest in player regions under sustained high taxes", () => {
-    let s = setTaxRate(createGame({ seed: 3 }), TAX_MAX);
+    let s = setTaxRate(createGame({ seed: 3, rivals: 0 }), TAX_MAX);
     for (let i = 0; i < 15; i++) s = resolveTurn(s);
     const owned = s.regions.filter((r) => r.ownerId === PLAYER_ID);
     const avgUnrest = owned.reduce((a, r) => a + r.unrest, 0) / owned.length;
@@ -148,7 +151,7 @@ describe("construction", () => {
   });
 
   it("completes a queued building over enough turns", () => {
-    let s = setTaxRate(createGame({ seed: 1 }), 0);
+    let s = setTaxRate(createGame({ seed: 1, rivals: 0 }), 0);
     const id = ownedId(s);
     s = queueBuilding(s, id, "market");
     const turns = Math.ceil(BUILDINGS.market.cost / 6) + 3;
@@ -158,7 +161,7 @@ describe("construction", () => {
 
   it("a completed market increases national gold output", () => {
     const seed = 1;
-    let plain = setTaxRate(createGame({ seed }), 0);
+    let plain = setTaxRate(createGame({ seed, rivals: 0 }), 0);
     const id = ownedId(plain);
     let built = queueBuilding(plain, id, "market");
     for (let i = 0; i < 8; i++) {

@@ -7,7 +7,14 @@ import {
   cancelConstruction,
 } from "@/systems/turn";
 import { raiseUnit, moveArmy, reachableRegions } from "@/systems/military";
-import type { GameState } from "@/systems/state";
+import {
+  declareWar,
+  playerPropose,
+  gift,
+  acceptOffer,
+  rejectOffer,
+} from "@/systems/diplomacy";
+import { PLAYER_ID, type GameState } from "@/systems/state";
 import { createHud } from "@/ui/hud";
 import "@/ui/style.css";
 
@@ -68,6 +75,30 @@ function main(): void {
     },
     onCancelMove() {
       moveArmyId = null;
+      sync();
+    },
+    onDeclareWar(targetId) {
+      state = declareWar(state, PLAYER_ID, targetId);
+      sync();
+    },
+    onMakePeace(targetId) {
+      state = playerPropose(state, targetId, "peace");
+      sync();
+    },
+    onProposePact(targetId, kind) {
+      state = playerPropose(state, targetId, kind);
+      sync();
+    },
+    onGift(targetId, amount) {
+      state = gift(state, PLAYER_ID, targetId, amount);
+      sync();
+    },
+    onAcceptOffer(offerId) {
+      state = acceptOffer(state, offerId);
+      sync();
+    },
+    onRejectOffer(offerId) {
+      state = rejectOffer(state, offerId);
       sync();
     },
   });

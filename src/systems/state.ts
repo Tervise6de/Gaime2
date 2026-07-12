@@ -77,6 +77,24 @@ export const OVEREXPANSION_UNREST = 2.5;
 /** Bankruptcy: unrest spike applied nationwide when the treasury goes negative. */
 export const BANKRUPTCY_UNREST = 15;
 
+/**
+ * Diplomacy tuning (M4, docs/game-design.md §3.5). Relations sit in −100..+100
+ * and drift toward a slow neutral; actions and proximity shift them.
+ */
+export const RELATION_MIN = -100;
+export const RELATION_MAX = 100;
+/** Each turn, relations decay this much toward 0 (grudges and goodwill fade). */
+export const RELATION_DRIFT = 1;
+/** Relation hit for declaring war / breaking a treaty. */
+export const RELATION_WAR_HIT = 45;
+/** Relation gain from a gift (per unit, scaled by amount). */
+export const GIFT_RELATION = 1; // per gold, capped in diplomacy.ts
+/** Border friction: relation drag per shared border with a nation. */
+export const BORDER_FRICTION = 0.5;
+/** Below this relation an AI will consider war; above it, treaties. */
+export const HOSTILE_THRESHOLD = -30;
+export const FRIENDLY_THRESHOLD = 40;
+
 /** A region's single construction slot. */
 export interface ConstructionOrder {
   building: BuildingId;
@@ -119,13 +137,6 @@ export interface Army {
   movesLeft: number;
 }
 
-export interface Nation {
-  id: number;
-  name: string;
-  color: string;
-  isPlayer: boolean;
-}
-
 export interface ResourceStocks {
   gold: number;
   food: number;
@@ -133,29 +144,100 @@ export interface ResourceStocks {
   knowledge: number;
 }
 
+/**
+ * AI personality archetype (docs/game-design.md §5). Weights shift decision
+ * *thresholds*, not the framework — same rules, different feel. 0..1 each.
+ */
+export interface Personality {
+  archetype: "warlord" | "merchant" | "builder" | "opportunist";
+  aggression: number;
+  expansion: number;
+  economy: number;
+  trustworthiness: number;
+}
+
+/**
+ * A nation. From M4 each non-barbarian nation runs the same economy and turn
+ * pipeline as the player under the same scarcity; rivals additionally run the
+ * rule-based AI (ai.ts). The player is just the nation with `isPlayer: true`.
+ */
+export interface Nation {
+  id: number;
+  name: string;
+  color: string;
+  isPlayer: boolean;
+  /** Barbarians are static neutral holders — no economy, no AI, no diplomacy. */
+  isBarbarian: boolean;
+  /** Eliminated once a nation holds no regions. */
+  alive: boolean;
+  /** Per-nation treasury and stockpiles. */
+  stocks: ResourceStocks;
+  /** Per-nation tax rate in [TAX_MIN, TAX_MAX]. */
+  taxRate: number;
+  /** AI archetype; undefined for the player and barbarians. */
+  personality?: Personality;
+  /** Last turn's flags, for the HUD. */
+  famine: boolean;
+  bankrupt: boolean;
+}
+
+/** Diplomatic standing between two nations. */
+export type TreatyStatus = "war" | "peace" | "nap" | "alliance";
+
+/** A pending diplomatic offer awaiting the recipient's decision (AI → player). */
+export interface DiplomaticOffer {
+  id: number;
+  from: number;
+  to: number;
+  type: "peace" | "nap" | "alliance" | "tribute";
+  /** Gold the sender offers (tribute/gift sweetener), if any. */
+  gold?: number;
+}
+
 export interface GameState {
   /** The seed the whole game derives from (map generation). */
   seed: number;
-  /** Advancing RNG state for combat/events — keeps resolution deterministic. */
+  /** Advancing RNG state for combat/AI/events — keeps resolution deterministic. */
   rngState: number;
   /** Turns elapsed; starts at 1. */
   turn: number;
-  /** Global tax rate in [TAX_MIN, TAX_MAX]. */
-  taxRate: number;
-  /** National stockpiles. Gold is the treasury. */
-  stocks: ResourceStocks;
   nations: Nation[];
   regions: Region[];
-  /** All armies on the map (player and barbarian). */
+  /** All armies on the map. */
   armies: Army[];
   /** Monotonic id source for new armies. */
   nextArmyId: number;
-  /** True when last turn's national food balance went negative. */
-  famine: boolean;
-  /** True when last turn ended with a negative treasury (bankruptcy). */
-  bankrupt: boolean;
+  /** Pairwise relations, keyed by pairKey(a,b): −100..+100. */
+  relations: Record<string, number>;
+  /** Pairwise treaty status, keyed by pairKey(a,b). Missing = peace. */
+  treaties: Record<string, TreatyStatus>;
+  /** Offers from AI nations awaiting the player's response. */
+  offers: DiplomaticOffer[];
+  nextOfferId: number;
+  /** Set once the game has been decided (M5 fills victory; M4 sets defeat). */
+  outcome: "playing" | "defeat" | "victory";
   /** Human-readable turn log, newest last. */
   log: string[];
+}
+
+/** The player is nation 0. */
+export function playerNation(state: GameState): Nation {
+  return state.nations[PLAYER_ID]!;
+}
+
+/** Look up a nation by id. */
+export function nationById(state: GameState, id: number): Nation | undefined {
+  return state.nations.find((n) => n.id === id);
+}
+
+/** Stable key for a pair of nations (order-independent). */
+export function pairKey(a: number, b: number): string {
+  return a < b ? `${a}-${b}` : `${b}-${a}`;
+}
+
+/** Clamp a tax rate into the legal band. */
+export function clampTax(rate: number): number {
+  return Math.min(TAX_MAX, Math.max(TAX_MIN, rate));
 }
 
 /** The four core resources, in display order. */

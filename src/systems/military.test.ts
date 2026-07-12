@@ -49,21 +49,23 @@ function battlefield(playerUnits: Partial<Record<string, number>>, barbUnits: Pa
   if (Object.keys(barbUnits).length) {
     armies.push({ id: 1, ownerId: BARBARIAN_ID, regionId: 1, units: { ...emptyUnits(), ...barbUnits }, movesLeft: 0 });
   }
+  const stocks = { gold: 200, food: 20, materials: 50, knowledge: 0 };
   return {
     seed: 1,
     rngState: 12345,
     turn: 1,
-    taxRate: 0,
-    stocks: { gold: 200, food: 20, materials: 50, knowledge: 0 },
     nations: [
-      { id: PLAYER_ID, name: "Realm", color: "#000", isPlayer: true },
-      { id: BARBARIAN_ID, name: "Barbarians", color: "#000", isPlayer: false },
+      { id: PLAYER_ID, name: "Realm", color: "#000", isPlayer: true, isBarbarian: false, alive: true, stocks: { ...stocks }, taxRate: 0, famine: false, bankrupt: false },
+      { id: BARBARIAN_ID, name: "Barbarians", color: "#000", isPlayer: false, isBarbarian: true, alive: true, stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, taxRate: 0, famine: false, bankrupt: false },
     ],
     regions: [r0, r1],
     armies,
     nextArmyId: 2,
-    famine: false,
-    bankrupt: false,
+    relations: {},
+    treaties: {},
+    offers: [],
+    nextOfferId: 0,
+    outcome: "playing",
     log: [],
   };
 }
@@ -93,17 +95,19 @@ describe("recruitment", () => {
 
   it("canRaiseUnit rejects when too poor", () => {
     const g = battlefield({ militia: 1 }, {});
-    g.stocks.gold = 0;
+    g.nations[PLAYER_ID]!.stocks.gold = 0;
     expect(canRaiseUnit(g, 0, "infantry", PLAYER_ID).ok).toBe(false);
   });
 
   it("raiseUnit spends resources and adds the unit", () => {
     const g = battlefield({ militia: 1 }, {});
     const next = raiseUnit(g, 0, "infantry", PLAYER_ID);
-    expect(next.stocks.gold).toBe(g.stocks.gold - UNITS.infantry.cost.gold);
+    expect(next.nations[PLAYER_ID]!.stocks.gold).toBe(
+      g.nations[PLAYER_ID]!.stocks.gold - UNITS.infantry.cost.gold,
+    );
     expect(armyAt(next, 0, PLAYER_ID)!.units.infantry).toBe(1);
     // Input not mutated.
-    expect(g.stocks.gold).toBe(200);
+    expect(g.nations[PLAYER_ID]!.stocks.gold).toBe(200);
   });
 });
 

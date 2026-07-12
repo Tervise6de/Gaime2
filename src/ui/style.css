@@ -491,6 +491,145 @@ body {
   border-radius: 8px;
 }
 
+/* --- Diplomacy ------------------------------------------------------------ */
+.hud-diplo {
+  left: 12px;
+  top: 84px;
+  width: 244px;
+  max-height: calc(100vh - 360px);
+  overflow-y: auto;
+}
+
+.hud-diplo-card {
+  padding: 8px 0;
+  border-top: 1px solid var(--panel-border);
+}
+
+.hud-diplo-card:first-of-type {
+  border-top: none;
+}
+
+.hud-diplo-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hud-diplo-name {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.hud-diplo-arch {
+  margin-left: auto;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.hud-diplo-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 4px 0 6px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-diplo-treaty {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+}
+
+.hud-diplo-treaty.war {
+  background: rgba(232, 119, 107, 0.25);
+  color: var(--negative);
+}
+
+.hud-diplo-treaty.alliance {
+  background: rgba(111, 185, 138, 0.25);
+  color: #6fb98a;
+}
+
+.hud-diplo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.hud-diplo-btn {
+  flex: 1 1 auto;
+  padding: 5px 8px;
+  font-size: 11px;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.hud-diplo-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.hud-diplo-btn.war:hover {
+  background: rgba(232, 119, 107, 0.22);
+}
+
+.hud-diplo-btn.accept {
+  background: rgba(111, 185, 138, 0.2);
+}
+
+.hud-offer {
+  padding: 8px;
+  margin-bottom: 8px;
+  background: rgba(244, 210, 122, 0.12);
+  border: 1px solid rgba(244, 210, 122, 0.4);
+  border-radius: 8px;
+}
+
+.hud-offer-text {
+  font-size: 12px;
+  margin: 0 0 6px;
+}
+
+.hud-offer-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* --- Outcome banner ------------------------------------------------------- */
+.hud-banner {
+  position: absolute;
+  top: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 14px 28px;
+  font-size: 18px;
+  font-weight: 700;
+  border-radius: 12px;
+  backdrop-filter: blur(6px);
+  align-items: center;
+  pointer-events: auto;
+}
+
+.hud-banner.win {
+  background: rgba(111, 185, 138, 0.9);
+  color: #0d0f14;
+}
+
+.hud-banner.lose {
+  background: rgba(232, 119, 107, 0.92);
+  color: #0d0f14;
+}
+
 /* --- Turn log ------------------------------------------------------------- */
 .hud-log-body {
   display: flex;

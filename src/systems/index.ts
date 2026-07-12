@@ -56,11 +56,34 @@ export {
   createGame,
   resolveTurn,
   setTaxRate,
-  clampTax,
   queueBuilding,
   cancelConstruction,
   canQueueBuilding,
+  advanceNationEconomy,
 } from "@/systems/turn";
 export type { NewGameOptions } from "@/systems/turn";
+
+export {
+  getRelation,
+  setRelation,
+  adjustRelation,
+  getTreaty,
+  setTreaty,
+  atWar,
+  nationPower,
+  sharedBorders,
+  declareWar,
+  makePeace,
+  setPact,
+  gift,
+  wouldAccept,
+  driftRelations,
+  addOffer,
+  acceptOffer,
+  rejectOffer,
+  playerPropose,
+} from "@/systems/diplomacy";
+
+export { runNationTurn } from "@/systems/ai";
 
 export * from "@/systems/state";

@@ -16,8 +16,11 @@ import { UNITS, type UnitType } from "@/data/units";
 import { TERRAIN, type StrategicResource } from "@/data/terrain";
 import { createRng } from "@/systems/rng";
 import { resolveCombat, type UnitCounts } from "@/systems/combat";
+import { atWar, declareWar } from "@/systems/diplomacy";
 import {
+  BARBARIAN_ID,
   CONQUEST_UNREST,
+  PLAYER_ID,
   UNREST_MAX,
   armySize,
   emptyUnits,
@@ -66,7 +69,7 @@ export interface RaiseCheck {
   reason?: string;
 }
 
-/** Whether the player can currently raise a unit type in a region. */
+/** Whether a nation can currently raise a unit type in a region. */
 export function canRaiseUnit(
   state: GameState,
   regionId: number,
@@ -77,9 +80,11 @@ export function canRaiseUnit(
   if (!region || region.ownerId !== ownerId) {
     return { ok: false, reason: "You must own the region." };
   }
+  const nation = state.nations.find((n) => n.id === ownerId);
+  if (!nation) return { ok: false, reason: "Unknown nation." };
   const def = UNITS[unit];
-  if (state.stocks.gold < def.cost.gold) return { ok: false, reason: "Not enough gold." };
-  if (state.stocks.materials < def.cost.materials) {
+  if (nation.stocks.gold < def.cost.gold) return { ok: false, reason: "Not enough gold." };
+  if (nation.stocks.materials < def.cost.materials) {
     return { ok: false, reason: "Not enough materials." };
   }
   if (def.requires && !strategicAccess(state, ownerId).has(def.requires)) {
@@ -93,16 +98,23 @@ export function raiseUnit(
   state: GameState,
   regionId: number,
   unit: UnitType,
-  ownerId = state.nations[0]!.id,
+  ownerId = PLAYER_ID,
 ): GameState {
   if (!canRaiseUnit(state, regionId, unit, ownerId).ok) return state;
   const def = UNITS[unit];
 
-  const stocks = {
-    ...state.stocks,
-    gold: round1(state.stocks.gold - def.cost.gold),
-    materials: round1(state.stocks.materials - def.cost.materials),
-  };
+  const nations = state.nations.map((n) =>
+    n.id === ownerId
+      ? {
+          ...n,
+          stocks: {
+            ...n.stocks,
+            gold: round1(n.stocks.gold - def.cost.gold),
+            materials: round1(n.stocks.materials - def.cost.materials),
+          },
+        }
+      : n,
+  );
 
   const existing = armyAt(state, regionId, ownerId);
   let armies: Army[];
@@ -127,7 +139,7 @@ export function raiseUnit(
     nextArmyId += 1;
   }
 
-  return { ...state, stocks, armies, nextArmyId };
+  return { ...state, nations, armies, nextArmyId };
 }
 
 /** Which adjacent regions an army could move into this turn (has moves left). */
@@ -162,6 +174,19 @@ export function moveArmy(
   if (target.ownerId === owner || friendlyAtTarget) {
     return relocateOrMerge(state, army, targetRegionId);
   }
+
+  // Attacking a rival nation's territory is an act of war.
+  let working = state;
+  const defenderNation = enemyAtTarget?.ownerId ?? target.ownerId;
+  if (
+    defenderNation !== null &&
+    defenderNation !== BARBARIAN_ID &&
+    defenderNation !== owner &&
+    !atWar(working, owner, defenderNation)
+  ) {
+    working = declareWar(working, owner, defenderNation);
+  }
+  state = working;
 
   // Hostile / neutral destination.
   if (!enemyAtTarget) {

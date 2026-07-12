@@ -24,13 +24,14 @@ export interface ConstructionResult {
 export function advanceConstruction(
   regions: Region[],
   availableMaterials: number,
+  ownerId: number,
 ): ConstructionResult {
   let budget = availableMaterials;
   const completed: { regionName: string; building: string }[] = [];
 
   const nextRegions = regions.map((region) => {
     const order = region.construction;
-    if (!order || budget <= 0) return region;
+    if (!order || budget <= 0 || region.ownerId !== ownerId) return region;
 
     const def = BUILDINGS[order.building];
     const remaining = def.cost - order.progress;

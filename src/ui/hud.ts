@@ -23,6 +23,8 @@ import {
   canRaiseUnit,
   totalUpkeep,
 } from "@/systems/military";
+import { getRelation, getTreaty } from "@/systems/diplomacy";
+import { ARCHETYPE_LABEL } from "@/data/personalities";
 import {
   PLAYER_ID,
   RESOURCE_KEYS,
@@ -32,6 +34,7 @@ import {
   UNREST_PENALTY_START,
   UNREST_REVOLT,
   armySize,
+  playerNation,
   type Army,
   type GameState,
   type Region,
@@ -47,7 +50,16 @@ export interface HudCallbacks {
   onRaiseUnit(regionId: number, unit: UnitType): void;
   onBeginMove(armyId: number): void;
   onCancelMove(): void;
+  onDeclareWar(targetId: number): void;
+  onMakePeace(targetId: number): void;
+  onProposePact(targetId: number, kind: "nap" | "alliance"): void;
+  onGift(targetId: number, amount: number): void;
+  onAcceptOffer(offerId: number): void;
+  onRejectOffer(offerId: number): void;
 }
+
+/** Fixed gift size the diplomacy panel offers. */
+const GIFT_AMOUNT = 30;
 
 export interface Hud {
   update(state: GameState, selectedRegionId: number | null, moveArmyId: number | null): void;
@@ -136,6 +148,18 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   rightPanel.append(regionBody);
   root.append(rightPanel);
 
+  // --- Diplomacy panel (top-left) -------------------------------------------
+  const diploPanel = el("div", "hud-panel hud-diplo");
+  diploPanel.append(heading("Diplomacy"));
+  const diploBody = el("div", "hud-diplo-body");
+  diploPanel.append(diploBody);
+  root.append(diploPanel);
+
+  // --- Outcome banner (hidden until decided) --------------------------------
+  const banner = el("div", "hud-banner");
+  banner.style.display = "none";
+  root.append(banner);
+
   // --- Bottom: turn log -----------------------------------------------------
   const logPanel = el("div", "hud-panel hud-log");
   logPanel.append(heading("Turn log"));
@@ -149,26 +173,36 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     selectedRegionId: number | null,
     moveArmyId: number | null,
   ): void {
+    const player = playerNation(state);
     const flow = nationalProduction(state, PLAYER_ID);
     const upkeep = totalUpkeep(state, PLAYER_ID);
     for (const key of RESOURCE_KEYS) {
-      resourceEls[key].stock.textContent = fmt(state.stocks[key]);
+      resourceEls[key].stock.textContent = fmt(player.stocks[key]);
       const f = key === "gold" ? round1(flow.gold - upkeep) : flow[key];
       resourceEls[key].flow.textContent = `${f >= 0 ? "+" : ""}${fmt(f)}/turn`;
       resourceEls[key].flow.classList.toggle("negative", f < 0);
     }
-    resourceEls.food.flow.classList.toggle("negative", state.famine || flow.food < 0);
+    resourceEls.food.flow.classList.toggle("negative", player.famine || flow.food < 0);
     turnBadge.textContent =
-      (state.famine ? "⚠ FAMINE · " : "") +
-      (state.bankrupt ? "⚠ BANKRUPT · " : "") +
+      (player.famine ? "⚠ FAMINE · " : "") +
+      (player.bankrupt ? "⚠ BANKRUPT · " : "") +
       `Turn ${state.turn} · seed ${state.seed}`;
-    turnBadge.classList.toggle("famine", state.famine || state.bankrupt);
+    turnBadge.classList.toggle("famine", player.famine || player.bankrupt);
 
-    taxInput.value = String(Math.round(state.taxRate * 100));
-    taxLabel.textContent = `Tax ${Math.round(state.taxRate * 100)}%`;
+    taxInput.value = String(Math.round(player.taxRate * 100));
+    taxLabel.textContent = `Tax ${Math.round(player.taxRate * 100)}%`;
     upkeepLine.textContent = `Army upkeep: ${fmt(upkeep)}g/turn. Higher taxes raise gold but push unrest up.`;
 
     renderRegion(regionBody, state, selectedRegionId, moveArmyId, callbacks);
+    renderDiplomacy(diploBody, state, callbacks);
+
+    if (state.outcome === "playing") {
+      banner.style.display = "none";
+    } else {
+      banner.style.display = "flex";
+      banner.className = "hud-banner " + (state.outcome === "victory" ? "win" : "lose");
+      banner.textContent = state.outcome === "victory" ? "Victory — the last realm standing." : "Defeat — your realm has fallen.";
+    }
 
     logBody.innerHTML = "";
     for (const line of state.log.slice(-8).reverse()) {
@@ -228,7 +262,7 @@ function renderOwnedRegion(
   moveArmyId: number | null,
   callbacks: HudCallbacks,
 ): void {
-  const flow = regionProduction(region, state.taxRate);
+  const flow = regionProduction(region, playerNation(state).taxRate);
 
   // Unrest bar.
   const unrestWrap = el("div", "hud-unrest");
@@ -373,7 +407,99 @@ function renderBuildSection(region: Region, callbacks: HudCallbacks): HTMLElemen
   return section;
 }
 
+function renderDiplomacy(
+  container: HTMLElement,
+  state: GameState,
+  callbacks: HudCallbacks,
+): void {
+  container.innerHTML = "";
+  const rivals = state.nations.filter((n) => !n.isPlayer && !n.isBarbarian && n.alive);
+  if (!rivals.length) {
+    container.append(line("No rival powers remain.", "hud-hint"));
+    return;
+  }
+
+  // Pending offers addressed to the player.
+  for (const offer of state.offers.filter((o) => o.to === PLAYER_ID)) {
+    const from = state.nations.find((n) => n.id === offer.from)?.name ?? "A rival";
+    const box = el("div", "hud-offer");
+    const text =
+      offer.type === "tribute"
+        ? `${from} demands ${offer.gold ?? 0}g tribute.`
+        : `${from} offers ${offer.type === "nap" ? "a non-aggression pact" : offer.type}.`;
+    box.append(line(text, "hud-offer-text"));
+    const row = el("div", "hud-offer-actions");
+    row.append(
+      btn("Accept", "hud-diplo-btn accept", () => callbacks.onAcceptOffer(offer.id)),
+      btn("Reject", "hud-diplo-btn", () => callbacks.onRejectOffer(offer.id)),
+    );
+    box.append(row);
+    container.append(box);
+  }
+
+  for (const rival of rivals) {
+    const rel = getRelation(state, PLAYER_ID, rival.id);
+    const treaty = getTreaty(state, PLAYER_ID, rival.id);
+    const card = el("div", "hud-diplo-card");
+
+    const head = el("div", "hud-diplo-head");
+    const sw = el("span", "hud-region-swatch");
+    sw.style.background = rival.color;
+    const nm = el("span", "hud-diplo-name");
+    nm.textContent = rival.name;
+    const arch = el("span", "hud-diplo-arch");
+    arch.textContent = rival.personality ? ARCHETYPE_LABEL[rival.personality.archetype] : "";
+    head.append(sw, nm, arch);
+    card.append(head);
+
+    const status = el("div", "hud-diplo-status");
+    const relSpan = el("span", "hud-diplo-rel");
+    relSpan.textContent = `${rel > 0 ? "+" : ""}${rel} ${relationLabel(rel)}`;
+    relSpan.style.color = relationColor(rel);
+    const treatySpan = el("span", "hud-diplo-treaty " + treaty);
+    treatySpan.textContent = treaty === "nap" ? "NAP" : treaty[0]!.toUpperCase() + treaty.slice(1);
+    status.append(relSpan, treatySpan);
+    card.append(status);
+
+    const actions = el("div", "hud-diplo-actions");
+    if (treaty === "war") {
+      actions.append(btn("Sue for peace", "hud-diplo-btn", () => callbacks.onMakePeace(rival.id)));
+    } else {
+      actions.append(btn("Declare war", "hud-diplo-btn war", () => callbacks.onDeclareWar(rival.id)));
+      if (treaty === "peace") {
+        actions.append(
+          btn("NAP", "hud-diplo-btn", () => callbacks.onProposePact(rival.id, "nap")),
+          btn("Alliance", "hud-diplo-btn", () => callbacks.onProposePact(rival.id, "alliance")),
+        );
+      }
+      actions.append(btn(`Gift ${GIFT_AMOUNT}g`, "hud-diplo-btn", () => callbacks.onGift(rival.id, GIFT_AMOUNT)));
+    }
+    card.append(actions);
+    container.append(card);
+  }
+}
+
 // --- helpers ----------------------------------------------------------------
+
+function relationLabel(rel: number): string {
+  if (rel >= 40) return "friendly";
+  if (rel <= -30) return "hostile";
+  return "neutral";
+}
+
+function relationColor(rel: number): string {
+  if (rel >= 40) return "#6fb98a";
+  if (rel <= -30) return "#e8776b";
+  return "#c9cedb";
+}
+
+function btn(label: string, className: string, onClick: () => void): HTMLButtonElement {
+  const b = document.createElement("button");
+  b.className = className;
+  b.textContent = label;
+  b.addEventListener("click", onClick);
+  return b;
+}
 
 function composition(army: Army): string {
   const parts: string[] = [];
