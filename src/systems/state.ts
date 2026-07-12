@@ -12,10 +12,13 @@
  */
 
 import type { BuildingId } from "@/data/buildings";
-import type { ResourceYield, TerrainId } from "@/data/terrain";
+import type { ResourceYield, StrategicResource, TerrainId } from "@/data/terrain";
+import type { UnitType } from "@/data/units";
 
-/** Owner id 0 is always the human player in Milestone 1. */
+/** Owner id 0 is always the human player. */
 export const PLAYER_ID = 0;
+/** Barbarians hold the neutral regions you conquer (M3; no diplomacy yet). */
+export const BARBARIAN_ID = 1;
 
 /** Tax is a global slider; the fiscal lever of docs/game-design.md §3.2. */
 export const TAX_MIN = 0;
@@ -54,6 +57,26 @@ export const MIN_POPULATION = 1;
 /** National food granary cap (surplus beyond this is wasted). */
 export const GRANARY_CAP = 60;
 
+/**
+ * Military / conquest tuning (M3, docs/game-design.md §3.4). Combat is abstract
+ * (no tactical grid); armies drain gold upkeep; conquest and overexpansion feed
+ * unrest, the anti-snowball brake.
+ */
+/** Fortification defensive bonus per level. */
+export const FORT_PER_LEVEL = 0.2;
+/** Random swing applied to the attacker's strength ratio in combat. */
+export const COMBAT_VARIANCE = 0.15;
+/** Fraction of the losing side's army destroyed in a decisive fight. */
+export const CASUALTY_SCALE = 0.6;
+/** Unrest added to a region the turn it is conquered (foreign population). */
+export const CONQUEST_UNREST = 40;
+/** Regions you can hold before overexpansion unrest kicks in. */
+export const FREE_REGIONS = 5;
+/** Extra unrest per region held beyond FREE_REGIONS. */
+export const OVEREXPANSION_UNREST = 2.5;
+/** Bankruptcy: unrest spike applied nationwide when the treasury goes negative. */
+export const BANKRUPTCY_UNREST = 15;
+
 /** A region's single construction slot. */
 export interface ConstructionOrder {
   building: BuildingId;
@@ -70,8 +93,10 @@ export interface Region {
   population: number;
   /** 0..100. Tax and famine raise it; temples and low tax lower it (M2). */
   unrest: number;
-  /** Defensive works. Inert until military (M3). */
+  /** Defensive works (levels). Multiplies defender strength in combat (M3). */
   fortification: number;
+  /** Strategic resource present here, if any (gates advanced units). */
+  resource: StrategicResource | null;
   /** Completed building ids in this region. */
   buildings: BuildingId[];
   /** What's under construction here, if anything. */
@@ -81,6 +106,17 @@ export interface Region {
   /** Layout position for the renderer, in world units [0, 1]. */
   x: number;
   y: number;
+}
+
+/** A stack of units of one nation occupying one region. */
+export interface Army {
+  id: number;
+  ownerId: number;
+  regionId: number;
+  /** Count of each unit type in the stack. */
+  units: Record<UnitType, number>;
+  /** Region moves remaining this turn. */
+  movesLeft: number;
 }
 
 export interface Nation {
@@ -98,8 +134,10 @@ export interface ResourceStocks {
 }
 
 export interface GameState {
-  /** The seed the whole game derives from (map, and later AI/events). */
+  /** The seed the whole game derives from (map generation). */
   seed: number;
+  /** Advancing RNG state for combat/events — keeps resolution deterministic. */
+  rngState: number;
   /** Turns elapsed; starts at 1. */
   turn: number;
   /** Global tax rate in [TAX_MIN, TAX_MAX]. */
@@ -108,8 +146,14 @@ export interface GameState {
   stocks: ResourceStocks;
   nations: Nation[];
   regions: Region[];
+  /** All armies on the map (player and barbarian). */
+  armies: Army[];
+  /** Monotonic id source for new armies. */
+  nextArmyId: number;
   /** True when last turn's national food balance went negative. */
   famine: boolean;
+  /** True when last turn ended with a negative treasury (bankruptcy). */
+  bankrupt: boolean;
   /** Human-readable turn log, newest last. */
   log: string[];
 }
@@ -122,6 +166,18 @@ export const RESOURCE_KEYS = [
   "knowledge",
 ] as const;
 export type ResourceKey = (typeof RESOURCE_KEYS)[number];
+
+/** A zeroed unit-count record. */
+export function emptyUnits(): Record<UnitType, number> {
+  return { militia: 0, infantry: 0, ranged: 0, cavalry: 0, siege: 0 };
+}
+
+/** Total number of units in a stack. */
+export function armySize(units: Record<UnitType, number>): number {
+  return (
+    units.militia + units.infantry + units.ranged + units.cavalry + units.siege
+  );
+}
 
 /** A per-turn production/consumption breakdown, used for the HUD and the sim. */
 export type ResourceFlow = ResourceYield;

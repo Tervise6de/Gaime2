@@ -24,9 +24,33 @@ export {
 } from "@/systems/economy";
 
 export { regionCapacity, nextPopulation } from "@/systems/population";
-export { unrestTarget, nextUnrest } from "@/systems/stability";
+export {
+  unrestTarget,
+  nextUnrest,
+  overexpansionUnrest,
+} from "@/systems/stability";
 export { advanceConstruction } from "@/systems/construction";
 export type { ConstructionResult } from "@/systems/construction";
+
+export {
+  resolveCombat,
+  sideStrength,
+  siegePower,
+} from "@/systems/combat";
+export type { CombatResult, CombatContext, UnitCounts } from "@/systems/combat";
+
+export {
+  armyAt,
+  anyArmyAt,
+  strategicAccess,
+  armyMoves,
+  canRaiseUnit,
+  raiseUnit,
+  reachableRegions,
+  moveArmy,
+  totalUpkeep,
+} from "@/systems/military";
+export type { RaiseCheck } from "@/systems/military";
 
 export {
   createGame,

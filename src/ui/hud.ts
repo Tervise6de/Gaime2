@@ -3,19 +3,26 @@
  *
  * The UI observes `GameState` and emits intents through callbacks; it never
  * mutates the simulation directly (architectural guardrail, docs/game-design.md
- * §7). `createHud` builds the panels once and returns an `update(state,
- * selected)` that re-renders them from the latest state.
+ * §7). `createHud` builds the panels once and returns an `update(...)` that
+ * re-renders them from the latest state.
  *
- * M2 surface: resource bar (stockpiles + income, with a famine flag), fiscal
- * panel (tax slider), end-turn / new-map controls, and a rich region panel —
- * population vs capacity, unrest, completed buildings, the construction slot,
- * and a build menu.
+ * M3 surface adds military to the region panel: ownership, fortification and
+ * strategic resource, the army stationed there (or the enemy garrison), a
+ * raise-unit menu, and a move/attack control that drives the map's target
+ * highlighting via the parent.
  */
 
 import { BUILDINGS, BUILDING_IDS, type BuildingId } from "@/data/buildings";
+import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
 import { TERRAIN } from "@/data/terrain";
 import { regionProduction, nationalProduction } from "@/systems/economy";
 import { regionCapacity } from "@/systems/population";
+import {
+  armyAt,
+  anyArmyAt,
+  canRaiseUnit,
+  totalUpkeep,
+} from "@/systems/military";
 import {
   PLAYER_ID,
   RESOURCE_KEYS,
@@ -24,6 +31,8 @@ import {
   TAX_STEP,
   UNREST_PENALTY_START,
   UNREST_REVOLT,
+  armySize,
+  type Army,
   type GameState,
   type Region,
   type ResourceKey,
@@ -35,10 +44,13 @@ export interface HudCallbacks {
   onNewGame(seed: number): void;
   onQueueBuilding(regionId: number, building: BuildingId): void;
   onCancelConstruction(regionId: number): void;
+  onRaiseUnit(regionId: number, unit: UnitType): void;
+  onBeginMove(armyId: number): void;
+  onCancelMove(): void;
 }
 
 export interface Hud {
-  update(state: GameState, selectedRegionId: number | null): void;
+  update(state: GameState, selectedRegionId: number | null, moveArmyId: number | null): void;
 }
 
 const RESOURCE_META: Record<ResourceKey, { label: string; icon: string }> = {
@@ -87,13 +99,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   taxInput.max = String(Math.round(TAX_MAX * 100));
   taxInput.step = String(Math.round(TAX_STEP * 100));
   taxInput.className = "hud-tax-slider";
-  taxInput.addEventListener("input", () => {
-    callbacks.onTaxChange(Number(taxInput.value) / 100);
-  });
+  taxInput.addEventListener("input", () => callbacks.onTaxChange(Number(taxInput.value) / 100));
   taxRow.append(taxInput, taxLabel);
-  const taxHint = el("p", "hud-hint");
-  taxHint.textContent = "Higher taxes raise gold but push unrest up over time.";
-  fiscal.append(taxRow, taxHint);
+  const upkeepLine = el("p", "hud-hint");
+  fiscal.append(taxRow, upkeepLine);
   leftPanel.append(fiscal);
 
   const controls = el("div", "hud-section");
@@ -113,13 +122,11 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   newGameBtn.textContent = "New map";
   newGameBtn.addEventListener("click", () => {
     const raw = seedInput.value.trim();
-    const seed = raw === "" ? (Date.now() >>> 0) : parseSeed(raw);
-    callbacks.onNewGame(seed);
+    callbacks.onNewGame(raw === "" ? (Date.now() >>> 0) : parseSeed(raw));
   });
   newGameRow.append(seedInput, newGameBtn);
   controls.append(newGameRow);
   leftPanel.append(controls);
-
   root.append(leftPanel);
 
   // --- Right panel: selected region -----------------------------------------
@@ -137,23 +144,31 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   root.append(logPanel);
 
   // --- Update ----------------------------------------------------------------
-  function update(state: GameState, selectedRegionId: number | null): void {
+  function update(
+    state: GameState,
+    selectedRegionId: number | null,
+    moveArmyId: number | null,
+  ): void {
     const flow = nationalProduction(state, PLAYER_ID);
+    const upkeep = totalUpkeep(state, PLAYER_ID);
     for (const key of RESOURCE_KEYS) {
       resourceEls[key].stock.textContent = fmt(state.stocks[key]);
-      const f = flow[key];
+      const f = key === "gold" ? round1(flow.gold - upkeep) : flow[key];
       resourceEls[key].flow.textContent = `${f >= 0 ? "+" : ""}${fmt(f)}/turn`;
       resourceEls[key].flow.classList.toggle("negative", f < 0);
     }
     resourceEls.food.flow.classList.toggle("negative", state.famine || flow.food < 0);
     turnBadge.textContent =
-      (state.famine ? "⚠ FAMINE · " : "") + `Turn ${state.turn} · seed ${state.seed}`;
-    turnBadge.classList.toggle("famine", state.famine);
+      (state.famine ? "⚠ FAMINE · " : "") +
+      (state.bankrupt ? "⚠ BANKRUPT · " : "") +
+      `Turn ${state.turn} · seed ${state.seed}`;
+    turnBadge.classList.toggle("famine", state.famine || state.bankrupt);
 
     taxInput.value = String(Math.round(state.taxRate * 100));
     taxLabel.textContent = `Tax ${Math.round(state.taxRate * 100)}%`;
+    upkeepLine.textContent = `Army upkeep: ${fmt(upkeep)}g/turn. Higher taxes raise gold but push unrest up.`;
 
-    renderRegion(regionBody, state, selectedRegionId, callbacks);
+    renderRegion(regionBody, state, selectedRegionId, moveArmyId, callbacks);
 
     logBody.innerHTML = "";
     for (const line of state.log.slice(-8).reverse()) {
@@ -170,20 +185,21 @@ function renderRegion(
   container: HTMLElement,
   state: GameState,
   selectedRegionId: number | null,
+  moveArmyId: number | null,
   callbacks: HudCallbacks,
 ): void {
   container.innerHTML = "";
   if (selectedRegionId === null) {
     const hint = el("p", "hud-hint");
-    hint.textContent = "Click a region on the map to inspect and develop it.";
+    hint.textContent = "Click a region to inspect, develop, and defend it.";
     container.append(hint);
     return;
   }
   const region = state.regions[selectedRegionId];
   if (!region) return;
   const terrain = TERRAIN[region.terrain];
-  const flow = regionProduction(region, state.taxRate);
-  const cap = regionCapacity(region);
+  const owned = region.ownerId === PLAYER_ID;
+  const ownerName = state.nations.find((n) => n.id === region.ownerId)?.name ?? "Neutral";
 
   const title = el("p", "hud-region-title");
   title.textContent = region.name;
@@ -192,9 +208,27 @@ function renderRegion(
   title.prepend(swatch);
 
   const meta = el("p", "hud-region-meta");
-  meta.textContent =
-    `${terrain.name} · pop ${fmt(region.population)}/${fmt(cap)} · ` +
-    `${region.adjacency.length} borders`;
+  const bits = [terrain.name, ownerName, `pop ${fmt(region.population)}/${fmt(regionCapacity(region))}`];
+  if (region.fortification > 0) bits.push(`fort ${region.fortification}`);
+  if (region.resource) bits.push(region.resource === "iron" ? "⚒ iron" : "🐎 horses");
+  meta.textContent = bits.join(" · ");
+  container.append(title, meta);
+
+  if (owned) {
+    renderOwnedRegion(container, state, region, moveArmyId, callbacks);
+  } else {
+    renderEnemyRegion(container, state, region);
+  }
+}
+
+function renderOwnedRegion(
+  container: HTMLElement,
+  state: GameState,
+  region: Region,
+  moveArmyId: number | null,
+  callbacks: HudCallbacks,
+): void {
+  const flow = regionProduction(region, state.taxRate);
 
   // Unrest bar.
   const unrestWrap = el("div", "hud-unrest");
@@ -207,6 +241,7 @@ function renderRegion(
   fill.style.background = unrestColor(region.unrest);
   bar.append(fill);
   unrestWrap.append(unrestLabel, bar);
+  container.append(unrestWrap);
 
   // Production breakdown.
   const table = el("div", "hud-region-flows");
@@ -221,33 +256,92 @@ function renderRegion(
     row.append(k, v);
     table.append(row);
   }
+  container.append(table);
 
-  container.append(title, meta, unrestWrap, table);
-
-  // Completed buildings.
   if (region.buildings.length) {
     const built = el("p", "hud-region-built");
     built.textContent = "Built: " + region.buildings.map((b) => BUILDINGS[b].name).join(", ");
     container.append(built);
   }
 
-  // Construction slot / build menu.
-  container.append(renderBuildSection(region, state, callbacks));
+  // Army in the region.
+  const army = armyAt(state, region.id, PLAYER_ID);
+  container.append(renderArmySection(state, region, army, moveArmyId, callbacks));
+
+  // Construction.
+  container.append(renderBuildSection(region, callbacks));
 }
 
-function renderBuildSection(
-  region: Region,
+function renderEnemyRegion(container: HTMLElement, state: GameState, region: Region): void {
+  const garrison = anyArmyAt(state, region.id);
+  const box = el("div", "hud-enemy");
+  const t = TERRAIN[region.terrain];
+  if (garrison && armySize(garrison.units) > 0) {
+    box.append(line(`Enemy garrison: ${armySize(garrison.units)} units (${composition(garrison)})`));
+  } else {
+    box.append(line("Undefended — an army walking in captures it."));
+  }
+  box.append(line(`Terrain defence ×${t.defense}${region.fortification ? `, fort ${region.fortification}` : ""}.`, "hud-hint"));
+  box.append(line("Move an adjacent army here to attack.", "hud-hint"));
+  container.append(box);
+}
+
+function renderArmySection(
   state: GameState,
+  region: Region,
+  army: Army | undefined,
+  moveArmyId: number | null,
   callbacks: HudCallbacks,
 ): HTMLElement {
+  const section = el("div", "hud-military");
+  section.append(heading("Army"));
+
+  if (army && armySize(army.units) > 0) {
+    section.append(line(`${armySize(army.units)} units — ${composition(army)}`, "hud-army-comp"));
+    section.append(line(`Moves left: ${army.movesLeft}`, "hud-hint"));
+    const moving = moveArmyId === army.id;
+    const moveBtn = document.createElement("button");
+    moveBtn.className = "hud-move-btn" + (moving ? " active" : "");
+    moveBtn.textContent = moving ? "Cancel move" : "Move / Attack ▸";
+    moveBtn.disabled = !moving && army.movesLeft <= 0;
+    moveBtn.addEventListener("click", () =>
+      moving ? callbacks.onCancelMove() : callbacks.onBeginMove(army.id),
+    );
+    section.append(moveBtn);
+    if (moving) section.append(line("Click a highlighted neighbour to move or attack.", "hud-hint"));
+  } else {
+    section.append(line("No army stationed here.", "hud-hint"));
+  }
+
+  // Raise-unit menu.
+  const menu = el("div", "hud-unit-menu");
+  for (const t of UNIT_TYPES) {
+    const def = UNITS[t];
+    const check = canRaiseUnit(state, region.id, t, PLAYER_ID);
+    const btn = document.createElement("button");
+    btn.className = "hud-unit-btn";
+    btn.disabled = !check.ok;
+    btn.title = check.ok
+      ? `${def.attack}⚔ / ${def.defense}🛡 · ${def.upkeep}g upkeep${def.requires ? ` · needs ${def.requires}` : ""}`
+      : check.reason ?? "";
+    btn.innerHTML =
+      `<span class="hud-unit-name">${def.short}</span>` +
+      `<span class="hud-unit-cost">${def.cost.gold}g ${def.cost.materials}⛏</span>`;
+    if (check.ok) btn.addEventListener("click", () => callbacks.onRaiseUnit(region.id, t));
+    menu.append(btn);
+  }
+  section.append(menu);
+  return section;
+}
+
+function renderBuildSection(region: Region, callbacks: HudCallbacks): HTMLElement {
   const section = el("div", "hud-build");
   section.append(heading("Construction"));
 
   if (region.construction) {
     const def = BUILDINGS[region.construction.building];
     const wrap = el("div", "hud-build-progress");
-    const label = el("div", "hud-build-progress-label");
-    label.textContent = `${def.name} — ${fmt(region.construction.progress)}/${def.cost} materials`;
+    wrap.append(line(`${def.name} — ${fmt(region.construction.progress)}/${def.cost} materials`, "hud-build-progress-label"));
     const bar = el("div", "hud-build-bar");
     const fill = el("div", "hud-build-fill");
     fill.style.width = `${(region.construction.progress / def.cost) * 100}%`;
@@ -256,7 +350,7 @@ function renderBuildSection(
     cancel.className = "hud-build-cancel";
     cancel.textContent = "Cancel";
     cancel.addEventListener("click", () => callbacks.onCancelConstruction(region.id));
-    wrap.append(label, bar, cancel);
+    wrap.append(bar, cancel);
     section.append(wrap);
     return section;
   }
@@ -272,20 +366,20 @@ function renderBuildSection(
     btn.innerHTML =
       `<span class="hud-build-name">${def.name}</span>` +
       `<span class="hud-build-cost">${already ? "built" : def.cost + "⛏"}</span>`;
-    if (!already) {
-      btn.addEventListener("click", () => callbacks.onQueueBuilding(region.id, id));
-    }
+    if (!already) btn.addEventListener("click", () => callbacks.onQueueBuilding(region.id, id));
     menu.append(btn);
   }
   section.append(menu);
-
-  const hint = el("p", "hud-hint");
-  hint.textContent = `Materials in store: ${fmt(state.stocks.materials)}. Building draws from the national stockpile each turn.`;
-  section.append(hint);
   return section;
 }
 
 // --- helpers ----------------------------------------------------------------
+
+function composition(army: Army): string {
+  const parts: string[] = [];
+  for (const t of UNIT_TYPES) if (army.units[t] > 0) parts.push(`${army.units[t]} ${UNITS[t].short}`);
+  return parts.join(", ") || "—";
+}
 
 function unrestTag(region: Region): HTMLElement {
   const tag = el("span", "hud-unrest-state");
@@ -307,6 +401,12 @@ function unrestColor(unrest: number): string {
   return "#6fb98a";
 }
 
+function line(text: string, className = ""): HTMLElement {
+  const p = el("p", className || "hud-line");
+  p.textContent = text;
+  return p;
+}
+
 function el(tag: string, className: string): HTMLElement {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -323,7 +423,10 @@ function fmt(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
-/** Parse a seed string: numeric strings become numbers, else a stable hash. */
+function round1(v: number): number {
+  return Math.round(v * 10) / 10;
+}
+
 function parseSeed(raw: string): number {
   const n = Number(raw);
   if (Number.isFinite(n)) return Math.abs(Math.trunc(n)) >>> 0;

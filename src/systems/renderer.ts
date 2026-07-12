@@ -1,20 +1,20 @@
 /**
  * Renderer system.
  *
- * Draws the region graph onto the 2D canvas: adjacency edges first, then each
- * region as a terrain-coloured node with its name and population. This is the
- * node+edge layout the design doc sanctions as Milestone 1's shippable map
- * (docs/game-design.md §4) — identical logic to what a later Voronoi renderer
- * would draw over the same graph.
+ * Draws the region graph onto the 2D canvas: adjacency edges, then each region
+ * as a terrain-coloured node ringed by its owner's colour, with population,
+ * strategic-resource and unrest markers, and any army stacks. This is the
+ * node+edge layout the design doc sanctions for M1–M3 (docs/game-design.md §4).
  *
- * The renderer only reads state and reports clicks; it never mutates the sim
- * (architectural guardrail: systems hold logic, the UI emits intents).
+ * The renderer only reads state and reports clicks; it never mutates the sim.
  */
 
 import { TERRAIN } from "@/data/terrain";
+import { armySize } from "@/systems/state";
 import {
   UNREST_PENALTY_START,
   UNREST_REVOLT,
+  type Army,
   type GameState,
   type Region,
 } from "@/systems/state";
@@ -23,35 +23,41 @@ const BACKGROUND = "#11151c";
 const EDGE_COLOR = "rgba(230, 233, 239, 0.14)";
 const NODE_RADIUS = 26;
 const SELECT_COLOR = "#f4d27a";
+const HIGHLIGHT_COLOR = "#63c7d6";
+const NEUTRAL_OWNER = "rgba(0,0,0,0.35)";
+
+const RESOURCE_ICON: Record<string, string> = { iron: "⚒", horses: "🐎" };
 
 export interface Renderer {
   start(): void;
   stop(): void;
-  /** Provide the state to draw. */
   setState(state: GameState): void;
-  /** Highlight a region (or null to clear). */
   setSelected(regionId: number | null): void;
-  /** Register a click handler; receives the clicked region id or null. */
+  /** Regions to highlight as move/attack targets. */
+  setHighlights(regionIds: number[]): void;
   onRegionClick(handler: (regionId: number | null) => void): void;
 }
 
 export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    throw new Error("Unable to acquire 2D rendering context");
-  }
+  if (!ctx) throw new Error("Unable to acquire 2D rendering context");
   const context = ctx;
 
   let running = false;
   let frame = 0;
   let state: GameState | null = null;
   let selected: number | null = null;
+  let highlights = new Set<number>();
   let clickHandler: (regionId: number | null) => void = () => {};
 
-  /** Map a region's world position [0,1] to canvas pixels, with margins. */
+  function ownerColor(ownerId: number | null): string {
+    if (ownerId === null || !state) return NEUTRAL_OWNER;
+    return state.nations.find((n) => n.id === ownerId)?.color ?? NEUTRAL_OWNER;
+  }
+
   function project(region: Region): { x: number; y: number } {
     const { clientWidth, clientHeight } = canvas;
-    const margin = NODE_RADIUS + 24;
+    const margin = NODE_RADIUS + 30;
     return {
       x: margin + region.x * (clientWidth - margin * 2),
       y: margin + region.y * (clientHeight - margin * 2),
@@ -69,29 +75,26 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   function render(): void {
     if (!running) return;
     const { clientWidth, clientHeight } = canvas;
-
     context.fillStyle = BACKGROUND;
     context.fillRect(0, 0, clientWidth, clientHeight);
-
     if (state) {
       drawEdges(state);
       drawNodes(state);
+      drawArmies(state);
     }
-
     frame = window.requestAnimationFrame(render);
   }
 
   function drawEdges(s: GameState): void {
-    context.strokeStyle = EDGE_COLOR;
     context.lineWidth = 2;
     for (const region of s.regions) {
       const a = project(region);
       for (const neighbourId of region.adjacency) {
-        // Draw each edge once (only when id < neighbour).
         if (region.id >= neighbourId) continue;
         const neighbour = s.regions[neighbourId];
         if (!neighbour) continue;
         const b = project(neighbour);
+        context.strokeStyle = EDGE_COLOR;
         context.beginPath();
         context.moveTo(a.x, a.y);
         context.lineTo(b.x, b.y);
@@ -105,43 +108,88 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       const p = project(region);
       const terrain = TERRAIN[region.terrain];
       const isSelected = region.id === selected;
+      const isTarget = highlights.has(region.id);
+
+      // Move/attack target glow.
+      if (isTarget) {
+        context.beginPath();
+        context.arc(p.x, p.y, NODE_RADIUS + 6, 0, Math.PI * 2);
+        context.strokeStyle = HIGHLIGHT_COLOR;
+        context.lineWidth = 3;
+        context.setLineDash([5, 4]);
+        context.stroke();
+        context.setLineDash([]);
+      }
 
       context.beginPath();
       context.arc(p.x, p.y, NODE_RADIUS, 0, Math.PI * 2);
       context.fillStyle = terrain.color;
       context.fill();
-
-      // Unrest ring: amber when restless, red when revolting.
-      const unrestStroke = unrestRing(region.unrest);
-      context.lineWidth = isSelected ? 4 : unrestStroke ? 3 : 2;
-      context.strokeStyle = isSelected
-        ? SELECT_COLOR
-        : unrestStroke ?? "rgba(0,0,0,0.35)";
+      context.lineWidth = isSelected ? 4 : 3;
+      context.strokeStyle = isSelected ? SELECT_COLOR : ownerColor(region.ownerId);
       context.stroke();
 
-      // Population count, centred.
+      // Population count.
       context.fillStyle = "#0d0f14";
       context.font = "600 13px system-ui, sans-serif";
       context.textAlign = "center";
       context.textBaseline = "middle";
       context.fillText(String(Math.round(region.population)), p.x, p.y);
 
-      // Construction indicator: a small hammer above the node.
+      // Strategic resource marker (top-left).
+      if (region.resource) {
+        context.font = "13px system-ui, sans-serif";
+        context.fillText(RESOURCE_ICON[region.resource] ?? "?", p.x - NODE_RADIUS + 4, p.y - NODE_RADIUS + 2);
+      }
+
+      // Unrest marker (top-right dot) and construction (hammer, top).
+      const dot = unrestDot(region.unrest);
+      if (dot) {
+        context.beginPath();
+        context.arc(p.x + NODE_RADIUS - 5, p.y - NODE_RADIUS + 5, 5, 0, Math.PI * 2);
+        context.fillStyle = dot;
+        context.fill();
+      }
       if (region.construction) {
         context.font = "12px system-ui, sans-serif";
         context.fillText("🔨", p.x, p.y - NODE_RADIUS - 8);
       }
 
-      // Region name below the node.
+      // Region name below.
       context.fillStyle = "#c9cedb";
       context.font = "500 11px system-ui, sans-serif";
       context.textBaseline = "top";
-      context.fillText(region.name, p.x, p.y + NODE_RADIUS + 3);
+      context.fillText(region.name, p.x, p.y + NODE_RADIUS + 4);
     }
   }
 
-  /** Ring colour for a region's unrest, or null when calm. */
-  function unrestRing(unrest: number): string | null {
+  function drawArmies(s: GameState): void {
+    for (const army of s.armies) {
+      const size = armySize(army.units);
+      if (size <= 0) continue;
+      const region = s.regions[army.regionId];
+      if (!region) continue;
+      const p = project(region);
+      const bx = p.x + NODE_RADIUS - 4;
+      const by = p.y + NODE_RADIUS - 4;
+
+      context.beginPath();
+      context.arc(bx, by, 10, 0, Math.PI * 2);
+      context.fillStyle = ownerColor(army.ownerId);
+      context.fill();
+      context.lineWidth = 1.5;
+      context.strokeStyle = "rgba(0,0,0,0.5)";
+      context.stroke();
+
+      context.fillStyle = "#0d0f14";
+      context.font = "600 11px system-ui, sans-serif";
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.fillText(String(size), bx, by);
+    }
+  }
+
+  function unrestDot(unrest: number): string | null {
     if (unrest >= UNREST_REVOLT) return "#e8776b";
     if (unrest >= UNREST_PENALTY_START) return "#e0b74a";
     return null;
@@ -160,8 +208,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
   function handleClick(ev: MouseEvent): void {
     const rect = canvas.getBoundingClientRect();
-    const hit = hitTest(ev.clientX - rect.left, ev.clientY - rect.top);
-    clickHandler(hit);
+    clickHandler(hitTest(ev.clientX - rect.left, ev.clientY - rect.top));
   }
 
   return {
@@ -185,8 +232,16 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     setSelected(regionId: number | null): void {
       selected = regionId;
     },
+    setHighlights(regionIds: number[]): void {
+      highlights = new Set(regionIds);
+    },
     onRegionClick(handler: (regionId: number | null) => void): void {
       clickHandler = handler;
     },
   };
+}
+
+/** Exposed for potential reuse/testing of the army badge count. */
+export function stackLabel(army: Army): string {
+  return String(armySize(army.units));
 }

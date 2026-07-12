@@ -13,8 +13,11 @@
  */
 
 import { createRng, type Rng } from "@/systems/rng";
-import { terrainFromRoll } from "@/data/terrain";
-import { PLAYER_ID, type Region } from "@/systems/state";
+import { TERRAIN, terrainFromRoll } from "@/data/terrain";
+import type { Region } from "@/systems/state";
+
+/** Chance a region whose terrain supports a strategic resource actually has one. */
+const RESOURCE_CHANCE = 0.35;
 
 export interface MapGenOptions {
   regionCount: number;
@@ -175,23 +178,27 @@ export function generateMap(
 
   const names = shuffledNames(rng, count);
 
-  const regions: Region[] = sites.map((site, i) => ({
-    id: i,
-    name: names[i]!,
-    terrain: terrainFromRoll(rng.next()),
-    ownerId: null,
-    population: rng.int(3, 7),
-    unrest: 0,
-    fortification: 0,
-    buildings: [],
-    construction: null,
-    adjacency: adjacency[i]!.slice().sort((a, b) => a - b),
-    x: site.x,
-    y: site.y,
-  }));
-
-  // Milestone 1 has a single nation: the player owns every region.
-  for (const region of regions) region.ownerId = PLAYER_ID;
+  const regions: Region[] = sites.map((site, i) => {
+    const terrain = terrainFromRoll(rng.next());
+    const strat = TERRAIN[terrain].strategic;
+    const resource = strat && rng.next() < RESOURCE_CHANCE ? strat : null;
+    return {
+      id: i,
+      name: names[i]!,
+      terrain,
+      // Ownership is assigned by createGame (player start + barbarian regions).
+      ownerId: null,
+      population: rng.int(3, 7),
+      unrest: 0,
+      fortification: 0,
+      resource,
+      buildings: [],
+      construction: null,
+      adjacency: adjacency[i]!.slice().sort((a, b) => a - b),
+      x: site.x,
+      y: site.y,
+    };
+  });
 
   return { regions };
 }

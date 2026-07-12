@@ -9,6 +9,7 @@ import {
   canQueueBuilding,
 } from "@/systems/turn";
 import { nationalProduction } from "@/systems/economy";
+import { totalUpkeep } from "@/systems/military";
 import { BUILDINGS } from "@/data/buildings";
 import { PLAYER_ID, TAX_MAX, TAX_MIN } from "@/systems/state";
 
@@ -17,11 +18,16 @@ describe("createGame", () => {
     expect(createGame({ seed: 999 })).toEqual(createGame({ seed: 999 }));
   });
 
-  it("starts at turn 1 with the player owning every region", () => {
+  it("starts at turn 1 with a small player realm and barbarian rest", () => {
     const g = createGame({ seed: 1 });
     expect(g.turn).toBe(1);
-    expect(g.regions.every((r) => r.ownerId === PLAYER_ID)).toBe(true);
+    const owned = g.regions.filter((r) => r.ownerId === PLAYER_ID);
+    expect(owned.length).toBeGreaterThan(0);
+    expect(owned.length).toBeLessThan(g.regions.length);
+    expect(g.regions.some((r) => r.ownerId !== PLAYER_ID)).toBe(true);
     expect(g.stocks.gold).toBeGreaterThan(0);
+    // The player begins with a field army.
+    expect(g.armies.some((a) => a.ownerId === PLAYER_ID)).toBe(true);
   });
 });
 
@@ -49,11 +55,12 @@ describe("resolveTurn", () => {
     expect(resolveTurn(g).turn).toBe(g.turn + 1);
   });
 
-  it("adds national production to stocks", () => {
+  it("adds national production to stocks, net of army upkeep", () => {
     const g = createGame({ seed: 1 });
     const flow = nationalProduction(g, PLAYER_ID);
+    const upkeep = totalUpkeep(g, PLAYER_ID);
     const next = resolveTurn(g);
-    expect(next.stocks.gold).toBeCloseTo(g.stocks.gold + flow.gold, 5);
+    expect(next.stocks.gold).toBeCloseTo(g.stocks.gold + flow.gold - upkeep, 5);
     expect(next.stocks.materials).toBeCloseTo(g.stocks.materials + flow.materials, 5);
   });
 
@@ -88,62 +95,77 @@ describe("resolveTurn", () => {
     expect(s.log.length).toBeLessThanOrEqual(50);
   });
 
-  it("grows population over a calm game", () => {
+  it("grows player population over a calm game", () => {
     let s = setTaxRate(createGame({ seed: 3 }), 0);
-    const start = s.regions.reduce((a, r) => a + r.population, 0);
+    const ownedPop = (g: typeof s) =>
+      g.regions.filter((r) => r.ownerId === PLAYER_ID).reduce((a, r) => a + r.population, 0);
+    const start = ownedPop(s);
     for (let i = 0; i < 20; i++) s = resolveTurn(s);
-    const end = s.regions.reduce((a, r) => a + r.population, 0);
-    expect(end).toBeGreaterThan(start);
+    expect(ownedPop(s)).toBeGreaterThan(start);
   });
 
-  it("raises unrest under sustained high taxes", () => {
+  it("raises unrest in player regions under sustained high taxes", () => {
     let s = setTaxRate(createGame({ seed: 3 }), TAX_MAX);
     for (let i = 0; i < 15; i++) s = resolveTurn(s);
-    const avgUnrest = s.regions.reduce((a, r) => a + r.unrest, 0) / s.regions.length;
+    const owned = s.regions.filter((r) => r.ownerId === PLAYER_ID);
+    const avgUnrest = owned.reduce((a, r) => a + r.unrest, 0) / owned.length;
     expect(avgUnrest).toBeGreaterThan(10);
   });
 });
 
 describe("construction", () => {
+  /** The id of a region the player owns at game start. */
+  const ownedId = (g: ReturnType<typeof createGame>): number =>
+    g.regions.find((r) => r.ownerId === PLAYER_ID)!.id;
+
   it("canQueueBuilding rejects a duplicate", () => {
     const g = createGame({ seed: 1 });
-    const r = { ...g.regions[0]!, buildings: ["farm" as const] };
+    const r = { ...g.regions[ownedId(g)]!, buildings: ["farm" as const] };
     expect(canQueueBuilding(r, "farm")).toBe(false);
     expect(canQueueBuilding(r, "market")).toBe(true);
   });
 
+  it("canQueueBuilding rejects a region the player does not own", () => {
+    const g = createGame({ seed: 1 });
+    const barb = g.regions.find((r) => r.ownerId !== PLAYER_ID)!;
+    expect(canQueueBuilding(barb, "market")).toBe(false);
+  });
+
   it("queueBuilding sets a construction order without mutating input", () => {
     const g = createGame({ seed: 1 });
-    const next = queueBuilding(g, 0, "market");
-    expect(next.regions[0]!.construction).toEqual({ building: "market", progress: 0 });
-    expect(g.regions[0]!.construction).toBeNull();
+    const id = ownedId(g);
+    const next = queueBuilding(g, id, "market");
+    expect(next.regions[id]!.construction).toEqual({ building: "market", progress: 0 });
+    expect(g.regions[id]!.construction).toBeNull();
   });
 
   it("cancelConstruction clears the slot", () => {
-    let g = queueBuilding(createGame({ seed: 1 }), 0, "market");
-    g = cancelConstruction(g, 0);
-    expect(g.regions[0]!.construction).toBeNull();
+    const base = createGame({ seed: 1 });
+    const id = ownedId(base);
+    let g = queueBuilding(base, id, "market");
+    g = cancelConstruction(g, id);
+    expect(g.regions[id]!.construction).toBeNull();
   });
 
   it("completes a queued building over enough turns", () => {
     let s = setTaxRate(createGame({ seed: 1 }), 0);
-    s = queueBuilding(s, 0, "market");
+    const id = ownedId(s);
+    s = queueBuilding(s, id, "market");
     const turns = Math.ceil(BUILDINGS.market.cost / 6) + 3;
     for (let i = 0; i < turns; i++) s = resolveTurn(s);
-    expect(s.regions[0]!.buildings).toContain("market");
+    expect(s.regions[id]!.buildings).toContain("market");
   });
 
-  it("a completed market increases that region's gold output", () => {
+  it("a completed market increases national gold output", () => {
     const seed = 1;
     let plain = setTaxRate(createGame({ seed }), 0);
-    let built = queueBuilding(plain, 0, "market");
+    const id = ownedId(plain);
+    let built = queueBuilding(plain, id, "market");
     for (let i = 0; i < 8; i++) {
       plain = resolveTurn(plain);
       built = resolveTurn(built);
     }
-    // With identical seed/tax, the only difference is the market in region 0.
-    expect(built.regions[0]!.buildings).toContain("market");
-    // National gold income should be higher in the built game.
+    expect(built.regions[id]!.buildings).toContain("market");
     const goldPlain = nationalProduction(plain, PLAYER_ID).gold;
     const goldBuilt = nationalProduction(built, PLAYER_ID).gold;
     expect(goldBuilt).toBeGreaterThan(goldPlain);

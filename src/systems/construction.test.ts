@@ -12,6 +12,7 @@ function region(overrides: Partial<Region> = {}): Region {
     population: 5,
     unrest: 0,
     fortification: 0,
+    resource: null,
     buildings: [],
     construction: null,
     adjacency: [],

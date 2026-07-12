@@ -18,6 +18,7 @@ function region(overrides: Partial<Region> = {}): Region {
     population: 5,
     unrest: 0,
     fortification: 0,
+    resource: null,
     buildings: [],
     construction: null,
     adjacency: [],
@@ -27,38 +28,46 @@ function region(overrides: Partial<Region> = {}): Region {
   };
 }
 
+const SMALL_REALM = 3; // ≤ FREE_REGIONS, so no overexpansion unrest
+
 describe("unrestTarget", () => {
   it("rises with tax", () => {
-    const low = unrestTarget(region(), 0);
-    const high = unrestTarget(region(), TAX_MAX);
+    const low = unrestTarget(region(), 0, SMALL_REALM);
+    const high = unrestTarget(region(), TAX_MAX, SMALL_REALM);
     expect(high).toBeGreaterThan(low);
   });
 
   it("is lowered by a temple", () => {
-    const plain = unrestTarget(region(), TAX_MAX);
-    const templed = unrestTarget(region({ buildings: ["temple"] }), TAX_MAX);
+    const plain = unrestTarget(region(), TAX_MAX, SMALL_REALM);
+    const templed = unrestTarget(region({ buildings: ["temple"] }), TAX_MAX, SMALL_REALM);
     expect(templed).toBeLessThan(plain);
+  });
+
+  it("rises with overexpansion", () => {
+    const small = unrestTarget(region(), 0, 3);
+    const sprawling = unrestTarget(region(), 0, 20);
+    expect(sprawling).toBeGreaterThan(small);
   });
 });
 
 describe("nextUnrest", () => {
   it("drifts toward the target, capped per turn", () => {
     const r = region({ unrest: 0 });
-    const next = nextUnrest(r, TAX_MAX, false);
+    const next = nextUnrest(r, TAX_MAX, false, SMALL_REALM);
     expect(next).toBeGreaterThan(0);
     expect(next - r.unrest).toBeLessThanOrEqual(UNREST_DRIFT + 0.001);
   });
 
   it("spikes during famine", () => {
-    const calm = nextUnrest(region({ unrest: 10 }), 0, false);
-    const starving = nextUnrest(region({ unrest: 10 }), 0, true);
+    const calm = nextUnrest(region({ unrest: 10 }), 0, false, SMALL_REALM);
+    const starving = nextUnrest(region({ unrest: 10 }), 0, true, SMALL_REALM);
     expect(starving).toBeGreaterThan(calm);
   });
 
   it("stays within [0, 100]", () => {
-    const high = nextUnrest(region({ unrest: 95 }), TAX_MAX, true);
+    const high = nextUnrest(region({ unrest: 95 }), TAX_MAX, true, 25);
     expect(high).toBeLessThanOrEqual(100);
-    const low = nextUnrest(region({ unrest: 0, buildings: ["temple"] }), 0, false);
+    const low = nextUnrest(region({ unrest: 0, buildings: ["temple"] }), 0, false, SMALL_REALM);
     expect(low).toBeGreaterThanOrEqual(0);
   });
 });

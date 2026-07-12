@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { generateMap, DEFAULT_MAP_OPTIONS } from "@/systems/mapgen";
-import { PLAYER_ID } from "@/systems/state";
 import { TERRAIN } from "@/data/terrain";
 
 /** Are all regions reachable from region 0 via adjacency? */
@@ -58,11 +57,12 @@ describe("map generation", () => {
     }
   });
 
-  it("assigns every region a valid terrain and the player as owner", () => {
+  it("assigns every region a valid terrain and leaves ownership unset", () => {
     const { regions } = generateMap(88);
     for (const region of regions) {
       expect(TERRAIN[region.terrain]).toBeDefined();
-      expect(region.ownerId).toBe(PLAYER_ID);
+      // Ownership is assigned later by createGame, not by the map generator.
+      expect(region.ownerId).toBeNull();
     }
   });
 

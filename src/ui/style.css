@@ -400,6 +400,97 @@ body {
   background: rgba(232, 119, 107, 0.2);
 }
 
+/* --- Military ------------------------------------------------------------- */
+.hud-military {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.hud-army-comp {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.hud-line {
+  margin: 0 0 4px;
+  font-size: 12px;
+}
+
+.hud-move-btn {
+  width: 100%;
+  margin: 6px 0;
+  padding: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1408;
+  background: var(--accent);
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.hud-move-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.hud-move-btn.active {
+  color: var(--fg);
+  background: rgba(99, 199, 214, 0.25);
+  border: 1px solid var(--highlight, #63c7d6);
+}
+
+.hud-unit-menu {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.hud-unit-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 2px;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.hud-unit-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.hud-unit-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.hud-unit-name {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.hud-unit-cost {
+  font-size: 8.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hud-enemy {
+  margin-top: 6px;
+  padding: 10px;
+  background: rgba(154, 91, 83, 0.16);
+  border: 1px solid rgba(154, 91, 83, 0.4);
+  border-radius: 8px;
+}
+
 /* --- Turn log ------------------------------------------------------------- */
 .hud-log-body {
   display: flex;

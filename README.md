@@ -4,14 +4,18 @@ A browser-based **Kingdom Management / 4X-lite** strategy game. Depth comes
 from interacting systems — economy, population, military, diplomacy — rather
 than from art. Low-art, high-decision-density, runs anywhere a browser does.
 
-> **Status:** Milestone 2 — Population + Stability + Buildings. On top of the M1
-> economy: population grows toward a terrain+building capacity when fed and
-> calm, and starves in famine; **unrest** rises with taxes and falls with
-> temples/low taxes, throttling production and — past a threshold — revolting;
-> and you **queue buildings** (farm, workshop, market, library, temple) in each
-> region's construction slot, drawing on the national materials stockpile. The
-> guns-vs-butter tension (minus guns) is live: tax vs. unrest, build vs. save,
-> grow vs. stall. Click a region to develop it.
+> **Status:** Milestone 3 — Military + Territorial conflict. On top of the M1
+> economy and M2 population/unrest/buildings: you start with a small realm
+> surrounded by **barbarian-held regions** to conquer. Raise five unit types in
+> a **rock-paper-scissors counter loop** (militia→cavalry→ranged→infantry→
+> militia, plus siege vs. forts), march **armies** along the region graph, and
+> fight **abstract combat** where composition, terrain defence and fortification
+> all matter. Cavalry and siege need **strategic resources** (horses / iron), so
+> specific territory is worth taking. Armies draw **gold upkeep** (bankruptcy
+> forces disbandment), and **conquest + overexpansion feed unrest** — the
+> anti-snowball brake. The full guns-vs-butter-vs-consolidation trade-off is
+> live. Click a region to develop or defend it; select an army and press
+> **Move / Attack** to march.
 
 ## Tech stack
 
@@ -46,9 +50,9 @@ npm run test:watch # run tests in watch mode
 ```
 
 The simulation is a set of **pure functions** over a serialisable `GameState`
-(seeded RNG, deterministic turn pipeline), so the systems are covered by fast
-unit tests — 57 tests across the RNG, map generation, economy, population,
-stability, construction, and turn resolution.
+(seeded RNG, deterministic turn pipeline — combat included), so the systems are
+covered by fast unit tests — 80 tests across the RNG, map generation, economy,
+population, stability, construction, combat, military, and turn resolution.
 
 ## Project structure
 

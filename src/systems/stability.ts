@@ -13,6 +13,8 @@
 import { BUILDINGS } from "@/data/buildings";
 import {
   FAMINE_UNREST_SPIKE,
+  FREE_REGIONS,
+  OVEREXPANSION_UNREST,
   TAX_MAX,
   UNREST_BASE,
   UNREST_DRIFT,
@@ -28,23 +30,37 @@ function buildingCalm(region: Region): number {
   return calm;
 }
 
+/** Unrest from holding more regions than a realm comfortably governs. */
+export function overexpansionUnrest(ownedRegionCount: number): number {
+  return Math.max(0, ownedRegionCount - FREE_REGIONS) * OVEREXPANSION_UNREST;
+}
+
 /** The steady-state unrest a region trends toward under current policy. */
-export function unrestTarget(region: Region, taxRate: number): number {
+export function unrestTarget(
+  region: Region,
+  taxRate: number,
+  ownedRegionCount: number,
+): number {
   const taxPressure = (taxRate / TAX_MAX) * UNREST_TAX_MAX;
-  const target = UNREST_BASE + taxPressure - buildingCalm(region);
+  const target =
+    UNREST_BASE +
+    taxPressure +
+    overexpansionUnrest(ownedRegionCount) -
+    buildingCalm(region);
   return clampUnrest(target);
 }
 
 /**
- * Next unrest for a region: drift toward the tax/building target (capped per
- * turn), then add a famine spike on top so starvation bites immediately.
+ * Next unrest for a region: drift toward the tax/expansion/building target
+ * (capped per turn), then add a famine spike so starvation bites immediately.
  */
 export function nextUnrest(
   region: Region,
   taxRate: number,
   famine: boolean,
+  ownedRegionCount: number,
 ): number {
-  const target = unrestTarget(region, taxRate);
+  const target = unrestTarget(region, taxRate, ownedRegionCount);
   const delta = clamp(target - region.unrest, -UNREST_DRIFT, UNREST_DRIFT);
   let next = region.unrest + delta;
   if (famine) next += FAMINE_UNREST_SPIKE;
