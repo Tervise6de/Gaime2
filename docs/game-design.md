@@ -256,6 +256,16 @@ seed for reproducible testing and shareable maps.
 archetypes.** No ML. Deterministic, debuggable, tunable — and, done right, it
 *feels* reactive because it responds to the real game state.
 
+> **Hard constraint — the AI is 100% local and free to run.** Rival-nation AI
+> is plain TypeScript that executes **entirely in the player's browser**. It
+> makes **no LLM/API calls**, needs **no API key**, and consumes **no credits or
+> tokens** — playing the game costs the player nothing and works fully offline.
+> Claude (this assistant) is used only at *development* time to write and tune
+> the rules; **none of that runs at play time**. This is a firm design rule, not
+> an implementation detail: no game system may call out to any AI service at
+> runtime. The upside is not just cost — a pure-function local AI is also
+> deterministic (seeded), instant (no network latency), and unit-testable.
+
 ### How it works
 
 Each AI nation runs the **same decision framework** each turn, under the same
@@ -342,6 +352,7 @@ which is the cheapest, highest-leverage source of replayability we have.
 | State | **Plain `GameState` object + pure reducer-style turn functions** | Deterministic, serializable, testable; no heavy state library needed. |
 | Randomness | **Seeded RNG** (e.g., mulberry32) | Reproducible map gen and AI for debugging, testing, and shareable seeds. *Mandatory* — no `Math.random()` in game logic. |
 | Testing | **Vitest** | Systems are pure functions → cheap, high-value unit tests. Essential for balancing a numbers game with confidence. |
+| **Opponent AI** | **Local rule-based TS, zero runtime API calls** | Runs in-browser, offline, free — **no LLM/credits/API key to play**. See §5's hard constraint. |
 | Geometry | Tiny vendored Delaunay/Voronoi helper (or hand-rolled) | Only external code we likely need; keep deps minimal. |
 
 **Revisions vs. the setup doc:** add **Vitest** (test the sim), mandate a
@@ -424,7 +435,8 @@ play and test.
 - **Map = region adjacency graph** (logic) rendered as Voronoi polygons (visual),
   with a node+edge fallback — simplest approach that still yields territorial play.
 - **AI = rule-based utility scoring** with personality archetypes — reactive by
-  responding to real state, not scripts.
+  responding to real state, not scripts. **Runs 100% locally in the browser:
+  no LLM/API calls, no API key, no credits — free and offline to play.**
 - **Replayability** from seeded procedural maps, national traits, rival
   personalities, branching tech, bounded events, and multiple victory paths.
 - **Stack** confirmed: TS + Canvas (map) + DOM (UI) + Vite, **plus** Vitest,
