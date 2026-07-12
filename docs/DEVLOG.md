@@ -6,6 +6,35 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-12 — Balance pass: game length + victory diversity
+
+Self-play probe (symmetric AI skill, 24 seeds, normal) found two problems:
+**games ended too fast** (median 48 turns vs the 60–150 target) and **Great
+Works dominated** (won 92% of games — everyone raced wonders).
+
+Changes:
+- Wonders are now a slower **national project**: cost 60 → 100, `WONDER_GOAL`
+  3 → 4, and the AI builds **only one wonder at a time** (no parallel spam).
+  → median game length 48 → ~103 turns.
+- **Personality-driven endgame**: only economy-minded nations (Builder/Merchant,
+  economy ≥ 0.6) chase wonders; aggressive nations spend on military and seek
+  domination. → victory mix broadened from 92% great-works to a spread of
+  great-works / domination / prestige; median ~120 turns.
+- **Domination threshold 60% → 50%** so conquest is a more reachable win.
+
+Committed-player viability (24 seeds each): Builder/Merchant ~50% wins,
+Warlord/Opportunist ~12–17%. Length healthy (median ~116) across all.
+
+Test count: 130 green. Build network-free (0 `fetch`).
+
+**Known imbalance for a future cycle:** the **military/domination path still
+underperforms the economic path** (~15% vs ~50% win rate for a committed
+player). Next: give aggression more teeth — cheaper/stronger military via
+tech, better AI force-concentration and siege use, or a small conquest economic
+reward — then re-probe until the paths are within ~15–20 points of each other.
+
+---
+
 ## Baseline — v1 complete (Milestones 1–6)
 
 The full game loop is shipped and playable end-to-end:

@@ -100,9 +100,9 @@ export const FRIENDLY_THRESHOLD = 40;
  * Tech / victory / events tuning (M5, docs/game-design.md §3.6, §6).
  */
 /** Fraction of all regions a nation must hold for a domination victory. */
-export const DOMINATION_FRACTION = 0.6;
+export const DOMINATION_FRACTION = 0.5;
 /** Great Works needed for an economic victory. */
-export const WONDER_GOAL = 3;
+export const WONDER_GOAL = 4;
 /** The game ends at this turn on a prestige-score tiebreak. */
 export const TURN_LIMIT = 150;
 /** Per-turn probability a bounded random event fires for the player. */

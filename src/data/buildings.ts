@@ -140,7 +140,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   wonder: {
     id: "wonder",
     name: "Great Work",
-    cost: 60,
+    cost: 100,
     yield: { gold: 2, knowledge: 2 },
     popCapacity: 0,
     unrest: 0,

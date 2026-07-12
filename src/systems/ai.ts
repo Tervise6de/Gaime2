@@ -43,6 +43,7 @@ import {
   BARBARIAN_ID,
   DIFFICULTY,
   PLAYER_ID,
+  WONDER_GOAL,
   armySize,
   clampTax,
   type GameState,
@@ -87,12 +88,24 @@ function manageEconomy(state: GameState, nationId: number): GameState {
   if (nation.stocks.gold > 300) target -= 0.05;
   s = setTax(s, nationId, target);
 
-  // Buildings: fill empty slots with the best unlocked option.
+  // Buildings: fill empty slots with the best unlocked option. A Great Work is
+  // a national project — only one may be under construction at a time, so the
+  // AI can't win by spamming wonders in every region at once.
   const done = s.nations.find((n) => n.id === nationId)!.research.done;
+  // Only economy-minded nations chase a Great Works win; aggressive nations
+  // spend on military and seek domination instead. This makes the endgame
+  // follow personality rather than everyone racing the same wonder path.
+  const pursuesWonders = (p?.economy ?? 0.5) >= 0.6;
+  let wonderInProgress = s.regions.some(
+    (r) => r.ownerId === nationId && r.construction?.building === "wonder",
+  );
   for (const region of s.regions) {
     if (region.ownerId !== nationId || region.construction) continue;
-    const choice = chooseBuilding(region, done, nation.wonders);
-    if (choice) s = queueFor(s, region.id, choice, nationId);
+    const choice = chooseBuilding(region, done, nation.wonders, pursuesWonders && !wonderInProgress);
+    if (choice) {
+      s = queueFor(s, region.id, choice, nationId);
+      if (choice === "wonder") wonderInProgress = true;
+    }
   }
   return s;
 }
@@ -113,12 +126,15 @@ function chooseBuilding(
   region: { unrest: number; buildings: BuildingId[] },
   done: TechId[],
   wonders: number,
+  canStartWonder: boolean,
 ): BuildingId | null {
   const has = (b: BuildingId) => region.buildings.includes(b);
   const unlocked = (b: BuildingId) => isBuildingUnlockedFor(done, b);
   if (region.unrest > 35 && !has("temple")) return "temple";
-  // Chase a Great Works victory once wonders are unlocked and progress exists.
-  if (unlocked("wonder") && !has("wonder") && wonders < 3) return "wonder";
+  // Chase a Great Works victory — but only one wonder at a time (national project).
+  if (canStartWonder && unlocked("wonder") && !has("wonder") && wonders < WONDER_GOAL) {
+    return "wonder";
+  }
   const order: BuildingId[] = [
     "market", "bank", "workshop", "university", "farm", "aqueduct", "library", "temple", "fortress",
   ];
