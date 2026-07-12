@@ -1,19 +1,33 @@
 /**
  * Renderer system.
  *
- * A thin wrapper around the 2D canvas context that owns the render loop and
- * keeps the drawing buffer in sync with the CSS size and device pixel ratio.
- * For now it simply clears the screen every frame; drawing of game state will
- * be layered on top later.
+ * Draws the region graph onto the 2D canvas: adjacency edges first, then each
+ * region as a terrain-coloured node with its name and population. This is the
+ * node+edge layout the design doc sanctions as Milestone 1's shippable map
+ * (docs/game-design.md §4) — identical logic to what a later Voronoi renderer
+ * would draw over the same graph.
+ *
+ * The renderer only reads state and reports clicks; it never mutates the sim
+ * (architectural guardrail: systems hold logic, the UI emits intents).
  */
 
+import { TERRAIN } from "@/data/terrain";
+import type { GameState, Region } from "@/systems/state";
+
 const BACKGROUND = "#11151c";
+const EDGE_COLOR = "rgba(230, 233, 239, 0.14)";
+const NODE_RADIUS = 26;
+const SELECT_COLOR = "#f4d27a";
 
 export interface Renderer {
-  /** Begin the requestAnimationFrame loop. */
   start(): void;
-  /** Stop the loop and detach listeners. */
   stop(): void;
+  /** Provide the state to draw. */
+  setState(state: GameState): void;
+  /** Highlight a region (or null to clear). */
+  setSelected(regionId: number | null): void;
+  /** Register a click handler; receives the clicked region id or null. */
+  onRegionClick(handler: (regionId: number | null) => void): void;
 }
 
 export function createRenderer(canvas: HTMLCanvasElement): Renderer {
@@ -21,24 +35,110 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   if (!ctx) {
     throw new Error("Unable to acquire 2D rendering context");
   }
+  const context = ctx;
 
   let running = false;
   let frame = 0;
+  let state: GameState | null = null;
+  let selected: number | null = null;
+  let clickHandler: (regionId: number | null) => void = () => {};
+
+  /** Map a region's world position [0,1] to canvas pixels, with margins. */
+  function project(region: Region): { x: number; y: number } {
+    const { clientWidth, clientHeight } = canvas;
+    const margin = NODE_RADIUS + 24;
+    return {
+      x: margin + region.x * (clientWidth - margin * 2),
+      y: margin + region.y * (clientHeight - margin * 2),
+    };
+  }
 
   function resize(): void {
     const dpr = window.devicePixelRatio || 1;
     const { clientWidth, clientHeight } = canvas;
     canvas.width = Math.max(1, Math.floor(clientWidth * dpr));
     canvas.height = Math.max(1, Math.floor(clientHeight * dpr));
-    ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+    context.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
   function render(): void {
     if (!running) return;
     const { clientWidth, clientHeight } = canvas;
-    ctx!.fillStyle = BACKGROUND;
-    ctx!.fillRect(0, 0, clientWidth, clientHeight);
+
+    context.fillStyle = BACKGROUND;
+    context.fillRect(0, 0, clientWidth, clientHeight);
+
+    if (state) {
+      drawEdges(state);
+      drawNodes(state);
+    }
+
     frame = window.requestAnimationFrame(render);
+  }
+
+  function drawEdges(s: GameState): void {
+    context.strokeStyle = EDGE_COLOR;
+    context.lineWidth = 2;
+    for (const region of s.regions) {
+      const a = project(region);
+      for (const neighbourId of region.adjacency) {
+        // Draw each edge once (only when id < neighbour).
+        if (region.id >= neighbourId) continue;
+        const neighbour = s.regions[neighbourId];
+        if (!neighbour) continue;
+        const b = project(neighbour);
+        context.beginPath();
+        context.moveTo(a.x, a.y);
+        context.lineTo(b.x, b.y);
+        context.stroke();
+      }
+    }
+  }
+
+  function drawNodes(s: GameState): void {
+    for (const region of s.regions) {
+      const p = project(region);
+      const terrain = TERRAIN[region.terrain];
+      const isSelected = region.id === selected;
+
+      context.beginPath();
+      context.arc(p.x, p.y, NODE_RADIUS, 0, Math.PI * 2);
+      context.fillStyle = terrain.color;
+      context.fill();
+      context.lineWidth = isSelected ? 4 : 2;
+      context.strokeStyle = isSelected ? SELECT_COLOR : "rgba(0,0,0,0.35)";
+      context.stroke();
+
+      // Population count, centred.
+      context.fillStyle = "#0d0f14";
+      context.font = "600 13px system-ui, sans-serif";
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.fillText(String(region.population), p.x, p.y);
+
+      // Region name below the node.
+      context.fillStyle = "#c9cedb";
+      context.font = "500 11px system-ui, sans-serif";
+      context.textBaseline = "top";
+      context.fillText(region.name, p.x, p.y + NODE_RADIUS + 3);
+    }
+  }
+
+  function hitTest(px: number, py: number): number | null {
+    if (!state) return null;
+    for (const region of state.regions) {
+      const p = project(region);
+      const dx = px - p.x;
+      const dy = py - p.y;
+      if (dx * dx + dy * dy <= NODE_RADIUS * NODE_RADIUS) return region.id;
+    }
+    return null;
+  }
+
+  function handleClick(ev: MouseEvent): void {
+    const rect = canvas.getBoundingClientRect();
+    const hit = hitTest(ev.clientX - rect.left, ev.clientY - rect.top);
+    clickHandler(hit);
   }
 
   return {
@@ -47,12 +147,23 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       running = true;
       resize();
       window.addEventListener("resize", resize);
+      canvas.addEventListener("click", handleClick);
       frame = window.requestAnimationFrame(render);
     },
     stop(): void {
       running = false;
       window.cancelAnimationFrame(frame);
       window.removeEventListener("resize", resize);
+      canvas.removeEventListener("click", handleClick);
+    },
+    setState(next: GameState): void {
+      state = next;
+    },
+    setSelected(regionId: number | null): void {
+      selected = regionId;
+    },
+    onRegionClick(handler: (regionId: number | null) => void): void {
+      clickHandler = handler;
     },
   };
 }
