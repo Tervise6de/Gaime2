@@ -1,5 +1,11 @@
 import { createRenderer } from "@/systems/renderer";
-import { createGame, resolveTurn, setTaxRate } from "@/systems/turn";
+import {
+  createGame,
+  resolveTurn,
+  setTaxRate,
+  queueBuilding,
+  cancelConstruction,
+} from "@/systems/turn";
 import type { GameState } from "@/systems/state";
 import { createHud } from "@/ui/hud";
 import "@/ui/style.css";
@@ -35,6 +41,14 @@ function main(): void {
     onNewGame(seed) {
       state = createGame({ seed });
       selectedRegion = null;
+      sync();
+    },
+    onQueueBuilding(regionId, building) {
+      state = queueBuilding(state, regionId, building);
+      sync();
+    },
+    onCancelConstruction(regionId) {
+      state = cancelConstruction(state, regionId);
       sync();
     },
   });

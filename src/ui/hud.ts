@@ -6,20 +6,26 @@
  * §7). `createHud` builds the panels once and returns an `update(state,
  * selected)` that re-renders them from the latest state.
  *
- * Milestone 1 surface: a top resource bar (stockpiles + per-turn income), a
- * fiscal panel (tax slider), the end-turn control, a selected-region readout,
- * and the turn log.
+ * M2 surface: resource bar (stockpiles + income, with a famine flag), fiscal
+ * panel (tax slider), end-turn / new-map controls, and a rich region panel —
+ * population vs capacity, unrest, completed buildings, the construction slot,
+ * and a build menu.
  */
 
+import { BUILDINGS, BUILDING_IDS, type BuildingId } from "@/data/buildings";
 import { TERRAIN } from "@/data/terrain";
 import { regionProduction, nationalProduction } from "@/systems/economy";
+import { regionCapacity } from "@/systems/population";
 import {
   PLAYER_ID,
   RESOURCE_KEYS,
   TAX_MAX,
   TAX_MIN,
   TAX_STEP,
+  UNREST_PENALTY_START,
+  UNREST_REVOLT,
   type GameState,
+  type Region,
   type ResourceKey,
 } from "@/systems/state";
 
@@ -27,6 +33,8 @@ export interface HudCallbacks {
   onTaxChange(rate: number): void;
   onEndTurn(): void;
   onNewGame(seed: number): void;
+  onQueueBuilding(regionId: number, building: BuildingId): void;
+  onCancelConstruction(regionId: number): void;
 }
 
 export interface Hud {
@@ -84,8 +92,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   });
   taxRow.append(taxInput, taxLabel);
   const taxHint = el("p", "hud-hint");
-  taxHint.textContent =
-    "Higher taxes raise more gold now. (Unrest cost arrives in Milestone 2.)";
+  taxHint.textContent = "Higher taxes raise gold but push unrest up over time.";
   fiscal.append(taxRow, taxHint);
   leftPanel.append(fiscal);
 
@@ -106,7 +113,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   newGameBtn.textContent = "New map";
   newGameBtn.addEventListener("click", () => {
     const raw = seedInput.value.trim();
-    const seed = raw === "" ? Date.now() >>> 0 : parseSeed(raw);
+    const seed = raw === "" ? (Date.now() >>> 0) : parseSeed(raw);
     callbacks.onNewGame(seed);
   });
   newGameRow.append(seedInput, newGameBtn);
@@ -138,12 +145,15 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       resourceEls[key].flow.textContent = `${f >= 0 ? "+" : ""}${fmt(f)}/turn`;
       resourceEls[key].flow.classList.toggle("negative", f < 0);
     }
-    turnBadge.textContent = `Turn ${state.turn} · seed ${state.seed}`;
+    resourceEls.food.flow.classList.toggle("negative", state.famine || flow.food < 0);
+    turnBadge.textContent =
+      (state.famine ? "⚠ FAMINE · " : "") + `Turn ${state.turn} · seed ${state.seed}`;
+    turnBadge.classList.toggle("famine", state.famine);
 
     taxInput.value = String(Math.round(state.taxRate * 100));
     taxLabel.textContent = `Tax ${Math.round(state.taxRate * 100)}%`;
 
-    renderRegion(regionBody, state, selectedRegionId);
+    renderRegion(regionBody, state, selectedRegionId, callbacks);
 
     logBody.innerHTML = "";
     for (const line of state.log.slice(-8).reverse()) {
@@ -160,11 +170,12 @@ function renderRegion(
   container: HTMLElement,
   state: GameState,
   selectedRegionId: number | null,
+  callbacks: HudCallbacks,
 ): void {
   container.innerHTML = "";
   if (selectedRegionId === null) {
     const hint = el("p", "hud-hint");
-    hint.textContent = "Click a region on the map to inspect it.";
+    hint.textContent = "Click a region on the map to inspect and develop it.";
     container.append(hint);
     return;
   }
@@ -172,6 +183,7 @@ function renderRegion(
   if (!region) return;
   const terrain = TERRAIN[region.terrain];
   const flow = regionProduction(region, state.taxRate);
+  const cap = regionCapacity(region);
 
   const title = el("p", "hud-region-title");
   title.textContent = region.name;
@@ -180,8 +192,23 @@ function renderRegion(
   title.prepend(swatch);
 
   const meta = el("p", "hud-region-meta");
-  meta.textContent = `${terrain.name} · pop ${region.population} · ${region.adjacency.length} borders`;
+  meta.textContent =
+    `${terrain.name} · pop ${fmt(region.population)}/${fmt(cap)} · ` +
+    `${region.adjacency.length} borders`;
 
+  // Unrest bar.
+  const unrestWrap = el("div", "hud-unrest");
+  const unrestLabel = el("div", "hud-unrest-label");
+  unrestLabel.textContent = `Unrest ${fmt(region.unrest)}`;
+  unrestLabel.append(unrestTag(region));
+  const bar = el("div", "hud-unrest-bar");
+  const fill = el("div", "hud-unrest-fill");
+  fill.style.width = `${Math.min(100, region.unrest)}%`;
+  fill.style.background = unrestColor(region.unrest);
+  bar.append(fill);
+  unrestWrap.append(unrestLabel, bar);
+
+  // Production breakdown.
   const table = el("div", "hud-region-flows");
   for (const key of RESOURCE_KEYS) {
     const row = el("div", "hud-region-flow");
@@ -195,10 +222,90 @@ function renderRegion(
     table.append(row);
   }
 
-  container.append(title, meta, table);
+  container.append(title, meta, unrestWrap, table);
+
+  // Completed buildings.
+  if (region.buildings.length) {
+    const built = el("p", "hud-region-built");
+    built.textContent = "Built: " + region.buildings.map((b) => BUILDINGS[b].name).join(", ");
+    container.append(built);
+  }
+
+  // Construction slot / build menu.
+  container.append(renderBuildSection(region, state, callbacks));
+}
+
+function renderBuildSection(
+  region: Region,
+  state: GameState,
+  callbacks: HudCallbacks,
+): HTMLElement {
+  const section = el("div", "hud-build");
+  section.append(heading("Construction"));
+
+  if (region.construction) {
+    const def = BUILDINGS[region.construction.building];
+    const wrap = el("div", "hud-build-progress");
+    const label = el("div", "hud-build-progress-label");
+    label.textContent = `${def.name} — ${fmt(region.construction.progress)}/${def.cost} materials`;
+    const bar = el("div", "hud-build-bar");
+    const fill = el("div", "hud-build-fill");
+    fill.style.width = `${(region.construction.progress / def.cost) * 100}%`;
+    bar.append(fill);
+    const cancel = document.createElement("button");
+    cancel.className = "hud-build-cancel";
+    cancel.textContent = "Cancel";
+    cancel.addEventListener("click", () => callbacks.onCancelConstruction(region.id));
+    wrap.append(label, bar, cancel);
+    section.append(wrap);
+    return section;
+  }
+
+  const menu = el("div", "hud-build-menu");
+  for (const id of BUILDING_IDS) {
+    const def = BUILDINGS[id];
+    const already = region.buildings.includes(id);
+    const btn = document.createElement("button");
+    btn.className = "hud-build-btn";
+    btn.disabled = already;
+    btn.title = def.blurb;
+    btn.innerHTML =
+      `<span class="hud-build-name">${def.name}</span>` +
+      `<span class="hud-build-cost">${already ? "built" : def.cost + "⛏"}</span>`;
+    if (!already) {
+      btn.addEventListener("click", () => callbacks.onQueueBuilding(region.id, id));
+    }
+    menu.append(btn);
+  }
+  section.append(menu);
+
+  const hint = el("p", "hud-hint");
+  hint.textContent = `Materials in store: ${fmt(state.stocks.materials)}. Building draws from the national stockpile each turn.`;
+  section.append(hint);
+  return section;
 }
 
 // --- helpers ----------------------------------------------------------------
+
+function unrestTag(region: Region): HTMLElement {
+  const tag = el("span", "hud-unrest-state");
+  if (region.unrest >= UNREST_REVOLT) {
+    tag.textContent = "REVOLT";
+    tag.classList.add("bad");
+  } else if (region.unrest >= UNREST_PENALTY_START) {
+    tag.textContent = "restless";
+    tag.classList.add("warn");
+  } else {
+    tag.textContent = "calm";
+  }
+  return tag;
+}
+
+function unrestColor(unrest: number): string {
+  if (unrest >= UNREST_REVOLT) return "#e8776b";
+  if (unrest >= UNREST_PENALTY_START) return "#e0b74a";
+  return "#6fb98a";
+}
 
 function el(tag: string, className: string): HTMLElement {
   const node = document.createElement(tag);

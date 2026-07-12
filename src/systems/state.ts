@@ -11,6 +11,7 @@
  * state. Numbers are illustrative starting values for tuning.
  */
 
+import type { BuildingId } from "@/data/buildings";
 import type { ResourceYield, TerrainId } from "@/data/terrain";
 
 /** Owner id 0 is always the human player in Milestone 1. */
@@ -22,6 +23,44 @@ export const TAX_MAX = 0.4;
 export const TAX_STEP = 0.05;
 export const DEFAULT_TAX = 0.1;
 
+/**
+ * Stability / population tuning (M2). The anti-snowball brake lives here
+ * (docs/game-design.md §3.3): tax and famine push unrest up; low tax and
+ * temples pull it down; high unrest throttles production and, past the revolt
+ * threshold, stops a region entirely.
+ */
+export const UNREST_MAX = 100;
+/** Baseline unrest every region carries. */
+export const UNREST_BASE = 5;
+/** Extra unrest a region trends toward at the maximum tax rate. */
+export const UNREST_TAX_MAX = 28;
+/** Unrest below this has no production effect. */
+export const UNREST_PENALTY_START = 30;
+/** At/above this, the region revolts: production stops, population falls. */
+export const UNREST_REVOLT = 75;
+/** Unrest moves at most this far toward its target each turn (gradual). */
+export const UNREST_DRIFT = 6;
+/** Unrest spike applied to a region during a national famine. */
+export const FAMINE_UNREST_SPIKE = 18;
+
+/** Population tuning (M2). */
+export const GROWTH_BASE = 0.35;
+/** Above this unrest a region stops growing. */
+export const GROWTH_UNREST_CEILING = 55;
+/** Fraction of population lost per turn during famine or revolt. */
+export const STARVE_FRACTION = 0.12;
+/** Minimum population a region retains (never depopulates to zero in M2). */
+export const MIN_POPULATION = 1;
+/** National food granary cap (surplus beyond this is wasted). */
+export const GRANARY_CAP = 60;
+
+/** A region's single construction slot. */
+export interface ConstructionOrder {
+  building: BuildingId;
+  /** Materials invested so far, out of the building's cost. */
+  progress: number;
+}
+
 export interface Region {
   id: number;
   name: string;
@@ -29,12 +68,14 @@ export interface Region {
   /** Owning nation id, or null for unowned/neutral terrain (used from M3). */
   ownerId: number | null;
   population: number;
-  /** 0..100. Inert in M1; the anti-snowball brake arrives in M2. */
+  /** 0..100. Tax and famine raise it; temples and low tax lower it (M2). */
   unrest: number;
   /** Defensive works. Inert until military (M3). */
   fortification: number;
-  /** Building ids queued/built here. Empty until M2. */
-  buildings: string[];
+  /** Completed building ids in this region. */
+  buildings: BuildingId[];
+  /** What's under construction here, if anything. */
+  construction: ConstructionOrder | null;
   /** Ids of adjacent regions (the pure logic graph). */
   adjacency: number[];
   /** Layout position for the renderer, in world units [0, 1]. */
@@ -67,6 +108,8 @@ export interface GameState {
   stocks: ResourceStocks;
   nations: Nation[];
   regions: Region[];
+  /** True when last turn's national food balance went negative. */
+  famine: boolean;
   /** Human-readable turn log, newest last. */
   log: string[];
 }

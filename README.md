@@ -4,11 +4,14 @@ A browser-based **Kingdom Management / 4X-lite** strategy game. Depth comes
 from interacting systems — economy, population, military, diplomacy — rather
 than from art. Low-art, high-decision-density, runs anywhere a browser does.
 
-> **Status:** Milestone 1 — Map + Economy skeleton. A seeded procedural region
-> graph renders as terrain-coloured nodes + adjacency edges; each region
-> produces gold/food/materials/knowledge by terrain; a global tax slider trades
-> production for treasury gold; ending the turn advances the economy through a
-> pure, deterministic turn pipeline. Click a region to inspect its production.
+> **Status:** Milestone 2 — Population + Stability + Buildings. On top of the M1
+> economy: population grows toward a terrain+building capacity when fed and
+> calm, and starves in famine; **unrest** rises with taxes and falls with
+> temples/low taxes, throttling production and — past a threshold — revolting;
+> and you **queue buildings** (farm, workshop, market, library, temple) in each
+> region's construction slot, drawing on the national materials stockpile. The
+> guns-vs-butter tension (minus guns) is live: tax vs. unrest, build vs. save,
+> grow vs. stall. Click a region to develop it.
 
 ## Tech stack
 
@@ -44,8 +47,8 @@ npm run test:watch # run tests in watch mode
 
 The simulation is a set of **pure functions** over a serialisable `GameState`
 (seeded RNG, deterministic turn pipeline), so the systems are covered by fast
-unit tests — 29 tests across the RNG, map generation, economy, and turn
-resolution.
+unit tests — 57 tests across the RNG, map generation, economy, population,
+stability, construction, and turn resolution.
 
 ## Project structure
 

@@ -127,6 +127,11 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.hud-turn.famine {
+  color: var(--negative);
+  font-weight: 600;
+}
+
 /* --- Panels --------------------------------------------------------------- */
 .hud-panel {
   position: absolute;
@@ -146,7 +151,9 @@ body {
 .hud-right {
   right: 12px;
   top: 84px;
-  width: 220px;
+  width: 244px;
+  max-height: calc(100vh - 320px);
+  overflow-y: auto;
 }
 
 .hud-log {
@@ -270,6 +277,127 @@ body {
 
 .hud-region-flow-val.negative {
   color: var(--negative);
+}
+
+/* --- Unrest bar ----------------------------------------------------------- */
+.hud-unrest {
+  margin: 4px 0 10px;
+}
+
+.hud-unrest-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-unrest-state {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.hud-unrest-state.warn {
+  color: #e0b74a;
+}
+
+.hud-unrest-state.bad {
+  color: var(--negative);
+  font-weight: 700;
+}
+
+.hud-unrest-bar,
+.hud-build-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.hud-unrest-fill,
+.hud-build-fill {
+  height: 100%;
+  transition: width 0.2s ease;
+}
+
+.hud-build-fill {
+  background: var(--accent);
+}
+
+/* --- Buildings / construction --------------------------------------------- */
+.hud-region-built {
+  margin: 10px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.hud-build {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.hud-build-menu {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.hud-build-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 8px;
+  text-align: left;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.hud-build-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.hud-build-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.hud-build-name {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.hud-build-cost {
+  font-size: 10px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-build-progress-label {
+  font-size: 12px;
+  margin-bottom: 5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-build-cancel {
+  margin-top: 8px;
+  padding: 5px 10px;
+  font-size: 11px;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.hud-build-cancel:hover {
+  background: rgba(232, 119, 107, 0.2);
 }
 
 /* --- Turn log ------------------------------------------------------------- */

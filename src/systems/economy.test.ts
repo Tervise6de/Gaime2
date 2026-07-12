@@ -13,6 +13,7 @@ function region(overrides: Partial<Region> = {}): Region {
     unrest: 0,
     fortification: 0,
     buildings: [],
+    construction: null,
     adjacency: [],
     x: 0.5,
     y: 0.5,

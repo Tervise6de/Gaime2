@@ -4,8 +4,12 @@ import {
   resolveTurn,
   setTaxRate,
   clampTax,
+  queueBuilding,
+  cancelConstruction,
+  canQueueBuilding,
 } from "@/systems/turn";
 import { nationalProduction } from "@/systems/economy";
+import { BUILDINGS } from "@/data/buildings";
 import { PLAYER_ID, TAX_MAX, TAX_MIN } from "@/systems/state";
 
 describe("createGame", () => {
@@ -82,5 +86,66 @@ describe("resolveTurn", () => {
     let s = createGame({ seed: 1 });
     for (let i = 0; i < 100; i++) s = resolveTurn(s);
     expect(s.log.length).toBeLessThanOrEqual(50);
+  });
+
+  it("grows population over a calm game", () => {
+    let s = setTaxRate(createGame({ seed: 3 }), 0);
+    const start = s.regions.reduce((a, r) => a + r.population, 0);
+    for (let i = 0; i < 20; i++) s = resolveTurn(s);
+    const end = s.regions.reduce((a, r) => a + r.population, 0);
+    expect(end).toBeGreaterThan(start);
+  });
+
+  it("raises unrest under sustained high taxes", () => {
+    let s = setTaxRate(createGame({ seed: 3 }), TAX_MAX);
+    for (let i = 0; i < 15; i++) s = resolveTurn(s);
+    const avgUnrest = s.regions.reduce((a, r) => a + r.unrest, 0) / s.regions.length;
+    expect(avgUnrest).toBeGreaterThan(10);
+  });
+});
+
+describe("construction", () => {
+  it("canQueueBuilding rejects a duplicate", () => {
+    const g = createGame({ seed: 1 });
+    const r = { ...g.regions[0]!, buildings: ["farm" as const] };
+    expect(canQueueBuilding(r, "farm")).toBe(false);
+    expect(canQueueBuilding(r, "market")).toBe(true);
+  });
+
+  it("queueBuilding sets a construction order without mutating input", () => {
+    const g = createGame({ seed: 1 });
+    const next = queueBuilding(g, 0, "market");
+    expect(next.regions[0]!.construction).toEqual({ building: "market", progress: 0 });
+    expect(g.regions[0]!.construction).toBeNull();
+  });
+
+  it("cancelConstruction clears the slot", () => {
+    let g = queueBuilding(createGame({ seed: 1 }), 0, "market");
+    g = cancelConstruction(g, 0);
+    expect(g.regions[0]!.construction).toBeNull();
+  });
+
+  it("completes a queued building over enough turns", () => {
+    let s = setTaxRate(createGame({ seed: 1 }), 0);
+    s = queueBuilding(s, 0, "market");
+    const turns = Math.ceil(BUILDINGS.market.cost / 6) + 3;
+    for (let i = 0; i < turns; i++) s = resolveTurn(s);
+    expect(s.regions[0]!.buildings).toContain("market");
+  });
+
+  it("a completed market increases that region's gold output", () => {
+    const seed = 1;
+    let plain = setTaxRate(createGame({ seed }), 0);
+    let built = queueBuilding(plain, 0, "market");
+    for (let i = 0; i < 8; i++) {
+      plain = resolveTurn(plain);
+      built = resolveTurn(built);
+    }
+    // With identical seed/tax, the only difference is the market in region 0.
+    expect(built.regions[0]!.buildings).toContain("market");
+    // National gold income should be higher in the built game.
+    const goldPlain = nationalProduction(plain, PLAYER_ID).gold;
+    const goldBuilt = nationalProduction(built, PLAYER_ID).gold;
+    expect(goldBuilt).toBeGreaterThan(goldPlain);
   });
 });

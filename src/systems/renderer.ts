@@ -12,7 +12,12 @@
  */
 
 import { TERRAIN } from "@/data/terrain";
-import type { GameState, Region } from "@/systems/state";
+import {
+  UNREST_PENALTY_START,
+  UNREST_REVOLT,
+  type GameState,
+  type Region,
+} from "@/systems/state";
 
 const BACKGROUND = "#11151c";
 const EDGE_COLOR = "rgba(230, 233, 239, 0.14)";
@@ -105,8 +110,13 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       context.arc(p.x, p.y, NODE_RADIUS, 0, Math.PI * 2);
       context.fillStyle = terrain.color;
       context.fill();
-      context.lineWidth = isSelected ? 4 : 2;
-      context.strokeStyle = isSelected ? SELECT_COLOR : "rgba(0,0,0,0.35)";
+
+      // Unrest ring: amber when restless, red when revolting.
+      const unrestStroke = unrestRing(region.unrest);
+      context.lineWidth = isSelected ? 4 : unrestStroke ? 3 : 2;
+      context.strokeStyle = isSelected
+        ? SELECT_COLOR
+        : unrestStroke ?? "rgba(0,0,0,0.35)";
       context.stroke();
 
       // Population count, centred.
@@ -114,7 +124,13 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       context.font = "600 13px system-ui, sans-serif";
       context.textAlign = "center";
       context.textBaseline = "middle";
-      context.fillText(String(region.population), p.x, p.y);
+      context.fillText(String(Math.round(region.population)), p.x, p.y);
+
+      // Construction indicator: a small hammer above the node.
+      if (region.construction) {
+        context.font = "12px system-ui, sans-serif";
+        context.fillText("🔨", p.x, p.y - NODE_RADIUS - 8);
+      }
 
       // Region name below the node.
       context.fillStyle = "#c9cedb";
@@ -122,6 +138,13 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       context.textBaseline = "top";
       context.fillText(region.name, p.x, p.y + NODE_RADIUS + 3);
     }
+  }
+
+  /** Ring colour for a region's unrest, or null when calm. */
+  function unrestRing(unrest: number): string | null {
+    if (unrest >= UNREST_REVOLT) return "#e8776b";
+    if (unrest >= UNREST_PENALTY_START) return "#e0b74a";
+    return null;
   }
 
   function hitTest(px: number, py: number): number | null {

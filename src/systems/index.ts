@@ -16,9 +16,27 @@ export type { Rng } from "@/systems/rng";
 export { generateMap, DEFAULT_MAP_OPTIONS } from "@/systems/mapgen";
 export type { MapGenOptions, GeneratedMap } from "@/systems/mapgen";
 
-export { regionProduction, nationalProduction, round1 } from "@/systems/economy";
+export {
+  regionProduction,
+  nationalProduction,
+  unrestPenalty,
+  round1,
+} from "@/systems/economy";
 
-export { createGame, resolveTurn, setTaxRate, clampTax } from "@/systems/turn";
+export { regionCapacity, nextPopulation } from "@/systems/population";
+export { unrestTarget, nextUnrest } from "@/systems/stability";
+export { advanceConstruction } from "@/systems/construction";
+export type { ConstructionResult } from "@/systems/construction";
+
+export {
+  createGame,
+  resolveTurn,
+  setTaxRate,
+  clampTax,
+  queueBuilding,
+  cancelConstruction,
+  canQueueBuilding,
+} from "@/systems/turn";
 export type { NewGameOptions } from "@/systems/turn";
 
 export * from "@/systems/state";

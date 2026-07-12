@@ -184,6 +184,7 @@ export function generateMap(
     unrest: 0,
     fortification: 0,
     buildings: [],
+    construction: null,
     adjacency: adjacency[i]!.slice().sort((a, b) => a - b),
     x: site.x,
     y: site.y,
