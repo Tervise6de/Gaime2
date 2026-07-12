@@ -15,13 +15,19 @@
  */
 
 import type { ResourceYield } from "@/data/terrain";
+import type { TechId } from "@/data/techs";
 
 export type BuildingId =
   | "farm"
   | "workshop"
   | "market"
   | "library"
-  | "temple";
+  | "temple"
+  | "aqueduct"
+  | "university"
+  | "bank"
+  | "fortress"
+  | "wonder";
 
 export interface BuildingDef {
   id: BuildingId;
@@ -34,6 +40,12 @@ export interface BuildingDef {
   popCapacity: number;
   /** Subtracted from the region's unrest target (an order-keeping effect). */
   unrest: number;
+  /** Fortification levels added to the region on completion (one-time). */
+  fortification?: number;
+  /** Tech that must be researched before this can be built. */
+  requiresTech?: TechId;
+  /** A Great Work — counts toward the economic victory. */
+  isWonder?: boolean;
   /** One-line description for the build menu. */
   blurb: string;
 }
@@ -83,6 +95,58 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     popCapacity: 0,
     unrest: 12,
     blurb: "-12 unrest — keeps a heavily-taxed region in order.",
+  },
+  aqueduct: {
+    id: "aqueduct",
+    name: "Aqueduct",
+    cost: 22,
+    yield: { food: 3 },
+    popCapacity: 6,
+    unrest: 0,
+    requiresTech: "irrigation",
+    blurb: "+3 food, +6 population capacity. (Irrigation)",
+  },
+  university: {
+    id: "university",
+    name: "University",
+    cost: 24,
+    yield: { knowledge: 4 },
+    popCapacity: 0,
+    unrest: 0,
+    requiresTech: "mathematics",
+    blurb: "+4 knowledge per turn. (Mathematics)",
+  },
+  bank: {
+    id: "bank",
+    name: "Bank",
+    cost: 24,
+    yield: { gold: 5 },
+    popCapacity: 0,
+    unrest: 0,
+    requiresTech: "banking",
+    blurb: "+5 gold per turn. (Banking)",
+  },
+  fortress: {
+    id: "fortress",
+    name: "Fortress",
+    cost: 28,
+    yield: {},
+    popCapacity: 0,
+    unrest: 0,
+    fortification: 2,
+    requiresTech: "engineering",
+    blurb: "+2 fortification — a hard region to crack. (Engineering)",
+  },
+  wonder: {
+    id: "wonder",
+    name: "Great Work",
+    cost: 60,
+    yield: { gold: 2, knowledge: 2 },
+    popCapacity: 0,
+    unrest: 0,
+    requiresTech: "architecture",
+    isWonder: true,
+    blurb: "A prestige project. Build enough to win an economic victory. (Architecture)",
   },
 };
 

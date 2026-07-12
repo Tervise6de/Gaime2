@@ -83,6 +83,9 @@ export function canRaiseUnit(
   const nation = state.nations.find((n) => n.id === ownerId);
   if (!nation) return { ok: false, reason: "Unknown nation." };
   const def = UNITS[unit];
+  if (def.requiresTech && !nation.research.done.includes(def.requiresTech)) {
+    return { ok: false, reason: `Requires ${def.requiresTech.replace(/_/g, " ")}.` };
+  }
   if (nation.stocks.gold < def.cost.gold) return { ok: false, reason: "Not enough gold." };
   if (nation.stocks.materials < def.cost.materials) {
     return { ok: false, reason: "Not enough materials." };

@@ -59,9 +59,23 @@ export {
   queueBuilding,
   cancelConstruction,
   canQueueBuilding,
+  chooseResearch,
   advanceNationEconomy,
 } from "@/systems/turn";
 export type { NewGameOptions } from "@/systems/turn";
+
+export {
+  techMultipliers,
+  techUnrestReduction,
+  isBuildingUnlocked,
+  isUnitUnlocked,
+  researchFrontier,
+  canResearch,
+  advanceResearch,
+  selectTech,
+} from "@/systems/tech";
+export { fireEvent } from "@/systems/events";
+export { checkVictory, nationScore } from "@/systems/victory";
 
 export {
   getRelation,

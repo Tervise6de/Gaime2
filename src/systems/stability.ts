@@ -40,18 +40,20 @@ export function unrestTarget(
   region: Region,
   taxRate: number,
   ownedRegionCount: number,
+  techReduction = 0,
 ): number {
   const taxPressure = (taxRate / TAX_MAX) * UNREST_TAX_MAX;
   const target =
     UNREST_BASE +
     taxPressure +
     overexpansionUnrest(ownedRegionCount) -
-    buildingCalm(region);
+    buildingCalm(region) -
+    techReduction;
   return clampUnrest(target);
 }
 
 /**
- * Next unrest for a region: drift toward the tax/expansion/building target
+ * Next unrest for a region: drift toward the tax/expansion/building/tech target
  * (capped per turn), then add a famine spike so starvation bites immediately.
  */
 export function nextUnrest(
@@ -59,8 +61,9 @@ export function nextUnrest(
   taxRate: number,
   famine: boolean,
   ownedRegionCount: number,
+  techReduction = 0,
 ): number {
-  const target = unrestTarget(region, taxRate, ownedRegionCount);
+  const target = unrestTarget(region, taxRate, ownedRegionCount, techReduction);
   const delta = clamp(target - region.unrest, -UNREST_DRIFT, UNREST_DRIFT);
   let next = region.unrest + delta;
   if (famine) next += FAMINE_UNREST_SPIKE;

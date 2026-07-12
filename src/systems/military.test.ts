@@ -55,8 +55,8 @@ function battlefield(playerUnits: Partial<Record<string, number>>, barbUnits: Pa
     rngState: 12345,
     turn: 1,
     nations: [
-      { id: PLAYER_ID, name: "Realm", color: "#000", isPlayer: true, isBarbarian: false, alive: true, stocks: { ...stocks }, taxRate: 0, famine: false, bankrupt: false },
-      { id: BARBARIAN_ID, name: "Barbarians", color: "#000", isPlayer: false, isBarbarian: true, alive: true, stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, taxRate: 0, famine: false, bankrupt: false },
+      { id: PLAYER_ID, name: "Realm", color: "#000", isPlayer: true, isBarbarian: false, alive: true, stocks: { ...stocks }, taxRate: 0, research: { current: null, progress: 0, done: [] }, wonders: 0, famine: false, bankrupt: false },
+      { id: BARBARIAN_ID, name: "Barbarians", color: "#000", isPlayer: false, isBarbarian: true, alive: true, stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, taxRate: 0, research: { current: null, progress: 0, done: [] }, wonders: 0, famine: false, bankrupt: false },
     ],
     regions: [r0, r1],
     armies,
@@ -86,11 +86,16 @@ describe("recruitment", () => {
     expect(strategicAccess(g, PLAYER_ID).has("iron")).toBe(false);
   });
 
-  it("canRaiseUnit gates cavalry on horse access", () => {
+  it("canRaiseUnit gates cavalry on horse access and tech", () => {
     const g = battlefield({ militia: 1 }, {});
-    expect(canRaiseUnit(g, 0, "cavalry", PLAYER_ID).ok).toBe(false);
+    // Needs the Horseback tech and horse access.
+    g.nations[PLAYER_ID]!.research.done = ["horseback"];
+    expect(canRaiseUnit(g, 0, "cavalry", PLAYER_ID).ok).toBe(false); // no horses yet
     g.regions[0]!.resource = "horses";
     expect(canRaiseUnit(g, 0, "cavalry", PLAYER_ID).ok).toBe(true);
+    // Without the tech it's blocked even with horses.
+    g.nations[PLAYER_ID]!.research.done = [];
+    expect(canRaiseUnit(g, 0, "cavalry", PLAYER_ID).ok).toBe(false);
   });
 
   it("canRaiseUnit rejects when too poor", () => {

@@ -605,6 +605,93 @@ body {
   gap: 6px;
 }
 
+/* --- Research ------------------------------------------------------------- */
+.hud-research {
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 12px;
+  width: min(680px, calc(100vw - 620px));
+  min-width: 380px;
+}
+
+.hud-research-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.hud-research-title {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.hud-research-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.hud-research-fill {
+  height: 100%;
+  transition: width 0.2s ease;
+}
+
+.hud-research-count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-tech-menu {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.hud-tech-btn {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  text-align: left;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--panel-border);
+  border-left: 3px solid var(--muted);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.hud-tech-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.hud-tech-btn.active {
+  background: rgba(244, 210, 122, 0.18);
+  border-color: var(--accent);
+}
+
+.hud-tech-name {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.hud-tech-cost {
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
 /* --- Outcome banner ------------------------------------------------------- */
 .hud-banner {
   position: absolute;

@@ -4,18 +4,20 @@ A browser-based **Kingdom Management / 4X-lite** strategy game. Depth comes
 from interacting systems — economy, population, military, diplomacy — rather
 than from art. Low-art, high-decision-density, runs anywhere a browser does.
 
-> **Status:** Milestone 4 — AI Nations + Diplomacy. It's now a **4X game**. Two
-> **rival nations** run the very same economy, population, unrest, building and
-> military systems as you, driven by a **rule-based utility AI** with
-> personality archetypes (Warlord, Merchant, Builder, Opportunist). They expand,
-> raise armies, and fight — reacting to real state, not scripts. **Relations**
-> (−100…+100) drift and shift on your actions and proximity; a small but
-> expressive **diplomacy** set lets you declare war, sue for peace, sign
-> non-aggression pacts and alliances, gift gold, and field/answer offers. Attack
-> a rival and it's war; turtle forever and the external clock runs you down
-> (defeat if eliminated, victory if you're the last realm standing). Earlier
-> layers still apply: terrain economy, tax-vs-unrest, buildings, the unit
-> counter loop, strategic resources, upkeep and conquest unrest.
+> **Status:** Milestone 5 — Tech/Research + Victory + Events. The **full game
+> loop** is here: a branching **tech tree** (16 techs across economy, military,
+> civics and wonders) whose research multiplies your economy, eases unrest, and
+> unlocks the advanced units and buildings; **three victory paths** (domination
+> by holding ≥60% of regions or eliminating rivals, a **Great Works** economic
+> win, and a prestige-score tiebreak at the turn limit); and **bounded random
+> events** (harvests, plague, ore finds, migration, uprisings, mercenaries) for
+> texture. It builds on M1–M4: terrain economy and taxes, population/unrest,
+> buildings, the unit counter loop and abstract combat, conquest, and two
+> **rule-based AI rivals** with personality archetypes plus a small, expressive
+> diplomacy set (war, peace, pacts, alliances, gifts, tribute).
+>
+> Games now have **goals and divergent strategies end-to-end — a full, winnable,
+> replayable game.** M6 (polish + balance) is next.
 >
 > **The rival AI is 100% local:** plain TypeScript running in your browser — no
 > LLM/API calls, no key, no credits. Free and offline to play.
@@ -53,10 +55,10 @@ npm run test:watch # run tests in watch mode
 ```
 
 The simulation is a set of **pure functions** over a serialisable `GameState`
-(seeded RNG, deterministic turn pipeline — combat and AI included), so the
-systems are covered by fast unit tests — 104 tests across the RNG, map
-generation, economy, population, stability, construction, combat, military,
-diplomacy, rival AI, and turn resolution.
+(seeded RNG, deterministic turn pipeline — combat, AI, research and events
+included), so the systems are covered by fast unit tests — 126 tests across the
+RNG, map generation, economy, population, stability, construction, combat,
+military, diplomacy, rival AI, tech, events, victory, and turn resolution.
 
 ## Project structure
 

@@ -17,6 +17,7 @@
 import { BUILDINGS, type BuildingId } from "@/data/buildings";
 import { UNITS, type UnitType } from "@/data/units";
 import { ARCHETYPES } from "@/data/personalities";
+import { TECHS, type TechId } from "@/data/techs";
 import { generateMap, type MapGenOptions } from "@/systems/mapgen";
 import { nationalProduction, round1 } from "@/systems/economy";
 import { advanceConstruction } from "@/systems/construction";
@@ -25,15 +26,20 @@ import { nextUnrest } from "@/systems/stability";
 import { armyMoves, totalUpkeep } from "@/systems/military";
 import { driftRelations } from "@/systems/diplomacy";
 import { runNationTurn } from "@/systems/ai";
+import { advanceResearch, techUnrestReduction, isBuildingUnlockedFor, selectTech } from "@/systems/tech";
+import { fireEvent } from "@/systems/events";
+import { checkVictory } from "@/systems/victory";
 import { createRng, type Rng } from "@/systems/rng";
 import {
   BANKRUPTCY_UNREST,
   BARBARIAN_ID,
   DEFAULT_TAX,
+  EVENT_CHANCE,
   GRANARY_CAP,
   PLAYER_ID,
   UNREST_MAX,
   clampTax,
+  emptyResearch,
   emptyUnits,
   type Army,
   type GameState,
@@ -51,6 +57,8 @@ const BARBARIAN_NATION: Nation = {
   alive: true,
   stocks: zeroStocks(),
   taxRate: 0,
+  research: emptyResearch(),
+  wonders: 0,
   famine: false,
   bankrupt: false,
 };
@@ -88,10 +96,12 @@ export function createGame(options: NewGameOptions): GameState {
       alive: true,
       stocks: { ...STARTING_STOCKS },
       taxRate: clampTax(options.taxRate ?? DEFAULT_TAX),
+      research: emptyResearch(),
+      wonders: 0,
       famine: false,
       bankrupt: false,
     },
-    { ...BARBARIAN_NATION, stocks: zeroStocks() },
+    { ...BARBARIAN_NATION, stocks: zeroStocks(), research: emptyResearch(), wonders: 0 },
   ];
   const personalities = shuffled(ARCHETYPES, rng);
   for (let i = 0; i < rivalCount; i++) {
@@ -105,6 +115,8 @@ export function createGame(options: NewGameOptions): GameState {
       stocks: { ...STARTING_STOCKS },
       taxRate: DEFAULT_TAX,
       personality: personalities[i % personalities.length],
+      research: emptyResearch(),
+      wonders: 0,
       famine: false,
       bankrupt: false,
     });
@@ -180,10 +192,15 @@ export function setTaxRate(state: GameState, rate: number, nationId = PLAYER_ID)
   return { ...state, nations };
 }
 
-/** Whether a building can be queued in a region (owned by player, not built). */
-export function canQueueBuilding(region: Region, building: BuildingId): boolean {
+/** Whether a building can be queued in a region (owned by player, unlocked, not built). */
+export function canQueueBuilding(
+  region: Region,
+  building: BuildingId,
+  done: TechId[] = [],
+): boolean {
   if (region.ownerId !== PLAYER_ID) return false;
   if (region.buildings.includes(building)) return false;
+  if (!isBuildingUnlockedFor(done, building)) return false;
   return true;
 }
 
@@ -196,10 +213,20 @@ export function queueBuilding(
 ): GameState {
   const region = state.regions[regionId];
   if (!region || region.ownerId !== ownerId || region.buildings.includes(building)) return state;
+  const owner = state.nations.find((n) => n.id === ownerId);
+  if (!owner || !isBuildingUnlockedFor(owner.research.done, building)) return state;
   const regions = state.regions.map((r) =>
     r.id === regionId ? { ...r, construction: { building, progress: 0 } } : r,
   );
   return { ...state, regions };
+}
+
+/** Select the player's (or a nation's) current research. Pure. */
+export function chooseResearch(state: GameState, tech: TechId, nationId = PLAYER_ID): GameState {
+  const nations = state.nations.map((n) =>
+    n.id === nationId ? { ...n, research: selectTech(n.research, tech) } : n,
+  );
+  return { ...state, nations };
 }
 
 /** Clear a region's construction order (progress is lost). Pure. */
@@ -223,31 +250,38 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
 
   const flow = nationalProduction(state, nationId);
   const upkeep = totalUpkeep(state, nationId);
+
+  // Research: knowledge produced funds the current tech.
+  const step = advanceResearch(nation.research, flow.knowledge);
+  const research = step.research;
+
   const stocks: ResourceStocks = {
     gold: round1(nation.stocks.gold + flow.gold - upkeep),
     food: nation.stocks.food,
     materials: round1(nation.stocks.materials + flow.materials),
-    knowledge: round1(nation.stocks.knowledge + flow.knowledge),
+    knowledge: round1(research.progress), // display: invested in current tech
   };
 
-  // Construction (this nation's regions only).
+  // Construction (this nation's regions only); may complete wonders.
   const built = advanceConstruction(state.regions, stocks.materials, nationId);
   stocks.materials = round1(stocks.materials - built.materialsSpent);
   let regions = built.regions;
+  const wondersBuilt = built.completed.filter((c) => BUILDINGS[c.building].isWonder).length;
 
   // Food balance → famine.
   const rawFood = round1(nation.stocks.food + flow.food);
   const famine = rawFood < 0;
   stocks.food = round1(Math.max(0, Math.min(GRANARY_CAP, rawFood)));
 
-  // Population & unrest for this nation's regions.
+  // Population & unrest for this nation's regions (tech eases unrest).
   const ownedCount = regions.filter((r) => r.ownerId === nationId).length;
+  const techCalm = techUnrestReduction(research.done);
   regions = regions.map((r) =>
     r.ownerId === nationId
       ? {
           ...r,
           population: nextPopulation(r, famine),
-          unrest: nextUnrest(r, nation.taxRate, famine, ownedCount),
+          unrest: nextUnrest(r, nation.taxRate, famine, ownedCount, techCalm),
         }
       : r,
   );
@@ -266,13 +300,14 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
   }
 
   const nations = state.nations.map((n) =>
-    n.id === nationId ? { ...n, stocks, famine, bankrupt } : n,
+    n.id === nationId ? { ...n, stocks, research, wonders: n.wonders + wondersBuilt, famine, bankrupt } : n,
   );
 
   let log = state.log;
   if (nation.isPlayer) {
     const notes: string[] = [];
-    for (const c of built.completed) notes.push(`${c.building} built in ${c.regionName}`);
+    for (const c of built.completed) notes.push(`${BUILDINGS[c.building].name} built in ${c.regionName}`);
+    if (step.completed) notes.push(`researched ${TECHS[step.completed].name}`);
     if (famine) notes.push("⚠ famine — population starving");
     if (bankrupt) notes.push("⚠ bankruptcy — troops disbanded, unrest spikes");
     const entry =
@@ -280,6 +315,8 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
       `+${flow.knowledge}k, food ${fmtSigned(flow.food)}. Treasury ${stocks.gold}g.` +
       (notes.length ? ` ${notes.join("; ")}.` : "");
     log = [...state.log, entry].slice(-50);
+  } else if (step.completed) {
+    log = [...state.log, `${nation.name} researched ${TECHS[step.completed].name}.`].slice(-50);
   }
 
   return { ...state, nations, regions, armies, log };
@@ -309,16 +346,31 @@ export function resolveTurn(state: GameState): GameState {
   // 3. Relations drift.
   s = driftRelations(s);
 
-  // 4. Refresh army moves for the coming turn.
+  // 4. Bounded random events (low probability, low variance).
+  s = fireEvents(s, rng);
+
+  // 5. Refresh army moves for the coming turn.
   s = { ...s, armies: s.armies.map((a) => ({ ...a, movesLeft: armyMoves(a.units) })) };
 
-  // 5. Outcome: update alive flags, detect elimination / player defeat.
+  // 6. Outcome: elimination, then domination / great works / turn-limit score.
   s = updateOutcome(s);
 
   return s;
 }
 
-/** Mark eliminated nations and set defeat/victory. */
+/** Fire at most one event per living nation, at low probability. */
+function fireEvents(state: GameState, rng: Rng): GameState {
+  let s = state;
+  for (const nation of s.nations) {
+    if (nation.isBarbarian || !nation.alive) continue;
+    // Rivals see events a bit less often (keeps the log player-focused).
+    const chance = nation.isPlayer ? EVENT_CHANCE : EVENT_CHANCE * 0.6;
+    if (rng.next() < chance) s = fireEvent(s, nation.id, rng);
+  }
+  return s;
+}
+
+/** Mark eliminated nations, then apply the victory/defeat conditions. */
 function updateOutcome(state: GameState): GameState {
   const nations = state.nations.map((n) => {
     if (n.isBarbarian) return n;
@@ -330,16 +382,25 @@ function updateOutcome(state: GameState): GameState {
   let log = state.log;
   for (const n of newlyDead) log = [...log, `${n.name} has been eliminated.`].slice(-50);
 
+  let withNations: GameState = { ...state, nations, log };
+
+  // Elimination outcomes.
   const player = nations[PLAYER_ID]!;
   const livingRivals = nations.filter((n) => !n.isBarbarian && !n.isPlayer && n.alive);
   const hadRivals = state.nations.some((n) => !n.isBarbarian && !n.isPlayer);
-  let outcome = state.outcome;
-  if (!player.alive) outcome = "defeat";
-  else if (hadRivals && livingRivals.length === 0) {
-    outcome = "victory"; // last realm standing (domination by elimination)
+  if (!player.alive) {
+    return { ...withNations, outcome: "defeat", victoryKind: "elimination" };
+  }
+  if (hadRivals && livingRivals.length === 0) {
+    return { ...withNations, outcome: "victory", victoryKind: "conquest" };
   }
 
-  return { ...state, nations, log, outcome };
+  // Domination / great works / turn-limit prestige.
+  const verdict = checkVictory(withNations);
+  if (verdict) {
+    return { ...withNations, outcome: verdict.outcome, victoryKind: verdict.kind };
+  }
+  return withNations;
 }
 
 /** Remove the single highest-upkeep unit from each of a nation's armies. */

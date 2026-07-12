@@ -36,6 +36,8 @@ import {
   setPact,
   sharedBorders,
 } from "@/systems/diplomacy";
+import { researchFrontier, selectTech, isBuildingUnlockedFor } from "@/systems/tech";
+import { TECHS, type TechId } from "@/data/techs";
 import type { Rng } from "@/systems/rng";
 import {
   BARBARIAN_ID,
@@ -68,6 +70,12 @@ function manageEconomy(state: GameState, nationId: number): GameState {
 
   let s = state;
 
+  // Research: keep a tech in progress, chosen by personality branch.
+  if (!nation.research.current) {
+    const pick = pickTech(nation.research.done, nation);
+    if (pick) s = chooseTech(s, nationId, pick);
+  }
+
   // Tax policy: aim higher when calm and poorer; ease off when unrest bites.
   const avgUnrest = owned.reduce((a, r) => a + r.unrest, 0) / owned.length;
   const p = nation.personality;
@@ -76,22 +84,50 @@ function manageEconomy(state: GameState, nationId: number): GameState {
   if (nation.stocks.gold > 300) target -= 0.05;
   s = setTax(s, nationId, target);
 
-  // Buildings: fill empty slots, prioritising order in restless regions and
-  // economy elsewhere (weighted by the economy trait).
+  // Buildings: fill empty slots with the best unlocked option.
+  const done = s.nations.find((n) => n.id === nationId)!.research.done;
   for (const region of s.regions) {
     if (region.ownerId !== nationId || region.construction) continue;
-    const choice = chooseBuilding(region);
+    const choice = chooseBuilding(region, done, nation.wonders);
     if (choice) s = queueFor(s, region.id, choice, nationId);
   }
   return s;
 }
 
-function chooseBuilding(region: { unrest: number; buildings: BuildingId[] }): BuildingId | null {
+function pickTech(done: TechId[], nation: Nation): TechId | null {
+  const frontier = researchFrontier(done);
+  if (!frontier.length) return null;
+  const p = nation.personality;
+  const branchPref =
+    (p?.aggression ?? 0) > 0.6 ? "military" : (p?.economy ?? 0) > 0.6 ? "economy" : "civics";
+  // Prefer the personality's branch, then anything cheapest.
+  const inBranch = frontier.filter((t) => TECHS[t].branch === branchPref);
+  const pool = inBranch.length ? inBranch : frontier;
+  return pool.reduce((best, t) => (TECHS[t].cost < TECHS[best].cost ? t : best), pool[0]!);
+}
+
+function chooseBuilding(
+  region: { unrest: number; buildings: BuildingId[] },
+  done: TechId[],
+  wonders: number,
+): BuildingId | null {
   const has = (b: BuildingId) => region.buildings.includes(b);
+  const unlocked = (b: BuildingId) => isBuildingUnlockedFor(done, b);
   if (region.unrest > 35 && !has("temple")) return "temple";
-  const order: BuildingId[] = ["market", "workshop", "farm", "library", "temple"];
-  for (const b of order) if (!has(b)) return b;
+  // Chase a Great Works victory once wonders are unlocked and progress exists.
+  if (unlocked("wonder") && !has("wonder") && wonders < 3) return "wonder";
+  const order: BuildingId[] = [
+    "market", "bank", "workshop", "university", "farm", "aqueduct", "library", "temple", "fortress",
+  ];
+  for (const b of order) if (unlocked(b) && !has(b)) return b;
   return null;
+}
+
+function chooseTech(state: GameState, nationId: number, tech: TechId): GameState {
+  const nations = state.nations.map((n) =>
+    n.id === nationId ? { ...n, research: selectTech(n.research, tech) } : n,
+  );
+  return { ...state, nations };
 }
 
 // --- diplomacy --------------------------------------------------------------

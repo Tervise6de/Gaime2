@@ -15,6 +15,7 @@
  */
 
 import type { StrategicResource } from "@/data/terrain";
+import type { TechId } from "@/data/techs";
 
 export type UnitType = "militia" | "infantry" | "ranged" | "cavalry" | "siege";
 
@@ -35,6 +36,8 @@ export interface UnitDef {
   siegePower: number;
   /** Strategic resource access required to raise this unit. */
   requires: StrategicResource | null;
+  /** Tech that must be researched to raise this unit (null = available from start). */
+  requiresTech: TechId | null;
 }
 
 export const UNITS: Record<UnitType, UnitDef> = {
@@ -50,6 +53,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     counters: "cavalry",
     siegePower: 0,
     requires: null,
+    requiresTech: null,
   },
   infantry: {
     id: "infantry",
@@ -63,6 +67,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     counters: "militia",
     siegePower: 0,
     requires: null,
+    requiresTech: null,
   },
   ranged: {
     id: "ranged",
@@ -76,6 +81,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     counters: "infantry",
     siegePower: 0,
     requires: null,
+    requiresTech: "bronze_working",
   },
   cavalry: {
     id: "cavalry",
@@ -89,6 +95,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     counters: "ranged",
     siegePower: 0,
     requires: "horses",
+    requiresTech: "horseback",
   },
   siege: {
     id: "siege",
@@ -102,6 +109,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     counters: null,
     siegePower: 2,
     requires: "iron",
+    requiresTech: "engineering",
   },
 };
 

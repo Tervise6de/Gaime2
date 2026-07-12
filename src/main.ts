@@ -5,6 +5,7 @@ import {
   setTaxRate,
   queueBuilding,
   cancelConstruction,
+  chooseResearch,
 } from "@/systems/turn";
 import { raiseUnit, moveArmy, reachableRegions } from "@/systems/military";
 import {
@@ -99,6 +100,10 @@ function main(): void {
     },
     onRejectOffer(offerId) {
       state = rejectOffer(state, offerId);
+      sync();
+    },
+    onChooseResearch(tech) {
+      state = chooseResearch(state, tech);
       sync();
     },
   });

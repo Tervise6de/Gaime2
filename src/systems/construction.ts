@@ -11,14 +11,14 @@
  * completions for the turn log. Input is not mutated.
  */
 
-import { BUILDINGS, BUILD_RATE } from "@/data/buildings";
+import { BUILDINGS, BUILD_RATE, type BuildingId } from "@/data/buildings";
 import { round1 } from "@/systems/economy";
 import type { Region } from "@/systems/state";
 
 export interface ConstructionResult {
   regions: Region[];
   materialsSpent: number;
-  completed: { regionName: string; building: string }[];
+  completed: { regionName: string; building: BuildingId }[];
 }
 
 export function advanceConstruction(
@@ -27,7 +27,7 @@ export function advanceConstruction(
   ownerId: number,
 ): ConstructionResult {
   let budget = availableMaterials;
-  const completed: { regionName: string; building: string }[] = [];
+  const completed: { regionName: string; building: BuildingId }[] = [];
 
   const nextRegions = regions.map((region) => {
     const order = region.construction;
@@ -42,11 +42,12 @@ export function advanceConstruction(
     const progress = round1(order.progress + invest);
 
     if (progress >= def.cost) {
-      completed.push({ regionName: region.name, building: def.name });
+      completed.push({ regionName: region.name, building: order.building });
       return {
         ...region,
         buildings: [...region.buildings, order.building],
         construction: null,
+        fortification: region.fortification + (def.fortification ?? 0),
       };
     }
     return { ...region, construction: { building: order.building, progress } };

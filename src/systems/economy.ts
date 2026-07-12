@@ -16,7 +16,7 @@
  */
 
 import { BUILDINGS } from "@/data/buildings";
-import { TERRAIN } from "@/data/terrain";
+import { TERRAIN, type ResourceYield } from "@/data/terrain";
 import {
   UNREST_PENALTY_START,
   UNREST_REVOLT,
@@ -25,6 +25,9 @@ import {
   type Region,
   type ResourceFlow,
 } from "@/systems/state";
+import { techMultipliers } from "@/systems/tech";
+
+const NO_MULT: ResourceYield = { food: 1, materials: 1, gold: 1, knowledge: 1 };
 
 /** Each unit of population works the land at these per-head rates. */
 const FOOD_PER_WORKER = 0.6;
@@ -57,17 +60,24 @@ function buildingYield(region: Region): ResourceFlow {
   return acc;
 }
 
-/** Per-turn resource flow produced by a single region at a given tax rate. */
-export function regionProduction(region: Region, taxRate: number): ResourceFlow {
+/**
+ * Per-turn resource flow produced by a single region at a given tax rate, with
+ * optional research yield multipliers (defaults to none).
+ */
+export function regionProduction(
+  region: Region,
+  taxRate: number,
+  mult: ResourceYield = NO_MULT,
+): ResourceFlow {
   const base = TERRAIN[region.terrain].base;
   const b = buildingYield(region);
   const pop = region.population;
   const m = unrestPenalty(region.unrest);
 
-  const food = (base.food + b.food + pop * FOOD_PER_WORKER - pop * FOOD_PER_HEAD) * m;
-  const materials = (base.materials + b.materials + pop * MAT_PER_WORKER) * m;
-  const gold = ((base.gold + b.gold) * (1 + taxRate) + pop * GOLD_PER_WORKER) * m;
-  const knowledge = (base.knowledge + b.knowledge) * m;
+  const food = (base.food + b.food + pop * FOOD_PER_WORKER - pop * FOOD_PER_HEAD) * m * mult.food;
+  const materials = (base.materials + b.materials + pop * MAT_PER_WORKER) * m * mult.materials;
+  const gold = ((base.gold + b.gold) * (1 + taxRate) + pop * GOLD_PER_WORKER) * m * mult.gold;
+  const knowledge = (base.knowledge + b.knowledge) * m * mult.knowledge;
 
   return {
     food: round1(food),
@@ -82,11 +92,13 @@ export function nationalProduction(
   state: GameState,
   ownerId: number,
 ): ResourceFlow {
-  const taxRate = state.nations.find((n) => n.id === ownerId)?.taxRate ?? 0;
+  const nation = state.nations.find((n) => n.id === ownerId);
+  const taxRate = nation?.taxRate ?? 0;
+  const mult = nation ? techMultipliers(nation.research.done) : NO_MULT;
   return state.regions
     .filter((r) => r.ownerId === ownerId)
     .reduce<ResourceFlow>((acc, region) => {
-      const flow = regionProduction(region, taxRate);
+      const flow = regionProduction(region, taxRate, mult);
       return {
         food: round1(acc.food + flow.food),
         materials: round1(acc.materials + flow.materials),

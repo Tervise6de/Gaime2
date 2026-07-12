@@ -14,6 +14,7 @@
 import type { BuildingId } from "@/data/buildings";
 import type { ResourceYield, StrategicResource, TerrainId } from "@/data/terrain";
 import type { UnitType } from "@/data/units";
+import type { TechId } from "@/data/techs";
 
 /** Owner id 0 is always the human player. */
 export const PLAYER_ID = 0;
@@ -94,6 +95,28 @@ export const BORDER_FRICTION = 0.5;
 /** Below this relation an AI will consider war; above it, treaties. */
 export const HOSTILE_THRESHOLD = -30;
 export const FRIENDLY_THRESHOLD = 40;
+
+/**
+ * Tech / victory / events tuning (M5, docs/game-design.md §3.6, §6).
+ */
+/** Fraction of all regions a nation must hold for a domination victory. */
+export const DOMINATION_FRACTION = 0.6;
+/** Great Works needed for an economic victory. */
+export const WONDER_GOAL = 3;
+/** The game ends at this turn on a prestige-score tiebreak. */
+export const TURN_LIMIT = 150;
+/** Per-turn probability a bounded random event fires for the player. */
+export const EVENT_CHANCE = 0.16;
+
+/** A nation's research state. */
+export interface Research {
+  /** The tech currently being researched, if any. */
+  current: TechId | null;
+  /** Knowledge invested into `current` so far. */
+  progress: number;
+  /** Completed techs. */
+  done: TechId[];
+}
 
 /** A region's single construction slot. */
 export interface ConstructionOrder {
@@ -176,6 +199,10 @@ export interface Nation {
   taxRate: number;
   /** AI archetype; undefined for the player and barbarians. */
   personality?: Personality;
+  /** Research state (techs done, current, progress). */
+  research: Research;
+  /** Great Works completed (economic victory progress). */
+  wonders: number;
   /** Last turn's flags, for the HUD. */
   famine: boolean;
   bankrupt: boolean;
@@ -214,10 +241,17 @@ export interface GameState {
   /** Offers from AI nations awaiting the player's response. */
   offers: DiplomaticOffer[];
   nextOfferId: number;
-  /** Set once the game has been decided (M5 fills victory; M4 sets defeat). */
+  /** Set once the game has been decided. */
   outcome: "playing" | "defeat" | "victory";
+  /** How the game was decided (for the banner), e.g. "domination". */
+  victoryKind?: string;
   /** Human-readable turn log, newest last. */
   log: string[];
+}
+
+/** A fresh research record. */
+export function emptyResearch(): Research {
+  return { current: null, progress: 0, done: [] };
 }
 
 /** The player is nation 0. */

@@ -24,7 +24,10 @@ import {
   totalUpkeep,
 } from "@/systems/military";
 import { getRelation, getTreaty } from "@/systems/diplomacy";
+import { researchFrontier, isBuildingUnlockedFor, techMultipliers } from "@/systems/tech";
 import { ARCHETYPE_LABEL } from "@/data/personalities";
+import { TECHS, type TechId } from "@/data/techs";
+import { WONDER_GOAL } from "@/systems/state";
 import {
   PLAYER_ID,
   RESOURCE_KEYS,
@@ -37,6 +40,7 @@ import {
   playerNation,
   type Army,
   type GameState,
+  type Nation,
   type Region,
   type ResourceKey,
 } from "@/systems/state";
@@ -56,7 +60,15 @@ export interface HudCallbacks {
   onGift(targetId: number, amount: number): void;
   onAcceptOffer(offerId: number): void;
   onRejectOffer(offerId: number): void;
+  onChooseResearch(tech: TechId): void;
 }
+
+const BRANCH_COLOR: Record<string, string> = {
+  economy: "#e0b74a",
+  military: "#e8776b",
+  civics: "#63c7d6",
+  wonders: "#b06ec0",
+};
 
 /** Fixed gift size the diplomacy panel offers. */
 const GIFT_AMOUNT = 30;
@@ -155,6 +167,12 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   diploPanel.append(diploBody);
   root.append(diploPanel);
 
+  // --- Research panel (bottom centre) ---------------------------------------
+  const researchPanel = el("div", "hud-panel hud-research");
+  const researchBody = el("div", "hud-research-body");
+  researchPanel.append(researchBody);
+  root.append(researchPanel);
+
   // --- Outcome banner (hidden until decided) --------------------------------
   const banner = el("div", "hud-banner");
   banner.style.display = "none";
@@ -195,13 +213,16 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
     renderRegion(regionBody, state, selectedRegionId, moveArmyId, callbacks);
     renderDiplomacy(diploBody, state, callbacks);
+    renderResearch(researchBody, player, callbacks);
 
     if (state.outcome === "playing") {
       banner.style.display = "none";
     } else {
       banner.style.display = "flex";
       banner.className = "hud-banner " + (state.outcome === "victory" ? "win" : "lose");
-      banner.textContent = state.outcome === "victory" ? "Victory — the last realm standing." : "Defeat — your realm has fallen.";
+      const kind = state.victoryKind ? ` (${state.victoryKind})` : "";
+      banner.textContent =
+        state.outcome === "victory" ? `Victory${kind}!` : `Defeat${kind} — your realm has fallen.`;
     }
 
     logBody.innerHTML = "";
@@ -262,7 +283,8 @@ function renderOwnedRegion(
   moveArmyId: number | null,
   callbacks: HudCallbacks,
 ): void {
-  const flow = regionProduction(region, playerNation(state).taxRate);
+  const player = playerNation(state);
+  const flow = regionProduction(region, player.taxRate, techMultipliers(player.research.done));
 
   // Unrest bar.
   const unrestWrap = el("div", "hud-unrest");
@@ -303,7 +325,7 @@ function renderOwnedRegion(
   container.append(renderArmySection(state, region, army, moveArmyId, callbacks));
 
   // Construction.
-  container.append(renderBuildSection(region, callbacks));
+  container.append(renderBuildSection(region, playerNation(state).research.done, callbacks));
 }
 
 function renderEnemyRegion(container: HTMLElement, state: GameState, region: Region): void {
@@ -368,7 +390,7 @@ function renderArmySection(
   return section;
 }
 
-function renderBuildSection(region: Region, callbacks: HudCallbacks): HTMLElement {
+function renderBuildSection(region: Region, done: TechId[], callbacks: HudCallbacks): HTMLElement {
   const section = el("div", "hud-build");
   section.append(heading("Construction"));
 
@@ -393,14 +415,16 @@ function renderBuildSection(region: Region, callbacks: HudCallbacks): HTMLElemen
   for (const id of BUILDING_IDS) {
     const def = BUILDINGS[id];
     const already = region.buildings.includes(id);
+    const unlocked = isBuildingUnlockedFor(done, id);
     const btn = document.createElement("button");
     btn.className = "hud-build-btn";
-    btn.disabled = already;
-    btn.title = def.blurb;
+    btn.disabled = already || !unlocked;
+    btn.title = unlocked ? def.blurb : `Locked — research ${def.requiresTech?.replace(/_/g, " ")}.`;
+    const costLabel = already ? "built" : !unlocked ? "🔒" : def.cost + "⛏";
     btn.innerHTML =
       `<span class="hud-build-name">${def.name}</span>` +
-      `<span class="hud-build-cost">${already ? "built" : def.cost + "⛏"}</span>`;
-    if (!already) btn.addEventListener("click", () => callbacks.onQueueBuilding(region.id, id));
+      `<span class="hud-build-cost">${costLabel}</span>`;
+    if (!already && unlocked) btn.addEventListener("click", () => callbacks.onQueueBuilding(region.id, id));
     menu.append(btn);
   }
   section.append(menu);
@@ -477,6 +501,49 @@ function renderDiplomacy(
     card.append(actions);
     container.append(card);
   }
+}
+
+function renderResearch(container: HTMLElement, player: Nation, callbacks: HudCallbacks): void {
+  container.innerHTML = "";
+  const research = player.research;
+
+  const header = el("div", "hud-research-head");
+  const title = el("span", "hud-research-title");
+  if (research.current) {
+    const def = TECHS[research.current];
+    const pct = Math.min(100, (research.progress / def.cost) * 100);
+    title.textContent = `Researching: ${def.name} (${Math.floor(research.progress)}/${def.cost})`;
+    const bar = el("div", "hud-research-bar");
+    const fill = el("div", "hud-research-fill");
+    fill.style.width = `${pct}%`;
+    fill.style.background = BRANCH_COLOR[def.branch];
+    bar.append(fill);
+    header.append(title, bar);
+  } else {
+    title.textContent = "Choose a technology to research →";
+    header.append(title);
+  }
+  const count = el("span", "hud-research-count");
+  count.textContent = `${research.done.length}/${Object.keys(TECHS).length} techs · ${player.wonders}/${WONDER_GOAL} wonders`;
+  header.append(count);
+  container.append(header);
+
+  const frontier = researchFrontier(research.done);
+  const menu = el("div", "hud-tech-menu");
+  for (const id of frontier) {
+    const def = TECHS[id];
+    const b = document.createElement("button");
+    b.className = "hud-tech-btn" + (research.current === id ? " active" : "");
+    b.title = def.blurb;
+    b.style.borderLeftColor = BRANCH_COLOR[def.branch];
+    b.innerHTML =
+      `<span class="hud-tech-name">${def.name}</span>` +
+      `<span class="hud-tech-cost">${def.cost}📖 · ${def.branch}</span>`;
+    b.addEventListener("click", () => callbacks.onChooseResearch(id));
+    menu.append(b);
+  }
+  if (!frontier.length) menu.append(line("All technologies researched.", "hud-hint"));
+  container.append(menu);
 }
 
 // --- helpers ----------------------------------------------------------------
