@@ -4,23 +4,25 @@ A browser-based **Kingdom Management / 4X-lite** strategy game. Depth comes
 from interacting systems — economy, population, military, diplomacy — rather
 than from art. Low-art, high-decision-density, runs anywhere a browser does.
 
-> **Status:** Milestone 5 — Tech/Research + Victory + Events. The **full game
-> loop** is here: a branching **tech tree** (16 techs across economy, military,
-> civics and wonders) whose research multiplies your economy, eases unrest, and
-> unlocks the advanced units and buildings; **three victory paths** (domination
-> by holding ≥60% of regions or eliminating rivals, a **Great Works** economic
-> win, and a prestige-score tiebreak at the turn limit); and **bounded random
-> events** (harvests, plague, ore finds, migration, uprisings, mercenaries) for
-> texture. It builds on M1–M4: terrain economy and taxes, population/unrest,
-> buildings, the unit counter loop and abstract combat, conquest, and two
-> **rule-based AI rivals** with personality archetypes plus a small, expressive
-> diplomacy set (war, peace, pacts, alliances, gifts, tribute).
->
-> Games now have **goals and divergent strategies end-to-end — a full, winnable,
-> replayable game.** M6 (polish + balance) is next.
+> **Status:** v1 complete (Milestones 1–6). A tight, systems-driven 4X: a seeded
+> procedural region-graph map; a terrain economy with taxes, population and the
+> **unrest** anti-snowball brake; buildings; a five-unit **counter loop** with
+> abstract combat, strategic resources, upkeep and conquest; **1–3 rule-based AI
+> rivals** with personality archetypes and a small, expressive **diplomacy** set
+> (war, peace, pacts, alliances, gifts, tribute); a branching **16-tech tree**;
+> **three victory paths** (domination, Great Works, prestige score); and bounded
+> random **events**. M6 adds **difficulty settings**, **save/load** (autosave +
+> a manual checkpoint), keyboard end-turn, a victory/defeat screen, and a
+> balance pass (with equal AI skill the player — one of three powers — wins ~40%
+> on easy, ~30% on normal, ~10% on hard).
 >
 > **The rival AI is 100% local:** plain TypeScript running in your browser — no
 > LLM/API calls, no key, no credits. Free and offline to play.
+>
+> *Deferred by design:* the map uses the **node+edge renderer** the design doc
+> sanctions as the shippable fallback (§4); the game is fully playable this way,
+> and a Voronoi-polygon renderer would be a pure visual upgrade over identical
+> logic.
 
 ## Tech stack
 
@@ -56,9 +58,10 @@ npm run test:watch # run tests in watch mode
 
 The simulation is a set of **pure functions** over a serialisable `GameState`
 (seeded RNG, deterministic turn pipeline — combat, AI, research and events
-included), so the systems are covered by fast unit tests — 126 tests across the
+included), so the systems are covered by fast unit tests — 130 tests across the
 RNG, map generation, economy, population, stability, construction, combat,
-military, diplomacy, rival AI, tech, events, victory, and turn resolution.
+military, diplomacy, rival AI, tech, events, victory, save/load, and turn
+resolution.
 
 ## Project structure
 

@@ -15,6 +15,7 @@ import {
   acceptOffer,
   rejectOffer,
 } from "@/systems/diplomacy";
+import { saveToLocal, loadFromLocal, hasLocalSave } from "@/systems/save";
 import { PLAYER_ID, type GameState } from "@/systems/state";
 import { createHud } from "@/ui/hud";
 import "@/ui/style.css";
@@ -22,14 +23,11 @@ import "@/ui/style.css";
 /**
  * Application entry point.
  *
- * Wires the three layers together: the pure sim (GameState + turn pipeline and
- * military intents), the canvas renderer (region graph + armies), and the DOM
- * HUD (reads state, emits intents). `state` is the single source of truth;
- * every intent produces a new GameState and re-syncs the view.
- *
- * Army movement uses a small "move mode": selecting a player army and pressing
- * Move highlights reachable neighbours; the next click on a highlighted region
- * issues `moveArmy` (which may resolve combat and capture).
+ * Wires the three layers together: the pure sim (GameState + turn pipeline,
+ * military and diplomacy intents), the canvas renderer (region graph + armies),
+ * and the DOM HUD (reads state, emits intents). `state` is the single source of
+ * truth; every intent produces a new GameState and re-syncs the view. The game
+ * autosaves to localStorage each change and can be reloaded.
  */
 function main(): void {
   const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas");
@@ -37,7 +35,8 @@ function main(): void {
   if (!canvas) throw new Error("Canvas element #game-canvas not found");
   if (!hudRoot) throw new Error("HUD element #hud not found");
 
-  let state: GameState = createGame({ seed: 12345 });
+  // Resume the last autosave if one exists, otherwise start a fresh game.
+  let state: GameState = (hasLocalSave("auto") && loadFromLocal("auto")) || createGame({ seed: 12345 });
   let selectedRegion: number | null = null;
   let moveArmyId: number | null = null;
 
@@ -45,30 +44,47 @@ function main(): void {
   const hud = createHud(hudRoot, {
     onTaxChange(rate) {
       state = setTaxRate(state, rate);
-      sync();
+      commit();
     },
     onEndTurn() {
+      if (state.outcome !== "playing") return;
       state = resolveTurn(state);
       moveArmyId = null;
-      sync();
+      commit();
     },
-    onNewGame(seed) {
-      state = createGame({ seed });
+    onNewGame(config) {
+      state = createGame(config);
       selectedRegion = null;
       moveArmyId = null;
-      sync();
+      commit();
+    },
+    onSave() {
+      const ok = saveToLocal(state, nowStamp(), "manual");
+      hud.toast(ok ? "Checkpoint saved." : "Save failed (storage unavailable).");
+    },
+    onLoad() {
+      const loaded = loadFromLocal("manual");
+      if (loaded) {
+        state = loaded;
+        selectedRegion = null;
+        moveArmyId = null;
+        commit(); // make the restored checkpoint the live autosave too
+        hud.toast("Checkpoint loaded.");
+      } else {
+        hud.toast("No saved checkpoint.");
+      }
     },
     onQueueBuilding(regionId, building) {
       state = queueBuilding(state, regionId, building);
-      sync();
+      commit();
     },
     onCancelConstruction(regionId) {
       state = cancelConstruction(state, regionId);
-      sync();
+      commit();
     },
     onRaiseUnit(regionId, unit) {
       state = raiseUnit(state, regionId, unit);
-      sync();
+      commit();
     },
     onBeginMove(armyId) {
       moveArmyId = armyId;
@@ -80,53 +96,68 @@ function main(): void {
     },
     onDeclareWar(targetId) {
       state = declareWar(state, PLAYER_ID, targetId);
-      sync();
+      commit();
     },
     onMakePeace(targetId) {
       state = playerPropose(state, targetId, "peace");
-      sync();
+      commit();
     },
     onProposePact(targetId, kind) {
       state = playerPropose(state, targetId, kind);
-      sync();
+      commit();
     },
     onGift(targetId, amount) {
       state = gift(state, PLAYER_ID, targetId, amount);
-      sync();
+      commit();
     },
     onAcceptOffer(offerId) {
       state = acceptOffer(state, offerId);
-      sync();
+      commit();
     },
     onRejectOffer(offerId) {
       state = rejectOffer(state, offerId);
-      sync();
+      commit();
     },
     onChooseResearch(tech) {
       state = chooseResearch(state, tech);
-      sync();
+      commit();
     },
   });
 
   renderer.onRegionClick((regionId) => {
-    // In move mode, a click on a reachable neighbour issues the move/attack.
     if (moveArmyId !== null && regionId !== null) {
       const army = state.armies.find((a) => a.id === moveArmyId);
       if (army && reachableRegions(state, army).includes(regionId)) {
         state = moveArmy(state, moveArmyId, regionId);
-        // Selection and move mode follow the (possibly relocated) army.
         const moved = state.armies.find((a) => a.id === moveArmyId);
         selectedRegion = moved ? moved.regionId : regionId;
         moveArmyId = moved && moved.movesLeft > 0 ? moved.id : null;
-        sync();
+        commit();
         return;
       }
     }
-    // Otherwise just select; leaving move mode.
     selectedRegion = regionId;
     moveArmyId = null;
     sync();
   });
+
+  // Keyboard: Enter / Space ends the turn (unless typing in an input).
+  window.addEventListener("keydown", (ev) => {
+    const target = ev.target as HTMLElement | null;
+    if (target && (target.tagName === "INPUT" || target.tagName === "SELECT")) return;
+    if ((ev.key === "Enter" || ev.key === " ") && state.outcome === "playing") {
+      ev.preventDefault();
+      state = resolveTurn(state);
+      moveArmyId = null;
+      commit();
+    }
+  });
+
+  /** Re-render the view and persist the continuous autosave. */
+  function commit(): void {
+    sync();
+    saveToLocal(state, nowStamp(), "auto");
+  }
 
   function sync(): void {
     renderer.setState(state);
@@ -145,7 +176,12 @@ function main(): void {
   sync();
 
   // eslint-disable-next-line no-console
-  console.info("Gaime2 — Milestone 3 ready. Raise armies, march, and conquer.");
+  console.info("Gaime2 — v1 ready. Build, research, conquer, and outlast your rivals.");
+}
+
+/** A wall-clock stamp for saves. Kept out of the sim (which forbids Date). */
+function nowStamp(): number {
+  return Date.now();
 }
 
 main();

@@ -65,6 +65,7 @@ function battlefield(playerUnits: Partial<Record<string, number>>, barbUnits: Pa
     treaties: {},
     offers: [],
     nextOfferId: 0,
+    difficulty: "normal",
     outcome: "playing",
     log: [],
   };

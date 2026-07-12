@@ -34,6 +34,7 @@ import {
   BANKRUPTCY_UNREST,
   BARBARIAN_ID,
   DEFAULT_TAX,
+  DIFFICULTY,
   EVENT_CHANCE,
   GRANARY_CAP,
   PLAYER_ID,
@@ -42,6 +43,7 @@ import {
   emptyResearch,
   emptyUnits,
   type Army,
+  type Difficulty,
   type GameState,
   type Nation,
   type Region,
@@ -77,6 +79,7 @@ export interface NewGameOptions {
   map?: MapGenOptions;
   taxRate?: number;
   rivals?: number;
+  difficulty?: Difficulty;
 }
 
 /** Build a fresh game from a seed. Pure: same seed → identical starting state. */
@@ -176,6 +179,7 @@ export function createGame(options: NewGameOptions): GameState {
     treaties: {},
     offers: [],
     nextOfferId: 0,
+    difficulty: options.difficulty ?? "normal",
     outcome: "playing",
     log: [
       `Turn 1 — your realm rises around ${playerCapitalName}; ` +
@@ -251,14 +255,17 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
   const flow = nationalProduction(state, nationId);
   const upkeep = totalUpkeep(state, nationId);
 
+  // Difficulty scales rival economies (never the player's).
+  const econMult = nation.isPlayer ? 1 : DIFFICULTY[state.difficulty].rivalEconomy;
+
   // Research: knowledge produced funds the current tech.
   const step = advanceResearch(nation.research, flow.knowledge);
   const research = step.research;
 
   const stocks: ResourceStocks = {
-    gold: round1(nation.stocks.gold + flow.gold - upkeep),
+    gold: round1(nation.stocks.gold + flow.gold * econMult - upkeep),
     food: nation.stocks.food,
-    materials: round1(nation.stocks.materials + flow.materials),
+    materials: round1(nation.stocks.materials + flow.materials * econMult),
     knowledge: round1(research.progress), // display: invested in current tech
   };
 

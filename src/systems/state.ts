@@ -108,6 +108,22 @@ export const TURN_LIMIT = 150;
 /** Per-turn probability a bounded random event fires for the player. */
 export const EVENT_CHANCE = 0.16;
 
+/** Difficulty scales rival economy and how soon they turn on the player. */
+export type Difficulty = "easy" | "normal" | "hard";
+
+export interface DifficultyConfig {
+  /** Multiplier on rival (non-player) income. */
+  rivalEconomy: number;
+  /** Turns before rivals may attack the player. */
+  earlyPeace: number;
+}
+
+export const DIFFICULTY: Record<Difficulty, DifficultyConfig> = {
+  easy: { rivalEconomy: 0.8, earlyPeace: 25 },
+  normal: { rivalEconomy: 1.0, earlyPeace: 18 },
+  hard: { rivalEconomy: 1.25, earlyPeace: 10 },
+};
+
 /** A nation's research state. */
 export interface Research {
   /** The tech currently being researched, if any. */
@@ -241,6 +257,8 @@ export interface GameState {
   /** Offers from AI nations awaiting the player's response. */
   offers: DiplomaticOffer[];
   nextOfferId: number;
+  /** Difficulty chosen for this game (scales rivals). */
+  difficulty: Difficulty;
   /** Set once the game has been decided. */
   outcome: "playing" | "defeat" | "victory";
   /** How the game was decided (for the banner), e.g. "domination". */

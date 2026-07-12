@@ -27,7 +27,7 @@ import { getRelation, getTreaty } from "@/systems/diplomacy";
 import { researchFrontier, isBuildingUnlockedFor, techMultipliers } from "@/systems/tech";
 import { ARCHETYPE_LABEL } from "@/data/personalities";
 import { TECHS, type TechId } from "@/data/techs";
-import { WONDER_GOAL } from "@/systems/state";
+import { WONDER_GOAL, type Difficulty } from "@/systems/state";
 import {
   PLAYER_ID,
   RESOURCE_KEYS,
@@ -45,10 +45,18 @@ import {
   type ResourceKey,
 } from "@/systems/state";
 
+export interface NewGameConfig {
+  seed: number;
+  difficulty: Difficulty;
+  rivals: number;
+}
+
 export interface HudCallbacks {
   onTaxChange(rate: number): void;
   onEndTurn(): void;
-  onNewGame(seed: number): void;
+  onNewGame(config: NewGameConfig): void;
+  onSave(): void;
+  onLoad(): void;
   onQueueBuilding(regionId: number, building: BuildingId): void;
   onCancelConstruction(regionId: number): void;
   onRaiseUnit(regionId: number, unit: UnitType): void;
@@ -75,6 +83,8 @@ const GIFT_AMOUNT = 30;
 
 export interface Hud {
   update(state: GameState, selectedRegionId: number | null, moveArmyId: number | null): void;
+  /** Flash a transient message (e.g. save/load feedback). */
+  toast(message: string): void;
 }
 
 const RESOURCE_META: Record<ResourceKey, { label: string; icon: string }> = {
@@ -136,20 +146,47 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   endTurnBtn.addEventListener("click", () => callbacks.onEndTurn());
   controls.append(endTurnBtn);
 
-  const newGameRow = el("div", "hud-newgame");
+  // New-game configuration: seed, difficulty, rivals.
+  const cfgRow = el("div", "hud-newgame");
   const seedInput = document.createElement("input");
   seedInput.type = "text";
   seedInput.className = "hud-seed";
   seedInput.placeholder = "seed";
+  const difficultySel = select("hud-select", [
+    ["easy", "Easy"],
+    ["normal", "Normal"],
+    ["hard", "Hard"],
+  ], "normal");
+  const rivalsSel = select("hud-select", [
+    ["1", "1 rival"],
+    ["2", "2 rivals"],
+    ["3", "3 rivals"],
+  ], "2");
+  cfgRow.append(seedInput, difficultySel, rivalsSel);
+  controls.append(cfgRow);
+
+  const btnRow = el("div", "hud-newgame");
   const newGameBtn = document.createElement("button");
-  newGameBtn.className = "hud-newgame-btn";
-  newGameBtn.textContent = "New map";
+  newGameBtn.className = "hud-newgame-btn primary";
+  newGameBtn.textContent = "New game";
   newGameBtn.addEventListener("click", () => {
     const raw = seedInput.value.trim();
-    callbacks.onNewGame(raw === "" ? (Date.now() >>> 0) : parseSeed(raw));
+    callbacks.onNewGame({
+      seed: raw === "" ? (Date.now() >>> 0) : parseSeed(raw),
+      difficulty: difficultySel.value as Difficulty,
+      rivals: Number(rivalsSel.value),
+    });
   });
-  newGameRow.append(seedInput, newGameBtn);
-  controls.append(newGameRow);
+  const saveBtn = document.createElement("button");
+  saveBtn.className = "hud-newgame-btn";
+  saveBtn.textContent = "Save";
+  saveBtn.addEventListener("click", () => callbacks.onSave());
+  const loadBtn = document.createElement("button");
+  loadBtn.className = "hud-newgame-btn";
+  loadBtn.textContent = "Load";
+  loadBtn.addEventListener("click", () => callbacks.onLoad());
+  btnRow.append(newGameBtn, saveBtn, loadBtn);
+  controls.append(btnRow);
   leftPanel.append(controls);
   root.append(leftPanel);
 
@@ -176,7 +213,25 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   // --- Outcome banner (hidden until decided) --------------------------------
   const banner = el("div", "hud-banner");
   banner.style.display = "none";
+  const bannerText = el("span", "hud-banner-text");
+  const bannerBtn = document.createElement("button");
+  bannerBtn.className = "hud-banner-btn";
+  bannerBtn.textContent = "New game";
+  bannerBtn.addEventListener("click", () => newGameBtn.click());
+  banner.append(bannerText, bannerBtn);
   root.append(banner);
+
+  // --- Transient toast (save/load feedback) ---------------------------------
+  const toast = el("div", "hud-toast");
+  toast.style.display = "none";
+  root.append(toast);
+  let toastTimer = 0;
+  function flashToast(msg: string): void {
+    toast.textContent = msg;
+    toast.style.display = "block";
+    window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => (toast.style.display = "none"), 2200);
+  }
 
   // --- Bottom: turn log -----------------------------------------------------
   const logPanel = el("div", "hud-panel hud-log");
@@ -204,7 +259,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     turnBadge.textContent =
       (player.famine ? "⚠ FAMINE · " : "") +
       (player.bankrupt ? "⚠ BANKRUPT · " : "") +
-      `Turn ${state.turn} · seed ${state.seed}`;
+      `Turn ${state.turn} · ${state.difficulty} · seed ${state.seed}`;
     turnBadge.classList.toggle("famine", player.famine || player.bankrupt);
 
     taxInput.value = String(Math.round(player.taxRate * 100));
@@ -221,7 +276,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       banner.style.display = "flex";
       banner.className = "hud-banner " + (state.outcome === "victory" ? "win" : "lose");
       const kind = state.victoryKind ? ` (${state.victoryKind})` : "";
-      banner.textContent =
+      bannerText.textContent =
         state.outcome === "victory" ? `Victory${kind}!` : `Defeat${kind} — your realm has fallen.`;
     }
 
@@ -233,7 +288,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     }
   }
 
-  return { update };
+  return { update, toast: flashToast };
 }
 
 function renderRegion(
@@ -558,6 +613,19 @@ function relationColor(rel: number): string {
   if (rel >= 40) return "#6fb98a";
   if (rel <= -30) return "#e8776b";
   return "#c9cedb";
+}
+
+function select(className: string, options: [string, string][], value: string): HTMLSelectElement {
+  const sel = document.createElement("select");
+  sel.className = className;
+  for (const [v, label] of options) {
+    const opt = document.createElement("option");
+    opt.value = v;
+    opt.textContent = label;
+    sel.append(opt);
+  }
+  sel.value = value;
+  return sel;
 }
 
 function btn(label: string, className: string, onClick: () => void): HTMLButtonElement {

@@ -41,6 +41,7 @@ import { TECHS, type TechId } from "@/data/techs";
 import type { Rng } from "@/systems/rng";
 import {
   BARBARIAN_ID,
+  DIFFICULTY,
   PLAYER_ID,
   armySize,
   clampTax,
@@ -48,8 +49,10 @@ import {
   type Nation,
 } from "@/systems/state";
 
-/** Rivals leave the player alone for the opening turns (fair ramp-up). */
-const EARLY_PEACE_TURNS = 15;
+/** Turns rivals leave the player alone at the start (scales with difficulty). */
+function earlyPeaceTurns(state: GameState): number {
+  return DIFFICULTY[state.difficulty].earlyPeace;
+}
 
 /** Run a rival nation's full turn. */
 export function runNationTurn(state: GameState, nationId: number, rng: Rng): GameState {
@@ -166,7 +169,7 @@ function doDiplomacy(state: GameState, nationId: number, rng: Rng): GameState {
     // Opportunistic war: hostile, bordering, and I'm stronger. Warlords pounce
     // at worse odds; peaceful types need a big edge. The player gets an
     // early-game grace period so a new realm isn't snuffed out immediately.
-    const earlyGraceForPlayer = o.isPlayer && s.turn < EARLY_PEACE_TURNS;
+    const earlyGraceForPlayer = o.isPlayer && s.turn < earlyPeaceTurns(s);
     const warThreshold = 1.5 - aggression;
     if (border && rel < -25 && ratio > warThreshold && !earlyGraceForPlayer) {
       s = openWar(s, nationId, o);
@@ -284,7 +287,7 @@ function bestTarget(state: GameState, army: { id: number; regionId: number; unit
     const isEnemy = target.ownerId !== null && !isBarb && atWar(state, nationId, target.ownerId);
     if (!isBarb && !isEnemy) continue; // don't attack nations we're at peace with
     // Honour the player's early-game grace: don't invade them before it lapses.
-    if (target.ownerId === PLAYER_ID && state.turn < EARLY_PEACE_TURNS) continue;
+    if (target.ownerId === PLAYER_ID && state.turn < earlyPeaceTurns(state)) continue;
 
     const defender = state.armies.find((a) => a.regionId === nid && a.ownerId !== nationId);
     const def = defender

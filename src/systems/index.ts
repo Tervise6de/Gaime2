@@ -76,6 +76,13 @@ export {
 } from "@/systems/tech";
 export { fireEvent } from "@/systems/events";
 export { checkVictory, nationScore } from "@/systems/victory";
+export {
+  serializeGame,
+  deserializeGame,
+  saveToLocal,
+  loadFromLocal,
+  hasLocalSave,
+} from "@/systems/save";
 
 export {
   getRelation,
