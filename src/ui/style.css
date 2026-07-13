@@ -1032,6 +1032,40 @@ body {
   width: min(460px, 96vw);
 }
 
+/* Choice-event decision modal. */
+.hud-choice-panel {
+  width: min(420px, 96vw);
+}
+
+.hud-choice-prompt {
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.hud-choice-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hud-choice-option {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hud-choice-btn {
+  padding: 8px 12px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.hud-choice-detail {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
 .hud-techtree-head {
   display: flex;
   align-items: center;

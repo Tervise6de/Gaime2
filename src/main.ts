@@ -16,6 +16,7 @@ import {
   acceptOffer,
   rejectOffer,
 } from "@/systems/diplomacy";
+import { resolveChoice } from "@/systems/events";
 import { saveToLocal, loadFromLocal, hasLocalSave, serializeGame, deserializeGame } from "@/systems/save";
 import { summarizeTurn, type TurnSummary } from "@/systems/summary";
 import { PLAYER_ID, type GameState } from "@/systems/state";
@@ -150,6 +151,10 @@ function main(): void {
       state = chooseResearch(state, tech);
       commit();
     },
+    onResolveChoice(optionId) {
+      state = resolveChoice(state, optionId);
+      commit();
+    },
   });
 
   renderer.onRegionClick((regionId) => {
@@ -182,6 +187,10 @@ function main(): void {
   /** Resolve one turn, capturing a summary of what changed for the player. */
   function advanceTurn(): void {
     if (state.outcome !== "playing") return;
+    if (state.pendingChoice) {
+      hud.toast("Resolve the pending decision first.");
+      return;
+    }
     const before = state;
     state = resolveTurn(state);
     lastSummary = summarizeTurn(before, state);

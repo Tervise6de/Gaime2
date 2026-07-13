@@ -6,6 +6,43 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Player-choice events (a decision, not just a happening)
+
+Every event so far *happened to* you. Added the first **choice event**: when a
+mercenary company's offer fires for the player, a modal asks — **Hire (−40g)** for
+2 infantry at your capital, or **Decline** — instead of auto-resolving. It's real
+agency: events can now pose decisions.
+
+The plumbing is built to generalise. `GameState` gained an optional, fully
+serialisable `pendingChoice` (event id + prompt + option labels — no functions,
+so it round-trips through save/load and legacy saves simply have none). An
+`EventDef` may carry a `choice { prompt, options[], aiPick }`: for the player,
+`fireEvent` raises `pendingChoice` (no effect yet); for an AI it calls `aiPick`
+and auto-resolves deterministically (funded, aggressive AIs hire; others
+decline). The player resolves via a new `resolveChoice(state, optionId)` intent
+that applies the chosen option's effect and clears the prompt. `main.ts` blocks
+End turn while a decision pends (with a toast); the HUD shows a non-dismissable
+modal. Determinism holds — the AI path is seed-driven; the player's pick is an
+input like any move.
+
+**Balance (200-seed × 4-archetype self-play probe, deleted before commit):** win
+rates warlord 34 / opportunist 28 / builder 29 / merchant 24 — a 24–34% spread,
+unchanged from before; all victory kinds reached, games complete. The AI's
+occasional 2-infantry hire is neutral.
+
+**Verify:** typecheck ✓, 242 tests ✓ (+5: player prompt raised without effect,
+hire pays 40g & adds 2 infantry & clears, decline clears at no cost, no-op when
+nothing pends, AI never leaves a decision pending), build ✓ (0 `fetch`, deps
+`{}`). Browser-driven (seed 2, one End turn): the modal showed the prompt and
+both options; End turn was blocked ("Resolve the pending decision first.");
+clicking Hire logged "Mercenaries hired" and let the turn advance. No console/page
+errors.
+
+**Next ideas:** more choice events (a defector noble, a risky expedition); let a
+choice depend on national trait; a keyboard shortcut to pick an option.
+
+---
+
 ## 2026-07-13 — Three more bounded events (gold, knowledge, unrest relief)
 
 The random-event pool had windfalls for food, materials, population and troops,

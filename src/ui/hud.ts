@@ -85,6 +85,8 @@ export interface HudCallbacks {
   onChooseResearch(tech: TechId): void;
   /** Select a region on the map (e.g. from a clicked log entry). */
   onSelectRegion(regionId: number): void;
+  /** Resolve the pending choice event by picking one of its options. */
+  onResolveChoice(optionId: string): void;
 }
 
 const BRANCH_COLOR: Record<string, string> = {
@@ -467,6 +469,33 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     else closeStandings();
   }
 
+  // --- Pending-decision modal (raised by a choice event) --------------------
+  // No backdrop/Esc dismissal: a decision must be made before play continues.
+  const choiceOverlay = el("div", "hud-techtree-overlay");
+  choiceOverlay.style.display = "none";
+  root.append(choiceOverlay);
+  function renderChoice(pc: NonNullable<GameState["pendingChoice"]>): void {
+    choiceOverlay.innerHTML = "";
+    const panel = el("div", "hud-techtree-panel hud-choice-panel");
+    const title = el("h2", "hud-techtree-title");
+    title.textContent = "A decision";
+    panel.append(title);
+    const prompt = el("p", "hud-choice-prompt");
+    prompt.textContent = pc.prompt;
+    panel.append(prompt);
+    const opts = el("div", "hud-choice-options");
+    for (const o of pc.options) {
+      const wrap = el("div", "hud-choice-option");
+      wrap.append(btn(o.label, "hud-choice-btn", () => callbacks.onResolveChoice(o.id)));
+      const d = el("span", "hud-choice-detail");
+      d.textContent = o.detail;
+      wrap.append(d);
+      opts.append(wrap);
+    }
+    panel.append(opts);
+    choiceOverlay.append(panel);
+  }
+
   // --- Keyboard shortcuts for the overlays ----------------------------------
   // L toggles the map legend, H toggles the getting-started tips, Esc closes
   // whatever's open. Ignore while typing in a form control so the tax/seed
@@ -511,6 +540,14 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     }
     // Keep an open standings overlay live as turns resolve.
     if (standingsOverlay.style.display !== "none") renderStandingsOverlay();
+    // A pending decision blocks play until resolved — show its modal.
+    if (state.pendingChoice) {
+      renderChoice(state.pendingChoice);
+      choiceOverlay.style.display = "flex";
+    } else if (choiceOverlay.style.display !== "none") {
+      choiceOverlay.style.display = "none";
+      choiceOverlay.innerHTML = "";
+    }
     // Keep the save-slot labels' turn markers current (e.g. after autosave/load).
     refreshSlotLabels();
     const flow = nationalProduction(state, PLAYER_ID);

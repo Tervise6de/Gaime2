@@ -276,6 +276,27 @@ export interface GameState {
    * equal length (dead nations keep being sampled) so turns line up by index.
    */
   scoreHistory?: Record<number, number[]>;
+  /**
+   * A decision awaiting the player's input, raised by a choice event. Purely
+   * serialisable data (no functions); the effect of each option is looked up by
+   * id in events.ts when the player resolves it. Undefined when nothing pends.
+   */
+  pendingChoice?: PendingChoice;
+}
+
+/** One selectable option in a pending decision (labels only — effect lives in events.ts). */
+export interface ChoiceOption {
+  id: string;
+  label: string;
+  detail: string;
+}
+
+/** A player decision raised by a choice event, awaiting resolution. */
+export interface PendingChoice {
+  /** The event id this decision belongs to (keys the option effects in events.ts). */
+  eventId: string;
+  prompt: string;
+  options: ChoiceOption[];
 }
 
 /** A fresh research record. */

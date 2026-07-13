@@ -1,8 +1,21 @@
 import { describe, it, expect } from "vitest";
-import { fireEvent } from "@/systems/events";
+import { fireEvent, resolveChoice } from "@/systems/events";
 import { createGame } from "@/systems/turn";
 import { createRng } from "@/systems/rng";
-import { PLAYER_ID } from "@/systems/state";
+import { PLAYER_ID, type GameState } from "@/systems/state";
+
+/** Fire seeds until the player's mercenary decision pends; throws if it never does. */
+function pendingMercenaryState(): GameState {
+  const g = createGame({ seed: 12345, rivals: 2 });
+  for (let i = 1; i <= 400; i++) {
+    const next = fireEvent(g, PLAYER_ID, createRng(i));
+    if (next.pendingChoice) return next;
+  }
+  throw new Error("mercenary_offer never fired for the player across 400 seeds");
+}
+
+const infantryOf = (s: GameState, id: number): number =>
+  s.armies.filter((a) => a.ownerId === id).reduce((n, a) => n + a.units.infantry, 0);
 
 describe("fireEvent", () => {
   it("is deterministic for a given rng seed", () => {
@@ -121,5 +134,51 @@ describe("fireEvent", () => {
       }
     }
     throw new Error("wandering scholars never fired across 200 seeds");
+  });
+});
+
+describe("choice events", () => {
+  it("raises a pending decision for the player instead of auto-applying", () => {
+    const g = createGame({ seed: 12345, rivals: 2 });
+    const gold0 = g.nations[PLAYER_ID]!.stocks.gold;
+    const s = pendingMercenaryState();
+    expect(s.pendingChoice?.eventId).toBe("mercenary_offer");
+    expect(s.pendingChoice?.options.map((o) => o.id)).toEqual(["hire", "decline"]);
+    // The prompt is raised but no effect has landed yet — gold is untouched.
+    expect(s.nations[PLAYER_ID]!.stocks.gold).toBe(gold0);
+  });
+
+  it("hire pays 40 gold, adds 2 infantry, and clears the prompt", () => {
+    const s = pendingMercenaryState();
+    const gold0 = s.nations[PLAYER_ID]!.stocks.gold;
+    const inf0 = infantryOf(s, PLAYER_ID);
+    expect(gold0).toBeGreaterThanOrEqual(40); // starting treasury affords it
+    const hired = resolveChoice(s, "hire");
+    expect(hired.pendingChoice).toBeUndefined();
+    expect(hired.nations[PLAYER_ID]!.stocks.gold).toBe(gold0 - 40);
+    expect(infantryOf(hired, PLAYER_ID)).toBe(inf0 + 2);
+  });
+
+  it("decline clears the prompt at no cost", () => {
+    const s = pendingMercenaryState();
+    const gold0 = s.nations[PLAYER_ID]!.stocks.gold;
+    const inf0 = infantryOf(s, PLAYER_ID);
+    const declined = resolveChoice(s, "decline");
+    expect(declined.pendingChoice).toBeUndefined();
+    expect(declined.nations[PLAYER_ID]!.stocks.gold).toBe(gold0);
+    expect(infantryOf(declined, PLAYER_ID)).toBe(inf0);
+  });
+
+  it("resolveChoice is a safe no-op when nothing pends", () => {
+    const g = createGame({ seed: 1, rivals: 2 });
+    expect(resolveChoice(g, "hire")).toBe(g);
+  });
+
+  it("an AI auto-resolves a choice event — never leaves a decision pending", () => {
+    const g = createGame({ seed: 12345, rivals: 2 });
+    const rivalId = g.nations.find((n) => !n.isPlayer && !n.isBarbarian)!.id;
+    for (let i = 1; i <= 300; i++) {
+      expect(fireEvent(g, rivalId, createRng(i)).pendingChoice).toBeUndefined();
+    }
   });
 });

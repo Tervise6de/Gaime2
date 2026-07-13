@@ -13,6 +13,7 @@ import type { Rng } from "@/systems/rng";
 import {
   GRANARY_CAP,
   MIN_POPULATION,
+  PLAYER_ID,
   UNREST_MAX,
   emptyUnits,
   type GameState,
@@ -20,14 +21,34 @@ import {
 } from "@/systems/state";
 import { round1 } from "@/systems/economy";
 import type { TraitId } from "@/data/traits";
+import type { UnitType } from "@/data/units";
+
+type EventOutcome = { state: GameState; message: string } | null;
+
+/** A branching option on a choice event — the player picks one; the AI auto-picks. */
+interface EventChoiceOption {
+  id: string;
+  label: string;
+  detail: string;
+  apply: (state: GameState, nationId: number) => EventOutcome;
+}
+
+interface EventChoice {
+  prompt: string;
+  options: EventChoiceOption[];
+  /** Which option id an AI nation takes (deterministic). */
+  aiPick: (state: GameState, nationId: number) => string;
+}
 
 interface EventDef {
   id: string;
   weight: number;
   /** Optional gate: only fires for nations that pass (defaults to always). */
   eligible?: (state: GameState, nationId: number) => boolean;
-  /** Apply to a nation; returns new state + a log message (or null to skip). */
-  apply: (state: GameState, nationId: number, rng: Rng) => { state: GameState; message: string } | null;
+  /** Immediate effect (auto-resolving events). Mutually exclusive with `choice`. */
+  apply?: (state: GameState, nationId: number, rng: Rng) => EventOutcome;
+  /** A player-facing decision; the AI resolves it automatically via `aiPick`. */
+  choice?: EventChoice;
 }
 
 /** Gate an event to nations carrying a specific national trait. */
@@ -49,6 +70,32 @@ function addStock(
       : n,
   );
   return { ...state, nations };
+}
+
+/**
+ * Add units to a nation's garrison at its capital (if still held) or, failing
+ * that, its first owned region. Deterministic — no RNG — so it is safe to run
+ * from a player's choice resolution as well as an AI event.
+ */
+function reinforce(state: GameState, nationId: number, unit: UnitType, count: number): GameState {
+  const owned = state.regions.filter((r) => r.ownerId === nationId);
+  if (!owned.length) return state;
+  const nation = state.nations.find((n) => n.id === nationId);
+  const capHeld =
+    nation?.capitalRegionId !== undefined && state.regions[nation.capitalRegionId]?.ownerId === nationId;
+  const region = capHeld ? state.regions[nation!.capitalRegionId!]! : owned[0]!;
+  const existing = state.armies.find((a) => a.regionId === region.id && a.ownerId === nationId);
+  if (existing) {
+    const armies = state.armies.map((a) =>
+      a.id === existing.id ? { ...a, units: { ...a.units, [unit]: a.units[unit] + count } } : a,
+    );
+    return { ...state, armies };
+  }
+  const armies = [
+    ...state.armies,
+    { id: state.nextArmyId, ownerId: nationId, regionId: region.id, units: { ...emptyUnits(), [unit]: count }, movesLeft: 0 },
+  ];
+  return { ...state, armies, nextArmyId: state.nextArmyId + 1 };
 }
 
 const EVENTS: EventDef[] = [
@@ -178,6 +225,42 @@ const EVENTS: EventDef[] = [
       return { state: { ...state, regions }, message: "A grand festival lifts spirits — unrest eases." };
     },
   },
+  {
+    // A player-facing DECISION: hire a passing mercenary company, or send it on.
+    // The AI resolves it deterministically via aiPick.
+    id: "mercenary_offer",
+    weight: 2,
+    choice: {
+      prompt: "A mercenary company offers its blades for 40 gold.",
+      options: [
+        {
+          id: "hire",
+          label: "Hire (−40g)",
+          detail: "Pay 40 gold; 2 infantry join your capital garrison.",
+          apply: (state, nationId) => {
+            const nation = state.nations.find((n) => n.id === nationId);
+            if (!nation || nation.stocks.gold < 40) {
+              return { state, message: "The coffers are too bare to hire the mercenaries." };
+            }
+            const paid = addStock(state, nationId, "gold", -40);
+            return { state: reinforce(paid, nationId, "infantry", 2), message: "Mercenaries hired — 2 infantry bolster your ranks." };
+          },
+        },
+        {
+          id: "decline",
+          label: "Decline",
+          detail: "Keep your gold; send them on their way.",
+          apply: (state) => ({ state, message: "You turn the mercenary company away." }),
+        },
+      ],
+      // A funded, aggressive AI hires; the cautious or cash-poor decline.
+      aiPick: (state, nationId) => {
+        const n = state.nations.find((x) => x.id === nationId);
+        const aggr = n?.personality?.aggression ?? 0.4;
+        return n && n.stocks.gold >= 60 && aggr >= 0.5 ? "hire" : "decline";
+      },
+    },
+  },
 
   // --- Trait-flavoured events: each fires only for a nation with that trait,
   // giving a modest windfall along its strength (design §6). ---
@@ -270,11 +353,46 @@ export function fireEvent(state: GameState, nationId: number, rng: Rng): GameSta
       break;
     }
   }
-  const result = chosen.apply(state, nationId, rng);
-  if (!result) return state;
   const nation = state.nations.find((n) => n.id === nationId);
   const prefix = nation && !nation.isPlayer ? `${nation.name}: ` : "";
+
+  // A choice event: the player is prompted (decision pends); the AI auto-resolves.
+  if (chosen.choice) {
+    if (nation?.isPlayer) {
+      const pendingChoice = {
+        eventId: chosen.id,
+        prompt: chosen.choice.prompt,
+        options: chosen.choice.options.map((o) => ({ id: o.id, label: o.label, detail: o.detail })),
+      };
+      return { ...state, pendingChoice, log: [...state.log, `A decision awaits — ${chosen.choice.prompt}`].slice(-50) };
+    }
+    const pick = chosen.choice.aiPick(state, nationId);
+    const opt = chosen.choice.options.find((o) => o.id === pick) ?? chosen.choice.options[0]!;
+    const outcome = opt.apply(state, nationId);
+    if (!outcome) return state;
+    return { ...outcome.state, log: [...outcome.state.log, `${prefix}${outcome.message}`].slice(-50) };
+  }
+
+  const result = chosen.apply?.(state, nationId, rng);
+  if (!result) return state;
   return { ...result.state, log: [...result.state.log, `${prefix}${result.message}`].slice(-50) };
+}
+
+/**
+ * Resolve the player's pending decision by applying the chosen option's effect
+ * and clearing the prompt. A no-op (just clears) if nothing pends or the option
+ * is unknown. Always acts for the player (only players get a pending choice).
+ */
+export function resolveChoice(state: GameState, optionId: string): GameState {
+  const pc = state.pendingChoice;
+  if (!pc) return state;
+  const ev = EVENTS.find((e) => e.id === pc.eventId);
+  const opt = ev?.choice?.options.find((o) => o.id === optionId);
+  if (!opt) return { ...state, pendingChoice: undefined };
+  const outcome = opt.apply(state, PLAYER_ID);
+  const base = outcome ? outcome.state : state;
+  const log = outcome ? [...base.log, outcome.message].slice(-50) : base.log;
+  return { ...base, pendingChoice: undefined, log };
 }
 
 function mutateRegion(
