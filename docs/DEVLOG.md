@@ -6,6 +6,38 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Completing the trait-choice set (Mercantile, Fertile, Industrious)
+
+Finished the "every trait has a signature decision" arc begun with the Martial
+levy and Scholarly lore. The three remaining traits each get a choice keyed to
+their strength, with distinct resource tradeoffs (not all the same shape):
+- **Mercantile — monopoly charter:** +40 gold now, but +6 unrest realm-wide (a
+  gain-at-a-cost, like Martial/Scholarly).
+- **Fertile — settling season:** spend 14 food to add +2 population to up to three
+  regions (growth, a wholly different lever).
+- **Industrious — public works:** spend 24 materials to ease unrest 8 realm-wide
+  (a spend-for-relief).
+
+Each is trait-gated (`eligible: hasTrait(...)`), pure/deterministic, and rides the
+existing choice plumbing (player → modal; AI auto-resolves via `aiPick`). Zero
+framework change; all five traits now have their own decision.
+
+**Balance (200-seed × 4-archetype self-play probe, deleted before commit):**
+warlord 34 / opportunist 27 / builder 26 / merchant 25 — a 25–34% spread,
+unchanged; all victory kinds reached.
+
+**Verify:** typecheck ✓, 263 tests ✓ (+4: each option's effect — gold+unrest,
+food→population×≤3, materials→unrest relief — plus a guard that none of the three
+fire for a trait-less nation), build ✓ (0 `fetch`, deps `{}`). Browser-driven
+(seed 2 easy, a Fertile player, one End turn): the settling-season modal rendered
+with both options; "Settle families" logged "families settle…" and the turn
+advanced. No console/page errors.
+
+**Next ideas:** number-key shortcuts to pick a choice option; a choice with a
+lasting modifier (needs a per-nation modifier field); a rare multi-turn quest.
+
+---
+
 ## 2026-07-13 — Trait-gated choice event: Scholarly "forbidden lore"
 
 Gave the **Scholarly** trait its signature "power at a cost" decision, matching

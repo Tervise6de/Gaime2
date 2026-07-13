@@ -16,7 +16,10 @@ function pendingChoiceState(eventId: string): GameState {
 const pendingMercenaryState = (): GameState => pendingChoiceState("mercenary_offer");
 
 /** Fire seeds until a trait-gated choice pends for a player carrying `trait`. */
-function pendingTraitChoice(eventId: string, trait: "martial" | "scholarly"): GameState {
+function pendingTraitChoice(
+  eventId: string,
+  trait: "martial" | "scholarly" | "mercantile" | "fertile" | "industrious",
+): GameState {
   const base = createGame({ seed: 12345, rivals: 2 });
   const g = { ...base, nations: base.nations.map((n) => (n.id === PLAYER_ID ? { ...n, trait } : n)) };
   for (let i = 1; i <= 600; i++) {
@@ -282,5 +285,54 @@ describe("choice events", () => {
     const burned = resolveChoice(s, "burn");
     expect(burned.pendingChoice).toBeUndefined();
     expect(burned.nations[PLAYER_ID]!.stocks.knowledge).toBe(know0);
+  });
+
+  it("Mercantile monopoly charter: +40 gold at +6 unrest, trait-gated", () => {
+    const base = pendingTraitChoice("monopoly_charter", "mercantile");
+    const s = { ...base, regions: base.regions.map((r) => (r.ownerId === PLAYER_ID ? { ...r, unrest: 10 } : r)) };
+    const gold0 = s.nations[PLAYER_ID]!.stocks.gold;
+    const granted = resolveChoice(s, "grant");
+    expect(granted.pendingChoice).toBeUndefined();
+    expect(granted.nations[PLAYER_ID]!.stocks.gold).toBe(gold0 + 40);
+    expect(granted.regions.filter((r) => r.ownerId === PLAYER_ID).every((r) => r.unrest === 16)).toBe(true);
+  });
+
+  it("Fertile settling season: spends 14 food to add population to ≤3 regions", () => {
+    const s = pendingTraitChoice("settling_season", "fertile");
+    const food0 = s.nations[PLAYER_ID]!.stocks.food;
+    const pop0 = s.regions.filter((r) => r.ownerId === PLAYER_ID).reduce((a, r) => a + r.population, 0);
+    const grown = resolveChoice(s, "settle");
+    expect(grown.pendingChoice).toBeUndefined();
+    expect(grown.nations[PLAYER_ID]!.stocks.food).toBe(food0 - 14);
+    const pop1 = grown.regions.filter((r) => r.ownerId === PLAYER_ID).reduce((a, r) => a + r.population, 0);
+    const owned = grown.regions.filter((r) => r.ownerId === PLAYER_ID).length;
+    expect(pop1 - pop0).toBe(2 * Math.min(3, owned)); // +2 in up to three regions
+  });
+
+  it("Industrious public works: spends 24 materials to ease unrest by 8", () => {
+    const base = pendingTraitChoice("public_works", "industrious");
+    const s = {
+      ...base,
+      nations: base.nations.map((n) =>
+        n.id === PLAYER_ID ? { ...n, stocks: { ...n.stocks, materials: 40 } } : n,
+      ),
+      regions: base.regions.map((r) => (r.ownerId === PLAYER_ID ? { ...r, unrest: 20 } : r)),
+    };
+    const mat0 = s.nations[PLAYER_ID]!.stocks.materials;
+    const built = resolveChoice(s, "commission");
+    expect(built.pendingChoice).toBeUndefined();
+    expect(built.nations[PLAYER_ID]!.stocks.materials).toBe(mat0 - 24);
+    expect(built.regions.filter((r) => r.ownerId === PLAYER_ID).every((r) => r.unrest === 12)).toBe(true);
+  });
+
+  it("each trait choice fires only for its own trait", () => {
+    // A single non-matching trait (opportunist has none of these) never sees them.
+    const g = createGame({ seed: 12345, rivals: 2 });
+    const plain = { ...g, nations: g.nations.map((n) => (n.id === PLAYER_ID ? { ...n, trait: undefined } : n)) };
+    const gated = ["monopoly_charter", "settling_season", "public_works"];
+    for (let i = 1; i <= 400; i++) {
+      const id = fireEvent(plain, PLAYER_ID, createRng(i)).pendingChoice?.eventId;
+      expect(gated).not.toContain(id);
+    }
   });
 });

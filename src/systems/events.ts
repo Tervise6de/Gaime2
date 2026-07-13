@@ -416,6 +416,117 @@ const EVENTS: EventDef[] = [
       },
     },
   },
+  {
+    // TRAIT DECISION (Mercantile): a fat purse now, resented by the commons.
+    id: "monopoly_charter",
+    weight: 2,
+    eligible: hasTrait("mercantile"),
+    choice: {
+      prompt: "A wealthy cartel will pay handsomely for an exclusive charter — grant it?",
+      options: [
+        {
+          id: "grant",
+          label: "Grant the charter (+40g)",
+          detail: "Take 40 gold now, but resentment lifts unrest 6 realm-wide.",
+          apply: (state, nationId) => {
+            const paid = addStock(state, nationId, "gold", 40);
+            const regions = paid.regions.map((r) =>
+              r.ownerId === nationId ? { ...r, unrest: Math.min(UNREST_MAX, round1(r.unrest + 6)) } : r,
+            );
+            return { state: { ...paid, regions }, message: "You grant the charter — coffers swell as commoners grumble." };
+          },
+        },
+        {
+          id: "refuse",
+          label: "Refuse",
+          detail: "Keep the markets open to all.",
+          apply: (state) => ({ state, message: "You refuse the cartel's charter." }),
+        },
+      ],
+      // A mercantile AI takes the coin when not already rich or restless.
+      aiPick: (state, nationId) => {
+        const n = state.nations.find((x) => x.id === nationId);
+        const owned = state.regions.filter((r) => r.ownerId === nationId);
+        const avg = owned.length ? owned.reduce((a, r) => a + r.unrest, 0) / owned.length : 100;
+        return n && n.stocks.gold < 120 && avg < 40 ? "grant" : "refuse";
+      },
+    },
+  },
+  {
+    // TRAIT DECISION (Fertile): spend food to settle new families (population growth).
+    id: "settling_season",
+    weight: 2,
+    eligible: hasTrait("fertile"),
+    choice: {
+      prompt: "A bountiful season lets you settle new families — feed them onto the land?",
+      options: [
+        {
+          id: "settle",
+          label: "Settle families (−14 food)",
+          detail: "Spend 14 food; +2 population in up to three of your regions.",
+          apply: (state, nationId) => {
+            const n = state.nations.find((x) => x.id === nationId);
+            if (!n || n.stocks.food < 14) return { state, message: "Too little food to settle new families." };
+            const fed = addStock(state, nationId, "food", -14);
+            const targetIds = new Set(fed.regions.filter((r) => r.ownerId === nationId).slice(0, 3).map((r) => r.id));
+            const regions = fed.regions.map((r) =>
+              targetIds.has(r.id) ? { ...r, population: round1(r.population + 2) } : r,
+            );
+            return { state: { ...fed, regions }, message: "New families settle the land — your realm grows." };
+          },
+        },
+        {
+          id: "store",
+          label: "Store the surplus",
+          detail: "Keep the grain against leaner days.",
+          apply: (state) => ({ state, message: "You store the surplus in the granaries." }),
+        },
+      ],
+      // A fertile AI with a food surplus settles.
+      aiPick: (state, nationId) => {
+        const n = state.nations.find((x) => x.id === nationId);
+        return n && n.stocks.food >= 28 ? "settle" : "store";
+      },
+    },
+  },
+  {
+    // TRAIT DECISION (Industrious): spend materials on public works that calm the realm.
+    id: "public_works",
+    weight: 2,
+    eligible: hasTrait("industrious"),
+    choice: {
+      prompt: "The guilds propose grand public works — commission them?",
+      options: [
+        {
+          id: "commission",
+          label: "Commission works (−24 materials)",
+          detail: "Spend 24 materials; eases unrest 8 across the realm.",
+          apply: (state, nationId) => {
+            const n = state.nations.find((x) => x.id === nationId);
+            if (!n || n.stocks.materials < 24) return { state, message: "Too few materials for public works." };
+            const paid = addStock(state, nationId, "materials", -24);
+            const regions = paid.regions.map((r) =>
+              r.ownerId === nationId ? { ...r, unrest: Math.max(0, round1(r.unrest - 8)) } : r,
+            );
+            return { state: { ...paid, regions }, message: "Public works rise — the realm's mood lifts." };
+          },
+        },
+        {
+          id: "defer",
+          label: "Defer",
+          detail: "Save the materials for war and walls.",
+          apply: (state) => ({ state, message: "You defer the public works." }),
+        },
+      ],
+      // An industrious AI with materials to spare invests when the realm is restless.
+      aiPick: (state, nationId) => {
+        const n = state.nations.find((x) => x.id === nationId);
+        const owned = state.regions.filter((r) => r.ownerId === nationId);
+        const avg = owned.length ? owned.reduce((a, r) => a + r.unrest, 0) / owned.length : 0;
+        return n && n.stocks.materials >= 40 && avg > 15 ? "commission" : "defer";
+      },
+    },
+  },
 
   // --- Trait-flavoured events: each fires only for a nation with that trait,
   // giving a modest windfall along its strength (design §6). ---
