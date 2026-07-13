@@ -16,6 +16,7 @@ import {
   rejectOffer,
 } from "@/systems/diplomacy";
 import { saveToLocal, loadFromLocal, hasLocalSave } from "@/systems/save";
+import { summarizeTurn, type TurnSummary } from "@/systems/summary";
 import { PLAYER_ID, type GameState } from "@/systems/state";
 import { createHud } from "@/ui/hud";
 import "@/ui/style.css";
@@ -39,6 +40,7 @@ function main(): void {
   let state: GameState = (hasLocalSave("auto") && loadFromLocal("auto")) || createGame({ seed: 12345 });
   let selectedRegion: number | null = null;
   let moveArmyId: number | null = null;
+  let lastSummary: TurnSummary | null = null;
 
   const renderer = createRenderer(canvas);
   const hud = createHud(hudRoot, {
@@ -47,15 +49,13 @@ function main(): void {
       commit();
     },
     onEndTurn() {
-      if (state.outcome !== "playing") return;
-      state = resolveTurn(state);
-      moveArmyId = null;
-      commit();
+      advanceTurn();
     },
     onNewGame(config) {
       state = createGame(config);
       selectedRegion = null;
       moveArmyId = null;
+      lastSummary = null;
       commit();
     },
     onSave() {
@@ -68,6 +68,7 @@ function main(): void {
         state = loaded;
         selectedRegion = null;
         moveArmyId = null;
+        lastSummary = null;
         commit(); // make the restored checkpoint the live autosave too
         hud.toast("Checkpoint loaded.");
       } else {
@@ -147,11 +148,19 @@ function main(): void {
     if (target && (target.tagName === "INPUT" || target.tagName === "SELECT")) return;
     if ((ev.key === "Enter" || ev.key === " ") && state.outcome === "playing") {
       ev.preventDefault();
-      state = resolveTurn(state);
-      moveArmyId = null;
-      commit();
+      advanceTurn();
     }
   });
+
+  /** Resolve one turn, capturing a summary of what changed for the player. */
+  function advanceTurn(): void {
+    if (state.outcome !== "playing") return;
+    const before = state;
+    state = resolveTurn(state);
+    lastSummary = summarizeTurn(before, state);
+    moveArmyId = null;
+    commit();
+  }
 
   /** Re-render the view and persist the continuous autosave. */
   function commit(): void {
@@ -163,7 +172,7 @@ function main(): void {
     renderer.setState(state);
     renderer.setSelected(selectedRegion);
     renderer.setHighlights(highlights());
-    hud.update(state, selectedRegion, moveArmyId);
+    hud.update(state, selectedRegion, moveArmyId, lastSummary);
   }
 
   function highlights(): number[] {

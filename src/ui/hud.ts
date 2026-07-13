@@ -27,6 +27,7 @@ import {
   unitCost,
 } from "@/systems/military";
 import { getRelation, getTreaty } from "@/systems/diplomacy";
+import type { TurnSummary } from "@/systems/summary";
 import { researchFrontier, isBuildingUnlockedFor } from "@/systems/tech";
 import { ARCHETYPE_LABEL } from "@/data/personalities";
 import { TRAITS } from "@/data/traits";
@@ -87,7 +88,12 @@ const BRANCH_COLOR: Record<string, string> = {
 const GIFT_AMOUNT = 30;
 
 export interface Hud {
-  update(state: GameState, selectedRegionId: number | null, moveArmyId: number | null): void;
+  update(
+    state: GameState,
+    selectedRegionId: number | null,
+    moveArmyId: number | null,
+    summary?: TurnSummary | null,
+  ): void;
   /** Flash a transient message (e.g. save/load feedback). */
   toast(message: string): void;
 }
@@ -238,8 +244,11 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     toastTimer = window.setTimeout(() => (toast.style.display = "none"), 2200);
   }
 
-  // --- Bottom: turn log -----------------------------------------------------
+  // --- Bottom: last-turn summary + turn log ---------------------------------
   const logPanel = el("div", "hud-panel hud-log");
+  const summaryBox = el("div", "hud-summary");
+  summaryBox.style.display = "none";
+  logPanel.append(summaryBox);
   logPanel.append(heading("Turn log"));
   const logBody = el("div", "hud-log-body");
   logPanel.append(logBody);
@@ -250,7 +259,9 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     state: GameState,
     selectedRegionId: number | null,
     moveArmyId: number | null,
+    summary?: TurnSummary | null,
   ): void {
+    renderSummary(summaryBox, summary ?? null);
     const player = playerNation(state);
     const flow = nationalProduction(state, PLAYER_ID);
     const upkeep = totalUpkeep(state, PLAYER_ID);
@@ -551,6 +562,36 @@ function renderBuildSection(region: Region, done: TechId[], callbacks: HudCallba
   }
   section.append(menu);
   return section;
+}
+
+/** Render the "last turn" summary of strategic changes, or hide it. */
+function renderSummary(box: HTMLElement, summary: TurnSummary | null): void {
+  if (!summary) {
+    box.style.display = "none";
+    return;
+  }
+  box.style.display = "block";
+  box.innerHTML = "";
+  box.append(heading("Last turn"));
+
+  const items: Array<[string, string]> = [];
+  const g = summary.goldDelta;
+  items.push([g >= 0 ? "good" : "bad", `${g >= 0 ? "+" : ""}${fmt(g)}g treasury`]);
+  if (summary.regionsGained.length) items.push(["good", `Gained ${summary.regionsGained.join(", ")}`]);
+  if (summary.regionsLost.length) items.push(["bad", `Lost ${summary.regionsLost.join(", ")}`]);
+  if (summary.warsDeclared.length) items.push(["bad", `War with ${summary.warsDeclared.join(", ")}`]);
+  if (summary.peaceMade.length) items.push(["good", `Peace with ${summary.peaceMade.join(", ")}`]);
+  if (summary.eliminated.length) items.push(["good", `Eliminated ${summary.eliminated.join(", ")}`]);
+  if (summary.techsCompleted.length) items.push(["good", `Researched ${summary.techsCompleted.map((t) => TECHS[t].name).join(", ")}`]);
+  if (summary.famine) items.push(["bad", "⚠ Famine"]);
+  if (summary.bankrupt) items.push(["bad", "⚠ Bankruptcy"]);
+  if (summary.quiet) items.push(["muted", "A quiet turn."]);
+
+  for (const [tone, text] of items) {
+    const row = el("div", "hud-summary-row " + tone);
+    row.textContent = text;
+    box.append(row);
+  }
 }
 
 function renderDiplomacy(

@@ -6,6 +6,36 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Turn-summary panel ("what changed last turn")
+
+Strategic changes were easy to miss in the scrolling log. A new **Last turn**
+panel (above the log) now surfaces the deltas after each end-turn: treasury swing,
+regions gained/lost, wars declared / peace made, rivals eliminated, techs
+completed, and famine/bankruptcy flags — green for gains, red for setbacks, or
+"A quiet turn." when nothing notable happened.
+
+Change:
+- `systems/summary.ts` (new, pure): `summarizeTurn(before, after)` diffs two
+  states from the player's perspective. No sim/balance impact — read-only.
+- `main.ts`: snapshots state before `resolveTurn`, computes the summary, and
+  passes it to the HUD (cleared on new game / load). Single `advanceTurn` helper
+  now backs both the button and the Enter/Space shortcut.
+- `hud.ts`: `renderSummary` renders the panel; `.hud-summary` styles.
+
+Six new unit tests (quiet turn, treasury swing, regions gained/lost, war/peace
+transitions, tech completed, no-mutation purity).
+
+**Verify:** typecheck ✓, 173 tests ✓, build ✓ (0 `fetch`). Browser-driven: the
+panel is hidden at game start and appears after ending a turn with the right
+deltas (e.g. "+7.2g treasury", "A quiet turn."), no console errors.
+
+Test count: 173 green (was 167).
+
+**Next ideas:** tech-tree screen (whole branching tree, not just the frontier);
+alerts strip for critical events; ask allies to join wars; map legend.
+
+---
+
 ## 2026-07-13 — Trait-aware AI openings (balances the archetypes)
 
 Traits gave every nation an economic edge but rivals didn't *play* to it. Now the
