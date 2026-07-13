@@ -268,8 +268,12 @@ export interface GameState {
   victoryKind?: string;
   /** Human-readable turn log, newest last. */
   log: string[];
-  /** The player's prestige score sampled once per turn, for the end-game graph. */
-  history?: number[];
+  /**
+   * Per-nation prestige score sampled once per turn (nation id → series, turn 1
+   * first), for the end-game score graph. Barbarians are excluded; series stay
+   * equal length (dead nations keep being sampled) so turns line up by index.
+   */
+  scoreHistory?: Record<number, number[]>;
 }
 
 /** A fresh research record. */

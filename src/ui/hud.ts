@@ -835,51 +835,76 @@ function renderStandings(container: HTMLElement, state: GameState): void {
   });
   container.append(table);
 
-  const spark = buildSparkline(state.history ?? [], state.nations[PLAYER_ID]!.color);
+  const spark = buildSparkline(state.scoreHistory ?? {}, state.nations);
   if (spark) container.append(spark);
 }
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+
 /**
- * A tiny inline-SVG line chart of the player's prestige score over the game.
+ * A tiny inline-SVG line chart of every nation's prestige score over the game —
+ * one line per non-barbarian nation in its own colour, the player's drawn last
+ * (on top) and thicker with an end dot. Shared y-scale so heights compare.
  * Returns null when there's too little history to be worth drawing. No deps —
  * hand-built SVG so it stays offline and self-contained.
  */
-function buildSparkline(history: number[], color: string): HTMLElement | null {
-  if (history.length < 2) return null;
+function buildSparkline(
+  scoreHistory: Record<number, number[]>,
+  nations: Nation[],
+): HTMLElement | null {
+  const series = nations
+    .filter((n) => !n.isBarbarian && (scoreHistory[n.id]?.length ?? 0) >= 2)
+    .map((n) => ({ nation: n, values: scoreHistory[n.id]! }));
+  if (series.length === 0) return null;
+
+  const turns = Math.max(...series.map((s) => s.values.length));
+  const all = series.flatMap((s) => s.values);
+  const max = Math.max(...all);
+  const min = Math.min(...all);
+  const span = max - min || 1;
   const w = 240;
   const h = 48;
   const pad = 3;
-  const max = Math.max(...history);
-  const min = Math.min(...history);
-  const span = max - min || 1;
-  const stepX = (w - pad * 2) / (history.length - 1);
-  const points = history.map((v, i) => {
-    const x = pad + i * stepX;
-    const y = h - pad - ((v - min) / span) * (h - pad * 2);
-    return `${round1(x)},${round1(y)}`;
-  });
+  const stepX = (w - pad * 2) / (turns - 1 || 1);
+  const toPoints = (values: number[]): string =>
+    values
+      .map((v, i) => {
+        const x = pad + i * stepX;
+        const y = h - pad - ((v - min) / span) * (h - pad * 2);
+        return `${round1(x)},${round1(y)}`;
+      })
+      .join(" ");
 
   const wrap = el("div", "hud-sparkline");
   const caption = el("span", "hud-sparkline-caption");
-  caption.textContent = `Your score, turn 1 → ${history.length}`;
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  caption.textContent = `Prestige score, turn 1 → ${turns}`;
+  const svg = document.createElementNS(SVG_NS, "svg");
   svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
   svg.setAttribute("class", "hud-sparkline-svg");
   svg.setAttribute("preserveAspectRatio", "none");
-  const poly = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
-  poly.setAttribute("points", points.join(" "));
-  poly.setAttribute("fill", "none");
-  poly.setAttribute("stroke", color);
-  poly.setAttribute("stroke-width", "2");
-  poly.setAttribute("stroke-linejoin", "round");
-  poly.setAttribute("stroke-linecap", "round");
-  const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-  const last = points[points.length - 1]!.split(",");
-  dot.setAttribute("cx", last[0]!);
-  dot.setAttribute("cy", last[1]!);
-  dot.setAttribute("r", "2.5");
-  dot.setAttribute("fill", color);
-  svg.append(poly, dot);
+
+  // Rivals first (dimmer, thinner), player last so it sits on top.
+  const ordered = [...series].sort((a, b) => Number(a.nation.isPlayer) - Number(b.nation.isPlayer));
+  for (const s of ordered) {
+    const poly = document.createElementNS(SVG_NS, "polyline");
+    poly.setAttribute("points", toPoints(s.values));
+    poly.setAttribute("fill", "none");
+    poly.setAttribute("stroke", s.nation.color);
+    poly.setAttribute("stroke-width", s.nation.isPlayer ? "2.2" : "1.3");
+    poly.setAttribute("stroke-opacity", s.nation.isPlayer ? "1" : "0.65");
+    poly.setAttribute("stroke-linejoin", "round");
+    poly.setAttribute("stroke-linecap", "round");
+    svg.append(poly);
+    if (s.nation.isPlayer) {
+      const last = toPoints(s.values).split(" ").pop()!.split(",");
+      const dot = document.createElementNS(SVG_NS, "circle");
+      dot.setAttribute("cx", last[0]!);
+      dot.setAttribute("cy", last[1]!);
+      dot.setAttribute("r", "2.5");
+      dot.setAttribute("fill", s.nation.color);
+      svg.append(dot);
+    }
+  }
   wrap.append(caption, svg);
   return wrap;
 }

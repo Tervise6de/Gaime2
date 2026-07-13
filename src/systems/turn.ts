@@ -197,11 +197,26 @@ export function createGame(options: NewGameOptions): GameState {
       `Turn 1 — your realm rises around ${playerCapitalName}; ` +
         `${rivalCount} rival power${rivalCount === 1 ? "" : "s"} contest the land (seed ${options.seed}).`,
     ],
-    history: [],
+    scoreHistory: {},
   };
-  // Seed the score graph with the opening position.
-  game.history = [nationScore(game, PLAYER_ID)];
+  // Seed the score graph with the opening position (one sample per nation).
+  game.scoreHistory = appendScores(game);
   return game;
+}
+
+/**
+ * Append the current per-nation prestige scores to the running history, keeping
+ * one aligned series per non-barbarian nation (dead nations included, so all
+ * series share the same length and turns line up by index). Pure.
+ */
+function appendScores(state: GameState): Record<number, number[]> {
+  const prev = state.scoreHistory ?? {};
+  const next: Record<number, number[]> = {};
+  for (const n of state.nations) {
+    if (n.isBarbarian) continue;
+    next[n.id] = [...(prev[n.id] ?? []), nationScore(state, n.id)];
+  }
+  return next;
 }
 
 /** Set a nation's tax rate (defaults to the player). Pure. */
@@ -378,8 +393,8 @@ export function resolveTurn(state: GameState): GameState {
   // 6. Outcome: elimination, then domination / great works / turn-limit score.
   s = updateOutcome(s);
 
-  // 7. Sample the player's prestige score for the end-game graph.
-  s = { ...s, history: [...(s.history ?? []), nationScore(s, PLAYER_ID)] };
+  // 7. Sample every nation's prestige score for the end-game graph.
+  s = { ...s, scoreHistory: appendScores(s) };
 
   return s;
 }

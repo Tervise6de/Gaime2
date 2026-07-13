@@ -6,6 +6,48 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Per-nation score lines on the end-game sparkline
+
+The end-game sparkline showed only the player's prestige curve; now it draws one
+line per non-barbarian nation in its own colour, so the final screen shows how
+you compared to every rival across the whole game — not just your own arc. On a
+domination defeat you can literally watch the winner's line rocket away while
+yours flatlines.
+
+`GameState.history: number[]` (player-only) became
+`scoreHistory: Record<number, number[]>` (nation id → per-turn series). It's
+sampled for every non-barbarian nation each turn — dead nations included, so all
+series stay equal length and turns line up by index. `appendScores()` in turn.ts
+seeds it in `createGame` and appends in `resolveTurn` (still frozen once the game
+is decided). Being optional it round-trips through the generic JSON save
+untouched; pre-existing saves (which carry the old `history`) simply draw no
+chart. The HUD renders rivals first (thin, 65% opacity) and the player last (on
+top, thicker, with an end dot) over a shared y-scale so heights compare.
+
+**Verify:** typecheck ✓, 220 tests ✓ (the 4 score-history tests updated to the
+per-nation shape: seeds one series per non-barbarian nation, all series grow
+together, deterministic per seed, frozen once decided), build ✓ (0 `fetch`, deps
+`{}`). Browser-driven a game to a turn-24 domination defeat — the SVG held 3
+polylines (2 rivals + player) in the right colours, one end dot, caption
+"Prestige score, turn 1 → 24", no console errors.
+
+Test count: 220 green.
+
+**Balance note (for a future dedicated pass):** a 48-seed × 4-archetype self-play
+probe (symmetric skill, deleted before commit) shows economy archetypes winning
+~40% (merchant/builder) vs ~21–23% for aggressive ones (warlord/opportunist) —
+economy is roughly 2× stronger and the spread breaches the ~15–30% band. Halving
+the Great Work's yield was a **no-op** on outcomes, so wonders aren't the driver;
+the root cause is that **war doesn't pay** (aggressive archetypes bleed
+casualties/upkeep/conquest-unrest fighting wars that don't convert to a lead).
+Fixing that means combat/AI tuning, not a data tweak — worth its own cycle.
+
+**Next ideas:** make aggression competitive (make war pay — e.g. plunder gold on
+conquest, or ease conquest-unrest for martial nations) and re-probe; a legend
+mapping sparkline colours to nation names; a compact mid-game score trend.
+
+---
+
 ## 2026-07-13 — Keyboard shortcuts for the overlays (L / H / Esc)
 
 Reaching for the mouse to peek at the legend or the tips breaks the flow of a
