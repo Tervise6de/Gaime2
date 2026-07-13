@@ -17,6 +17,7 @@
 
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
 import type { BuildingId } from "@/data/buildings";
+import type { TraitId } from "@/data/traits";
 import { TERRAIN } from "@/data/terrain";
 import { sideStrength, type UnitCounts } from "@/systems/combat";
 import {
@@ -105,7 +106,13 @@ function manageEconomy(state: GameState, nationId: number): GameState {
   );
   for (const region of s.regions) {
     if (region.ownerId !== nationId || region.construction) continue;
-    const choice = chooseBuilding(region, done, nation.wonders, pursuesWonders && !wonderInProgress);
+    const choice = chooseBuilding(
+      region,
+      done,
+      nation.wonders,
+      pursuesWonders && !wonderInProgress,
+      nation.trait,
+    );
     if (choice) {
       s = queueFor(s, region.id, choice, nationId);
       if (choice === "wonder") wonderInProgress = true;
@@ -126,11 +133,26 @@ function pickTech(done: TechId[], nation: Nation): TechId | null {
   return pool.reduce((best, t) => (TECHS[t].cost < TECHS[best].cost ? t : best), pool[0]!);
 }
 
-function chooseBuilding(
+/** Base build order when a nation's trait expresses no preference. */
+const BASE_BUILD_ORDER: BuildingId[] = [
+  "market", "bank", "workshop", "university", "farm", "aqueduct", "library", "temple", "fortress",
+];
+
+/** Buildings a trait rushes first, so rivals open along their strength. */
+const TRAIT_BUILD_PRIORITY: Record<TraitId, BuildingId[]> = {
+  fertile: ["farm", "aqueduct"],
+  industrious: ["workshop", "fortress"],
+  mercantile: ["market", "bank"],
+  scholarly: ["library", "university"],
+  martial: ["fortress", "workshop"],
+};
+
+export function chooseBuilding(
   region: { unrest: number; buildings: BuildingId[] },
   done: TechId[],
   wonders: number,
   canStartWonder: boolean,
+  trait?: TraitId,
 ): BuildingId | null {
   const has = (b: BuildingId) => region.buildings.includes(b);
   const unlocked = (b: BuildingId) => isBuildingUnlockedFor(done, b);
@@ -139,9 +161,8 @@ function chooseBuilding(
   if (canStartWonder && unlocked("wonder") && !has("wonder") && wonders < WONDER_GOAL) {
     return "wonder";
   }
-  const order: BuildingId[] = [
-    "market", "bank", "workshop", "university", "farm", "aqueduct", "library", "temple", "fortress",
-  ];
+  // Trait-preferred buildings first, then the generalist order.
+  const order = [...new Set([...(trait ? TRAIT_BUILD_PRIORITY[trait] : []), ...BASE_BUILD_ORDER])];
   for (const b of order) if (unlocked(b) && !has(b)) return b;
   return null;
 }
@@ -478,8 +499,10 @@ function recruit(state: GameState, nationId: number, rng: Rng): GameState {
     .filter((a) => a.ownerId === nationId)
     .reduce((sum, a) => sum + armySize(a.units), 0);
 
-  // Warlords keep a bigger standing army; everyone raises more in wartime.
-  const wanted = 3 + Math.round(aggression * 6) + (atWarNow ? 3 : 0);
+  // Warlords keep a bigger standing army; everyone raises more in wartime; a
+  // Martial realm (cheaper units) fields a larger host and leans on it.
+  const wanted =
+    3 + Math.round(aggression * 6) + (atWarNow ? 3 : 0) + (nation.trait === "martial" ? 3 : 0);
   if (myUnits >= wanted) return state;
   if (nation.stocks.gold < 30) return state;
 

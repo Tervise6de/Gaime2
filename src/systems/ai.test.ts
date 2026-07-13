@@ -6,7 +6,9 @@ import {
   isBadlyOutmatched,
   retreatStep,
   defendStep,
+  chooseBuilding,
 } from "@/systems/ai";
+import type { BuildingId } from "@/data/buildings";
 import { createGame, resolveTurn } from "@/systems/turn";
 import { createRng } from "@/systems/rng";
 import {
@@ -152,6 +154,35 @@ describe("planRecruitment (composition-aware)", () => {
       RIVAL,
     );
     expect(new Set(plan).size).toBe(plan.length);
+  });
+});
+
+describe("trait-aware AI openings", () => {
+  const empty = (buildings: BuildingId[] = []) => ({ unrest: 0, buildings });
+
+  it("opens on the trait's synergy building (unlocked from start)", () => {
+    expect(chooseBuilding(empty(), [], 0, false, "fertile")).toBe("farm");
+    expect(chooseBuilding(empty(), [], 0, false, "industrious")).toBe("workshop");
+    expect(chooseBuilding(empty(), [], 0, false, "mercantile")).toBe("market");
+    expect(chooseBuilding(empty(), [], 0, false, "scholarly")).toBe("library");
+  });
+
+  it("a Martial realm rushes a fortress once it is unlocked", () => {
+    expect(chooseBuilding(empty(), ["engineering"], 0, false, "martial")).toBe("fortress");
+    // Locked fortress → falls back to its next preference (workshop).
+    expect(chooseBuilding(empty(), [], 0, false, "martial")).toBe("workshop");
+  });
+
+  it("falls back to the generalist order with no trait", () => {
+    expect(chooseBuilding(empty(), [], 0, false)).toBe("market");
+  });
+
+  it("still prioritises a temple when unrest is high, whatever the trait", () => {
+    expect(chooseBuilding({ unrest: 40, buildings: [] }, [], 0, false, "scholarly")).toBe("temple");
+  });
+
+  it("skips a building it already has and moves to the next preference", () => {
+    expect(chooseBuilding(empty(["farm"]), [], 0, false, "fertile")).not.toBe("farm");
   });
 });
 

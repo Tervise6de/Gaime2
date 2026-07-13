@@ -6,6 +6,37 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Trait-aware AI openings (balances the archetypes)
+
+Traits gave every nation an economic edge but rivals didn't *play* to it. Now the
+AI opens along its trait's strength:
+- **Build order** — each trait rushes its synergy buildings first
+  (`TRAIT_BUILD_PRIORITY`): Fertile→farm/aqueduct, Industrious→workshop/fortress,
+  Mercantile→market/bank, Scholarly→library/university, Martial→fortress/workshop
+  — then falls back to the generalist order. High-unrest temples and one-at-a-time
+  wonders still take precedence.
+- **Standing army** — a Martial realm (cheaper units) keeps a larger host
+  (`wanted += 3`), leaning on its discount.
+
+`chooseBuilding` is now exported and takes an optional `trait`; six new unit tests
+cover each trait's opening, the Martial fortress rush + fallback, the no-trait
+generalist path, the unrest-temple override, and skipping an already-built choice.
+
+**Balance check (temporary symmetric probe, deleted before commit):** this is the
+headline result — win rates **converged to ~21% across all four archetypes**
+(warlord 42→21, merchant 13→21, builder 13→21, opportunist 25→21), landing
+squarely in the healthy 21–29% band. Playing to your trait matters more than your
+archetype now, so every personality is equally viable. Median length ~31–39.
+Browser-smoked, 96 probe games ran clean, no console errors.
+
+Test count: 167 green (was 162). Build network-free (0 `fetch`).
+
+**Next ideas:** turn-summary panel (income/events/wars/losses last turn); tech-tree
+screen; ask allies to join wars / gang up on the leader; trait-aware tech rush
+(Scholarly picks tech faster).
+
+---
+
 ## 2026-07-13 — National traits for opening variety
 
 Each nation (player + rivals) now draws one of five national traits per game
