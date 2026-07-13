@@ -6,6 +6,34 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Tech-tree screen (the whole branching tree)
+
+The research bar only showed the current tech + the immediate frontier, so the
+branching structure and what each path leads to were invisible. New **Tech tree**
+button (in the research bar) opens a full-screen modal of all 16 techs laid out by
+branch (Economy/Military/Civics/Wonders rows) and tier, each node marked **done**
+(✓, green), **in progress** (glowing), **available** (bright, clickable to set
+research), or **locked** (dimmed, with missing prerequisites in its tooltip).
+Clicking an available tech selects it and closes the modal; backdrop or ✕ closes.
+
+Change (UI only, no sim/balance impact): `renderTechTree` builds the overlay from
+`TECHS`/`TECH_IDS`; `createHud` owns open/close and keeps an open tree synced with
+the latest research state. Caught and fixed a pointer-events gotcha — `#hud` is
+`pointer-events:none` with panels opting in, so the modal needed
+`pointer-events:auto` to receive clicks.
+
+**Verify:** typecheck ✓, 181 tests ✓, build ✓ (0 `fetch`). Browser-driven: the
+overlay opens with 4 branch rows / 16 nodes (4 available, 12 locked at game
+start), clicking Agriculture set "Researching: Agriculture (0/20)" and closed the
+modal, no console errors.
+
+Test count: 181 green (unchanged — pure UI, covered by browser verification).
+
+**Next ideas:** alerts strip for critical events; trait-aware tech rush; allies
+join your wars on request; Voronoi map renderer.
+
+---
+
 ## 2026-07-13 — Shared-enemy warmth (coalitions that hold)
 
 Follow-up to the coalition-war change: co-belligerents had no reason to stay

@@ -31,7 +31,7 @@ import type { TurnSummary } from "@/systems/summary";
 import { researchFrontier, isBuildingUnlockedFor } from "@/systems/tech";
 import { ARCHETYPE_LABEL } from "@/data/personalities";
 import { TRAITS } from "@/data/traits";
-import { TECHS, type TechId } from "@/data/techs";
+import { TECHS, TECH_IDS, type TechId, type TechBranch } from "@/data/techs";
 import { WONDER_GOAL, type Difficulty } from "@/systems/state";
 import {
   PLAYER_ID,
@@ -254,6 +254,24 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   logPanel.append(logBody);
   root.append(logPanel);
 
+  // --- Tech-tree overlay (whole branching tree; opened from the research bar) -
+  const techOverlay = el("div", "hud-techtree-overlay");
+  techOverlay.style.display = "none";
+  techOverlay.addEventListener("click", (ev) => {
+    if (ev.target === techOverlay) closeTechTree(); // backdrop click closes
+  });
+  root.append(techOverlay);
+  let lastPlayer: Nation | null = null;
+
+  function openTechTree(): void {
+    if (!lastPlayer) return;
+    renderTechTree(techOverlay, lastPlayer, callbacks, closeTechTree);
+    techOverlay.style.display = "flex";
+  }
+  function closeTechTree(): void {
+    techOverlay.style.display = "none";
+  }
+
   // --- Update ----------------------------------------------------------------
   function update(
     state: GameState,
@@ -263,6 +281,11 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   ): void {
     renderSummary(summaryBox, summary ?? null);
     const player = playerNation(state);
+    lastPlayer = player;
+    // Keep an open tech tree in sync with the latest research state.
+    if (techOverlay.style.display !== "none") {
+      renderTechTree(techOverlay, player, callbacks, closeTechTree);
+    }
     const flow = nationalProduction(state, PLAYER_ID);
     const upkeep = totalUpkeep(state, PLAYER_ID);
     for (const key of RESOURCE_KEYS) {
@@ -287,7 +310,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
     renderRegion(regionBody, state, selectedRegionId, moveArmyId, callbacks);
     renderDiplomacy(diploBody, state, callbacks);
-    renderResearch(researchBody, player, callbacks);
+    renderResearch(researchBody, player, callbacks, openTechTree);
 
     if (state.outcome === "playing") {
       banner.style.display = "none";
@@ -669,7 +692,12 @@ function renderDiplomacy(
   }
 }
 
-function renderResearch(container: HTMLElement, player: Nation, callbacks: HudCallbacks): void {
+function renderResearch(
+  container: HTMLElement,
+  player: Nation,
+  callbacks: HudCallbacks,
+  onOpenTree: () => void,
+): void {
   container.innerHTML = "";
   const research = player.research;
 
@@ -691,7 +719,8 @@ function renderResearch(container: HTMLElement, player: Nation, callbacks: HudCa
   }
   const count = el("span", "hud-research-count");
   count.textContent = `${research.done.length}/${Object.keys(TECHS).length} techs · ${player.wonders}/${WONDER_GOAL} wonders`;
-  header.append(count);
+  const treeBtn = btn("Tech tree ▤", "hud-techtree-open", onOpenTree);
+  header.append(count, treeBtn);
   container.append(header);
 
   const frontier = researchFrontier(research.done);
@@ -710,6 +739,76 @@ function renderResearch(container: HTMLElement, player: Nation, callbacks: HudCa
   }
   if (!frontier.length) menu.append(line("All technologies researched.", "hud-hint"));
   container.append(menu);
+}
+
+const TECH_BRANCHES: TechBranch[] = ["economy", "military", "civics", "wonders"];
+
+/**
+ * Full tech-tree overlay: every tech laid out by branch (row) and tier, marked
+ * done / in-progress / available / locked. Available techs are clickable to set
+ * research; locked nodes tooltip their missing prerequisites. Read-only apart
+ * from the research-selection intent.
+ */
+function renderTechTree(
+  container: HTMLElement,
+  player: Nation,
+  callbacks: HudCallbacks,
+  onClose: () => void,
+): void {
+  container.innerHTML = "";
+  const done = new Set(player.research.done);
+  const current = player.research.current;
+
+  const panel = el("div", "hud-techtree-panel");
+  const head = el("div", "hud-techtree-head");
+  const ttTitle = el("h2", "hud-techtree-title");
+  ttTitle.textContent = "Technology tree";
+  head.append(ttTitle, btn("✕", "hud-techtree-close", onClose));
+  panel.append(head);
+
+  const grid = el("div", "hud-techtree-grid");
+  for (const branch of TECH_BRANCHES) {
+    const row = el("div", "hud-techtree-row");
+    const label = el("div", "hud-techtree-branch");
+    label.textContent = branch;
+    label.style.color = BRANCH_COLOR[branch];
+    row.append(label);
+
+    const track = el("div", "hud-techtree-track");
+    const ids = TECH_IDS.filter((id) => TECHS[id].branch === branch).sort(
+      (a, b) => TECHS[a].tier - TECHS[b].tier || TECHS[a].cost - TECHS[b].cost,
+    );
+    for (const id of ids) {
+      const def = TECHS[id];
+      const isDone = done.has(id);
+      const isCurrent = current === id;
+      const unlocked = def.requires.every((r) => done.has(r));
+      const available = !isDone && !isCurrent && unlocked;
+      const state = isDone ? "done" : isCurrent ? "current" : available ? "available" : "locked";
+
+      const node = el("div", "hud-tt-node " + state);
+      node.style.borderColor = BRANCH_COLOR[branch];
+      const missing = def.requires.filter((r) => !done.has(r)).map((r) => TECHS[r].name);
+      node.title = def.blurb + (missing.length ? ` (needs ${missing.join(", ")})` : "");
+      node.innerHTML =
+        `<span class="hud-tt-name">${isDone ? "✓ " : ""}${def.name}</span>` +
+        `<span class="hud-tt-meta">T${def.tier} · ${def.cost}📖</span>`;
+      if (available) {
+        node.addEventListener("click", () => {
+          callbacks.onChooseResearch(id);
+          onClose();
+        });
+      }
+      track.append(node);
+    }
+    row.append(track);
+    grid.append(row);
+  }
+  panel.append(grid);
+  panel.append(
+    line("✓ researched · glowing = in progress · bright = available · dim = locked", "hud-techtree-legend"),
+  );
+  container.append(panel);
 }
 
 // --- helpers ----------------------------------------------------------------
