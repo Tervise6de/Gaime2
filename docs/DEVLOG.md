@@ -86,11 +86,11 @@ warmth between co-belligerents; tech-tree screen; trait-aware tech rush.
 
 ---
 
-## 2026-07-13 — Session summary (6 cycles: AI depth + traits + UX)
+## 2026-07-13 — Session summary (9 cycles: AI depth + traits + UX)
 
-Six verified cycles this session, each typecheck+test+build green, browser-checked
+Nine verified cycles this session, each typecheck+test+build green, browser-checked
 where UI/gameplay, balance-probed where the AI changed (probe deleted each time),
-and pushed to `claude/milestone-1-playable-r0hjxb` + `main`. Tests 130 → **173**.
+and pushed to `claude/milestone-1-playable-r0hjxb` + `main`. Tests 130 → **181**.
 
 1. **Composition-aware AI recruiting** — rivals bring siege vs. forts and counter
    the enemy's actual unit mix instead of always defaulting to infantry.
@@ -105,13 +105,19 @@ and pushed to `claude/milestone-1-playable-r0hjxb` + `main`. Tests 130 → **173
    archetypes** (from a 13–42% spread), squarely in the healthy 21–29% band.
 6. **Turn-summary panel** — a "Last turn" readout of the strategic deltas
    (regions, wars, eliminations, tech, treasury) above the log.
+7. **Gang up on a runaway leader** — the AI forms coalitions against a snowballing
+   power; anti-snowball nudge that lengthens games (median 31→36 in-probe).
+8. **Shared-enemy warmth** — co-belligerents warm toward each other so coalitions
+   hold together instead of eroding under border friction.
+9. **Tech-tree screen** — a full modal of the whole branching tree, nodes marked
+   done / in-progress / available / locked; click an available tech to research it.
 
 Guardrails held throughout: 100% local/offline, `dependencies: {}`, 0 `fetch` in
 the bundle, deterministic seeded RNG, pure turn pipeline.
 
-**Best next tasks:** tech-tree screen (whole branching tree); ask allies to join
-wars / gang up on the leader; trait-aware tech rush (Scholarly researches faster);
-alerts strip for critical events; Voronoi map renderer over the identical graph.
+**Best next tasks:** alerts strip for critical events (attacked/region lost/famine/
+revolt/tech done); trait-aware tech rush (Scholarly researches faster); allies join
+your wars on request; Voronoi map renderer over the identical graph logic.
 
 ---
 
