@@ -700,3 +700,57 @@ describe("rival behaviour over a game", () => {
     expect(s.nations[BARBARIAN_ID]!.stocks.gold).toBe(barbGold0);
   });
 });
+
+describe("tribute demands", () => {
+  const P = 0, R = 2;
+  const nat = (id: number, over: Partial<Nation> = {}): Nation => ({
+    id, name: `N${id}`, color: "#fff", isPlayer: id === P, isBarbarian: id === BARBARIAN_ID, alive: true,
+    stocks: { gold: id === R ? 200 : 20, food: 20, materials: 10, knowledge: 0 },
+    taxRate: 0.1, research: emptyResearch(), wonders: 0, famine: false, bankrupt: false, ...over,
+  });
+
+  /** A strong rival (3 regions, big army) bordering a weak player, at the given relation. */
+  function tributeState(rel: number): GameState {
+    return {
+      turn: 50, difficulty: "normal",
+      relations: { "0-2": rel }, treaties: {}, offers: [], nextOfferId: 0,
+      regions: [
+        region({ id: 0, ownerId: P, adjacency: [1] }),
+        region({ id: 1, ownerId: R, adjacency: [0, 2] }),
+        region({ id: 2, ownerId: R, adjacency: [1, 3] }),
+        region({ id: 3, ownerId: R, adjacency: [2] }),
+      ],
+      armies: [
+        army({ id: 1, ownerId: P, regionId: 0, units: units({ militia: 1 }) }),
+        army({ id: 2, ownerId: R, regionId: 1, units: units({ infantry: 8 }) }),
+      ],
+      nextArmyId: 3,
+      nations: [
+        nat(P),
+        nat(BARBARIAN_ID, { isBarbarian: true }),
+        nat(R, { personality: { archetype: "opportunist", aggression: 0.5, expansion: 0.6, economy: 0.6, trustworthiness: 0.4 } }),
+      ],
+      outcome: "playing", log: [],
+    } as unknown as GameState;
+  }
+
+  it("a strong, bordering, unfriendly rival demands tribute of the player", () => {
+    const after = runNationTurn(tributeState(-15), R, createRng(1));
+    const offer = after.offers.find((o) => o.type === "tribute" && o.from === R && o.to === P);
+    expect(offer).toBeDefined();
+    expect(offer!.gold).toBeGreaterThan(0);
+    expect(after.log.some((l) => l.includes("tribute"))).toBe(true);
+  });
+
+  it("does not demand tribute while relations are friendly", () => {
+    const after = runNationTurn(tributeState(20), R, createRng(1));
+    expect(after.offers.some((o) => o.type === "tribute")).toBe(false);
+  });
+
+  it("does not stack a second demand while one already stands", () => {
+    const first = runNationTurn(tributeState(-15), R, createRng(1));
+    expect(first.offers.filter((o) => o.type === "tribute")).toHaveLength(1);
+    const second = runNationTurn(first, R, createRng(2));
+    expect(second.offers.filter((o) => o.type === "tribute")).toHaveLength(1); // dedup holds
+  });
+});

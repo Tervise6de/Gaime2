@@ -315,6 +315,25 @@ function doDiplomacy(state: GameState, nationId: number, rng: Rng): GameState {
       continue;
     }
 
+    // Extortion short of war: a strong, bordering rival that is unfriendly (but
+    // not yet hostile enough to invade — that case warred above) demands tribute
+    // of the player. Pay up, or refuse and watch relations sour toward the war
+    // it foreshadows. Only the player can weigh such an offer, and only one
+    // stands at a time (dedup); ignoring it never itself triggers war.
+    if (
+      o.isPlayer &&
+      border &&
+      treaty === "peace" &&
+      !earlyGraceForPlayer &&
+      rel < 0 &&
+      ratio > 1.35 &&
+      !s.offers.some((of) => of.from === nationId && of.to === o.id && of.type === "tribute")
+    ) {
+      s = demandTribute(s, nationId, o.id, Math.min(50, Math.round(18 + (ratio - 1) * 25)));
+      actions++;
+      continue;
+    }
+
     // Trustworthy types shore up relations with a pact or a gift.
     if (trust > 0.55 && rel > 15 && treaty === "peace" && border) {
       s = offerPact(s, nationId, o, rel > 45 ? "alliance" : "nap");
@@ -374,6 +393,14 @@ function offerPact(
 ): GameState {
   if (target.isPlayer) return addOffer(state, from, target.id, kind);
   return setPact(state, from, target.id, kind);
+}
+
+/** A strong rival demands gold of the player; logs the ultimatum. */
+function demandTribute(state: GameState, from: number, playerId: number, gold: number): GameState {
+  const next = addOffer(state, from, playerId, "tribute", gold);
+  if (next === state) return state; // a demand already stands (dedup)
+  const name = state.nations.find((n) => n.id === from)?.name ?? "A rival";
+  return { ...next, log: [...next.log, `${name} demands ${gold}g in tribute — pay, or risk war.`].slice(-50) };
 }
 
 // --- military ---------------------------------------------------------------

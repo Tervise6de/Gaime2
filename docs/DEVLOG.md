@@ -6,6 +6,40 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — AI tribute demands (activating a dead diplomacy mechanic)
+
+The `tribute` offer type was fully wired — `acceptOffer` makes the player pay,
+`rejectOffer` sours relations, the HUD renders "X demands Ng tribute" with
+Accept/Reject — but **no AI ever generated one**, so the whole extortion path was
+dead. Now a strong, bordering rival that is unfriendly (`rel < 0`) but not yet
+hostile enough to invade (that case already wars at `rel < −25`) and clearly
+out-powers the player (`ratio > 1.35`) **demands tribute** (18–50 gold, scaled by
+its edge) instead of sitting idle. Pay up, or refuse and let the relation hit push
+toward the war it foreshadows. One demand stands at a time (dedup); ignoring it
+never itself triggers war — the teeth are the souring relations.
+
+Self-contained: a new branch + `demandTribute` helper in `doDiplomacy` (ai.ts),
+reusing the existing `addOffer` and the already-built accept/reject + HUD. No new
+UI. The demand only ever targets the player, so self-play is untouched.
+
+**Balance (200-seed × 4-archetype self-play probe, deleted before commit):**
+warlord 34 / opportunist 27 / builder 26 / merchant 25 — identical to before (the
+offer only affects the human; in self-play it sits unresolved). All victory kinds
+reached.
+
+**Verify:** typecheck ✓, 266 tests ✓ (+3: a strong unfriendly bordering rival
+demands tribute + logs it, no demand while friendly, no second demand while one
+stands), build ✓ (0 `fetch`, deps `{}`). Browser-driven (seed 4): at turn 18 both
+rivals demanded tribute ("Valdheim demands 31g", "Suzerain of Kael demands 50g")
+with Accept/Reject; accepting Valdheim's paid exactly 31 gold (111.1 → 80.1). No
+console/page errors.
+
+**Next ideas:** the AI escalates to war a few turns after a refused demand; a
+player-initiated tribute *demand* on a weaker rival; number-key shortcuts for
+choice options.
+
+---
+
 ## 2026-07-13 — Completing the trait-choice set (Mercantile, Fertile, Industrious)
 
 Finished the "every trait has a signature decision" arc begun with the Martial
