@@ -148,6 +148,31 @@ describe("construction", () => {
     expect(canQueueBuilding(barb, "market")).toBe(false);
   });
 
+  it("canQueueBuilding gates the Harbor to coast terrain", () => {
+    const g = createGame({ seed: 1 });
+    const owned = g.regions[ownedId(g)]!;
+    expect(canQueueBuilding({ ...owned, terrain: "coast" }, "harbor")).toBe(true);
+    expect(canQueueBuilding({ ...owned, terrain: "plains" }, "harbor")).toBe(false);
+  });
+
+  it("queueBuilding refuses a terrain-bound building off its terrain", () => {
+    const g = createGame({ seed: 1 });
+    const id = ownedId(g);
+    const inland = {
+      ...g,
+      regions: g.regions.map((r) => (r.id === id ? { ...r, terrain: "hills" as const } : r)),
+    };
+    expect(queueBuilding(inland, id, "harbor").regions[id]!.construction).toBeNull();
+    const coastal = {
+      ...g,
+      regions: g.regions.map((r) => (r.id === id ? { ...r, terrain: "coast" as const } : r)),
+    };
+    expect(queueBuilding(coastal, id, "harbor").regions[id]!.construction).toEqual({
+      building: "harbor",
+      progress: 0,
+    });
+  });
+
   it("queueBuilding sets a construction order without mutating input", () => {
     const g = createGame({ seed: 1 });
     const id = ownedId(g);

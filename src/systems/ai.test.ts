@@ -168,7 +168,8 @@ describe("planRecruitment (composition-aware)", () => {
 });
 
 describe("trait-aware AI openings", () => {
-  const empty = (buildings: BuildingId[] = []) => ({ unrest: 0, buildings });
+  const empty = (buildings: BuildingId[] = [], terrain: Region["terrain"] = "plains") =>
+    ({ unrest: 0, buildings, terrain });
 
   it("opens on the trait's synergy building (unlocked from start)", () => {
     expect(chooseBuilding(empty(), [], 0, false, "fertile")).toBe("farm");
@@ -188,7 +189,7 @@ describe("trait-aware AI openings", () => {
   });
 
   it("still prioritises a temple when unrest is high, whatever the trait", () => {
-    expect(chooseBuilding({ unrest: 40, buildings: [] }, [], 0, false, "scholarly")).toBe("temple");
+    expect(chooseBuilding({ unrest: 40, buildings: [], terrain: "plains" }, [], 0, false, "scholarly")).toBe("temple");
   });
 
   it("skips a building it already has and moves to the next preference", () => {
@@ -213,6 +214,14 @@ describe("trait-aware AI openings", () => {
     expect(
       chooseBuilding(empty(["library", "university"]), ["mathematics", "philosophy"], 0, false, "scholarly"),
     ).toBe("forum");
+  });
+
+  it("builds the Harbor on coast regions only", () => {
+    // Coast, market built → Harbor is next in the generalist order.
+    expect(chooseBuilding(empty(["market"], "coast"), [], 0, false)).toBe("harbor");
+    // Same position on plains → the Harbor never fits; skips to Workshop
+    // (bank/guildhall still locked).
+    expect(chooseBuilding(empty(["market"]), [], 0, false)).toBe("workshop");
   });
 });
 

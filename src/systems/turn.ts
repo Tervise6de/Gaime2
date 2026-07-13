@@ -237,6 +237,8 @@ export function canQueueBuilding(
   if (region.ownerId !== PLAYER_ID) return false;
   if (region.buildings.includes(building)) return false;
   if (!isBuildingUnlockedFor(done, building)) return false;
+  const terrain = BUILDINGS[building].requiresTerrain;
+  if (terrain && region.terrain !== terrain) return false;
   return true;
 }
 
@@ -249,6 +251,8 @@ export function queueBuilding(
 ): GameState {
   const region = state.regions[regionId];
   if (!region || region.ownerId !== ownerId || region.buildings.includes(building)) return state;
+  const terrain = BUILDINGS[building].requiresTerrain;
+  if (terrain && region.terrain !== terrain) return state;
   const owner = state.nations.find((n) => n.id === ownerId);
   if (!owner || !isBuildingUnlockedFor(owner.research.done, building)) return state;
   const regions = state.regions.map((r) =>

@@ -14,13 +14,14 @@
  * Numbers are illustrative starting values for tuning.
  */
 
-import type { ResourceYield } from "@/data/terrain";
+import type { ResourceYield, TerrainId } from "@/data/terrain";
 import type { TechId } from "@/data/techs";
 
 export type BuildingId =
   | "farm"
   | "workshop"
   | "market"
+  | "harbor"
   | "library"
   | "temple"
   | "aqueduct"
@@ -46,6 +47,8 @@ export interface BuildingDef {
   fortification?: number;
   /** Tech that must be researched before this can be built. */
   requiresTech?: TechId;
+  /** Terrain the region must have — hidden entirely elsewhere (not just locked). */
+  requiresTerrain?: TerrainId;
   /** A Great Work — counts toward the economic victory. */
   isWonder?: boolean;
   /** One-line description for the build menu. */
@@ -79,6 +82,16 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     popCapacity: 0,
     unrest: 0,
     blurb: "+3 gold per turn (before tax).",
+  },
+  harbor: {
+    id: "harbor",
+    name: "Harbor",
+    cost: 20,
+    yield: { gold: 3, food: 2 },
+    popCapacity: 2,
+    unrest: 0,
+    requiresTerrain: "coast",
+    blurb: "+3 gold, +2 food, +2 population capacity. Coast regions only.",
   },
   library: {
     id: "library",

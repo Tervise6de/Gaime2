@@ -16,9 +16,9 @@
  */
 
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
-import type { BuildingId } from "@/data/buildings";
+import { BUILDINGS, type BuildingId } from "@/data/buildings";
 import type { TraitId } from "@/data/traits";
-import { TERRAIN } from "@/data/terrain";
+import { TERRAIN, type TerrainId } from "@/data/terrain";
 import { sideStrength, type UnitCounts } from "@/systems/combat";
 import {
   canRaiseUnit,
@@ -166,20 +166,20 @@ function pickTech(done: TechId[], nation: Nation): TechId | null {
 
 /** Base build order when a nation's trait expresses no preference. */
 const BASE_BUILD_ORDER: BuildingId[] = [
-  "market", "bank", "guildhall", "workshop", "university", "forum", "farm", "aqueduct", "library", "temple", "fortress",
+  "market", "harbor", "bank", "guildhall", "workshop", "university", "forum", "farm", "aqueduct", "library", "temple", "fortress",
 ];
 
 /** Buildings a trait rushes first, so rivals open along their strength. */
 const TRAIT_BUILD_PRIORITY: Record<TraitId, BuildingId[]> = {
   fertile: ["farm", "aqueduct"],
   industrious: ["workshop", "guildhall"],
-  mercantile: ["market", "bank", "guildhall"],
+  mercantile: ["market", "harbor", "bank", "guildhall"],
   scholarly: ["library", "university", "forum"],
   martial: ["fortress", "workshop"],
 };
 
 export function chooseBuilding(
-  region: { unrest: number; buildings: BuildingId[] },
+  region: { unrest: number; buildings: BuildingId[]; terrain: TerrainId },
   done: TechId[],
   wonders: number,
   canStartWonder: boolean,
@@ -187,6 +187,10 @@ export function chooseBuilding(
 ): BuildingId | null {
   const has = (b: BuildingId) => region.buildings.includes(b);
   const unlocked = (b: BuildingId) => isBuildingUnlockedFor(done, b);
+  const fits = (b: BuildingId) => {
+    const t = BUILDINGS[b].requiresTerrain;
+    return !t || region.terrain === t;
+  };
   if (region.unrest > 35 && !has("temple")) return "temple";
   // Chase a Great Works victory — but only one wonder at a time (national project).
   if (canStartWonder && unlocked("wonder") && !has("wonder") && wonders < WONDER_GOAL) {
@@ -194,7 +198,7 @@ export function chooseBuilding(
   }
   // Trait-preferred buildings first, then the generalist order.
   const order = [...new Set([...(trait ? TRAIT_BUILD_PRIORITY[trait] : []), ...BASE_BUILD_ORDER])];
-  for (const b of order) if (unlocked(b) && !has(b)) return b;
+  for (const b of order) if (unlocked(b) && !has(b) && fits(b)) return b;
   return null;
 }
 

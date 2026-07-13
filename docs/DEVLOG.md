@@ -6,6 +6,43 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Terrain-gated buildings + the Harbor (coast only)
+
+Buildings could differ by tech but not by *place* — every region offered the
+same menu, so terrain was only a yield table. Added `requiresTerrain` to
+`BuildingDef` and the first user of it: the **Harbor** (cost 20, +3 gold,
++2 food, +2 pop capacity), buildable **only on coast** regions. Coastal land now
+has a development identity, not just a colour.
+
+Gating is enforced at every layer: `canQueueBuilding` + `queueBuilding` (player
+path, so a stale intent can't sneak one inland), `chooseBuilding` (AI path — its
+region param grew a `terrain` field), and the HUD build menu, which *hides*
+off-terrain buildings rather than showing them locked — a 🔒 invites research,
+but no tech turns plains into coast. AI symmetry: Harbor sits in
+`BASE_BUILD_ORDER` (after market) and the mercantile trait priority, and the
+terrain filter keeps rivals from wasting picks on it inland. No tech
+requirement — the gate is the geography.
+
+**Balance (500-seed × 4-archetype self-play probe, deleted before commit):**
+warlord 42.6 → 41.0%, opportunist 34.9 → 36.3%, builder 27.3 → 28.0%, merchant
+28.7 → 28.1% — within noise, top-end marginally flatter; all victory kinds
+reached (domination 1691 / great works 294 / prestige 10 / elimination 5 of
+2000); avg length 44.1 → 43.6 turns; 0 incomplete. (The BEFORE run reproduced
+the previous cycle's AFTER numbers exactly — the sim's determinism doubles as a
+probe sanity check.)
+
+**Verify:** typecheck ✓, 250 tests ✓ (+3: canQueueBuilding gates the Harbor to
+coast; queueBuilding refuses it off-terrain and queues it on coast; the AI
+builds it on coast and skips it on plains), build ✓ (0 `fetch`, deps `{}`).
+Browser-driven both sides: a coast region's menu lists the Harbor; a plains
+region's menu omits it entirely. No console/page errors.
+
+**Next ideas:** trait-dependent choice-event options; a second terrain-bound
+building (Mine on mountains?) now that the gating exists; show the region's
+terrain-exclusive building in the map legend.
+
+---
+
 ## 2026-07-13 — New building: the Forum (Philosophy)
 
 The civics twin of last cycle's Guildhall. `philosophy` (civics tier 2) gave

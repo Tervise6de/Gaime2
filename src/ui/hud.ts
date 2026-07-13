@@ -873,6 +873,9 @@ function renderBuildSection(region: Region, done: TechId[], callbacks: HudCallba
   const menu = el("div", "hud-build-menu");
   for (const id of BUILDING_IDS) {
     const def = BUILDINGS[id];
+    // Terrain-bound buildings (Harbor) are hidden off-terrain, not shown locked —
+    // a lock invites research, but no tech makes plains into coast.
+    if (def.requiresTerrain && def.requiresTerrain !== region.terrain) continue;
     const already = region.buildings.includes(id);
     const unlocked = isBuildingUnlockedFor(done, id);
     const btn = document.createElement("button");
