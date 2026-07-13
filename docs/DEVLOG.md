@@ -6,6 +6,33 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Click a log entry to find that region on the map
+
+The turn log names places ("Suzerain of Kael won at Wyrmholt — Wyrmholt
+captured!", "Lost Millbrook"), but on a 20-node map you had to hunt for where
+that was. Now any log line that mentions a region is clickable: it selects that
+region — highlighting it on the map and opening its detail panel — so "who took
+what where" is one tap away. Linked lines get a pointer cursor, a hover
+underline, and a "Show <region> on the map" tooltip.
+
+Region names are distinct proper nouns, so matching is a plain substring scan
+(`regionMentionedIn`) that picks the *longest* matching name (so "Kelmoor" wins
+over a stray "Kel"). The click reuses the existing selection path via a new
+`onSelectRegion` HUD intent wired in `main.ts` — same code as clicking the node,
+so the map highlight and region panel already do the right thing. UI-only; no
+sim/state/balance change.
+
+**Verify:** typecheck ✓, 221 tests ✓, build ✓ (0 `fetch`, deps `{}`).
+Browser-driven: advanced turns until conquest lines appeared (3 linked lines);
+clicking "…won at Wyrmholt — Wyrmholt captured!" selected Wyrmholt — the region
+panel showed "Wyrmholt · Hills · Suzerain of Kael · pop 3/7 · fort 1" and the
+node highlighted on the map. No console errors.
+
+**Next ideas:** also link nation names in the log to the diplomacy panel; a "Copy
+seed" button; a named save-slot picker.
+
+---
+
 ## 2026-07-13 — Export / import a save as a file (backup & sharing)
 
 Saves lived only in `localStorage` (auto + one manual slot), so a game couldn't

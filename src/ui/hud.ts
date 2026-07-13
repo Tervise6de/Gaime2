@@ -82,6 +82,8 @@ export interface HudCallbacks {
   onAcceptOffer(offerId: number): void;
   onRejectOffer(offerId: number): void;
   onChooseResearch(tech: TechId): void;
+  /** Select a region on the map (e.g. from a clicked log entry). */
+  onSelectRegion(regionId: number): void;
 }
 
 const BRANCH_COLOR: Record<string, string> = {
@@ -486,16 +488,26 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
     // Full log: newest first, numbered chronologically, scrollable. The buffer
     // is capped upstream (~50 entries), so entry #1 is the oldest still kept.
+    // A line that names a region is clickable — it selects that region on the map.
     logHeading.textContent = `Turn log (${state.log.length})`;
     logBody.innerHTML = "";
     const total = state.log.length;
     for (let i = total - 1; i >= 0; i--) {
-      const row = el("p", "hud-log-line" + (i === total - 1 ? " latest" : ""));
+      const text = state.log[i]!;
+      const regionId = regionMentionedIn(state, text);
+      const row = el(
+        "p",
+        "hud-log-line" + (i === total - 1 ? " latest" : "") + (regionId !== null ? " linked" : ""),
+      );
       const num = el("span", "hud-log-num");
       num.textContent = String(i + 1);
       const txt = el("span", "hud-log-text");
-      txt.textContent = state.log[i]!;
+      txt.textContent = text;
       row.append(num, txt);
+      if (regionId !== null) {
+        row.title = `Show ${state.regions[regionId]!.name} on the map`;
+        row.addEventListener("click", () => callbacks.onSelectRegion(regionId));
+      }
       logBody.append(row);
     }
   }
@@ -1285,6 +1297,23 @@ function heading(text: string): HTMLElement {
   const h = el("h2", "hud-heading");
   h.textContent = text;
   return h;
+}
+
+/**
+ * The region a log line refers to, if any — the longest region name that appears
+ * in the text (longest wins so "Kelmoor" beats a stray "Kel"). Region names are
+ * distinct proper nouns, so a plain substring match is reliable here.
+ */
+function regionMentionedIn(state: GameState, line: string): number | null {
+  let bestId: number | null = null;
+  let bestLen = 0;
+  for (const r of state.regions) {
+    if (r.name.length > bestLen && line.includes(r.name)) {
+      bestId = r.id;
+      bestLen = r.name.length;
+    }
+  }
+  return bestId;
 }
 
 function fmt(n: number): string {

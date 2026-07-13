@@ -141,6 +141,11 @@ function main(): void {
       state = rejectOffer(state, offerId);
       commit();
     },
+    onSelectRegion(regionId) {
+      selectedRegion = regionId;
+      moveArmyId = null;
+      sync();
+    },
     onChooseResearch(tech) {
       state = chooseResearch(state, tech);
       commit();

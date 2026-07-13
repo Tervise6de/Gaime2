@@ -1302,6 +1302,18 @@ body {
   color: var(--text, #e6e9ee);
 }
 
+/* A line naming a region is clickable — it focuses that region on the map. */
+.hud-log-line.linked {
+  cursor: pointer;
+}
+
+.hud-log-line.linked:hover .hud-log-text {
+  color: var(--text, #e6e9ee);
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.35);
+  text-underline-offset: 2px;
+}
+
 /* Last-turn summary (above the log). */
 .hud-summary {
   margin-bottom: 10px;
