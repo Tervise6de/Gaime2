@@ -6,6 +6,32 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Map legend
+
+The canvas map draws a lot of vocabulary — terrain-coloured fills, owner-colour
+rings, a population number, amber/red unrest dots, ⚒/🐎 strategic-resource icons,
+a 🔨 construction marker, army badges, and gold/cyan selection rings — with no
+key. Added a **❔ Legend** toggle in the top bar that opens a static legend panel
+explaining every marker, grouped into Terrain / Region markers / Selection. The
+swatch colours mirror the renderer constants (terrain from the `TERRAIN` table;
+unrest amber `#e0b74a` / red `#e8776b`; selection gold `#f4d27a`; target cyan
+`#63c7d6`) so the key matches the map exactly.
+
+Change (UI only, no sim/balance impact): `buildLegend()` constructs the panel once
+in `createHud`; a top-bar button toggles its visibility; new `.hud-legend*` styles.
+
+**Verify:** typecheck ✓, 210 tests ✓, build ✓ (0 `fetch`). Browser-driven: the
+panel is hidden at start, the toggle opens it with all 15 rows (5 terrain + 8
+markers + 2 selection, colours matching the live nodes) and closes it again, no
+console errors.
+
+Test count: 210 green (unchanged — static presentational UI, browser-verified).
+
+**Next ideas:** first-time hints; per-enemy call-to-arms; end-game score screen;
+Voronoi map renderer; trait-flavoured events.
+
+---
+
 ## 2026-07-13 — Three features via parallel agents (alerts · tech rush · call-to-arms)
 
 Fanned out three sub-agents in isolated git worktrees on disjoint file sets, each

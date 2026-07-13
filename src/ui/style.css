@@ -768,6 +768,113 @@ body {
   text-transform: capitalize;
 }
 
+/* --- Map legend ----------------------------------------------------------- */
+.hud-legend-toggle {
+  margin-left: auto;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--panel-border, #2a323d);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.hud-legend-toggle:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.hud-legend {
+  position: fixed;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 250px;
+  max-height: 80vh;
+  overflow-y: auto;
+  z-index: 30;
+}
+
+.hud-legend-h {
+  margin: 10px 0 5px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+}
+
+.hud-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 2px 0;
+  font-size: 12px;
+}
+
+.hud-legend-swatch {
+  flex: 0 0 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hud-legend-label {
+  color: var(--muted, #9aa4b2);
+  line-height: 1.3;
+}
+
+.hud-legend-disc {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.hud-legend-mdot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.hud-legend-ring {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid;
+  display: inline-block;
+}
+
+.hud-legend-ring.dashed {
+  border-style: dashed;
+}
+
+.hud-legend-num {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--fg);
+}
+
+.hud-legend-ico {
+  font-size: 14px;
+}
+
+.hud-legend-badge {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 50%;
+  background: #d94f4f;
+  color: #0d0f14;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 16px;
+  display: inline-block;
+}
+
 /* --- Critical-events alert strip ------------------------------------------ */
 .hud-alerts {
   position: fixed;

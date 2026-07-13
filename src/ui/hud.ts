@@ -14,7 +14,7 @@
 
 import { BUILDINGS, BUILDING_IDS, type BuildingId } from "@/data/buildings";
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
-import { TERRAIN } from "@/data/terrain";
+import { TERRAIN, TERRAIN_IDS } from "@/data/terrain";
 import { regionProduction, nationalProduction, nationYieldMult } from "@/systems/economy";
 import { regionCapacity } from "@/systems/population";
 import { previewCombat } from "@/systems/combat";
@@ -131,12 +131,21 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   }
   const turnBadge = el("div", "hud-turn");
   topBar.append(turnBadge);
+  const legendToggle = btn("❔ Legend", "hud-legend-toggle", () => {
+    legendPanel.style.display = legendPanel.style.display === "none" ? "block" : "none";
+  });
+  topBar.append(legendToggle);
   root.append(topBar);
 
   // Critical-events alert strip (just below the resource bar).
   const alertStrip = el("div", "hud-alerts");
   alertStrip.style.display = "none";
   root.append(alertStrip);
+
+  // Map legend (hidden until toggled) — explains the node/marker vocabulary.
+  const legendPanel = buildLegend();
+  legendPanel.style.display = "none";
+  root.append(legendPanel);
 
   // --- Left panel: fiscal + turn control ------------------------------------
   const leftPanel = el("div", "hud-panel hud-left");
@@ -593,6 +602,57 @@ function renderBuildSection(region: Region, done: TechId[], callbacks: HudCallba
   }
   section.append(menu);
   return section;
+}
+
+/**
+ * Build the map-legend panel: a static key to the node/marker vocabulary the
+ * canvas renderer draws (terrain fills, owner rings, population, unrest dots,
+ * strategic-resource icons, construction, army badges, selection/target rings).
+ * Colours mirror the renderer constants so the key matches the map exactly.
+ */
+function buildLegend(): HTMLElement {
+  const panel = el("div", "hud-panel hud-legend");
+  panel.append(heading("Map legend"));
+
+  const section = (title: string): void => {
+    const h = el("div", "hud-legend-h");
+    h.textContent = title;
+    panel.append(h);
+  };
+  const row = (swatchHtml: string, label: string): void => {
+    const r = el("div", "hud-legend-row");
+    const sw = el("span", "hud-legend-swatch");
+    sw.innerHTML = swatchHtml;
+    const lb = el("span", "hud-legend-label");
+    lb.textContent = label;
+    r.append(sw, lb);
+    panel.append(r);
+  };
+  const disc = (color: string): string =>
+    `<span class="hud-legend-disc" style="background:${color}"></span>`;
+  const dot = (color: string): string =>
+    `<span class="hud-legend-mdot" style="background:${color}"></span>`;
+  const ring = (color: string, dashed = false): string =>
+    `<span class="hud-legend-ring${dashed ? " dashed" : ""}" style="border-color:${color}"></span>`;
+
+  section("Terrain (node fill)");
+  for (const t of TERRAIN_IDS) row(disc(TERRAIN[t].color), TERRAIN[t].name);
+
+  section("Region markers");
+  row(ring("#d8a24a"), "Owner colour (ring) · dark = neutral/barbarian");
+  row('<span class="hud-legend-num">6</span>', "Population (number in node)");
+  row(dot("#e0b74a"), "Unrest — unhappy (amber dot)");
+  row(dot("#e8776b"), "Unrest — revolt risk (red dot)");
+  row('<span class="hud-legend-ico">⚒</span>', "Iron deposit");
+  row('<span class="hud-legend-ico">🐎</span>', "Horses");
+  row('<span class="hud-legend-ico">🔨</span>', "Building under construction");
+  row('<span class="hud-legend-badge">3</span>', "Army (owner colour, unit count)");
+
+  section("Selection");
+  row(ring("#f4d27a"), "Selected region");
+  row(ring("#63c7d6", true), "Move / attack target");
+
+  return panel;
 }
 
 /** Render the critical-events alert strip (danger/warn/good chips), or hide it. */
