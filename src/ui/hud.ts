@@ -90,6 +90,9 @@ const BRANCH_COLOR: Record<string, string> = {
 /** Fixed gift size the diplomacy panel offers. */
 const GIFT_AMOUNT = 30;
 
+/** localStorage key marking that the first-time hints have been dismissed. */
+const HINTS_KEY = "gaime2:hintsSeen";
+
 export interface Hud {
   update(
     state: GameState,
@@ -254,6 +257,41 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   banner.append(bannerText, bannerStandings, bannerBtn);
   root.append(banner);
 
+  // --- First-time hints (shown once, until dismissed) -----------------------
+  const hints = el("div", "hud-hints");
+  hints.style.display = "none";
+  const hintsTitle = el("div", "hud-hints-title");
+  hintsTitle.textContent = "Welcome, ruler 👑";
+  const hintsBody = el("ul", "hud-hints-list");
+  for (const tip of [
+    "Set your tax rate on the left — more gold, but higher unrest.",
+    "Click a region to develop it: queue buildings and raise armies.",
+    "Move / Attack an army onto a neighbour to expand or conquer.",
+    "End turn to advance; watch the 🏆 victory progress up top.",
+    "Tap ❔ Legend anytime to decode the map markers.",
+  ]) {
+    const li = document.createElement("li");
+    li.textContent = tip;
+    hintsBody.append(li);
+  }
+  const hintsBtn = btn("Got it", "hud-hints-btn", () => {
+    hints.style.display = "none";
+    hintsDismissed = true;
+    try {
+      window.localStorage.setItem(HINTS_KEY, "1");
+    } catch {
+      /* storage unavailable — dismiss for this session only */
+    }
+  });
+  hints.append(hintsTitle, hintsBody, hintsBtn);
+  root.append(hints);
+  let hintsDismissed = false;
+  try {
+    hintsDismissed = window.localStorage.getItem(HINTS_KEY) === "1";
+  } catch {
+    hintsDismissed = false;
+  }
+
   // --- Transient toast (save/load feedback) ---------------------------------
   const toast = el("div", "hud-toast");
   toast.style.display = "none";
@@ -328,6 +366,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     turnBadge.classList.toggle("famine", player.famine || player.bankrupt);
 
     renderVictoryProgress(victoryEl, state);
+
+    // First-time hints: only on turn 1 of a live game, until dismissed.
+    hints.style.display =
+      !hintsDismissed && state.turn === 1 && state.outcome === "playing" ? "block" : "none";
 
     taxInput.value = String(Math.round(player.taxRate * 100));
     taxLabel.textContent = `Tax ${Math.round(player.taxRate * 100)}%`;

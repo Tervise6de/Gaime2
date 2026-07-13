@@ -6,6 +6,32 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — First-time hints
+
+New players had no onboarding. A dismissible **"Welcome, ruler 👑"** card now
+appears on turn 1 of a fresh game with five one-line tips (set tax, develop
+regions, move/attack to expand, end turn + watch victory progress, use the
+legend). "Got it" hides it and records a `gaime2:hintsSeen` flag in localStorage,
+so returning players never see it again; it only reappears if that flag is
+cleared. Shown strictly on turn 1 of a live game (never mid-game or after a game
+ends).
+
+Change (UI only, no sim/balance impact): a `hud-hints` card built in `createHud`,
+toggled from the update loop on `turn === 1 && outcome === "playing" &&
+!dismissed`; localStorage access is wrapped in try/catch (falls back to
+session-only dismissal). New `.hud-hints*` styles.
+
+**Verify:** typecheck ✓, 214 tests ✓, build ✓ (0 `fetch`). Browser-driven: on a
+fresh context the card shows with all 5 tips on turn 1; "Got it" hides it and sets
+the flag; a subsequent New Game keeps it hidden; no console errors.
+
+Test count: 214 green (unchanged — presentational/localStorage UI, browser-verified).
+
+**Next ideas:** score-history sparkline; tooltips for every stat; a "?" to reopen
+hints; Voronoi map renderer; trait-flavoured events.
+
+---
+
 ## 2026-07-13 — Per-enemy call to arms
 
 The "Call to arms" button only offered an ally the *first* war the player was
