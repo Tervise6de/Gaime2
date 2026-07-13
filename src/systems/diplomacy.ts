@@ -71,6 +71,25 @@ export function nationPower(state: GameState, id: number): number {
   return army + regions * 6 + treasury;
 }
 
+/**
+ * How many living nations both `a` and `b` are at war with — their common
+ * enemies. `pool` defaults to all living non-barbarian nations.
+ */
+export function sharedEnemies(
+  state: GameState,
+  a: number,
+  b: number,
+  pool?: Array<{ id: number; isBarbarian: boolean; alive: boolean }>,
+): number {
+  const nations = pool ?? state.nations.filter((n) => !n.isBarbarian && n.alive);
+  let count = 0;
+  for (const c of nations) {
+    if (c.isBarbarian || !c.alive || c.id === a || c.id === b) continue;
+    if (atWar(state, a, c.id) && atWar(state, b, c.id)) count++;
+  }
+  return count;
+}
+
 /** Number of adjacent region pairs bordering nations a and b. */
 export function sharedBorders(state: GameState, a: number, b: number): number {
   let count = 0;
@@ -259,6 +278,12 @@ export function driftRelations(state: GameState): GameState {
       const borders = sharedBorders(state, a, b);
       rel -= borders * 0.5;
       if (treaty === "alliance") rel += 2;
+
+      // Shared-enemy warmth: co-belligerents (both at war with the same third
+      // power) draw closer, so coalitions against a common foe hold together
+      // instead of eroding under border friction.
+      rel += 2 * sharedEnemies(state, a, b, players);
+
       if (treaty === "war") rel = Math.min(rel, HOSTILE_THRESHOLD);
 
       relations[key] = clamp(Math.round(rel), RELATION_MIN, RELATION_MAX);

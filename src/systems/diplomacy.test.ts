@@ -16,6 +16,8 @@ import {
   rejectOffer,
   nationPower,
   sharedBorders,
+  sharedEnemies,
+  setTreaty,
 } from "@/systems/diplomacy";
 import { createGame } from "@/systems/turn";
 import {
@@ -138,5 +140,29 @@ describe("wouldAccept", () => {
     g.nations[RIVAL_A]!.stocks.gold = 0;
     // Player is proposer; rival is target.
     expect(typeof wouldAccept(g, 0, RIVAL_A, "peace")).toBe("boolean");
+  });
+});
+
+describe("shared-enemy warmth", () => {
+  it("counts the nations a pair are both at war with", () => {
+    let s = game();
+    expect(sharedEnemies(s, RIVAL_A, RIVAL_B)).toBe(0);
+    s = setTreaty(s, 0, RIVAL_A, "war");
+    s = setTreaty(s, 0, RIVAL_B, "war");
+    expect(sharedEnemies(s, RIVAL_A, RIVAL_B)).toBe(1);
+  });
+
+  it("does not count a or b themselves as a shared enemy", () => {
+    const s = setTreaty(game(), RIVAL_A, RIVAL_B, "war");
+    expect(sharedEnemies(s, RIVAL_A, RIVAL_B)).toBe(0);
+  });
+
+  it("warms co-belligerents' relations vs. the no-shared-enemy baseline", () => {
+    const base = setRelation(game(), RIVAL_A, RIVAL_B, 0);
+    const relBase = getRelation(driftRelations(base), RIVAL_A, RIVAL_B);
+    let war = setTreaty(base, 0, RIVAL_A, "war");
+    war = setTreaty(war, 0, RIVAL_B, "war");
+    const relWar = getRelation(driftRelations(war), RIVAL_A, RIVAL_B);
+    expect(relWar).toBeGreaterThan(relBase);
   });
 });

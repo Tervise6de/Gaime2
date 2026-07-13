@@ -6,6 +6,27 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Shared-enemy warmth (coalitions that hold)
+
+Follow-up to the coalition-war change: co-belligerents had no reason to stay
+friendly, so border friction eroded their relations even while they fought a
+common foe, and coalitions fell apart. Now `driftRelations` adds a small warmth
+(+2 per shared enemy) between any two nations at war with the same third power —
+"the enemy of my enemy." New exported `sharedEnemies(state, a, b)`; three tests
+(count, self-exclusion, warmth vs. the no-shared-enemy baseline).
+
+**Balance check (temporary symmetric probe, deleted before commit):** a mild
+positive nudge for economic archetypes as coalitions hold together — merchant and
+builder 21→25%, warlord/opportunist steady (17%/25%), median length unchanged
+(36). Spread stays a tight 17–25%. No regression; 96 probe games clean.
+
+Test count: 181 green (was 178). Build network-free (0 `fetch`).
+
+**Next ideas:** allies join *your* wars on request; tech-tree screen; trait-aware
+tech rush; alerts strip for critical events.
+
+---
+
 ## 2026-07-13 — Gang up on a runaway leader (coalition wars)
 
 Nothing checked a snowballing nation: rivals fought their own 1v1s while one
