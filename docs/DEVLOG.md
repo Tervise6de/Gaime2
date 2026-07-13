@@ -6,6 +6,35 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Session summary (6 cycles: AI depth + traits + UX)
+
+Six verified cycles this session, each typecheck+test+build green, browser-checked
+where UI/gameplay, balance-probed where the AI changed (probe deleted each time),
+and pushed to `claude/milestone-1-playable-r0hjxb` + `main`. Tests 130 → **173**.
+
+1. **Composition-aware AI recruiting** — rivals bring siege vs. forts and counter
+   the enemy's actual unit mix instead of always defaulting to infantry.
+2. **AI home defence** — garrison threatened frontier regions; retreat badly
+   outmatched armies instead of feeding them in.
+3. **Combat-odds preview (UI)** — attacker/defender strength + win chance for each
+   target in Move/Attack mode, from the same maths the sim resolves with.
+4. **National traits** — Fertile/Industrious/Martial/Mercantile/Scholarly drawn
+   per game for player and rivals; production + unit-cost effects; shown in the HUD.
+5. **Trait-aware AI openings** — rivals open along their trait's strength. Headline
+   result: committed-player win rate **converged to ~21% across all four
+   archetypes** (from a 13–42% spread), squarely in the healthy 21–29% band.
+6. **Turn-summary panel** — a "Last turn" readout of the strategic deltas
+   (regions, wars, eliminations, tech, treasury) above the log.
+
+Guardrails held throughout: 100% local/offline, `dependencies: {}`, 0 `fetch` in
+the bundle, deterministic seeded RNG, pure turn pipeline.
+
+**Best next tasks:** tech-tree screen (whole branching tree); ask allies to join
+wars / gang up on the leader; trait-aware tech rush (Scholarly researches faster);
+alerts strip for critical events; Voronoi map renderer over the identical graph.
+
+---
+
 ## 2026-07-13 — Turn-summary panel ("what changed last turn")
 
 Strategic changes were easy to miss in the scrolling log. A new **Last turn**
