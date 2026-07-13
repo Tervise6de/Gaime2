@@ -1070,15 +1070,73 @@ body {
   top: 96px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 14px 20px;
+  padding: 16px 22px;
   font-size: 18px;
   font-weight: 700;
   border-radius: 12px;
   backdrop-filter: blur(6px);
   display: flex;
-  align-items: center;
-  gap: 16px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  min-width: 320px;
+  max-width: 92vw;
+  text-align: center;
   pointer-events: auto;
+}
+
+/* Final standings table on the end-game screen. */
+.hud-standings-table {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.hud-standings-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.hud-standings-row.you {
+  background: rgba(0, 0, 0, 0.34);
+  outline: 1px solid rgba(255, 255, 255, 0.45);
+}
+
+.hud-standings-row.dead {
+  opacity: 0.55;
+}
+
+.hud-standings-rank {
+  flex: 0 0 18px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.hud-standings-name {
+  flex: 1 1 auto;
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.hud-standings-detail {
+  color: rgba(0, 0, 0, 0.6);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hud-standings-score {
+  flex: 0 0 auto;
+  min-width: 44px;
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .hud-banner.win {

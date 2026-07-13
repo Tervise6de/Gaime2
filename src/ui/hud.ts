@@ -27,6 +27,7 @@ import {
   unitCost,
 } from "@/systems/military";
 import { getRelation, getTreaty, atWar, wouldJoinWar } from "@/systems/diplomacy";
+import { nationScore } from "@/systems/victory";
 import type { TurnSummary } from "@/systems/summary";
 import { deriveAlerts } from "@/ui/alerts";
 import { researchFrontier, isBuildingUnlockedFor } from "@/systems/tech";
@@ -241,11 +242,12 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const banner = el("div", "hud-banner");
   banner.style.display = "none";
   const bannerText = el("span", "hud-banner-text");
+  const bannerStandings = el("div", "hud-standings");
   const bannerBtn = document.createElement("button");
   bannerBtn.className = "hud-banner-btn";
   bannerBtn.textContent = "New game";
   bannerBtn.addEventListener("click", () => newGameBtn.click());
-  banner.append(bannerText, bannerBtn);
+  banner.append(bannerText, bannerStandings, bannerBtn);
   root.append(banner);
 
   // --- Transient toast (save/load feedback) ---------------------------------
@@ -337,6 +339,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       const kind = state.victoryKind ? ` (${state.victoryKind})` : "";
       bannerText.textContent =
         state.outcome === "victory" ? `Victory${kind}!` : `Defeat${kind} — your realm has fallen.`;
+      renderStandings(bannerStandings, state);
     }
 
     logBody.innerHTML = "";
@@ -653,6 +656,44 @@ function buildLegend(): HTMLElement {
   row(ring("#63c7d6", true), "Move / attack target");
 
   return panel;
+}
+
+/**
+ * Final standings for the end-game screen: every non-barbarian nation ranked by
+ * prestige score, with a compact regions/wonders/techs breakdown. The player row
+ * is highlighted and eliminated nations are marked.
+ */
+function renderStandings(container: HTMLElement, state: GameState): void {
+  container.innerHTML = "";
+  const rows = state.nations
+    .filter((n) => !n.isBarbarian)
+    .map((n) => ({
+      n,
+      score: nationScore(state, n.id),
+      regions: state.regions.filter((r) => r.ownerId === n.id).length,
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  const table = el("div", "hud-standings-table");
+  rows.forEach((row, i) => {
+    const tr = el(
+      "div",
+      "hud-standings-row" + (row.n.isPlayer ? " you" : "") + (row.n.alive ? "" : " dead"),
+    );
+    const rank = el("span", "hud-standings-rank");
+    rank.textContent = String(i + 1);
+    const sw = el("span", "hud-region-swatch");
+    sw.style.background = row.n.color;
+    const name = el("span", "hud-standings-name");
+    name.textContent = (row.n.isPlayer ? "You" : row.n.name) + (row.n.alive ? "" : " ✗");
+    const detail = el("span", "hud-standings-detail");
+    detail.textContent = `${row.regions}⬢ · ${row.n.wonders}★ · ${row.n.research.done.length}📖`;
+    const score = el("span", "hud-standings-score");
+    score.textContent = String(row.score);
+    tr.append(rank, sw, name, detail, score);
+    table.append(tr);
+  });
+  container.append(table);
 }
 
 /** Render the critical-events alert strip (danger/warn/good chips), or hide it. */

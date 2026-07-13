@@ -6,6 +6,32 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — End-game standings screen
+
+The game-over banner only said "Victory/Defeat (kind)" — no sense of how the game
+actually shook out. It now shows a **final standings table**: every non-barbarian
+nation ranked by prestige score (`nationScore`), each row a colour swatch, name
+(the player shown as "You" and highlighted; eliminated nations dimmed with a ✗),
+a compact `regions⬢ · wonders★ · techs📖` breakdown, and the score. The banner is
+now a vertical card (title → standings → New game).
+
+Change (UI only, reads existing `nationScore` from `@/systems/victory`; no sim or
+balance impact): `renderStandings(container, state)` builds the ranked table on
+game end; new `.hud-standings*` styles.
+
+**Verify:** typecheck ✓, 210 tests ✓, build ✓ (0 `fetch`). Browser-driven: played
+seed 7 to its end (Defeat by domination at turn 12) and confirmed the standings
+list all three nations sorted by score (Suzerain of Kael 263 · Valdheim 157 · You
+68), with the player row highlighted, no console errors.
+
+Test count: 210 green (unchanged — presentational UI over tested scoring,
+browser-verified).
+
+**Next ideas:** first-time hints; per-enemy call-to-arms; a small score-history
+sparkline on the end screen; Voronoi map renderer; trait-flavoured events.
+
+---
+
 ## 2026-07-13 — Map legend
 
 The canvas map draws a lot of vocabulary — terrain-coloured fills, owner-colour
