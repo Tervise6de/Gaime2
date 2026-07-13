@@ -17,6 +17,7 @@
 
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
 import type { BuildingId } from "@/data/buildings";
+import { TERRAIN } from "@/data/terrain";
 import { sideStrength, type UnitCounts } from "@/systems/combat";
 import {
   canRaiseUnit,
@@ -42,11 +43,13 @@ import type { Rng } from "@/systems/rng";
 import {
   BARBARIAN_ID,
   DIFFICULTY,
+  FORT_PER_LEVEL,
   PLAYER_ID,
   WONDER_GOAL,
   armySize,
   clampTax,
   emptyUnits,
+  type Army,
   type GameState,
   type Nation,
 } from "@/systems/state";
@@ -238,6 +241,9 @@ function offerPact(
 
 // --- military ---------------------------------------------------------------
 
+/** An army retreats when a bordering enemy's attack exceeds its defence by this. */
+const RETREAT_RATIO = 1.35;
+
 function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
   let s = state;
   const nation = s.nations.find((n) => n.id === nationId);
@@ -255,17 +261,163 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
     if (target !== null) s = moveArmy(s, live.id, target);
   }
 
-  // Phase 2 — concentrate: armies with no winnable target march through friendly
-  // territory toward the nearest frontier, converging and merging into one stack
-  // strong enough to break defences a split force cannot.
+  // Phase 2 — reposition idle armies (no winnable attack this turn):
+  //   • badly outmatched where it stands → retreat to a safer owned region
+  //     (don't feed the army into a losing fight);
+  //   • holding a defensible threatened region → stay put and garrison it;
+  //   • otherwise march to reinforce the nearest threatened region, or, failing
+  //     that, concentrate toward the offensive frontier (previous behaviour).
   for (const army of myArmies()) {
     const live = s.armies.find((a) => a.id === army.id);
     if (!live || live.movesLeft <= 0) continue;
     if (bestTarget(s, live, nationId) !== null) continue;
+
+    if (isBadlyOutmatched(s, live, nationId)) {
+      const refuge = retreatStep(s, live, nationId);
+      if (refuge !== null) s = moveArmy(s, live.id, refuge);
+      continue; // if nowhere safer, hold and sell it dearly rather than advance
+    }
+
+    // Defensible and already under threat here → garrison in place.
+    if (regionIsThreatened(s, live.regionId, nationId)) continue;
+
+    const defend = defendStep(s, live, nationId);
+    if (defend !== null) {
+      s = moveArmy(s, live.id, defend);
+      continue;
+    }
+
     const step = advanceStep(s, live, nationId);
     if (step !== null) s = moveArmy(s, live.id, step);
   }
   return s;
+}
+
+/** Enemy (rival, at-war) armies standing in regions adjacent to `regionId`. */
+function adjacentThreats(state: GameState, regionId: number, nationId: number): Army[] {
+  const region = state.regions[regionId];
+  if (!region) return [];
+  const out: Army[] = [];
+  for (const nb of region.adjacency) {
+    for (const a of state.armies) {
+      if (a.regionId !== nb) continue;
+      if (a.ownerId === nationId || a.ownerId === null || a.ownerId === BARBARIAN_ID) continue;
+      if (atWar(state, nationId, a.ownerId)) out.push(a);
+    }
+  }
+  return out;
+}
+
+/** Whether an owned region has a mobile enemy stack poised on its border. */
+export function regionIsThreatened(state: GameState, regionId: number, nationId: number): boolean {
+  const r = state.regions[regionId];
+  if (!r || r.ownerId !== nationId) return false;
+  return adjacentThreats(state, regionId, nationId).length > 0;
+}
+
+/** Our defensive strength for `units` standing in `regionId` against `enemy`. */
+function defenseAt(
+  state: GameState,
+  units: UnitCounts,
+  regionId: number,
+  enemy: UnitCounts,
+): number {
+  const r = state.regions[regionId];
+  if (!r) return 0;
+  const fortMult = 1 + r.fortification * FORT_PER_LEVEL;
+  return sideStrength(units, enemy, "defense") * TERRAIN[r.terrain].defense * fortMult;
+}
+
+/** How hard the strongest bordering enemy would hit an army where it stands. */
+function incomingPressure(state: GameState, army: Army, nationId: number): number {
+  let worst = 0;
+  for (const threat of adjacentThreats(state, army.regionId, nationId)) {
+    const atk = sideStrength(threat.units, army.units, "attack");
+    if (atk > worst) worst = atk;
+  }
+  return worst;
+}
+
+/** An army is badly outmatched if a bordering enemy clearly beats its defence. */
+export function isBadlyOutmatched(state: GameState, army: Army, nationId: number): boolean {
+  const pressure = incomingPressure(state, army, nationId);
+  if (pressure <= 0) return false;
+  const threats = adjacentThreats(state, army.regionId, nationId);
+  const enemyUnits = strongestOf(threats);
+  const def = defenseAt(state, army.units, army.regionId, enemyUnits);
+  return pressure > def * RETREAT_RATIO;
+}
+
+/** The units of the strongest (by size) army in a list, for counter maths. */
+function strongestOf(armies: Army[]): UnitCounts {
+  let best: UnitCounts = emptyUnits();
+  let bestSize = -1;
+  for (const a of armies) {
+    const size = armySize(a.units);
+    if (size > bestSize) {
+      bestSize = size;
+      best = a.units;
+    }
+  }
+  return best;
+}
+
+/**
+ * The adjacent owned region that is safest to retreat into — the one facing the
+ * least incoming enemy pressure, and strictly safer than staying put. Null if no
+ * owned neighbour is any safer (then the army holds and fights where it is).
+ */
+export function retreatStep(state: GameState, army: Army, nationId: number): number | null {
+  const here = state.regions[army.regionId];
+  if (!here) return null;
+  const hereThreat = adjacentThreats(state, army.regionId, nationId).reduce(
+    (m, a) => Math.max(m, sideStrength(a.units, army.units, "attack")),
+    0,
+  );
+  let best: number | null = null;
+  let bestThreat = hereThreat;
+  for (const nb of here.adjacency) {
+    const r = state.regions[nb];
+    if (!r || r.ownerId !== nationId) continue; // retreat only into our own land
+    // Pressure the army would face there next turn.
+    let threat = 0;
+    for (const a of state.armies) {
+      const ar = state.regions[a.regionId];
+      if (!ar || a.ownerId === nationId || a.ownerId === null || a.ownerId === BARBARIAN_ID) continue;
+      if (!atWar(state, nationId, a.ownerId)) continue;
+      if (ar.adjacency.includes(nb)) threat = Math.max(threat, sideStrength(a.units, army.units, "attack"));
+    }
+    if (threat < bestThreat) {
+      bestThreat = threat;
+      best = nb;
+    }
+  }
+  return best;
+}
+
+/**
+ * First step (an owned neighbour) along the shortest own-land path toward the
+ * nearest threatened owned region — reinforcing where enemies are massing.
+ * Null if the army is already at the threatened region or none is reachable.
+ */
+export function defendStep(state: GameState, army: Army, nationId: number): number | null {
+  const start = army.regionId;
+  if (regionIsThreatened(state, start, nationId)) return null; // already defending
+  const visited = new Set<number>([start]);
+  const queue: { node: number; first: number | null }[] = [{ node: start, first: null }];
+  while (queue.length) {
+    const { node, first } = queue.shift()!;
+    for (const nb of state.regions[node]!.adjacency) {
+      if (visited.has(nb)) continue;
+      const nbR = state.regions[nb];
+      if (!nbR || nbR.ownerId !== nationId) continue; // march only through own land
+      visited.add(nb);
+      const step = first ?? nb;
+      if (regionIsThreatened(state, nb, nationId)) return step;
+      queue.push({ node: nb, first: step });
+    }
+  }
+  return null;
 }
 
 /** Whether a nation may attack into a region (hostile, honouring player grace). */

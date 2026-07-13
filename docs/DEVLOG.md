@@ -6,6 +6,49 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — AI home defence: garrison the frontier, retreat when outmatched
+
+Rival armies had no defensive instinct. With no winnable adjacent target an army
+just marched toward the *offensive* frontier — so a threatened home region got no
+garrison, and a badly outmatched stack would keep walking into stronger enemies
+instead of pulling back.
+
+Change (`ai.ts`, pure/deterministic): the "reposition idle armies" phase now
+reasons about defence before offence. For each idle army (no winnable attack this
+turn):
+1. **Retreat when badly outmatched** — if a bordering enemy's attack exceeds our
+   defence here (terrain + fort included) by `RETREAT_RATIO` (1.35), fall back to
+   the safest adjacent owned region rather than feeding the army in. If nowhere is
+   safer, hold and sell it dearly.
+2. **Garrison a defensible threatened region** — if an enemy stack borders the
+   region we're standing on and we're *not* outmatched, stay put and defend it
+   instead of marching away.
+3. **Reinforce** — otherwise march through friendly land toward the nearest
+   threatened owned region (BFS), converging where enemies are massing.
+4. **Concentrate** — with nothing to defend, fall back to the previous offensive
+   staging toward the attack frontier.
+
+New pure helpers `regionIsThreatened`, `isBadlyOutmatched`, `retreatStep`,
+`defendStep`; eight new unit tests (threat detection excludes immobile barbarian
+garrisons; outmatch judgement; retreat picks the safest owned neighbour or holds;
+reinforce marches toward the threatened region or holds when already there).
+
+**Balance check (temporary symmetric probe, deleted before commit):** with every
+nation now defending competently, aggressive archetypes win a bit less in
+self-play (warlord 46→38%, opportunist 25→13%; merchant/builder unchanged at 4%),
+median length steady (44). That's the intended anti-snowball effect — reckless
+aggression is punished when targets retreat and garrison. Against a human the win
+is clear-cut: rivals stop suiciding armies and hold their land. Browser-smoked, no
+console errors.
+
+Test count: 146 green (was 138). Build network-free (0 `fetch`).
+
+**Next ideas:** combat-odds preview in the UI (attacker vs. defender strength +
+rough win chance for each highlighted target before committing); national traits
+(design §6) for opening variety; ask allies to join wars; gang up on the leader.
+
+---
+
 ## 2026-07-13 — Composition-aware AI recruiting
 
 Rival recruiting used a fixed preference (`infantry → ranged → militia`, cavalry

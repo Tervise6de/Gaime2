@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { runNationTurn, planRecruitment } from "@/systems/ai";
+import {
+  runNationTurn,
+  planRecruitment,
+  regionIsThreatened,
+  isBadlyOutmatched,
+  retreatStep,
+  defendStep,
+} from "@/systems/ai";
 import { createGame, resolveTurn } from "@/systems/turn";
 import { createRng } from "@/systems/rng";
 import {
@@ -145,6 +152,100 @@ describe("planRecruitment (composition-aware)", () => {
       RIVAL,
     );
     expect(new Set(plan).size).toBe(plan.length);
+  });
+});
+
+describe("home defence (retreat / garrison)", () => {
+  const ENEMY = 3;
+
+  /** Build a defence scenario. `regions`/`armies` describe the local situation. */
+  function defenceState(regions: Region[], armies: Army[], atWar = true): GameState {
+    return {
+      turn: 50,
+      difficulty: "normal",
+      treaties: atWar ? { "2-3": "war" } : {},
+      armies,
+      nations: [],
+      regions,
+    } as unknown as GameState;
+  }
+
+  it("flags a region with a bordering enemy rival army as threatened", () => {
+    const s = defenceState(
+      [region({ id: 0, ownerId: RIVAL, adjacency: [1] }), region({ id: 1, ownerId: ENEMY, adjacency: [0] })],
+      [army({ id: 5, ownerId: ENEMY, regionId: 1, units: units({ infantry: 4 }) })],
+    );
+    expect(regionIsThreatened(s, 0, RIVAL)).toBe(true);
+  });
+
+  it("does not treat a bordering barbarian garrison as a mobile threat", () => {
+    const s = defenceState(
+      [region({ id: 0, ownerId: RIVAL, adjacency: [1] }), region({ id: 1, ownerId: BARBARIAN_ID, adjacency: [0] })],
+      [army({ id: 5, ownerId: BARBARIAN_ID, regionId: 1, units: units({ militia: 3 }) })],
+    );
+    expect(regionIsThreatened(s, 0, RIVAL)).toBe(false);
+  });
+
+  it("judges a tiny army beside a large enemy stack as badly outmatched", () => {
+    const mine = army({ id: 1, ownerId: RIVAL, regionId: 0, units: units({ militia: 1 }) });
+    const s = defenceState(
+      [region({ id: 0, ownerId: RIVAL, adjacency: [1] }), region({ id: 1, ownerId: ENEMY, adjacency: [0] })],
+      [mine, army({ id: 5, ownerId: ENEMY, regionId: 1, units: units({ infantry: 10 }) })],
+    );
+    expect(isBadlyOutmatched(s, mine, RIVAL)).toBe(true);
+  });
+
+  it("does not flag a strong garrison as outmatched by a small raid", () => {
+    const mine = army({ id: 1, ownerId: RIVAL, regionId: 0, units: units({ infantry: 6, militia: 2 }) });
+    const s = defenceState(
+      [region({ id: 0, ownerId: RIVAL, adjacency: [1] }), region({ id: 1, ownerId: ENEMY, adjacency: [0] })],
+      [mine, army({ id: 5, ownerId: ENEMY, regionId: 1, units: units({ militia: 1 }) })],
+    );
+    expect(isBadlyOutmatched(s, mine, RIVAL)).toBe(false);
+  });
+
+  it("retreats toward the safest adjacent owned region", () => {
+    const mine = army({ id: 1, ownerId: RIVAL, regionId: 0, units: units({ militia: 1 }) });
+    const s = defenceState(
+      [
+        region({ id: 0, ownerId: RIVAL, adjacency: [1, 2] }),
+        region({ id: 1, ownerId: ENEMY, adjacency: [0] }),
+        region({ id: 2, ownerId: RIVAL, adjacency: [0] }), // safe refuge
+      ],
+      [mine, army({ id: 5, ownerId: ENEMY, regionId: 1, units: units({ infantry: 10 }) })],
+    );
+    expect(retreatStep(s, mine, RIVAL)).toBe(2);
+  });
+
+  it("returns null when no owned neighbour is any safer", () => {
+    const mine = army({ id: 1, ownerId: RIVAL, regionId: 0, units: units({ militia: 1 }) });
+    const s = defenceState(
+      [region({ id: 0, ownerId: RIVAL, adjacency: [1] }), region({ id: 1, ownerId: ENEMY, adjacency: [0] })],
+      [mine, army({ id: 5, ownerId: ENEMY, regionId: 1, units: units({ infantry: 10 }) })],
+    );
+    expect(retreatStep(s, mine, RIVAL)).toBe(null);
+  });
+
+  it("marches toward the nearest threatened owned region to reinforce it", () => {
+    const mine = army({ id: 1, ownerId: RIVAL, regionId: 2, units: units({ infantry: 4 }) });
+    const s = defenceState(
+      [
+        region({ id: 0, ownerId: RIVAL, adjacency: [1, 2] }), // threatened front
+        region({ id: 1, ownerId: ENEMY, adjacency: [0] }),
+        region({ id: 2, ownerId: RIVAL, adjacency: [0] }), // our reserve army sits here
+      ],
+      [mine, army({ id: 5, ownerId: ENEMY, regionId: 1, units: units({ infantry: 4 }) })],
+    );
+    expect(defendStep(s, mine, RIVAL)).toBe(0);
+  });
+
+  it("holds (null) when the army already stands on the threatened region", () => {
+    const mine = army({ id: 1, ownerId: RIVAL, regionId: 0, units: units({ infantry: 4 }) });
+    const s = defenceState(
+      [region({ id: 0, ownerId: RIVAL, adjacency: [1] }), region({ id: 1, ownerId: ENEMY, adjacency: [0] })],
+      [mine, army({ id: 5, ownerId: ENEMY, regionId: 1, units: units({ infantry: 4 }) })],
+    );
+    expect(defendStep(s, mine, RIVAL)).toBe(null);
   });
 });
 
