@@ -6,6 +6,39 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — New building: the Forum (Philosophy)
+
+The civics twin of last cycle's Guildhall. `philosophy` (civics tier 2) gave
+only passive bonuses and unlocked nothing — the civics branch's build dead-end.
+Added the **Forum** (cost 26, +2 knowledge, −6 unrest), gated behind Philosophy:
+a library-and-temple in one, matching the civics identity of knowledge + order.
+It complements rather than obsoletes the Temple (−12 unrest, cheap, unlocked
+from turn 1) — the Forum is the researched, yield-carrying upgrade path.
+
+Both halves of the gate were set from the start this time (`requiresTech` on the
+building **and** `unlockBuilding: "forum"` on the tech — the exact pair last
+cycle's bug taught us), and the browser check confirmed the 🔒. AI symmetry:
+Forum joins `BASE_BUILD_ORDER` (after university) and the scholarly trait's
+priority list, so rivals build it too.
+
+**Balance (500-seed × 4-archetype self-play probe, deleted before commit):**
+warlord 43.0 → 42.6%, opportunist 34.9 → 34.9%, builder 28.4 → 27.3%, merchant
+27.2 → 28.7% — all within noise; all victory kinds reached (domination 1686 /
+great works 296 / prestige 12 / elimination 6 of 2000); avg length 44.3 → 44.1
+turns; 0 incomplete. Neutral content.
+
+**Verify:** typecheck ✓, 247 tests ✓ (+2: Forum locked without Philosophy /
+chosen with it; a Scholarly realm reaches for it after its knowledge buildings),
+build ✓ (0 `fetch`, deps `{}`). Browser-driven: clicked a player region (via the
+renderer's margin transform); the build menu lists 12 buildings and the Forum
+shows 🔒 at turn 2. No console/page errors.
+
+**Next ideas:** the coast-terrain building (Harbor) — the region panel already
+labels Coast terrain, so add `requiresTerrain` gating to `BuildingDef` and hide
+non-matching buildings from menu+AI; trait-dependent choice-event options.
+
+---
+
 ## 2026-07-13 — New building: the Guildhall (Economics)
 
 Content for the economy branch. The `economics` tech (tier 2) previously gave only

@@ -27,6 +27,7 @@ export type BuildingId =
   | "university"
   | "bank"
   | "guildhall"
+  | "forum"
   | "fortress"
   | "wonder";
 
@@ -136,6 +137,16 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     unrest: 0,
     requiresTech: "economics",
     blurb: "+3 gold, +3 materials — the economy branch's workshop-and-market in one. (Economics)",
+  },
+  forum: {
+    id: "forum",
+    name: "Forum",
+    cost: 26,
+    yield: { knowledge: 2 },
+    popCapacity: 0,
+    unrest: 6,
+    requiresTech: "philosophy",
+    blurb: "+2 knowledge, -6 unrest — the civics branch's library-and-temple in one. (Philosophy)",
   },
   fortress: {
     id: "fortress",

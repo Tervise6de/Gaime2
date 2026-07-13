@@ -104,7 +104,7 @@ export const TECHS: Record<TechId, TechDef> = {
   philosophy: {
     id: "philosophy", name: "Philosophy", branch: "civics", tier: 2, cost: 50,
     requires: ["civil_service"], yieldMult: { knowledge: 0.25 }, unrestReduction: 4,
-    blurb: "+25% knowledge, -4 unrest.",
+    unlockBuilding: "forum", blurb: "+25% knowledge, -4 unrest; unlocks the Forum.",
   },
   feudalism: {
     id: "feudalism", name: "Feudalism", branch: "military", tier: 2, cost: 48,

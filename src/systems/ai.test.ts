@@ -201,6 +201,19 @@ describe("trait-aware AI openings", () => {
     expect(chooseBuilding(empty(["market", "bank"]), [], 0, false)).toBe("workshop");
     expect(chooseBuilding(empty(["market", "bank"]), ["economics"], 0, false)).toBe("guildhall");
   });
+
+  it("builds the Forum only once Philosophy is researched", () => {
+    // Market+workshop built; bank/guildhall/university locked. Without
+    // Philosophy the Forum (next in order) is skipped to Farm; with it, chosen.
+    expect(chooseBuilding(empty(["market", "workshop"]), [], 0, false)).toBe("farm");
+    expect(chooseBuilding(empty(["market", "workshop"]), ["philosophy"], 0, false)).toBe("forum");
+  });
+
+  it("a Scholarly realm reaches for the Forum after its knowledge buildings", () => {
+    expect(
+      chooseBuilding(empty(["library", "university"]), ["mathematics", "philosophy"], 0, false, "scholarly"),
+    ).toBe("forum");
+  });
 });
 
 describe("trait-aware tech selection", () => {
