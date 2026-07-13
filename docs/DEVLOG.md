@@ -6,6 +6,33 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Victory-progress readout
+
+There was no in-game sense of how close anyone was to winning — you found out only
+when the game ended. Added a compact readout to the top bar:
+`🏆 <leading realm> <share>%  ·  ⭐ <your wonders>/4  ·  ⏳ <turn>/150`. It names
+the realm holding the most territory and its share of all owned regions (the
+domination math mirrors `checkVictory` exactly, barbarians included, so the % is
+the real win-condition number), your Great Works progress, and the turn vs. the
+prestige deadline. When a **rival** nears domination the whole readout turns red
+as a threat cue.
+
+Change (UI only, reads existing state + `DOMINATION_FRACTION`/`WONDER_GOAL`/
+`TURN_LIMIT`; no sim or balance impact): `renderVictoryProgress(el, state)` in the
+HUD update loop; new `.hud-victory` styles.
+
+**Verify:** typecheck ✓, 210 tests ✓, build ✓ (0 `fetch`). Browser-driven (seed 7):
+turn 1 showed "You 14%", by turn 11 "Suzerain of Kael 45%" with the red threat
+highlight active as the rival approached the 50% threshold, no console errors.
+
+Test count: 210 green (unchanged — presentational UI mirroring tested victory math,
+browser-verified).
+
+**Next ideas:** first-time hints; per-enemy call-to-arms; score-history sparkline;
+tooltips for every stat; Voronoi map renderer; trait-flavoured events.
+
+---
+
 ## 2026-07-13 — End-game standings screen
 
 The game-over banner only said "Victory/Defeat (kind)" — no sense of how the game

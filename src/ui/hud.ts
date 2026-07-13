@@ -34,7 +34,7 @@ import { researchFrontier, isBuildingUnlockedFor } from "@/systems/tech";
 import { ARCHETYPE_LABEL } from "@/data/personalities";
 import { TRAITS } from "@/data/traits";
 import { TECHS, TECH_IDS, type TechId, type TechBranch } from "@/data/techs";
-import { WONDER_GOAL, type Difficulty } from "@/systems/state";
+import { WONDER_GOAL, DOMINATION_FRACTION, TURN_LIMIT, type Difficulty } from "@/systems/state";
 import {
   PLAYER_ID,
   RESOURCE_KEYS,
@@ -132,6 +132,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   }
   const turnBadge = el("div", "hud-turn");
   topBar.append(turnBadge);
+  const victoryEl = el("div", "hud-victory");
+  victoryEl.title = "Progress toward each victory: leading realm's territory share (domination at "
+    + `${Math.round(DOMINATION_FRACTION * 100)}%), Great Works, and the turn ${TURN_LIMIT} prestige deadline.`;
+  topBar.append(victoryEl);
   const legendToggle = btn("❔ Legend", "hud-legend-toggle", () => {
     legendPanel.style.display = legendPanel.style.display === "none" ? "block" : "none";
   });
@@ -322,6 +326,8 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       ` · seed ${state.seed}`;
     turnBadge.title = player.trait ? TRAITS[player.trait].blurb : "";
     turnBadge.classList.toggle("famine", player.famine || player.bankrupt);
+
+    renderVictoryProgress(victoryEl, state);
 
     taxInput.value = String(Math.round(player.taxRate * 100));
     taxLabel.textContent = `Tax ${Math.round(player.taxRate * 100)}%`;
@@ -656,6 +662,34 @@ function buildLegend(): HTMLElement {
   row(ring("#63c7d6", true), "Move / attack target");
 
   return panel;
+}
+
+/**
+ * Compact victory-progress readout for the top bar: the leading realm's
+ * territory share (domination fires at DOMINATION_FRACTION), the player's Great
+ * Works, and the turn vs. the prestige deadline. The domination math mirrors
+ * `checkVictory` exactly (share of all owned regions, barbarians included), so
+ * the number matches the actual win condition. Flags a rival nearing domination.
+ */
+function renderVictoryProgress(elm: HTMLElement, state: GameState): void {
+  const total = state.regions.filter((r) => r.ownerId !== null).length || 1;
+  let leader: Nation | null = null;
+  let leaderRegions = -1;
+  for (const n of state.nations) {
+    if (n.isBarbarian || !n.alive) continue;
+    const held = state.regions.filter((r) => r.ownerId === n.id).length;
+    if (held > leaderRegions) {
+      leaderRegions = held;
+      leader = n;
+    }
+  }
+  const share = Math.round((Math.max(0, leaderRegions) / total) * 100);
+  const leaderName = leader ? (leader.isPlayer ? "You" : leader.name) : "—";
+  const player = playerNation(state);
+  elm.textContent =
+    `🏆 ${leaderName} ${share}%  ·  ⭐ ${player.wonders}/${WONDER_GOAL}  ·  ⏳ ${state.turn}/${TURN_LIMIT}`;
+  const rivalNearing = !!leader && !leader.isPlayer && share >= DOMINATION_FRACTION * 100 - 12;
+  elm.classList.toggle("threat", rivalNearing);
 }
 
 /**
