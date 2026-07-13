@@ -39,7 +39,7 @@ import {
   sharedBorders,
 } from "@/systems/diplomacy";
 import { researchFrontier, selectTech, isBuildingUnlockedFor } from "@/systems/tech";
-import { TECHS, type TechId } from "@/data/techs";
+import { TECHS, type TechId, type TechBranch } from "@/data/techs";
 import type { Rng } from "@/systems/rng";
 import {
   BARBARIAN_ID,
@@ -122,15 +122,43 @@ function manageEconomy(state: GameState, nationId: number): GameState {
   return s;
 }
 
+/** The research branch a nation should favour, given the personality thresholds. */
+function personalityBranch(nation: Nation): TechBranch {
+  const p = nation.personality;
+  return (p?.aggression ?? 0) > 0.6 ? "military" : (p?.economy ?? 0) > 0.6 ? "economy" : "civics";
+}
+
+/**
+ * The research branch a nation prefers, biased first by its national TRAIT so a
+ * realm rushes the tech path that plays to its strength — a Scholarly nation up
+ * the knowledge/civics line, a Martial one the military line, economic traits
+ * the economy line. With no trait it falls back to the personality branch.
+ */
+export function preferredTechBranch(nation: Nation): TechBranch {
+  switch (nation.trait) {
+    case "scholarly":
+      return "civics";
+    case "martial":
+      return "military";
+    case "mercantile":
+    case "industrious":
+    case "fertile":
+      return "economy";
+    default:
+      return personalityBranch(nation);
+  }
+}
+
 function pickTech(done: TechId[], nation: Nation): TechId | null {
   const frontier = researchFrontier(done);
   if (!frontier.length) return null;
-  const p = nation.personality;
-  const branchPref =
-    (p?.aggression ?? 0) > 0.6 ? "military" : (p?.economy ?? 0) > 0.6 ? "economy" : "civics";
-  // Prefer the personality's branch, then anything cheapest.
-  const inBranch = frontier.filter((t) => TECHS[t].branch === branchPref);
-  const pool = inBranch.length ? inBranch : frontier;
+  // Prefer the trait-driven branch, then the personality branch, then anything.
+  const traitBranch = preferredTechBranch(nation);
+  const persBranch = personalityBranch(nation);
+  const inTrait = frontier.filter((t) => TECHS[t].branch === traitBranch);
+  const inPers = frontier.filter((t) => TECHS[t].branch === persBranch);
+  const pool = inTrait.length ? inTrait : inPers.length ? inPers : frontier;
+  // Cheapest of the chosen candidate set (deterministic, never null here).
   return pool.reduce((best, t) => (TECHS[t].cost < TECHS[best].cost ? t : best), pool[0]!);
 }
 

@@ -9,7 +9,10 @@ import {
   chooseBuilding,
   runawayLeader,
   coalitionPowerAgainst,
+  preferredTechBranch,
 } from "@/systems/ai";
+import type { TraitId } from "@/data/traits";
+import type { Personality } from "@/systems/state";
 import type { BuildingId } from "@/data/buildings";
 import { atWar } from "@/systems/diplomacy";
 import { emptyResearch } from "@/systems/state";
@@ -188,6 +191,118 @@ describe("trait-aware AI openings", () => {
 
   it("skips a building it already has and moves to the next preference", () => {
     expect(chooseBuilding(empty(["farm"]), [], 0, false, "fertile")).not.toBe("farm");
+  });
+});
+
+describe("trait-aware tech selection", () => {
+  const MERCHANT: Personality = {
+    archetype: "merchant",
+    aggression: 0.2,
+    expansion: 0.5,
+    economy: 0.9,
+    trustworthiness: 0.85,
+  };
+  const WARLORD: Personality = {
+    archetype: "warlord",
+    aggression: 0.9,
+    expansion: 0.8,
+    economy: 0.3,
+    trustworthiness: 0.2,
+  };
+
+  function techNation(over: Partial<Nation> = {}): Nation {
+    return {
+      id: RIVAL,
+      name: "N",
+      color: "#fff",
+      isPlayer: false,
+      isBarbarian: false,
+      alive: true,
+      stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 },
+      taxRate: 0.15,
+      research: emptyResearch(),
+      wonders: 0,
+      famine: false,
+      bankrupt: false,
+      ...over,
+    };
+  }
+
+  /** A single rival owning one region, so runNationTurn will pick a tech. */
+  function techState(nation: Nation): GameState {
+    return {
+      turn: 50,
+      difficulty: "normal",
+      treaties: {},
+      offers: [],
+      armies: [],
+      nations: [nation],
+      regions: [region({ id: 0, ownerId: RIVAL, adjacency: [] })],
+    } as unknown as GameState;
+  }
+
+  /** The tech a nation begins researching on its next turn (from an empty tree). */
+  const chosenTech = (nation: Nation) =>
+    runNationTurn(techState(nation), RIVAL, createRng(1)).nations.find((n) => n.id === RIVAL)!
+      .research.current;
+
+  it("a Scholarly nation rushes a civics tech over an economy one (trait beats personality)", () => {
+    // Merchant personality alone would take an economy tech; the trait flips it.
+    const tech = chosenTech(techNation({ trait: "scholarly", personality: MERCHANT }));
+    expect(tech).toBe("writing"); // cheapest civics frontier tech
+  });
+
+  it("a Martial nation rushes a military tech even with an economic personality", () => {
+    const tech = chosenTech(techNation({ trait: "martial", personality: MERCHANT }));
+    expect(tech).toBe("bronze_working"); // cheapest military frontier tech
+  });
+
+  it("falls back to the personality branch when the nation has no trait", () => {
+    const warlordTech = chosenTech(techNation({ personality: WARLORD }));
+    expect(warlordTech).toBe("bronze_working"); // aggression>0.6 → military
+    const merchantTech = chosenTech(techNation({ personality: MERCHANT }));
+    expect(merchantTech).toBe("agriculture"); // economy>0.6 → cheapest economy tech
+  });
+
+  it("is deterministic — same nation yields the same pick", () => {
+    const nation = techNation({ trait: "scholarly", personality: MERCHANT });
+    expect(chosenTech(nation)).toBe(chosenTech(nation));
+  });
+
+  describe("preferredTechBranch", () => {
+    const withTrait = (trait: TraitId) =>
+      preferredTechBranch(techNation({ trait, personality: MERCHANT }));
+
+    it("maps each trait to its branch", () => {
+      expect(withTrait("scholarly")).toBe("civics");
+      expect(withTrait("martial")).toBe("military");
+      expect(withTrait("mercantile")).toBe("economy");
+      expect(withTrait("industrious")).toBe("economy");
+      expect(withTrait("fertile")).toBe("economy");
+    });
+
+    it("falls back to the personality branch when trait is undefined", () => {
+      expect(preferredTechBranch(techNation({ personality: WARLORD }))).toBe("military");
+      expect(preferredTechBranch(techNation({ personality: MERCHANT }))).toBe("economy");
+      // No aggression/economy edge → civics.
+      expect(
+        preferredTechBranch(
+          techNation({
+            personality: {
+              archetype: "builder",
+              aggression: 0.2,
+              expansion: 0.3,
+              economy: 0.5,
+              trustworthiness: 0.6,
+            },
+          }),
+        ),
+      ).toBe("civics");
+    });
+
+    it("falls back to civics when there is no trait and no personality", () => {
+      expect(preferredTechBranch(techNation())).toBe("civics");
+    });
   });
 });
 
