@@ -17,7 +17,7 @@ import {
   rejectOffer,
 } from "@/systems/diplomacy";
 import { resolveChoice } from "@/systems/events";
-import { saveToLocal, loadFromLocal, hasLocalSave, serializeGame, deserializeGame } from "@/systems/save";
+import { saveToLocal, loadFromLocal, hasLocalSave, clearLocalSave, serializeGame, deserializeGame } from "@/systems/save";
 import { summarizeTurn, type TurnSummary } from "@/systems/summary";
 import { PLAYER_ID, type GameState } from "@/systems/state";
 import { createHud } from "@/ui/hud";
@@ -76,6 +76,10 @@ function main(): void {
       } else {
         hud.toast(`${slotLabel(slot)} is empty.`);
       }
+    },
+    onClearSlot(slot) {
+      const cleared = clearLocalSave(slot);
+      hud.toast(cleared ? `Cleared ${slotLabel(slot)}.` : `${slotLabel(slot)} is already empty.`);
     },
     onExport() {
       downloadText(`gaime2-turn${state.turn}-seed${state.seed}.json`, serializeGame(state, nowStamp()));

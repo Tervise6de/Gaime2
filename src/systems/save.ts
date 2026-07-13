@@ -83,6 +83,18 @@ export function hasLocalSave(slot: SaveSlot = "slot1"): boolean {
   }
 }
 
+/** Remove a slot's checkpoint. Returns true only if something was cleared. */
+export function clearLocalSave(slot: SaveSlot): boolean {
+  try {
+    const key = STORAGE_KEY[slot];
+    if (localStorage.getItem(key) === null) return false;
+    localStorage.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** A slot's saved turn + timestamp for labelling the picker, or null if empty. */
 export function slotInfo(slot: SaveSlot): { turn: number; savedAt: number } | null {
   try {

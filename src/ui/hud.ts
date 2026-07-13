@@ -66,6 +66,7 @@ export interface HudCallbacks {
   onNewGame(config: NewGameConfig): void;
   onSave(slot: SaveSlot): void;
   onLoad(slot: SaveSlot): void;
+  onClearSlot(slot: SaveSlot): void;
   /** Download the current game as a JSON file (backup / sharing). */
   onExport(): void;
   /** Load a game from an uploaded save-file's JSON text. */
@@ -275,7 +276,15 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   loadBtn.className = "hud-newgame-btn";
   loadBtn.textContent = "Load";
   loadBtn.addEventListener("click", () => callbacks.onLoad(slotSel.value as SaveSlot));
-  btnRow.append(newGameBtn, slotSel, saveBtn, loadBtn);
+  const clearBtn = document.createElement("button");
+  clearBtn.className = "hud-newgame-btn hud-clear-btn";
+  clearBtn.textContent = "✕";
+  clearBtn.title = "Clear the selected slot's checkpoint (the live game is untouched).";
+  clearBtn.addEventListener("click", () => {
+    callbacks.onClearSlot(slotSel.value as SaveSlot);
+    refreshSlotLabels(); // the slot reads "empty" again immediately
+  });
+  btnRow.append(newGameBtn, slotSel, saveBtn, loadBtn, clearBtn);
   controls.append(btnRow);
 
   // Export / import a save as a downloadable file (backup / sharing) — fully

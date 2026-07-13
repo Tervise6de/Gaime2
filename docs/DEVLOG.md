@@ -6,6 +6,33 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Per-slot save clear (✕) — and a control-row overflow fix
+
+The most-requested next-idea of the last four cycles: each checkpoint slot can
+now be emptied. A compact **✕** beside Save/Load clears the *selected* slot —
+guarded both ways (toast says "Cleared Slot 2." or "Slot 2 is already empty.";
+the live game and autosave are never touched), and the picker label flips back
+to "· empty" immediately. New `clearLocalSave(slot)` in save.ts returns whether
+anything was actually removed, so the toast can tell the difference.
+
+**The browser check caught a real layout bug:** the extra button pushed the
+control row wider than its panel and the ✕ landed *under the research strip*,
+which swallowed its clicks (Playwright's "element intercepts pointer events" —
+a click a human also couldn't make). `.hud-newgame` rows now `flex-wrap`, so
+overflow drops to a new line instead of sliding beneath neighbouring panels —
+Load, previously half-clipped at this width, is fully visible too.
+
+**Verify:** typecheck ✓, 253 tests ✓ (+1: clearLocalSave empties once, then
+reports already-empty, against a stubbed localStorage), build ✓ (0 `fetch`,
+deps `{}`). Browser-driven end-to-end: save → "Slot 2 · T1" → ✕ → "Slot 2 ·
+empty" + "Cleared Slot 2." toast → second press → "already empty". Screenshot
+confirms the wrapped row sits inside its panel. No console/page errors.
+
+**Next ideas:** number-key shortcuts for choice-event options; trait-dependent
+choice options; show wall-clock save time on slot hover.
+
+---
+
 ## 2026-07-13 — Capitals read at a glance: double ring + region-panel line
 
 Two sibling next-ideas in one small UI cycle. The map's 👑 crown glyph is tiny at

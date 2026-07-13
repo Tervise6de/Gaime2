@@ -207,8 +207,14 @@ body {
 
 .hud-newgame {
   display: flex;
+  flex-wrap: wrap; /* overflow drops to a new line instead of sliding under neighbouring panels */
   gap: 8px;
   margin-top: 10px;
+}
+
+/* Compact one-glyph button (the slot-clear ✕). */
+.hud-clear-btn {
+  padding: 8px 9px;
 }
 
 .hud-seed {
