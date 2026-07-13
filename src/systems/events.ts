@@ -261,6 +261,80 @@ const EVENTS: EventDef[] = [
       },
     },
   },
+  {
+    // DECISION: convert gold into materials + knowledge via an expedition.
+    id: "expedition",
+    weight: 2,
+    choice: {
+      prompt: "Scouts have found ruins beyond the frontier. Fund an expedition for 30 gold?",
+      options: [
+        {
+          id: "fund",
+          label: "Fund it (−30g)",
+          detail: "Spend 30 gold; return with 25 materials and 15 knowledge.",
+          apply: (state, nationId) => {
+            const n = state.nations.find((x) => x.id === nationId);
+            if (!n || n.stocks.gold < 30) {
+              return { state, message: "The coffers are too bare to fund an expedition." };
+            }
+            let s = addStock(state, nationId, "gold", -30);
+            s = addStock(s, nationId, "materials", 25);
+            s = addStock(s, nationId, "knowledge", 15);
+            return { state: s, message: "The expedition returns laden with materials and lore." };
+          },
+        },
+        {
+          id: "ignore",
+          label: "Ignore",
+          detail: "Leave the ruins to the dust.",
+          apply: (state) => ({ state, message: "You leave the ruins unexplored." }),
+        },
+      ],
+      // Economy-minded, funded AIs invest; others pass.
+      aiPick: (state, nationId) => {
+        const n = state.nations.find((x) => x.id === nationId);
+        const econ = n?.personality?.economy ?? 0.5;
+        return n && n.stocks.gold >= 50 && econ >= 0.5 ? "fund" : "ignore";
+      },
+    },
+  },
+  {
+    // DECISION: spend food to relieve unrest across the realm.
+    id: "grain_aid",
+    weight: 1,
+    choice: {
+      prompt: "A starving border town begs for grain. Open your granaries?",
+      options: [
+        {
+          id: "aid",
+          label: "Share grain (−12 food)",
+          detail: "Give 12 food; eases unrest by 6 across all your regions.",
+          apply: (state, nationId) => {
+            const n = state.nations.find((x) => x.id === nationId);
+            if (!n || n.stocks.food < 12) {
+              return { state, message: "The granaries are too empty to share." };
+            }
+            const fed = addStock(state, nationId, "food", -12);
+            const regions = fed.regions.map((r) =>
+              r.ownerId === nationId ? { ...r, unrest: Math.max(0, round1(r.unrest - 6)) } : r,
+            );
+            return { state: { ...fed, regions }, message: "Your granaries relieve the town — the realm's mood lifts." };
+          },
+        },
+        {
+          id: "refuse",
+          label: "Refuse",
+          detail: "Keep the grain for your own.",
+          apply: (state) => ({ state, message: "You turn the petitioners away." }),
+        },
+      ],
+      // Nations with a food surplus share; the hungry keep it.
+      aiPick: (state, nationId) => {
+        const n = state.nations.find((x) => x.id === nationId);
+        return n && n.stocks.food >= 24 ? "aid" : "refuse";
+      },
+    },
+  },
 
   // --- Trait-flavoured events: each fires only for a nation with that trait,
   // giving a modest windfall along its strength (design §6). ---

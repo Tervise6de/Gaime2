@@ -6,6 +6,37 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Two more choice events (expedition, grain aid)
+
+Put last cycle's choice-event framework to work — proof it generalises with zero
+new plumbing, just data. Two decisions with different resource tradeoffs:
+**expedition** ("Fund it −30g" → +25 materials +15 knowledge, or Ignore) turns
+gold into research/build power; **grain aid** ("Share grain −12 food" → −6 unrest
+across all regions, or Refuse) trades a food surplus for stability. Each carries
+its own `aiPick` — economy-minded funded AIs run the expedition; food-rich AIs
+share grain; others pass.
+
+Both are pure and deterministic (no RNG in the option effects), reusing the
+existing `addStock` helper and the same modal/`resolveChoice` path as the
+mercenary offer.
+
+**Balance (200-seed × 4-archetype self-play probe, deleted before commit):**
+warlord 33 / opportunist 29 / builder 28 / merchant 22 — a 22–33% spread,
+unchanged; all victory kinds reached, games complete. Neutral texture.
+
+**Verify:** typecheck ✓, 244 tests ✓ (+2: expedition trades 30g for
+materials+knowledge; grain aid spends 12 food to ease unrest by 6 without
+underflow — plus the mercenary tests retargeted to an event-specific seed
+finder now that three choice events share the pool), build ✓ (0 `fetch`, deps
+`{}`). Browser-driven (seed 41, one End turn): the expedition modal showed its
+prompt and both options with detail text; "Fund it" logged "expedition returns…"
+and the turn advanced. No console/page errors.
+
+**Next ideas:** a choice whose options depend on national trait; a rare
+multi-turn quest event; number-key shortcuts to pick an option.
+
+---
+
 ## 2026-07-13 — Player-choice events (a decision, not just a happening)
 
 Every event so far *happened to* you. Added the first **choice event**: when a

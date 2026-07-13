@@ -4,15 +4,16 @@ import { createGame } from "@/systems/turn";
 import { createRng } from "@/systems/rng";
 import { PLAYER_ID, type GameState } from "@/systems/state";
 
-/** Fire seeds until the player's mercenary decision pends; throws if it never does. */
-function pendingMercenaryState(): GameState {
+/** Fire seeds until a specific choice event pends for the player; throws if it never does. */
+function pendingChoiceState(eventId: string): GameState {
   const g = createGame({ seed: 12345, rivals: 2 });
-  for (let i = 1; i <= 400; i++) {
+  for (let i = 1; i <= 600; i++) {
     const next = fireEvent(g, PLAYER_ID, createRng(i));
-    if (next.pendingChoice) return next;
+    if (next.pendingChoice?.eventId === eventId) return next;
   }
-  throw new Error("mercenary_offer never fired for the player across 400 seeds");
+  throw new Error(`${eventId} never fired for the player across 600 seeds`);
 }
+const pendingMercenaryState = (): GameState => pendingChoiceState("mercenary_offer");
 
 const infantryOf = (s: GameState, id: number): number =>
   s.armies.filter((a) => a.ownerId === id).reduce((n, a) => n + a.units.infantry, 0);
@@ -180,5 +181,28 @@ describe("choice events", () => {
     for (let i = 1; i <= 300; i++) {
       expect(fireEvent(g, rivalId, createRng(i)).pendingChoice).toBeUndefined();
     }
+  });
+
+  it("funding an expedition trades 30 gold for materials and knowledge", () => {
+    const s = pendingChoiceState("expedition");
+    const g0 = s.nations[PLAYER_ID]!.stocks;
+    expect(g0.gold).toBeGreaterThanOrEqual(30);
+    const funded = resolveChoice(s, "fund");
+    expect(funded.pendingChoice).toBeUndefined();
+    expect(funded.nations[PLAYER_ID]!.stocks.gold).toBe(g0.gold - 30);
+    expect(funded.nations[PLAYER_ID]!.stocks.materials).toBeGreaterThan(g0.materials);
+    expect(funded.nations[PLAYER_ID]!.stocks.knowledge).toBeGreaterThan(g0.knowledge);
+  });
+
+  it("grain aid spends food to ease unrest across all owned regions", () => {
+    const base = pendingChoiceState("grain_aid");
+    // Raise player unrest so the −6 relief is observable and never underflows.
+    const s = { ...base, regions: base.regions.map((r) => (r.ownerId === PLAYER_ID ? { ...r, unrest: 20 } : r)) };
+    const food0 = s.nations[PLAYER_ID]!.stocks.food;
+    const aided = resolveChoice(s, "aid");
+    expect(aided.pendingChoice).toBeUndefined();
+    expect(aided.nations[PLAYER_ID]!.stocks.food).toBe(food0 - 12);
+    const mine = aided.regions.filter((r) => r.ownerId === PLAYER_ID);
+    expect(mine.every((r) => r.unrest === 14)).toBe(true);
   });
 });
