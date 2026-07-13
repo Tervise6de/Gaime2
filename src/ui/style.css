@@ -1277,10 +1277,29 @@ body {
 
 .hud-log-line {
   margin: 0;
+  display: flex;
+  gap: 6px;
   font-size: 11px;
   line-height: 1.4;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+.hud-log-num {
+  flex: 0 0 auto;
+  min-width: 18px;
+  text-align: right;
+  opacity: 0.45;
+  user-select: none;
+}
+
+.hud-log-text {
+  flex: 1 1 auto;
+}
+
+/* The most recent entry stands out from the scrollback. */
+.hud-log-line.latest .hud-log-text {
+  color: var(--text, #e6e9ee);
 }
 
 /* Last-turn summary (above the log). */

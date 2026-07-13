@@ -6,6 +6,46 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Numbered, scrollable full turn log (+ a balance non-change)
+
+**Shipped — full turn log.** The log panel showed only the last 8 entries, plain
+and unnumbered. It now renders the whole retained buffer (~50 entries) newest
+first, each with a right-aligned muted line number, the latest entry brightened,
+in a scrollable box (the heading shows the count, "Turn log (50)"). You can
+scroll back through the recent history instead of losing it after eight lines.
+Pure presentation — no sim/state change; the log buffer cap is unchanged.
+
+**Verify:** typecheck ✓, 220 tests ✓, build ✓ (0 `fetch`, deps `{}`).
+Browser-driven 20 turns: heading read "Turn log (50)", 50 numbered lines
+rendered, newest (#50) highlighted, the body genuinely scrollable
+(scrollHeight > clientHeight), no console errors.
+
+**Investigated but deliberately did NOT ship — a balance change.** Following last
+cycle's note ("economy archetypes win ~40% vs aggression ~21%"), I probed two
+levers (conquest plunder gold; easing `CONQUEST_UNREST`) with self-play. Two
+findings killed the change:
+- *Plunder is the wrong lever.* Gold-on-conquest is symmetric — every nation
+  loots — so it nets out; rival-only plunder even *widened* the gap by handing a
+  windfall to whoever was already crushing a rival (merchant 40→46%).
+- *The imbalance was mostly seed-set noise.* At 48 seeds the "economic
+  dominance" flipped sign when I changed the seed multiplier (×7 → ×13). A robust
+  **200-seed** baseline shows the opposite of last cycle's read: warlord **34%**,
+  opportunist 28%, merchant 22%, builder 18% — aggression already *leads*, and
+  the spread (18–34%) is within acceptable bounds. Easing `CONQUEST_UNREST` would
+  have pushed the already-strongest archetype higher.
+
+So no tuning shipped: the game is acceptably balanced within sampling noise, and
+last cycle's DEVLOG claim was an artefact of a too-small sample. Lesson recorded:
+**balance probes need ≥150–200 seeds** before a constant is touched. (Probe was
+temporary and deleted, per the guardrail.)
+
+**Next ideas:** if revisiting balance, lift the pure-turtle *builder* (weakest at
+18%) rather than nerf economy, and always confirm on ≥200 seeds; a compact
+mid-game score trend in the top bar; click a log line to recentre the map on the
+region it mentions.
+
+---
+
 ## 2026-07-13 — Per-nation score lines on the end-game sparkline
 
 The end-game sparkline showed only the player's prestige curve; now it draws one

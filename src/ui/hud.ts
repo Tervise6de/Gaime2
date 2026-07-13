@@ -344,7 +344,8 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const summaryBox = el("div", "hud-summary");
   summaryBox.style.display = "none";
   logPanel.append(summaryBox);
-  logPanel.append(heading("Turn log"));
+  const logHeading = heading("Turn log");
+  logPanel.append(logHeading);
   const logBody = el("div", "hud-log-body");
   logPanel.append(logBody);
   root.append(logPanel);
@@ -449,11 +450,19 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       renderStandings(bannerStandings, state);
     }
 
+    // Full log: newest first, numbered chronologically, scrollable. The buffer
+    // is capped upstream (~50 entries), so entry #1 is the oldest still kept.
+    logHeading.textContent = `Turn log (${state.log.length})`;
     logBody.innerHTML = "";
-    for (const line of state.log.slice(-8).reverse()) {
-      const p = el("p", "hud-log-line");
-      p.textContent = line;
-      logBody.append(p);
+    const total = state.log.length;
+    for (let i = total - 1; i >= 0; i--) {
+      const row = el("p", "hud-log-line" + (i === total - 1 ? " latest" : ""));
+      const num = el("span", "hud-log-num");
+      num.textContent = String(i + 1);
+      const txt = el("span", "hud-log-text");
+      txt.textContent = state.log[i]!;
+      row.append(num, txt);
+      logBody.append(row);
     }
   }
 
