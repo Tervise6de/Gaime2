@@ -6,6 +6,30 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Capitals shown on the map (a crown that falls when captured)
+
+Now that capitals carry strategic weight (the AI drives at them and weights loot
+by archetype), the player needs to *see* where they are. The renderer draws a 👑
+at the bottom-left of each capital node — but only while that nation still holds
+it: the crown is computed from `nation.capitalRegionId` **and** a live ownership
+check (`region.ownerId === nation.id`), so the moment a seat of power is taken
+its crown vanishes (and doesn't transfer to the conqueror's captured tile). At a
+glance you can read the map's power centres and watch a rival get decapitated.
+
+Reads state only, never mutates it (renderer guardrail); no new RNG. A matching
+legend row ("👑 Capital — a nation's seat of power") was added under the map key.
+
+**Verify:** typecheck ✓, 228 tests ✓, build ✓ (0 `fetch`, deps `{}`). Browser-
+driven: the legend shows the new Capital row; a zoomed crop confirmed the crown
+renders at the player capital (Ironreach) while a neutral barbarian region
+(Eastmarch) has none. No console/page errors. (Pure renderer/legend change — no
+sim/balance impact, so no self-play probe needed.)
+
+**Next ideas:** tint or ring a capital node so it reads at full-board zoom too;
+a "jump to my capital" control; mark each nation's capital in the Standings rows.
+
+---
+
 ## 2026-07-13 — AI aims crippling strikes at enemy capitals, weighted by archetype
 
 The follow-up the last entry asked for: rivals now *covet enemy capitals*, and

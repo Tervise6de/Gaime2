@@ -104,6 +104,15 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   }
 
   function drawNodes(s: GameState): void {
+    // A nation's capital, marked only while that nation still holds it — the
+    // crown vanishes the turn the seat of power is captured.
+    const capitals = new Set<number>();
+    for (const n of s.nations) {
+      if (n.isBarbarian || n.capitalRegionId === undefined) continue;
+      const cap = s.regions[n.capitalRegionId];
+      if (cap && cap.ownerId === n.id) capitals.add(n.capitalRegionId);
+    }
+
     for (const region of s.regions) {
       const p = project(region);
       const terrain = TERRAIN[region.terrain];
@@ -140,6 +149,12 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       if (region.resource) {
         context.font = "13px system-ui, sans-serif";
         context.fillText(RESOURCE_ICON[region.resource] ?? "?", p.x - NODE_RADIUS + 4, p.y - NODE_RADIUS + 2);
+      }
+
+      // Capital marker (crown, bottom-left corner) — the owner's seat of power.
+      if (capitals.has(region.id)) {
+        context.font = "13px system-ui, sans-serif";
+        context.fillText("👑", p.x - NODE_RADIUS + 5, p.y + NODE_RADIUS - 7);
       }
 
       // Unrest marker (top-right dot) and construction (hammer, top).
