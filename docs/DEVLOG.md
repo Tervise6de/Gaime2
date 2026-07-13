@@ -6,6 +6,35 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — New building: the Mine (mountains + Masonry)
+
+Fast follow on the terrain-gating mechanic: the **Mine** (cost 22, +4 materials,
++2 gold), the first building to compose BOTH gates — `requiresTerrain:
+"mountains"` and `requiresTech: "masonry"`. Masonry (military tier 1) was the
+last building-less mid-tree tech, so this also finishes the "every mid tech
+unlocks something buildable" sweep begun with the Guildhall and Forum. Mountains
+(the poorest, rarest terrain) now have an economic reason to hold. Both gate
+halves set together (tech.unlockBuilding + building.requiresTech). AI: Mine in
+`BASE_BUILD_ORDER` (after workshop) and the industrious trait's priorities.
+
+The two gates interact correctly in the UI: on mountains without Masonry the
+Mine shows 🔒 (actionable — research it); off-mountains it is hidden entirely
+(no tech moves a mountain).
+
+**Balance (500-seed × 4-archetype probe, deleted):** warlord 41.0 → 41.2%,
+builder 28.0 → 28.3%, merchant 28.1 → 27.8%, opportunist 36.3 → 36.2% — noise;
+all victory kinds reached; avg 43.6 → 43.6 turns; 0 incomplete.
+
+**Verify:** typecheck ✓, 252 tests ✓ (+2: gates compose in `chooseBuilding` —
+mountains+Masonry yes, either alone no; `canQueueBuilding` needs both), build ✓
+(0 `fetch`, deps `{}`). Browser-driven: forced an owned region to mountains via
+the autosave; its menu lists "Mine 🔒" pre-Masonry. No console/page errors.
+
+**Next ideas:** capital ★ marker on map + region panel; per-slot saved-turn
+labels in the save picker.
+
+---
+
 ## 2026-07-13 — Terrain-gated buildings + the Harbor (coast only)
 
 Buildings could differ by tech but not by *place* — every region offered the

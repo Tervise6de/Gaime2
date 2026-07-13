@@ -155,6 +155,15 @@ describe("construction", () => {
     expect(canQueueBuilding({ ...owned, terrain: "plains" }, "harbor")).toBe(false);
   });
 
+  it("canQueueBuilding needs BOTH the terrain and the tech for the Mine", () => {
+    const g = createGame({ seed: 1 });
+    const peak = { ...g.regions[ownedId(g)]!, terrain: "mountains" as const };
+    expect(canQueueBuilding(peak, "mine")).toBe(false); // no Masonry yet
+    expect(canQueueBuilding(peak, "mine", ["masonry"])).toBe(true);
+    const flat = { ...peak, terrain: "plains" as const };
+    expect(canQueueBuilding(flat, "mine", ["masonry"])).toBe(false);
+  });
+
   it("queueBuilding refuses a terrain-bound building off its terrain", () => {
     const g = createGame({ seed: 1 });
     const id = ownedId(g);

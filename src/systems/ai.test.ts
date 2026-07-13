@@ -216,6 +216,16 @@ describe("trait-aware AI openings", () => {
     ).toBe("forum");
   });
 
+  it("builds the Mine only on mountains AND with Masonry (gates compose)", () => {
+    const built: BuildingId[] = ["market", "workshop"];
+    // Mountains + Masonry → Mine (next in order after workshop).
+    expect(chooseBuilding(empty(built, "mountains"), ["masonry"], 0, false)).toBe("mine");
+    // Mountains without the tech → skipped (locked).
+    expect(chooseBuilding(empty(built, "mountains"), [], 0, false)).not.toBe("mine");
+    // The tech without the terrain → skipped (doesn't fit).
+    expect(chooseBuilding(empty(built, "plains"), ["masonry"], 0, false)).not.toBe("mine");
+  });
+
   it("builds the Harbor on coast regions only", () => {
     // Coast, market built → Harbor is next in the generalist order.
     expect(chooseBuilding(empty(["market"], "coast"), [], 0, false)).toBe("harbor");

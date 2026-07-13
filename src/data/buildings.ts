@@ -22,6 +22,7 @@ export type BuildingId =
   | "workshop"
   | "market"
   | "harbor"
+  | "mine"
   | "library"
   | "temple"
   | "aqueduct"
@@ -92,6 +93,17 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     unrest: 0,
     requiresTerrain: "coast",
     blurb: "+3 gold, +2 food, +2 population capacity. Coast regions only.",
+  },
+  mine: {
+    id: "mine",
+    name: "Mine",
+    cost: 22,
+    yield: { materials: 4, gold: 2 },
+    popCapacity: 0,
+    unrest: 0,
+    requiresTech: "masonry",
+    requiresTerrain: "mountains",
+    blurb: "+4 materials, +2 gold. Mountain regions only. (Masonry)",
   },
   library: {
     id: "library",

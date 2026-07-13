@@ -166,13 +166,13 @@ function pickTech(done: TechId[], nation: Nation): TechId | null {
 
 /** Base build order when a nation's trait expresses no preference. */
 const BASE_BUILD_ORDER: BuildingId[] = [
-  "market", "harbor", "bank", "guildhall", "workshop", "university", "forum", "farm", "aqueduct", "library", "temple", "fortress",
+  "market", "harbor", "bank", "guildhall", "workshop", "mine", "university", "forum", "farm", "aqueduct", "library", "temple", "fortress",
 ];
 
 /** Buildings a trait rushes first, so rivals open along their strength. */
 const TRAIT_BUILD_PRIORITY: Record<TraitId, BuildingId[]> = {
   fertile: ["farm", "aqueduct"],
-  industrious: ["workshop", "guildhall"],
+  industrious: ["workshop", "mine", "guildhall"],
   mercantile: ["market", "harbor", "bank", "guildhall"],
   scholarly: ["library", "university", "forum"],
   martial: ["fortress", "workshop"],

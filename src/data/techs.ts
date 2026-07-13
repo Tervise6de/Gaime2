@@ -85,7 +85,8 @@ export const TECHS: Record<TechId, TechDef> = {
   },
   masonry: {
     id: "masonry", name: "Masonry", branch: "military", tier: 1, cost: 30,
-    requires: ["bronze_working"], unrestReduction: 4, blurb: "-4 unrest everywhere.",
+    requires: ["bronze_working"], unrestReduction: 4, unlockBuilding: "mine",
+    blurb: "-4 unrest everywhere; unlocks the Mine (mountains).",
   },
   civil_service: {
     id: "civil_service", name: "Civil Service", branch: "civics", tier: 1, cost: 40,
