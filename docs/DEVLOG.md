@@ -6,6 +6,34 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Trait-gated choice event: Martial "call the banners"
+
+First **trait-flavoured decision** — proof the choice framework and the trait
+system compose. A Martial nation (and only a Martial nation, via the existing
+`eligible: hasTrait("martial")` gate) is periodically offered to *call the
+banners*: **+3 militia at the capital but +8 unrest realm-wide**, or stand down.
+A real martial tradeoff — muscle now against contentment — that non-martial
+realms never see, deepening each trait's distinct feel.
+
+Zero framework change: it plugs into the existing choice plumbing (player →
+`pendingChoice` modal; AI auto-resolves via `aiPick` — a calm, aggressive martial
+AI musters, a restless one holds). Pure/deterministic, entirely in events.ts.
+
+**Balance (200-seed × 4-archetype self-play probe, deleted before commit):**
+warlord 34 / opportunist 28 / builder 26 / merchant 25 — a 25–34% spread,
+unchanged; all victory kinds reached. The trait-gated levy is neutral texture.
+
+**Verify:** typecheck ✓, 256 tests ✓ (+3: fires only for Martial nations,
+mustering adds 3 militia & raises unrest to +8, standing down is a no-op), build
+✓ (0 `fetch`, deps `{}`). Browser-driven (seed 15, a Martial player, one End
+turn): the modal showed the prompt and both options; "Call the banners" logged
+"banners are called…" and the turn advanced. No console/page errors.
+
+**Next ideas:** more trait choices (Mercantile trade pact, Scholarly sage);
+number-key shortcuts to pick a choice option; a choice with a lasting modifier.
+
+---
+
 ## 2026-07-13 — Per-slot save clear (✕) — and a control-row overflow fix
 
 The most-requested next-idea of the last four cycles: each checkpoint slot can

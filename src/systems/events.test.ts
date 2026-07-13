@@ -15,8 +15,21 @@ function pendingChoiceState(eventId: string): GameState {
 }
 const pendingMercenaryState = (): GameState => pendingChoiceState("mercenary_offer");
 
+/** Fire seeds until a trait-gated choice pends for a player carrying `trait`. */
+function pendingTraitChoice(eventId: string, trait: "martial"): GameState {
+  const base = createGame({ seed: 12345, rivals: 2 });
+  const g = { ...base, nations: base.nations.map((n) => (n.id === PLAYER_ID ? { ...n, trait } : n)) };
+  for (let i = 1; i <= 600; i++) {
+    const next = fireEvent(g, PLAYER_ID, createRng(i));
+    if (next.pendingChoice?.eventId === eventId) return next;
+  }
+  throw new Error(`${eventId} never fired for a ${trait} player across 600 seeds`);
+}
+
 const infantryOf = (s: GameState, id: number): number =>
   s.armies.filter((a) => a.ownerId === id).reduce((n, a) => n + a.units.infantry, 0);
+const militiaOf = (s: GameState, id: number): number =>
+  s.armies.filter((a) => a.ownerId === id).reduce((n, a) => n + a.units.militia, 0);
 
 describe("fireEvent", () => {
   it("is deterministic for a given rng seed", () => {
@@ -204,5 +217,36 @@ describe("choice events", () => {
     expect(aided.nations[PLAYER_ID]!.stocks.food).toBe(food0 - 12);
     const mine = aided.regions.filter((r) => r.ownerId === PLAYER_ID);
     expect(mine.every((r) => r.unrest === 14)).toBe(true);
+  });
+
+  it("call-the-banners only fires for a Martial nation", () => {
+    // A non-Martial player scanning the same seeds never sees it.
+    const g = createGame({ seed: 12345, rivals: 2 });
+    const fair = { ...g, nations: g.nations.map((n) => (n.id === PLAYER_ID ? { ...n, trait: "mercantile" as const } : n)) };
+    let seen = false;
+    for (let i = 1; i <= 600; i++) {
+      if (fireEvent(fair, PLAYER_ID, createRng(i)).pendingChoice?.eventId === "call_the_banners") seen = true;
+    }
+    expect(seen).toBe(false);
+    // A Martial player can receive it.
+    expect(pendingTraitChoice("call_the_banners", "martial").pendingChoice?.eventId).toBe("call_the_banners");
+  });
+
+  it("mustering the banners adds 3 militia and raises unrest by 8", () => {
+    const base = pendingTraitChoice("call_the_banners", "martial");
+    const s = { ...base, regions: base.regions.map((r) => (r.ownerId === PLAYER_ID ? { ...r, unrest: 10 } : r)) };
+    const militia0 = militiaOf(s, PLAYER_ID);
+    const mustered = resolveChoice(s, "muster");
+    expect(mustered.pendingChoice).toBeUndefined();
+    expect(militiaOf(mustered, PLAYER_ID)).toBe(militia0 + 3);
+    expect(mustered.regions.filter((r) => r.ownerId === PLAYER_ID).every((r) => r.unrest === 18)).toBe(true);
+  });
+
+  it("standing down leaves troops and unrest unchanged", () => {
+    const s = pendingTraitChoice("call_the_banners", "martial");
+    const militia0 = militiaOf(s, PLAYER_ID);
+    const stood = resolveChoice(s, "stand_down");
+    expect(stood.pendingChoice).toBeUndefined();
+    expect(militiaOf(stood, PLAYER_ID)).toBe(militia0);
   });
 });

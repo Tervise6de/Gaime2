@@ -335,6 +335,43 @@ const EVENTS: EventDef[] = [
       },
     },
   },
+  {
+    // TRAIT DECISION (Martial): conscript a levy now, at a cost in contentment.
+    id: "call_the_banners",
+    weight: 2,
+    eligible: hasTrait("martial"),
+    choice: {
+      prompt: "Your war-captains urge you to call the banners — conscript a levy now, at a cost in contentment?",
+      options: [
+        {
+          id: "muster",
+          label: "Call the banners (+3 militia)",
+          detail: "3 militia join your capital, but unrest rises 8 across the realm.",
+          apply: (state, nationId) => {
+            const withTroops = reinforce(state, nationId, "militia", 3);
+            const regions = withTroops.regions.map((r) =>
+              r.ownerId === nationId ? { ...r, unrest: Math.min(UNREST_MAX, round1(r.unrest + 8)) } : r,
+            );
+            return { state: { ...withTroops, regions }, message: "The banners are called — militia muster as grumbling spreads." };
+          },
+        },
+        {
+          id: "stand_down",
+          label: "Stand down",
+          detail: "Leave the levies to their fields.",
+          apply: (state) => ({ state, message: "You leave the banners furled." }),
+        },
+      ],
+      // A calm, aggressive martial AI musters; if the realm is already restless it holds.
+      aiPick: (state, nationId) => {
+        const n = state.nations.find((x) => x.id === nationId);
+        const owned = state.regions.filter((r) => r.ownerId === nationId);
+        const avgUnrest = owned.length ? owned.reduce((a, r) => a + r.unrest, 0) / owned.length : 100;
+        const aggr = n?.personality?.aggression ?? 0.4;
+        return avgUnrest < 35 && aggr >= 0.5 ? "muster" : "stand_down";
+      },
+    },
+  },
 
   // --- Trait-flavoured events: each fires only for a nation with that trait,
   // giving a modest windfall along its strength (design §6). ---
