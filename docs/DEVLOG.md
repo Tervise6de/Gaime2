@@ -6,6 +6,38 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Trait-flavoured events
+
+The random-events pool was trait-blind. Added five **trait-gated events**, one per
+national trait, each a modest windfall along that realm's strength (design §6):
+Fertile → *bountiful season* (+food), Industrious → *master craftsmen*
+(+materials), Mercantile → *trade caravan* (+gold, the first gold event),
+Scholarly → *breakthrough* (research progress, else banked knowledge), Martial →
+*veteran volunteers* (a couple of militia). `EventDef` gained an optional
+`eligible` gate; `fireEvent` now filters the pool to the nation's eligible events
+before the weighted pick, so a trait event can only fire for a nation carrying
+that trait.
+
+**Balance check (temporary self-play probe, deleted before commit):** the first
+cut fired too often and swung warlord 13→29% — events must be texture, not
+game-swinging — so I halved their weight (2→1) and made the Martial windfall
+defensive militia instead of infantry. Re-probe: a **tight, even 17–21% across all
+archetypes** (warlord back to a healthy 21% from an anomalous 13%; median length
+26→31, toward the 60–150 target). Modest, even rebalancing — no game-swinging.
+96 probe games ran clean; browser-smoked three games with events in the pool, no
+console errors.
+
+Two new unit tests: a trait event fires only for a nation with that trait (a
+Mercantile realm can get the trade caravan, a Fertile one never does), and the
+windfall applies its effect (gold rises when the caravan fires).
+
+Test count: 216 green (was 214; +2). Build network-free (0 `fetch`).
+
+**Next ideas:** score-history sparkline; tooltips for every stat; a "?" to reopen
+hints; Voronoi map renderer; more trait synergies (trait-aware AI tax/diplomacy).
+
+---
+
 ## 2026-07-13 — First-time hints
 
 New players had no onboarding. A dismissible **"Welcome, ruler 👑"** card now
