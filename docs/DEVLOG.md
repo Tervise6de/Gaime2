@@ -6,6 +6,31 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Alarm when a rival nears victory
+
+The victory gauge (last entry) let you *check* the threat, but only if you opened
+the Standings. Now the alerts strip raises a standing **danger** chip the moment
+any living rival crosses 75% toward its nearest win — "Suzerain of Kael nears a
+domination victory (82%)" — so you can't lose without warning, even if you never
+open a panel. It's state-derived (not a one-turn diff), so it persists every turn
+the threat stands and clears itself if the rival is pushed back.
+
+`deriveAlerts` now folds in `victoryProgress` for each non-player nation, reusing
+the same 75% threshold the gauge paints red — one source of truth for "danger".
+Pure/read-only as before; sorted with the other dangers so the scariest thing
+stays first.
+
+**Verify:** typecheck ✓, 234 tests ✓ (+3: fires at a rival's 3/4-wonder 75%,
+stays silent for a rival comfortably short, and never alarms on the *player's*
+own lead), build ✓ (0 `fetch`, deps `{}`). Browser-driven: idle-played to turn 20
+and the strip showed "Suzerain of Kael nears a domination victory (82%)" as a red
+chip. No console/page errors.
+
+**Next ideas:** pulse/animate the chip the first turn it appears; a matching
+in-log line; per-slot save "clear" (✕).
+
+---
+
 ## 2026-07-13 — Victory-progress threat gauge in the Standings
 
 The Standings showed raw counts (regions ⬢, wonders ★) but not the thing that

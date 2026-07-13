@@ -11,6 +11,7 @@
 
 import { TECHS } from "@/data/techs";
 import { PLAYER_ID, UNREST_REVOLT, type GameState } from "@/systems/state";
+import { victoryProgress } from "@/systems/victory";
 import type { TurnSummary } from "@/systems/summary";
 
 export interface Alert {
@@ -20,6 +21,8 @@ export interface Alert {
 
 /** Most alerts we ever show at once; excess (lowest priority) is dropped. */
 const MAX_ALERTS = 6;
+/** A rival at or above this share of its nearest win raises the loudest alarm. */
+const LEADER_ALARM = 0.75;
 
 /**
  * Derive the player's critical alerts for the current state and (optional) last
@@ -30,6 +33,19 @@ export function deriveAlerts(state: GameState, summary: TurnSummary | null): Ale
   const danger: Alert[] = [];
   const warn: Alert[] = [];
   const good: Alert[] = [];
+
+  // Loudest of all: a rival on the brink of winning. State-derived, so it stands
+  // every turn the threat persists — you should never lose without warning.
+  for (const n of state.nations) {
+    if (n.isBarbarian || n.isPlayer || !n.alive) continue;
+    const vp = victoryProgress(state, n.id);
+    if (vp.fraction >= LEADER_ALARM) {
+      danger.push({
+        severity: "danger",
+        text: `${n.name} nears a ${vp.kind} victory (${Math.round(vp.fraction * 100)}%)`,
+      });
+    }
+  }
 
   if (summary) {
     for (const name of summary.regionsLost) danger.push({ severity: "danger", text: `Lost ${name}` });

@@ -53,6 +53,28 @@ describe("deriveAlerts", () => {
     expect(alerts).toContainEqual({ severity: "danger", text: "Bankruptcy — troops disbanded" });
   });
 
+  it("raises a danger alert when a rival nears a victory", () => {
+    const g = calmGame();
+    const rival = g.nations.find((n) => !n.isPlayer && !n.isBarbarian)!;
+    rival.wonders = 3; // 3/4 = 75% toward a Great Works win
+    const alerts = deriveAlerts(g, quietSummary());
+    expect(
+      alerts.some((a) => a.severity === "danger" && a.text.startsWith(`${rival.name} nears a great works victory`)),
+    ).toBe(true);
+  });
+
+  it("does not alarm on a rival comfortably short of any win", () => {
+    const alerts = deriveAlerts(calmGame(), quietSummary());
+    expect(alerts.some((a) => a.text.includes("nears a"))).toBe(false);
+  });
+
+  it("does not raise the near-victory alarm for the player's own lead", () => {
+    const g = calmGame();
+    g.nations[PLAYER_ID]!.wonders = 4; // player at a win — not an alert
+    const alerts = deriveAlerts(g, quietSummary());
+    expect(alerts.some((a) => a.text.includes("nears a"))).toBe(false);
+  });
+
   it("emits good alerts for gains, eliminations, and techs", () => {
     const alerts = deriveAlerts(
       calmGame(),
