@@ -54,6 +54,67 @@ export function siegePower(units: UnitCounts): number {
   return s;
 }
 
+export interface CombatStrengths {
+  attack: number;
+  defense: number;
+}
+
+/**
+ * The effective attack and defence strengths for a proposed fight, applying the
+ * counter loop, terrain defence, and fortification (net of the attacker's siege
+ * power). Shared by `resolveCombat` and the UI odds preview so both agree.
+ */
+export function combatStrengths(
+  attacker: UnitCounts,
+  defender: UnitCounts,
+  ctx: CombatContext,
+): CombatStrengths {
+  const effFort = Math.max(0, ctx.fortification - siegePower(attacker));
+  const attack = sideStrength(attacker, defender, "attack");
+  const defense =
+    sideStrength(defender, attacker, "defense") *
+    ctx.terrainDefense *
+    (1 + effFort * FORT_PER_LEVEL);
+  return { attack, defense };
+}
+
+/**
+ * Probability the attacker wins, from the strength ratio and the bounded uniform
+ * combat swing (±COMBAT_VARIANCE). Matches `resolveCombat`'s win condition
+ * (effRatio ≥ 0.5), so the preview reflects the real dice.
+ */
+export function winChance(attack: number, defense: number): number {
+  const ratio = attack / (attack + defense || 1);
+  const v = COMBAT_VARIANCE;
+  if (v <= 0) return ratio >= 0.5 ? 1 : 0;
+  return clamp((ratio - 0.5 + v) / (2 * v), 0, 1);
+}
+
+export interface CombatPreview extends CombatStrengths {
+  /** Attacker win probability in [0,1]. */
+  winChance: number;
+  /** True when the target has no defenders (an uncontested capture). */
+  undefended: boolean;
+}
+
+/** Non-destructive combat forecast for the UI: strengths + win chance. Pure. */
+export function previewCombat(
+  attacker: UnitCounts,
+  defender: UnitCounts,
+  ctx: CombatContext,
+): CombatPreview {
+  if (armySize(defender) === 0) {
+    return {
+      attack: sideStrength(attacker, defender, "attack"),
+      defense: 0,
+      winChance: 1,
+      undefended: true,
+    };
+  }
+  const { attack, defense } = combatStrengths(attacker, defender, ctx);
+  return { attack, defense, winChance: winChance(attack, defense), undefended: false };
+}
+
 export interface CombatResult {
   attackerLosses: UnitCounts;
   defenderLosses: UnitCounts;
@@ -87,12 +148,7 @@ export function resolveCombat(
     };
   }
 
-  const effFort = Math.max(0, ctx.fortification - siegePower(attacker));
-  const atk = sideStrength(attacker, defender, "attack");
-  const def =
-    sideStrength(defender, attacker, "defense") *
-    ctx.terrainDefense *
-    (1 + effFort * FORT_PER_LEVEL);
+  const { attack: atk, defense: def } = combatStrengths(attacker, defender, ctx);
 
   const ratio = atk / (atk + def || 1);
   const swing = (rng.next() * 2 - 1) * COMBAT_VARIANCE;

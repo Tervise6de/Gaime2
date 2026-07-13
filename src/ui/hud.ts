@@ -17,10 +17,12 @@ import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
 import { TERRAIN } from "@/data/terrain";
 import { regionProduction, nationalProduction } from "@/systems/economy";
 import { regionCapacity } from "@/systems/population";
+import { previewCombat } from "@/systems/combat";
 import {
   armyAt,
   anyArmyAt,
   canRaiseUnit,
+  reachableRegions,
   totalUpkeep,
 } from "@/systems/military";
 import { getRelation, getTreaty } from "@/systems/diplomacy";
@@ -37,6 +39,7 @@ import {
   UNREST_PENALTY_START,
   UNREST_REVOLT,
   armySize,
+  emptyUnits,
   playerNation,
   type Army,
   type GameState,
@@ -419,7 +422,10 @@ function renderArmySection(
       moving ? callbacks.onCancelMove() : callbacks.onBeginMove(army.id),
     );
     section.append(moveBtn);
-    if (moving) section.append(line("Click a highlighted neighbour to move or attack.", "hud-hint"));
+    if (moving) {
+      section.append(line("Click a highlighted neighbour to move or attack.", "hud-hint"));
+      section.append(renderCombatOdds(state, army));
+    }
   } else {
     section.append(line("No army stationed here.", "hud-hint"));
   }
@@ -443,6 +449,61 @@ function renderArmySection(
   }
   section.append(menu);
   return section;
+}
+
+/**
+ * Combat-odds preview for the army's move/attack targets: for each reachable
+ * hostile neighbour, the attacker vs. defender strength and a rough win chance,
+ * so the player can weigh an attack before committing. Display only — the same
+ * `previewCombat` maths the sim uses to resolve the fight.
+ */
+function renderCombatOdds(state: GameState, army: Army): HTMLElement {
+  const box = el("div", "hud-odds");
+  box.append(heading("Attack odds"));
+
+  const rows: HTMLElement[] = [];
+  for (const nid of reachableRegions(state, army)) {
+    const target = state.regions[nid];
+    if (!target || target.ownerId === PLAYER_ID) continue; // friendly = relocate, no fight
+    const defender = state.armies.find((a) => a.regionId === nid && a.ownerId !== PLAYER_ID);
+    const preview = previewCombat(army.units, defender?.units ?? emptyUnits(), {
+      terrainDefense: TERRAIN[target.terrain].defense,
+      fortification: target.fortification,
+    });
+
+    const row = el("div", "hud-odds-row");
+    const name = el("span", "hud-odds-name");
+    name.textContent = target.name;
+    row.append(name);
+
+    if (preview.undefended) {
+      const chip = el("span", "hud-odds-chip win");
+      chip.textContent = "capture";
+      row.append(chip);
+    } else {
+      const detail = el("span", "hud-odds-detail");
+      detail.textContent = `⚔${Math.round(preview.attack)} · 🛡${Math.round(preview.defense)}`;
+      const pct = Math.round(preview.winChance * 100);
+      const chip = el("span", "hud-odds-chip " + oddsClass(preview.winChance));
+      chip.textContent = `${pct}%`;
+      row.append(detail, chip);
+    }
+    rows.push(row);
+  }
+
+  if (rows.length === 0) {
+    box.append(line("No hostile neighbour in reach.", "hud-hint"));
+  } else {
+    for (const r of rows) box.append(r);
+  }
+  return box;
+}
+
+/** Bucket a win chance into good / even / poor for colour-coding. */
+function oddsClass(chance: number): string {
+  if (chance >= 0.65) return "win";
+  if (chance >= 0.4) return "even";
+  return "lose";
 }
 
 function renderBuildSection(region: Region, done: TechId[], callbacks: HudCallbacks): HTMLElement {

@@ -465,6 +465,59 @@ body {
   border: 1px solid var(--highlight, #63c7d6);
 }
 
+/* Combat-odds preview (shown while moving/attacking). */
+.hud-odds {
+  margin: 8px 0 4px;
+  padding: 8px;
+  background: rgba(99, 199, 214, 0.08);
+  border: 1px solid rgba(99, 199, 214, 0.25);
+  border-radius: 7px;
+}
+
+.hud-odds-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 12px;
+}
+
+.hud-odds-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hud-odds-detail {
+  color: var(--muted, #9aa4b2);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-odds-chip {
+  min-width: 42px;
+  text-align: center;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-odds-chip.win {
+  color: #0d1a10;
+  background: #6cae7a;
+}
+
+.hud-odds-chip.even {
+  color: #1a1408;
+  background: #e0b74a;
+}
+
+.hud-odds-chip.lose {
+  color: #1d0e0c;
+  background: #e8776b;
+}
+
 .hud-unit-menu {
   display: grid;
   grid-template-columns: repeat(5, 1fr);

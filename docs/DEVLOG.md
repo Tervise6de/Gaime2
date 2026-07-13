@@ -6,6 +6,39 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Combat-odds preview in the UI
+
+Attacking was a blind commit: the player picked a highlighted target with no idea
+of the odds until the fight resolved. Now, in Move/Attack mode, the army panel
+shows an **Attack odds** list — one row per reachable hostile neighbour with the
+attacker vs. defender strength and a rough win chance, colour-coded (green ≥65%,
+amber ≥40%, red below), plus "capture" for undefended targets.
+
+Change:
+- `combat.ts` (pure): factored the strength maths out of `resolveCombat` into a
+  shared `combatStrengths(attacker, defender, ctx)` (counter loop + terrain +
+  fort net of siege) so the preview and the real fight can't drift apart. Added
+  `winChance(atk, def)` — the exact probability implied by the ratio and the
+  bounded uniform combat swing (±`COMBAT_VARIANCE`), matching `resolveCombat`'s
+  win condition — and `previewCombat(...)` returning strengths + win chance +
+  an `undefended` flag. Seven new unit tests (0–1 bounds, 50% at parity,
+  monotonic in attacker strength, fort/terrain/siege effects, undefended = 100%).
+- `hud.ts` (view only): `renderCombatOdds` renders the list from `previewCombat`
+  for each `reachableRegions` target that isn't ours; new `.hud-odds` styles.
+
+**Verify:** typecheck ✓, 153 tests ✓, build ✓ (0 `fetch`). Browser-driven: opened
+Move/Attack on a starting army and confirmed the odds panel lists every adjacent
+target with strengths and win% (e.g. undefended→capture, ⚔12/🛡4→100%,
+⚔11/🛡29→0%), no console errors. Pure-sim balance untouched (display only).
+
+Test count: 153 green (was 146).
+
+**Next ideas:** national traits (design §6) drawn per game for opening variety;
+turn-summary panel (what changed last turn); tech-tree screen; ask allies to join
+wars / gang up on the leader.
+
+---
+
 ## 2026-07-13 — AI home defence: garrison the frontier, retreat when outmatched
 
 Rival armies had no defensive instinct. With no winnable adjacent target an army
