@@ -26,8 +26,9 @@ import {
   totalUpkeep,
   unitCost,
 } from "@/systems/military";
-import { getRelation, getTreaty } from "@/systems/diplomacy";
+import { getRelation, getTreaty, atWar, wouldJoinWar } from "@/systems/diplomacy";
 import type { TurnSummary } from "@/systems/summary";
+import { deriveAlerts } from "@/ui/alerts";
 import { researchFrontier, isBuildingUnlockedFor } from "@/systems/tech";
 import { ARCHETYPE_LABEL } from "@/data/personalities";
 import { TRAITS } from "@/data/traits";
@@ -71,6 +72,7 @@ export interface HudCallbacks {
   onDeclareWar(targetId: number): void;
   onMakePeace(targetId: number): void;
   onProposePact(targetId: number, kind: "nap" | "alliance"): void;
+  onCallToArms(allyId: number, enemyId: number): void;
   onGift(targetId: number, amount: number): void;
   onAcceptOffer(offerId: number): void;
   onRejectOffer(offerId: number): void;
@@ -130,6 +132,11 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const turnBadge = el("div", "hud-turn");
   topBar.append(turnBadge);
   root.append(topBar);
+
+  // Critical-events alert strip (just below the resource bar).
+  const alertStrip = el("div", "hud-alerts");
+  alertStrip.style.display = "none";
+  root.append(alertStrip);
 
   // --- Left panel: fiscal + turn control ------------------------------------
   const leftPanel = el("div", "hud-panel hud-left");
@@ -280,6 +287,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     summary?: TurnSummary | null,
   ): void {
     renderSummary(summaryBox, summary ?? null);
+    renderAlerts(alertStrip, state, summary ?? null);
     const player = playerNation(state);
     lastPlayer = player;
     // Keep an open tech tree in sync with the latest research state.
@@ -587,6 +595,23 @@ function renderBuildSection(region: Region, done: TechId[], callbacks: HudCallba
   return section;
 }
 
+/** Render the critical-events alert strip (danger/warn/good chips), or hide it. */
+function renderAlerts(strip: HTMLElement, state: GameState, summary: TurnSummary | null): void {
+  const alerts = deriveAlerts(state, summary);
+  if (alerts.length === 0) {
+    strip.style.display = "none";
+    strip.innerHTML = "";
+    return;
+  }
+  strip.style.display = "flex";
+  strip.innerHTML = "";
+  for (const a of alerts) {
+    const chip = el("span", "hud-alert " + a.severity);
+    chip.textContent = a.text;
+    strip.append(chip);
+  }
+}
+
 /** Render the "last turn" summary of strategic changes, or hide it. */
 function renderSummary(box: HTMLElement, summary: TurnSummary | null): void {
   if (!summary) {
@@ -685,11 +710,35 @@ function renderDiplomacy(
           btn("Alliance", "hud-diplo-btn", () => callbacks.onProposePact(rival.id, "alliance")),
         );
       }
+      // Call an ally to arms against an enemy the player is fighting but they aren't.
+      if (treaty === "alliance") {
+        const enemy = callableEnemy(state, rival.id);
+        if (enemy !== null) {
+          const enemyName = state.nations.find((n) => n.id === enemy)?.name ?? "the enemy";
+          const willing = wouldJoinWar(state, rival.id, PLAYER_ID, enemy);
+          const b = btn(`Call to arms vs ${enemyName}`, "hud-diplo-btn", () =>
+            callbacks.onCallToArms(rival.id, enemy),
+          );
+          b.title = willing
+            ? `${rival.name} would likely join.`
+            : `${rival.name} may decline (needs better relations or a fair fight).`;
+          actions.append(b);
+        }
+      }
       actions.append(btn(`Gift ${GIFT_AMOUNT}g`, "hud-diplo-btn", () => callbacks.onGift(rival.id, GIFT_AMOUNT)));
     }
     card.append(actions);
     container.append(card);
   }
+}
+
+/** An enemy the player is at war with that `ally` isn't already fighting, or null. */
+function callableEnemy(state: GameState, allyId: number): number | null {
+  for (const n of state.nations) {
+    if (n.isBarbarian || n.isPlayer || !n.alive || n.id === allyId) continue;
+    if (atWar(state, PLAYER_ID, n.id) && !atWar(state, allyId, n.id)) return n.id;
+  }
+  return null;
 }
 
 function renderResearch(

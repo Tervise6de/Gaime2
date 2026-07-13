@@ -29,6 +29,7 @@ import {
 import {
   addOffer,
   atWar,
+  callToArms,
   declareWar,
   getRelation,
   getTreaty,
@@ -37,6 +38,7 @@ import {
   nationPower,
   setPact,
   sharedBorders,
+  wouldJoinWar,
 } from "@/systems/diplomacy";
 import { researchFrontier, selectTech, isBuildingUnlockedFor } from "@/systems/tech";
 import { TECHS, type TechId, type TechBranch } from "@/data/techs";
@@ -322,6 +324,25 @@ function doDiplomacy(state: GameState, nationId: number, rng: Rng): GameState {
       actions++;
     }
   }
+  // Rally an ally into a war I'm LOSING (call to arms) — at most one per turn, and
+  // only when the enemy out-powers me, so it's a genuine cry for help rather than
+  // an automatic dogpile (which would end games too fast). wouldJoinWar declines
+  // for a player ally, so the AI never forces the player into a war.
+  rally: for (const ally of others) {
+    if (getTreaty(s, nationId, ally.id) !== "alliance") continue;
+    for (const enemy of others) {
+      if (enemy.id === ally.id) continue;
+      if (
+        atWar(s, nationId, enemy.id) &&
+        nationPower(s, enemy.id) > nationPower(s, nationId) * 1.1 &&
+        wouldJoinWar(s, ally.id, nationId, enemy.id)
+      ) {
+        s = callToArms(s, nationId, ally.id, enemy.id);
+        break rally;
+      }
+    }
+  }
+
   // Small random chance a warlord with no target still probes a neighbour.
   void rng;
   return s;

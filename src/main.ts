@@ -11,6 +11,7 @@ import { raiseUnit, moveArmy, reachableRegions } from "@/systems/military";
 import {
   declareWar,
   playerPropose,
+  callToArms,
   gift,
   acceptOffer,
   rejectOffer,
@@ -105,6 +106,10 @@ function main(): void {
     },
     onProposePact(targetId, kind) {
       state = playerPropose(state, targetId, kind);
+      commit();
+    },
+    onCallToArms(allyId, enemyId) {
+      state = callToArms(state, PLAYER_ID, allyId, enemyId);
       commit();
     },
     onGift(targetId, amount) {

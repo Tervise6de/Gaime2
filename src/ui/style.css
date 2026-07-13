@@ -768,6 +768,48 @@ body {
   text-transform: capitalize;
 }
 
+/* --- Critical-events alert strip ------------------------------------------ */
+.hud-alerts {
+  position: fixed;
+  top: 66px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  max-width: 70vw;
+  pointer-events: none;
+}
+
+.hud-alert {
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.hud-alert.danger {
+  color: #2a0f0c;
+  background: #e8776b;
+  border-color: #f0a097;
+}
+
+.hud-alert.warn {
+  color: #241a06;
+  background: #e0b74a;
+  border-color: #eccb78;
+}
+
+.hud-alert.good {
+  color: #0d1a10;
+  background: #6cae7a;
+  border-color: #93c79f;
+}
+
 /* --- Tech-tree overlay ---------------------------------------------------- */
 .hud-techtree-open {
   padding: 3px 8px;

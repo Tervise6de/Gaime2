@@ -6,6 +6,41 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Three features via parallel agents (alerts · tech rush · call-to-arms)
+
+Fanned out three sub-agents in isolated git worktrees on disjoint file sets, each
+implementing + self-verifying one feature, then integrated them (cherry-pick, zero
+conflicts) and did the shared UI wiring, balance probe, and browser checks here.
+
+1. **Critical-events alert strip** (`src/ui/alerts.ts`, pure + 12 tests): a compact
+   strip below the resource bar surfacing what a scrolling log buries — regions
+   lost, wars, famine, bankruptcy (danger), active revolts (warn), captures,
+   eliminations, techs (good), ordered danger→warn→good, capped at 6. Wired into
+   the HUD (`renderAlerts` in the update loop) with colour-coded chips.
+2. **Trait-aware tech rush** (`ai.ts` + 7 tests): new pure `preferredTechBranch`
+   biases `pickTech` by national trait (Scholarly→civics, Martial→military,
+   economic traits→economy), falling back to the personality branch — nations now
+   research along their strength.
+3. **Call to arms** (`diplomacy.ts` + 10 tests): `wouldJoinWar` / `callToArms` let
+   an ally join your war against a common enemy. Wired a player button on allied
+   diplomacy cards (main.ts `onCallToArms`), plus a conservative AI reciprocity —
+   an AI rallies an ally only into a war it's *losing* (enemy out-powers it), so
+   it's a cry for help, not an automatic dogpile.
+
+**Balance check (temporary probe, deleted before commit):** win rates stay spread
+and every archetype viable — warlord 13%, merchant 25%, builder 25%, opportunist
+21%; the aggressor trends a touch lower and games shorten in-probe (median 36→26)
+as smarter tech targeting speeds the AI. No degeneracy, 96 games clean. Alerts
+strip browser-verified (war/revolt/bankruptcy chips render, no console errors);
+call-to-arms covered by unit tests + typecheck.
+
+Test count: **210 green** (was 181; +12 +7 +10). Build network-free (0 `fetch`).
+
+**Next ideas:** Voronoi map renderer; per-enemy call-to-arms; trait-flavoured
+events; a proper end-game score screen.
+
+---
+
 ## 2026-07-13 — Tech-tree screen (the whole branching tree)
 
 The research bar only showed the current tech + the immediate frontier, so the
