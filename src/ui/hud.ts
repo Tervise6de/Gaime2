@@ -652,6 +652,11 @@ function renderRegion(
 
   const meta = el("p", "hud-region-meta");
   const bits = [terrain.name, ownerName, `pop ${fmt(region.population)}/${fmt(regionCapacity(region))}`];
+  // The held capital of its owner (crown falls with the seat, as on the map).
+  const capitalOf = state.nations.find(
+    (n) => !n.isBarbarian && n.capitalRegionId === region.id && region.ownerId === n.id,
+  );
+  if (capitalOf) bits.splice(1, 0, `👑 capital of ${capitalOf.isPlayer ? "your realm" : capitalOf.name}`);
   if (region.fortification > 0) bits.push(`fort ${region.fortification}`);
   if (region.resource) bits.push(region.resource === "iron" ? "⚒ iron" : "🐎 horses");
   meta.textContent = bits.join(" · ");
@@ -935,7 +940,7 @@ function buildLegend(): HTMLElement {
   row('<span class="hud-legend-ico">⚒</span>', "Iron deposit");
   row('<span class="hud-legend-ico">🐎</span>', "Horses");
   row('<span class="hud-legend-ico">🔨</span>', "Building under construction");
-  row('<span class="hud-legend-ico">👑</span>', "Capital (a nation's seat of power)");
+  row('<span class="hud-legend-ico">👑</span>', "Capital — crown + double ring (a nation's seat of power)");
   row('<span class="hud-legend-badge">3</span>', "Army (owner colour, unit count)");
 
   section("Selection");

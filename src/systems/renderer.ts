@@ -138,6 +138,16 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       context.strokeStyle = isSelected ? SELECT_COLOR : ownerColor(region.ownerId);
       context.stroke();
 
+      // Capital: a second concentric ring in the owner's colour — a "double
+      // ring" reads at full-board zoom where the tiny crown glyph does not.
+      if (capitals.has(region.id)) {
+        context.beginPath();
+        context.arc(p.x, p.y, NODE_RADIUS + 4.5, 0, Math.PI * 2);
+        context.lineWidth = 2;
+        context.strokeStyle = ownerColor(region.ownerId);
+        context.stroke();
+      }
+
       // Population count.
       context.fillStyle = "#0d0f14";
       context.font = "600 13px system-ui, sans-serif";

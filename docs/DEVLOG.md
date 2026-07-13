@@ -6,6 +6,27 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Capitals read at a glance: double ring + region-panel line
+
+Two sibling next-ideas in one small UI cycle. The map's 👑 crown glyph is tiny at
+full-board zoom, so capitals now also get a **second concentric ring** in the
+owner's colour — a double ring reads at any size, and it uses the same live
+"still holds its own capital" set as the crown, so it falls with the seat. And
+the region detail panel now says so in words: the meta line reads
+"Plains · 👑 capital of your realm · …" (or the rival's name), using the same
+held-capital check. Legend row updated to name both marks. Pure presentation —
+no sim/state/balance change.
+
+**Verify:** typecheck ✓, 252 tests ✓, build ✓ (0 `fetch`, deps `{}`).
+Browser-driven: clicked the player capital — panel shows "👑 capital of your
+realm"; the map shows double rings on each held capital (rival's in its own
+colour). No console/page errors.
+
+**Next ideas:** per-slot save clear (✕); number-key shortcuts for choice-event
+options; trait-dependent choice options.
+
+---
+
 ## 2026-07-13 — New building: the Mine (mountains + Masonry)
 
 Fast follow on the terrain-gating mechanic: the **Mine** (cost 22, +4 materials,
