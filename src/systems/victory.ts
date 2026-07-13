@@ -33,6 +33,35 @@ export function nationScore(state: GameState, id: number): number {
   );
 }
 
+export interface VictoryProgress {
+  /** The path this nation is closest to completing. */
+  kind: "domination" | "great works";
+  /** A compact label, e.g. "42%⬢" (territory share) or "2/4★" (wonders). */
+  label: string;
+  /** How far toward that win, 0..1 (1 = would trigger it). */
+  fraction: number;
+}
+
+/**
+ * The victory path a nation is nearest to winning, as a 0..1 threat gauge for
+ * the standings. Compares its territory share (toward domination) against its
+ * wonders (toward Great Works) and reports whichever is closer. Pure.
+ */
+export function victoryProgress(state: GameState, id: number): VictoryProgress {
+  const nation = state.nations.find((n) => n.id === id);
+  const total = state.regions.filter((r) => r.ownerId !== null).length || 1;
+  const held = state.regions.filter((r) => r.ownerId === id).length;
+  const domShare = held / total;
+  const domFraction = Math.min(1, domShare / DOMINATION_FRACTION);
+  const wonders = nation?.wonders ?? 0;
+  const wonderFraction = Math.min(1, wonders / WONDER_GOAL);
+
+  if (wonderFraction >= domFraction && wonders > 0) {
+    return { kind: "great works", label: `${wonders}/${WONDER_GOAL}★`, fraction: wonderFraction };
+  }
+  return { kind: "domination", label: `${Math.round(domShare * 100)}%⬢`, fraction: domFraction };
+}
+
 export interface VictoryCheck {
   outcome: "victory" | "defeat";
   kind: string;

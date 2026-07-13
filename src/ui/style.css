@@ -1224,6 +1224,24 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Victory-progress gauge pill — reads on both the light banner and dark overlay. */
+.hud-standings-vp {
+  flex: 0 0 auto;
+  min-width: 42px;
+  text-align: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hud-standings-vp.calm { color: #7fca9a; }
+.hud-standings-vp.warn { color: #f0c85a; }
+.hud-standings-vp.danger { color: #f0897b; }
+
 .hud-sparkline {
   margin-top: 10px;
   display: flex;

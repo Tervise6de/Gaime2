@@ -27,7 +27,7 @@ import {
   unitCost,
 } from "@/systems/military";
 import { getRelation, getTreaty, wouldJoinWar, warTargetsFor } from "@/systems/diplomacy";
-import { nationScore } from "@/systems/victory";
+import { nationScore, victoryProgress } from "@/systems/victory";
 import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
 import type { TurnSummary } from "@/systems/summary";
 import { deriveAlerts } from "@/ui/alerts";
@@ -805,6 +805,13 @@ function oddsClass(chance: number): string {
   return "lose";
 }
 
+/** Colour a victory-progress gauge: closer to a win reads more alarming. */
+function vpClass(fraction: number): string {
+  if (fraction >= 0.75) return "danger";
+  if (fraction >= 0.5) return "warn";
+  return "calm";
+}
+
 function renderBuildSection(region: Region, done: TechId[], callbacks: HudCallbacks): HTMLElement {
   const section = el("div", "hud-build");
   section.append(heading("Construction"));
@@ -976,6 +983,16 @@ function renderStandings(
     const score = el("span", "hud-standings-score");
     score.textContent = String(row.score);
     tr.append(rank, sw, name, detail, score);
+    // Threat gauge: how close this nation is to its nearest victory. The chip
+    // shows the progress-to-win % (matching its colour); the tooltip names the
+    // path and the concrete stat behind it.
+    if (row.n.alive) {
+      const vp = victoryProgress(state, row.n.id);
+      const chip = el("span", "hud-standings-vp " + vpClass(vp.fraction));
+      chip.textContent = `${Math.round(vp.fraction * 100)}%`;
+      chip.title = `${Math.round(vp.fraction * 100)}% toward a ${vp.kind} victory (${vp.label})`;
+      tr.append(chip);
+    }
     if (canPick) {
       tr.title = `Show ${row.n.isPlayer ? "your" : row.n.name + "’s"} capital on the map`;
       tr.addEventListener("click", () => onPick!(row.n.capitalRegionId!));

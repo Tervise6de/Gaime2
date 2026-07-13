@@ -6,6 +6,34 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Victory-progress threat gauge in the Standings
+
+The Standings showed raw counts (regions ⬢, wonders ★) but not the thing that
+actually matters: *how close is each nation to winning?* Added a colour-coded
+gauge pill per row showing progress toward that nation's **nearest** victory —
+green (calm) < 50% ≤ amber (warn) < 75% ≤ red (danger). At a glance you can see
+"the leader is 55% of the way to a domination win" and react before it's too
+late.
+
+New pure `victoryProgress(state, id)` in victory.ts compares a nation's territory
+share (toward `DOMINATION_FRACTION`) against its wonders (toward `WONDER_GOAL`)
+and reports whichever is closer as `{ kind, label, fraction }`, clamped to 1. The
+chip shows the fraction% (matching its colour); the tooltip names the path and
+the concrete stat, e.g. "55% toward a domination victory (27%⬢)". Shows in both
+the mid-game overlay and the end-game banner. Pure/deterministic — no sim/balance
+change (a read-only projection of existing state).
+
+**Verify:** typecheck ✓, 231 tests ✓ (+3: default domination path hitting 1.0 at
+the threshold, switching to Great Works when wonders are closer, fraction clamped
+to 1), build ✓ (0 `fetch`, deps `{}`). Browser-driven at turn 13: gauges read
+55% (amber) / 45% / 27% (green) matching the leader's territory lead, tooltips
+correct, readable on the dark overlay. No console/page errors.
+
+**Next ideas:** flash the top-bar victory readout when any rival crosses 75%; a
+per-slot save "clear" (✕); tint the capital node for full-board zoom.
+
+---
+
 ## 2026-07-13 — Standings rows show capitals and jump to them
 
 Tied the mid-game Standings panel to the map and the capital work. Each nation
