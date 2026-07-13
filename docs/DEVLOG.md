@@ -6,6 +6,33 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — End-game score-history sparkline
+
+The end-game standings now carry a small line chart of the player's prestige
+score across the whole game (backlog: "score-history sparkline on the end
+screen"). It turns the final banner from a single snapshot into a story — you
+can see the run climb, plateau, and (on a defeat) collapse.
+
+The sim samples the player's `nationScore` once per resolved turn into a new
+optional `history: number[]` on `GameState`, seeded with the opening position in
+`createGame` and appended in `resolveTurn` after the outcome step (so a decided
+game stops growing it). Being optional, it round-trips through the generic JSON
+save/load untouched and old saves simply render no chart. The HUD draws it as a
+hand-built inline `<svg>` polyline (no deps, fully offline) below the standings
+table, coloured with the player's nation colour and dotted at the latest point.
+
+**Verify:** typecheck ✓, 220 tests ✓ (216 + 4: history seeded, grows per turn,
+deterministic per seed, frozen once decided), build ✓ (0 `fetch`, deps `{}`).
+Browser-driven: played a game to a turn-24 domination defeat — the sparkline
+rendered with 24 points, caption "Your score, turn 1 → 24", no console errors.
+
+Test count: 220 green.
+
+**Next ideas:** a "?" button to reopen the first-time hints; per-nation score
+lines on the sparkline; a compact mid-game score trend in the top bar.
+
+---
+
 ## 2026-07-13 — Explanatory stat tooltips
 
 Complements the map legend + first-time hints with hover tooltips that explain the

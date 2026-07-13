@@ -29,7 +29,7 @@ import { driftRelations } from "@/systems/diplomacy";
 import { runNationTurn } from "@/systems/ai";
 import { advanceResearch, techUnrestReduction, isBuildingUnlockedFor, selectTech } from "@/systems/tech";
 import { fireEvent } from "@/systems/events";
-import { checkVictory } from "@/systems/victory";
+import { checkVictory, nationScore } from "@/systems/victory";
 import { createRng, type Rng } from "@/systems/rng";
 import {
   BANKRUPTCY_UNREST,
@@ -179,7 +179,7 @@ export function createGame(options: NewGameOptions): GameState {
 
   const playerCapitalName = regions[capitals[0]!]!.name;
 
-  return {
+  const game: GameState = {
     seed: options.seed,
     rngState: rng.seed,
     turn: 1,
@@ -197,7 +197,11 @@ export function createGame(options: NewGameOptions): GameState {
       `Turn 1 — your realm rises around ${playerCapitalName}; ` +
         `${rivalCount} rival power${rivalCount === 1 ? "" : "s"} contest the land (seed ${options.seed}).`,
     ],
+    history: [],
   };
+  // Seed the score graph with the opening position.
+  game.history = [nationScore(game, PLAYER_ID)];
+  return game;
 }
 
 /** Set a nation's tax rate (defaults to the player). Pure. */
@@ -373,6 +377,9 @@ export function resolveTurn(state: GameState): GameState {
 
   // 6. Outcome: elimination, then domination / great works / turn-limit score.
   s = updateOutcome(s);
+
+  // 7. Sample the player's prestige score for the end-game graph.
+  s = { ...s, history: [...(s.history ?? []), nationScore(s, PLAYER_ID)] };
 
   return s;
 }

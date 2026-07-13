@@ -795,6 +795,54 @@ function renderStandings(container: HTMLElement, state: GameState): void {
     table.append(tr);
   });
   container.append(table);
+
+  const spark = buildSparkline(state.history ?? [], state.nations[PLAYER_ID]!.color);
+  if (spark) container.append(spark);
+}
+
+/**
+ * A tiny inline-SVG line chart of the player's prestige score over the game.
+ * Returns null when there's too little history to be worth drawing. No deps —
+ * hand-built SVG so it stays offline and self-contained.
+ */
+function buildSparkline(history: number[], color: string): HTMLElement | null {
+  if (history.length < 2) return null;
+  const w = 240;
+  const h = 48;
+  const pad = 3;
+  const max = Math.max(...history);
+  const min = Math.min(...history);
+  const span = max - min || 1;
+  const stepX = (w - pad * 2) / (history.length - 1);
+  const points = history.map((v, i) => {
+    const x = pad + i * stepX;
+    const y = h - pad - ((v - min) / span) * (h - pad * 2);
+    return `${round1(x)},${round1(y)}`;
+  });
+
+  const wrap = el("div", "hud-sparkline");
+  const caption = el("span", "hud-sparkline-caption");
+  caption.textContent = `Your score, turn 1 → ${history.length}`;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  svg.setAttribute("class", "hud-sparkline-svg");
+  svg.setAttribute("preserveAspectRatio", "none");
+  const poly = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+  poly.setAttribute("points", points.join(" "));
+  poly.setAttribute("fill", "none");
+  poly.setAttribute("stroke", color);
+  poly.setAttribute("stroke-width", "2");
+  poly.setAttribute("stroke-linejoin", "round");
+  poly.setAttribute("stroke-linecap", "round");
+  const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  const last = points[points.length - 1]!.split(",");
+  dot.setAttribute("cx", last[0]!);
+  dot.setAttribute("cy", last[1]!);
+  dot.setAttribute("r", "2.5");
+  dot.setAttribute("fill", color);
+  svg.append(poly, dot);
+  wrap.append(caption, svg);
+  return wrap;
 }
 
 /** Render the critical-events alert strip (danger/warn/good chips), or hide it. */

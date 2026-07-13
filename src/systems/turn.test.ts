@@ -174,3 +174,37 @@ describe("construction", () => {
     expect(goldBuilt).toBeGreaterThan(goldPlain);
   });
 });
+
+describe("score history", () => {
+  it("seeds a one-entry history at game start", () => {
+    const g = createGame({ seed: 7 });
+    expect(g.history).toHaveLength(1);
+    expect(g.history![0]).toBeGreaterThan(0);
+  });
+
+  it("appends one sample per resolved turn", () => {
+    let s = createGame({ seed: 7, rivals: 0 });
+    const before = s.history!.length;
+    s = resolveTurn(s);
+    s = resolveTurn(s);
+    expect(s.history!.length).toBe(before + 2);
+  });
+
+  it("stays deterministic (same seed → identical history)", () => {
+    const run = (seed: number) => {
+      let s = createGame({ seed, rivals: 1 });
+      for (let i = 0; i < 10; i++) s = resolveTurn(s);
+      return s.history;
+    };
+    expect(run(42)).toEqual(run(42));
+  });
+
+  it("does not grow history once the game is decided", () => {
+    let s = createGame({ seed: 7, rivals: 0 });
+    s = resolveTurn(s);
+    s = { ...s, outcome: "victory" };
+    const len = s.history!.length;
+    s = resolveTurn(s);
+    expect(s.history!.length).toBe(len);
+  });
+});

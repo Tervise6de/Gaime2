@@ -268,6 +268,8 @@ export interface GameState {
   victoryKind?: string;
   /** Human-readable turn log, newest last. */
   log: string[];
+  /** The player's prestige score sampled once per turn, for the end-game graph. */
+  history?: number[];
 }
 
 /** A fresh research record. */
