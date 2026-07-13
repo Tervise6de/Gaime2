@@ -6,6 +6,38 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — AI force concentration → military path now competitive
+
+Addressed the open item from 2026-07-12: the military/domination path badly
+underperformed the economic one (committed-player win rate ~15% vs ~50%).
+
+Root cause: rival armies fought **piecemeal**. An army with no winnable adjacent
+target just sat still, so forces never gathered — scattered 2-unit stacks lost
+where one concentrated stack would have won.
+
+Change (`ai.ts`, pure/deterministic): the military turn is now two phases.
+1. **Attack** — strongest armies first take their best winnable adjacent target.
+2. **Concentrate** — idle armies march *through friendly territory only* (BFS to
+   the nearest frontier region) and converge, merging into one stack strong
+   enough to break defences a split force can't. The march never blunders into a
+   losing fight (own-land pathing), so it's safe.
+
+Self-play probe (24 seeds × 4 committed archetypes) — win rates went from a wide
+**12–50%** spread to a tight **21–29%** across all archetypes (Warlord now the
+strongest at 29%; fair 3-way baseline ≈ 33% with nation-0 first-mover edge).
+Domination now decides ~half of games (was a rare ~1/6). Median length 69–108
+turns, still in the 60–150 target. Every strategy is viable and roughly equal.
+
+Test count: 130 green. Build network-free (0 `fetch`). Browser-smoked: a game
+runs cleanly with rivals actively conquering, no console errors.
+
+**Next ideas:** composition-aware AI recruiting (bring siege vs forts, counters
+vs the enemy's mix); AI defends threatened home regions / retreats losing armies;
+combat-odds preview in the UI before the player commits an attack; national
+traits (design §6) for more opening variety.
+
+---
+
 ## 2026-07-12 — Balance pass: game length + victory diversity
 
 Self-play probe (symmetric AI skill, 24 seeds, normal) found two problems:

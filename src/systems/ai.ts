@@ -245,14 +245,72 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
   // Recruit: keep an army if aggressive/at war and it's affordable.
   s = recruit(s, nationId, rng);
 
-  // Move each army: attack the weakest reachable, winnable target.
-  for (const army of s.armies.filter((a) => a.ownerId === nationId)) {
+  // Phase 1 — attack: strongest armies first take their best winnable target.
+  const myArmies = () => s.armies.filter((a) => a.ownerId === nationId);
+  for (const army of [...myArmies()].sort((a, b) => armySize(b.units) - armySize(a.units))) {
     const live = s.armies.find((a) => a.id === army.id);
     if (!live || live.movesLeft <= 0) continue;
     const target = bestTarget(s, live, nationId);
     if (target !== null) s = moveArmy(s, live.id, target);
   }
+
+  // Phase 2 — concentrate: armies with no winnable target march through friendly
+  // territory toward the nearest frontier, converging and merging into one stack
+  // strong enough to break defences a split force cannot.
+  for (const army of myArmies()) {
+    const live = s.armies.find((a) => a.id === army.id);
+    if (!live || live.movesLeft <= 0) continue;
+    if (bestTarget(s, live, nationId) !== null) continue;
+    const step = advanceStep(s, live, nationId);
+    if (step !== null) s = moveArmy(s, live.id, step);
+  }
   return s;
+}
+
+/** Whether a nation may attack into a region (hostile, honouring player grace). */
+function isAttackable(state: GameState, regionId: number, nationId: number): boolean {
+  const r = state.regions[regionId];
+  if (!r || r.ownerId === null || r.ownerId === nationId) return false;
+  if (r.ownerId === BARBARIAN_ID) return true;
+  if (r.ownerId === PLAYER_ID && state.turn < earlyPeaceTurns(state)) return false;
+  return atWar(state, nationId, r.ownerId);
+}
+
+/**
+ * The first step (an owned neighbour) toward the nearest frontier region — an
+ * owned region bordering something attackable. Marches only through friendly
+ * land, so the advance never blunders into a losing fight. Null if the army is
+ * already at the front or no owned path reaches one.
+ */
+function advanceStep(
+  state: GameState,
+  army: { regionId: number },
+  nationId: number,
+): number | null {
+  const start = army.regionId;
+  const isFrontier = (rid: number): boolean => {
+    const r = state.regions[rid];
+    return (
+      !!r && r.ownerId === nationId && r.adjacency.some((n) => isAttackable(state, n, nationId))
+    );
+  };
+  if (isFrontier(start)) return null; // already staged at the front
+
+  const visited = new Set<number>([start]);
+  const queue: { node: number; first: number | null }[] = [{ node: start, first: null }];
+  while (queue.length) {
+    const { node, first } = queue.shift()!;
+    for (const nb of state.regions[node]!.adjacency) {
+      if (visited.has(nb)) continue;
+      const nbR = state.regions[nb];
+      if (!nbR || nbR.ownerId !== nationId) continue; // march only through own land
+      visited.add(nb);
+      const step = first ?? nb;
+      if (isFrontier(nb)) return step;
+      queue.push({ node: nb, first: step });
+    }
+  }
+  return null;
 }
 
 function recruit(state: GameState, nationId: number, rng: Rng): GameState {
