@@ -16,7 +16,7 @@ import {
   acceptOffer,
   rejectOffer,
 } from "@/systems/diplomacy";
-import { saveToLocal, loadFromLocal, hasLocalSave } from "@/systems/save";
+import { saveToLocal, loadFromLocal, hasLocalSave, serializeGame, deserializeGame } from "@/systems/save";
 import { summarizeTurn, type TurnSummary } from "@/systems/summary";
 import { PLAYER_ID, type GameState } from "@/systems/state";
 import { createHud } from "@/ui/hud";
@@ -74,6 +74,23 @@ function main(): void {
         hud.toast("Checkpoint loaded.");
       } else {
         hud.toast("No saved checkpoint.");
+      }
+    },
+    onExport() {
+      downloadText(`gaime2-turn${state.turn}-seed${state.seed}.json`, serializeGame(state, nowStamp()));
+      hud.toast("Save exported to file.");
+    },
+    onImport(json) {
+      const loaded = deserializeGame(json);
+      if (loaded) {
+        state = loaded;
+        selectedRegion = null;
+        moveArmyId = null;
+        lastSummary = null;
+        commit(); // adopt the imported game as the live autosave
+        hud.toast(`Imported game — turn ${state.turn}.`);
+      } else {
+        hud.toast("Import failed — not a valid Gaime2 save.");
       }
     },
     onQueueBuilding(regionId, building) {
@@ -196,6 +213,19 @@ function main(): void {
 /** A wall-clock stamp for saves. Kept out of the sim (which forbids Date). */
 function nowStamp(): number {
   return Date.now();
+}
+
+/** Trigger a client-side file download of text — fully local, no network. */
+function downloadText(filename: string, text: string): void {
+  const blob = new Blob([text], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 main();

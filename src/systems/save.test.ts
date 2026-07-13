@@ -35,4 +35,12 @@ describe("save / load", () => {
     const g = createGame({ seed: 1, difficulty: "easy" });
     expect(deserializeGame(serializeGame(g, 0))!.difficulty).toBe("easy");
   });
+
+  it("round-trips the score-history graph (export/import contract)", () => {
+    let g = createGame({ seed: 3, rivals: 2 });
+    for (let i = 0; i < 6; i++) g = resolveTurn(g);
+    const restored = deserializeGame(serializeGame(g, 0))!;
+    expect(restored.scoreHistory).toEqual(g.scoreHistory);
+    expect(restored.scoreHistory![0]!.length).toBe(g.turn);
+  });
 });

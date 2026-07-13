@@ -65,6 +65,10 @@ export interface HudCallbacks {
   onNewGame(config: NewGameConfig): void;
   onSave(): void;
   onLoad(): void;
+  /** Download the current game as a JSON file (backup / sharing). */
+  onExport(): void;
+  /** Load a game from an uploaded save-file's JSON text. */
+  onImport(json: string): void;
   onQueueBuilding(regionId: number, building: BuildingId): void;
   onCancelConstruction(regionId: number): void;
   onRaiseUnit(regionId: number, unit: UnitType): void;
@@ -246,6 +250,36 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   loadBtn.addEventListener("click", () => callbacks.onLoad());
   btnRow.append(newGameBtn, saveBtn, loadBtn);
   controls.append(btnRow);
+
+  // Export / import a save as a downloadable file (backup / sharing) — fully
+  // local: a Blob download and a FileReader upload, no network involved.
+  const fileRow = el("div", "hud-newgame");
+  const exportBtn = document.createElement("button");
+  exportBtn.className = "hud-newgame-btn";
+  exportBtn.textContent = "⬇ Export";
+  exportBtn.title = "Download this game as a JSON file.";
+  exportBtn.addEventListener("click", () => callbacks.onExport());
+  const importBtn = document.createElement("button");
+  importBtn.className = "hud-newgame-btn";
+  importBtn.textContent = "⬆ Import";
+  importBtn.title = "Load a game from a saved JSON file.";
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.accept = "application/json,.json";
+  fileInput.style.display = "none";
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      callbacks.onImport(typeof reader.result === "string" ? reader.result : "");
+      fileInput.value = ""; // allow re-importing the same file
+    };
+    reader.readAsText(file);
+  });
+  importBtn.addEventListener("click", () => fileInput.click());
+  fileRow.append(exportBtn, importBtn, fileInput);
+  controls.append(fileRow);
   leftPanel.append(controls);
   root.append(leftPanel);
 

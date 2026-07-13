@@ -6,6 +6,35 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Export / import a save as a file (backup & sharing)
+
+Saves lived only in `localStorage` (auto + one manual slot), so a game couldn't
+leave the browser — no backups, no sharing, and a cleared cache lost everything.
+Added **⬇ Export** and **⬆ Import** buttons under New game / Save / Load. Export
+downloads the current game as `gaime2-turn<N>-seed<seed>.json`; Import reads an
+uploaded save file and adopts it as the live game (and autosave). The whole thing
+is fully local — a `Blob` + object-URL download and a `FileReader` upload, no
+network — and reuses the existing `serializeGame`/`deserializeGame`, so every
+state field (including the per-nation `scoreHistory`) round-trips and a foreign or
+corrupt file is rejected with a toast rather than corrupting the session.
+
+Layering kept clean: the HUD owns the file-input/`FileReader` DOM and emits
+`onExport` / `onImport(json)` intents; `main.ts` (the composition root) does the
+serialize + `Blob` download and the deserialize + state swap. The sim is
+untouched — `Date`/DOM stay out of `systems/`.
+
+**Verify:** typecheck ✓, 221 tests ✓ (+1: score-history export/import round-trip
+contract), build ✓ (0 `fetch`, deps `{}`). Browser-driven the real flow: at
+turn 5 Export downloaded `gaime2-turn5-seed12345.json` (with `scoreHistory`);
+advanced to turn 10; importing that file reverted to turn 5 ("Imported game —
+turn 5."); a garbage file left the game at turn 5 with "Import failed — not a
+valid Gaime2 save." No console errors.
+
+**Next ideas:** a third named/manual save slot or a slot picker; a "Copy seed"
+button for quick sharing; drag-and-drop a save file onto the map to import.
+
+---
+
 ## 2026-07-13 — Numbered, scrollable full turn log (+ a balance non-change)
 
 **Shipped — full turn log.** The log panel showed only the last 8 entries, plain
