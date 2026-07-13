@@ -6,6 +6,34 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Player can demand tribute too (symmetric extortion)
+
+Last cycle gave the AI tribute demands; this gives the player the same lever. A
+new **Demand 30g** button on each rival's diplomacy card (beside Gift 30g)
+extorts a weaker rival. The AI's answer reuses the existing `wouldAccept(...,
+"tribute")` — it yields only when the player out-powers it ≥1.6× and it isn't too
+proud — so the button's tooltip tells you in advance whether it would pay or
+scorn. Yielding transfers the gold *and* dips relations (a coerced payment breeds
+resentment, unlike a gift); scorning just dips relations (an affront).
+
+Self-contained: `playerDemandTribute` in diplomacy.ts + an `onDemandTribute`
+intent wired through hud.ts/main.ts. Pure/deterministic. It's a player-only
+action (the AI never calls it), so self-play balance is unchanged — no probe
+needed.
+
+**Verify:** typecheck ✓, 268 tests ✓ (+2: a much weaker non-proud rival yields
+30g and its relation drops; a roughly-even rival scorns — no transfer, relation
+still dips), build ✓ (0 `fetch`, deps `{}`). Browser-driven: both rival cards
+show "Demand 30g" with an accurate tooltip ("would scorn… needs to be far
+weaker"); clicking it early logged "Valdheim scorns your demand for tribute." with
+no gold change. No console/page errors. (The yield path is unit-tested; it needs a
+1.6× power lead that's impractical to reach in a quick idle browser run.)
+
+**Next ideas:** AI escalates to war a few turns after a refused demand; a
+"Demand" that scales with the power gap; number-key shortcuts for choice options.
+
+---
+
 ## 2026-07-13 — AI tribute demands (activating a dead diplomacy mechanic)
 
 The `tribute` offer type was fully wired — `acceptOffer` makes the player pay,

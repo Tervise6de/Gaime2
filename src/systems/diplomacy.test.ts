@@ -21,11 +21,13 @@ import {
   wouldJoinWar,
   callToArms,
   warTargetsFor,
+  playerDemandTribute,
 } from "@/systems/diplomacy";
 import { createGame } from "@/systems/turn";
 import {
   RELATION_MAX,
   RELATION_MIN,
+  emptyUnits,
   pairKey,
   type GameState,
 } from "@/systems/state";
@@ -91,6 +93,47 @@ describe("gift", () => {
     const g = game();
     g.nations[0]!.stocks.gold = 5;
     expect(gift(g, 0, RIVAL_A, 30)).toBe(g);
+  });
+});
+
+describe("playerDemandTribute", () => {
+  /** The player fields an overwhelming host; RIVAL_A is meek and can pay. */
+  function lopsided(): GameState {
+    let g = game();
+    const capital = g.regions.find((r) => r.ownerId === 0)!.id;
+    g = { ...g, armies: [...g.armies, { id: 999, ownerId: 0, regionId: capital, units: { ...emptyUnits(), infantry: 30 }, movesLeft: 0 }] };
+    return {
+      ...g,
+      nations: g.nations.map((n) =>
+        n.id === RIVAL_A
+          ? {
+              ...n,
+              personality: { archetype: "merchant", aggression: 0.2, expansion: 0.5, economy: 0.9, trustworthiness: 0.85 },
+              stocks: { ...n.stocks, gold: 100 },
+            }
+          : n,
+      ),
+    };
+  }
+
+  it("a much weaker, non-proud rival yields tribute — and resents it", () => {
+    const g = lopsided();
+    const rivalGold0 = g.nations[RIVAL_A]!.stocks.gold;
+    const playerGold0 = g.nations[0]!.stocks.gold;
+    const rel0 = getRelation(g, 0, RIVAL_A);
+    const next = playerDemandTribute(g, RIVAL_A);
+    expect(next.nations[RIVAL_A]!.stocks.gold).toBe(rivalGold0 - 30);
+    expect(next.nations[0]!.stocks.gold).toBe(playerGold0 + 30);
+    expect(getRelation(next, 0, RIVAL_A)).toBeLessThan(rel0); // cowed, not thanked
+  });
+
+  it("a rival that is not far weaker scorns the demand: no transfer, relations dip", () => {
+    const g = game(); // roughly balanced power → wouldAccept(tribute) is false
+    const rivalGold0 = g.nations[RIVAL_A]!.stocks.gold;
+    const rel0 = getRelation(g, 0, RIVAL_A);
+    const next = playerDemandTribute(g, RIVAL_A);
+    expect(next.nations[RIVAL_A]!.stocks.gold).toBe(rivalGold0);
+    expect(getRelation(next, 0, RIVAL_A)).toBeLessThan(rel0);
   });
 });
 

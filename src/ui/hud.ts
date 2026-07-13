@@ -26,7 +26,7 @@ import {
   totalUpkeep,
   unitCost,
 } from "@/systems/military";
-import { getRelation, getTreaty, wouldJoinWar, warTargetsFor } from "@/systems/diplomacy";
+import { getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, TRIBUTE_DEMAND } from "@/systems/diplomacy";
 import { nationScore, victoryProgress } from "@/systems/victory";
 import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
 import type { TurnSummary } from "@/systems/summary";
@@ -81,6 +81,7 @@ export interface HudCallbacks {
   onProposePact(targetId: number, kind: "nap" | "alliance"): void;
   onCallToArms(allyId: number, enemyId: number): void;
   onGift(targetId: number, amount: number): void;
+  onDemandTribute(targetId: number): void;
   onAcceptOffer(offerId: number): void;
   onRejectOffer(offerId: number): void;
   onChooseResearch(tech: TechId): void;
@@ -1260,6 +1261,13 @@ function renderDiplomacy(
         }
       }
       actions.append(btn(`Gift ${GIFT_AMOUNT}g`, "hud-diplo-btn", () => callbacks.onGift(rival.id, GIFT_AMOUNT)));
+      // Extort a weaker rival: it yields only when clearly outmatched and not proud.
+      const wouldYield = wouldAccept(state, PLAYER_ID, rival.id, "tribute");
+      const demand = btn(`Demand ${TRIBUTE_DEMAND}g`, "hud-diplo-btn", () => callbacks.onDemandTribute(rival.id));
+      demand.title = wouldYield
+        ? `${rival.name} is cowed enough to pay — but will resent it.`
+        : `${rival.name} would scorn the demand (needs to be far weaker).`;
+      actions.append(demand);
     }
     card.append(actions);
     container.append(card);

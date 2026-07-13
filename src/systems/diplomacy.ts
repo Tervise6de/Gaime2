@@ -253,6 +253,34 @@ export function playerPropose(
   return { ...state, log: [...state.log, `${name(state, target)} refused your ${type}.`].slice(-50) };
 }
 
+/** Gold a player tribute demand asks for (mirrors the fixed gift size). */
+export const TRIBUTE_DEMAND = 30;
+
+/**
+ * The player demands tribute of a rival. It yields only when clearly weaker and
+ * not too proud (`wouldAccept(..., "tribute")`, i.e. the player out-powers it
+ * ≥1.6× and its aggression is modest); otherwise it scorns the threat. Either
+ * way, being cowed or affronted sours relations. Pure — no immediate transfer
+ * improves standing (unlike a gift).
+ */
+export function playerDemandTribute(state: GameState, target: number, gold = TRIBUTE_DEMAND): GameState {
+  const player = state.nations.find((n) => n.isPlayer)!.id;
+  const tn = state.nations.find((n) => n.id === target);
+  if (tn && wouldAccept(state, player, target, "tribute")) {
+    const pay = Math.min(gold, Math.max(0, Math.round(tn.stocks.gold)));
+    const nations = state.nations.map((n) => {
+      if (n.id === target) return { ...n, stocks: { ...n.stocks, gold: round1(n.stocks.gold - pay) } };
+      if (n.id === player) return { ...n, stocks: { ...n.stocks, gold: round1(n.stocks.gold + pay) } };
+      return n;
+    });
+    let next: GameState = { ...state, nations };
+    next = adjustRelation(next, player, target, -6); // paid, but resentful
+    return { ...next, log: [...next.log, `${name(next, target)} yields ${pay}g to your demand.`].slice(-50) };
+  }
+  const refused = adjustRelation(state, player, target, -6); // affronted by the threat
+  return { ...refused, log: [...refused.log, `${name(refused, target)} scorns your demand for tribute.`].slice(-50) };
+}
+
 // --- call to arms (allies join your wars) -----------------------------------
 
 /**

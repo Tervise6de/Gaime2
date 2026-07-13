@@ -13,6 +13,7 @@ import {
   playerPropose,
   callToArms,
   gift,
+  playerDemandTribute,
   acceptOffer,
   rejectOffer,
 } from "@/systems/diplomacy";
@@ -136,6 +137,10 @@ function main(): void {
     },
     onGift(targetId, amount) {
       state = gift(state, PLAYER_ID, targetId, amount);
+      commit();
+    },
+    onDemandTribute(targetId) {
+      state = playerDemandTribute(state, targetId);
       commit();
     },
     onAcceptOffer(offerId) {
