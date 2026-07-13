@@ -18,6 +18,8 @@ import {
   sharedBorders,
   sharedEnemies,
   setTreaty,
+  wouldJoinWar,
+  callToArms,
 } from "@/systems/diplomacy";
 import { createGame } from "@/systems/turn";
 import {
@@ -164,5 +166,91 @@ describe("shared-enemy warmth", () => {
     war = setTreaty(war, 0, RIVAL_B, "war");
     const relWar = getRelation(driftRelations(war), RIVAL_A, RIVAL_B);
     expect(relWar).toBeGreaterThan(relBase);
+  });
+});
+
+describe("call to arms", () => {
+  // A ready-to-accept scenario: player (0) allied with AI rival A, at war with
+  // rival B, warm relations, and rival A strong enough to help.
+  const ready = (): GameState => {
+    let g = game();
+    g = setTreaty(g, 0, RIVAL_A, "alliance");
+    g = setRelation(g, 0, RIVAL_A, 40);
+    g = declareWar(g, 0, RIVAL_B);
+    // Ensure the ally is not hopelessly weak against the enemy.
+    g.nations[RIVAL_A]!.stocks.gold = 400;
+    g.nations[RIVAL_B]!.stocks.gold = 100;
+    return g;
+  };
+
+  describe("wouldJoinWar", () => {
+    it("accepts when allied, requester at war, relations >= 20, and able", () => {
+      expect(wouldJoinWar(ready(), RIVAL_A, 0, RIVAL_B)).toBe(true);
+    });
+
+    it("rejects when the ally is the player", () => {
+      // Requester rival A, ally is the player (0) — the player never auto-joins.
+      let g = game();
+      g = setTreaty(g, RIVAL_A, 0, "alliance");
+      g = setRelation(g, RIVAL_A, 0, 40);
+      g = declareWar(g, RIVAL_A, RIVAL_B);
+      expect(wouldJoinWar(g, 0, RIVAL_A, RIVAL_B)).toBe(false);
+    });
+
+    it("rejects when not allied", () => {
+      let g = ready();
+      g = setTreaty(g, 0, RIVAL_A, "nap");
+      expect(wouldJoinWar(g, RIVAL_A, 0, RIVAL_B)).toBe(false);
+    });
+
+    it("rejects when the ally is already at war with the enemy", () => {
+      const g = declareWar(ready(), RIVAL_A, RIVAL_B);
+      expect(wouldJoinWar(g, RIVAL_A, 0, RIVAL_B)).toBe(false);
+    });
+
+    it("rejects when the requester is NOT at war with the enemy", () => {
+      const g = makePeace(ready(), 0, RIVAL_B);
+      expect(wouldJoinWar(g, RIVAL_A, 0, RIVAL_B)).toBe(false);
+    });
+
+    it("rejects when relations are too cold", () => {
+      const g = setRelation(ready(), 0, RIVAL_A, 10);
+      expect(wouldJoinWar(g, RIVAL_A, 0, RIVAL_B)).toBe(false);
+    });
+
+    it("rejects when the ally is far too weak", () => {
+      const g = ready();
+      // Make the enemy overwhelmingly strong via treasury.
+      g.nations[RIVAL_B]!.stocks.gold = 500000;
+      expect(wouldJoinWar(g, RIVAL_A, 0, RIVAL_B)).toBe(false);
+    });
+  });
+
+  describe("callToArms", () => {
+    it("sets the ally at war and logs on accept", () => {
+      const g = ready();
+      const next = callToArms(g, 0, RIVAL_A, RIVAL_B);
+      expect(atWar(next, RIVAL_A, RIVAL_B)).toBe(true);
+      expect(next.log[next.log.length - 1]).toMatch(/call to arms against/);
+    });
+
+    it("is a no-op except for a log line on decline", () => {
+      // Not allied → decline.
+      const g = setTreaty(ready(), 0, RIVAL_A, "nap");
+      const next = callToArms(g, 0, RIVAL_A, RIVAL_B);
+      expect(next.treaties).toEqual(g.treaties);
+      expect(atWar(next, RIVAL_A, RIVAL_B)).toBe(false);
+      expect(next.log[next.log.length - 1]).toMatch(/declined the call to arms/);
+      // Only a single log line was appended.
+      expect(next.log.length).toBe(g.log.length + 1);
+    });
+
+    it("does not mutate the input state", () => {
+      const g = ready();
+      const logLen = g.log.length;
+      callToArms(g, 0, RIVAL_A, RIVAL_B);
+      expect(g.log.length).toBe(logLen);
+      expect(atWar(g, RIVAL_A, RIVAL_B)).toBe(false);
+    });
   });
 });

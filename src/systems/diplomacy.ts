@@ -253,6 +253,56 @@ export function playerPropose(
   return { ...state, log: [...state.log, `${name(state, target)} refused your ${type}.`].slice(-50) };
 }
 
+// --- call to arms (allies join your wars) -----------------------------------
+
+/**
+ * Whether AI nation `ally` would answer `requester`'s call to arms against
+ * `enemy`. Deterministic and pure — an ally joins only when it is a committed
+ * friend (alliance), the war is real, joining is not self-defeating, and it is
+ * strong enough not to be signing its own death warrant.
+ */
+export function wouldJoinWar(
+  state: GameState,
+  ally: number,
+  requester: number,
+  enemy: number,
+): boolean {
+  const allyNation = state.nations.find((n) => n.id === ally);
+  // Only AI nations answer a call to arms — not the player, not barbarians.
+  if (!allyNation || allyNation.isPlayer || allyNation.isBarbarian) return false;
+  // Must be a formal ally of the requester.
+  if (getTreaty(state, requester, ally) !== "alliance") return false;
+  // The requester must actually be at war with the enemy.
+  if (!atWar(state, requester, enemy)) return false;
+  // The ally can't be the enemy, and won't double-declare an existing war.
+  if (ally === enemy || atWar(state, ally, enemy)) return false;
+  // Relations must be decent.
+  if (getRelation(state, requester, ally) < 20) return false;
+  // The ally won't suicide against an overwhelmingly stronger foe.
+  if (nationPower(state, ally) < 0.4 * nationPower(state, enemy)) return false;
+  return true;
+}
+
+/**
+ * `requester` calls their ally to war against `enemy`. If the ally would join,
+ * it declares war and a call-to-arms line is logged on top of declareWar's own
+ * line; otherwise the ally declines and only a log line is appended. Pure.
+ */
+export function callToArms(
+  state: GameState,
+  requester: number,
+  ally: number,
+  enemy: number,
+): GameState {
+  if (wouldJoinWar(state, ally, requester, enemy)) {
+    const next = declareWar(state, ally, enemy);
+    const line = `${name(next, ally)} answered ${name(next, requester)}'s call to arms against ${name(next, enemy)}!`;
+    return { ...next, log: [...next.log, line].slice(-50) };
+  }
+  const line = `${name(state, ally)} declined the call to arms.`;
+  return { ...state, log: [...state.log, line].slice(-50) };
+}
+
 // --- per-turn relations drift ----------------------------------------------
 
 /**
