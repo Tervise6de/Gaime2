@@ -372,6 +372,50 @@ const EVENTS: EventDef[] = [
       },
     },
   },
+  {
+    // TRAIT DECISION (Scholarly): the trait's signature "power at a cost" — a
+    // burst of learning that unsettles the traditional, mirroring the Martial levy.
+    id: "forbidden_lore",
+    weight: 2,
+    eligible: hasTrait("scholarly"),
+    choice: {
+      prompt: "A wandering sage offers forbidden lore — enlightening, but unsettling to the devout. Study it?",
+      options: [
+        {
+          id: "study",
+          label: "Study the lore (+research)",
+          detail: "Speeds your current research by 30 (else +25 knowledge), but unrest rises 6 realm-wide.",
+          apply: (state, nationId) => {
+            const nation = state.nations.find((n) => n.id === nationId);
+            if (!nation) return { state, message: "" };
+            const nations = state.nations.map((n) =>
+              n.id === nationId
+                ? n.research.current
+                  ? { ...n, research: { ...n.research, progress: round1(n.research.progress + 30) } }
+                  : { ...n, stocks: { ...n.stocks, knowledge: round1(n.stocks.knowledge + 25) } }
+                : n,
+            );
+            const regions = state.regions.map((r) =>
+              r.ownerId === nationId ? { ...r, unrest: Math.min(UNREST_MAX, round1(r.unrest + 6)) } : r,
+            );
+            return { state: { ...state, nations, regions }, message: "You study the forbidden lore — insight spreads, and so does unease." };
+          },
+        },
+        {
+          id: "burn",
+          label: "Burn the scrolls",
+          detail: "Refuse the lore; keep the peace.",
+          apply: (state) => ({ state, message: "You consign the sage's scrolls to the flames." }),
+        },
+      ],
+      // A calm scholarly realm studies; a restless one plays it safe.
+      aiPick: (state, nationId) => {
+        const owned = state.regions.filter((r) => r.ownerId === nationId);
+        const avgUnrest = owned.length ? owned.reduce((a, r) => a + r.unrest, 0) / owned.length : 100;
+        return avgUnrest < 35 ? "study" : "burn";
+      },
+    },
+  },
 
   // --- Trait-flavoured events: each fires only for a nation with that trait,
   // giving a modest windfall along its strength (design §6). ---

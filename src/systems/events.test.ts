@@ -16,7 +16,7 @@ function pendingChoiceState(eventId: string): GameState {
 const pendingMercenaryState = (): GameState => pendingChoiceState("mercenary_offer");
 
 /** Fire seeds until a trait-gated choice pends for a player carrying `trait`. */
-function pendingTraitChoice(eventId: string, trait: "martial"): GameState {
+function pendingTraitChoice(eventId: string, trait: "martial" | "scholarly"): GameState {
   const base = createGame({ seed: 12345, rivals: 2 });
   const g = { ...base, nations: base.nations.map((n) => (n.id === PLAYER_ID ? { ...n, trait } : n)) };
   for (let i = 1; i <= 600; i++) {
@@ -248,5 +248,39 @@ describe("choice events", () => {
     const stood = resolveChoice(s, "stand_down");
     expect(stood.pendingChoice).toBeUndefined();
     expect(militiaOf(stood, PLAYER_ID)).toBe(militia0);
+  });
+
+  it("forbidden-lore fires only for a Scholarly nation", () => {
+    const g = createGame({ seed: 12345, rivals: 2 });
+    const other = { ...g, nations: g.nations.map((n) => (n.id === PLAYER_ID ? { ...n, trait: "martial" as const } : n)) };
+    let seen = false;
+    for (let i = 1; i <= 600; i++) {
+      if (fireEvent(other, PLAYER_ID, createRng(i)).pendingChoice?.eventId === "forbidden_lore") seen = true;
+    }
+    expect(seen).toBe(false);
+    expect(pendingTraitChoice("forbidden_lore", "scholarly").pendingChoice?.eventId).toBe("forbidden_lore");
+  });
+
+  it("studying the lore speeds current research but raises unrest by 6", () => {
+    const base = pendingTraitChoice("forbidden_lore", "scholarly");
+    const s = {
+      ...base,
+      nations: base.nations.map((n) =>
+        n.id === PLAYER_ID ? { ...n, research: { current: "writing" as const, progress: 0, done: [] } } : n,
+      ),
+      regions: base.regions.map((r) => (r.ownerId === PLAYER_ID ? { ...r, unrest: 10 } : r)),
+    };
+    const studied = resolveChoice(s, "study");
+    expect(studied.pendingChoice).toBeUndefined();
+    expect(studied.nations[PLAYER_ID]!.research.progress).toBe(30);
+    expect(studied.regions.filter((r) => r.ownerId === PLAYER_ID).every((r) => r.unrest === 16)).toBe(true);
+  });
+
+  it("burning the scrolls changes nothing but clears the prompt", () => {
+    const s = pendingTraitChoice("forbidden_lore", "scholarly");
+    const know0 = s.nations[PLAYER_ID]!.stocks.knowledge;
+    const burned = resolveChoice(s, "burn");
+    expect(burned.pendingChoice).toBeUndefined();
+    expect(burned.nations[PLAYER_ID]!.stocks.knowledge).toBe(know0);
   });
 });

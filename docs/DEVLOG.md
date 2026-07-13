@@ -6,6 +6,37 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Trait-gated choice event: Scholarly "forbidden lore"
+
+Gave the **Scholarly** trait its signature "power at a cost" decision, matching
+the Martial levy so each trait has a parallel identity. A Scholarly nation (only,
+via `eligible: hasTrait("scholarly")`) is offered forbidden lore from a wandering
+sage: **study it** to speed the current research by 30 (else +25 knowledge) at
+**+6 unrest realm-wide**, or **burn the scrolls** and keep the peace — knowledge
+against order, the mirror of the Martial troops-against-order trade.
+
+Zero framework change — same choice plumbing (player → modal; AI auto-resolves
+via `aiPick`: a calm scholarly realm studies, a restless one burns). Pure and
+deterministic, entirely in events.ts.
+
+**Balance (200-seed × 4-archetype self-play probe, deleted before commit):**
+warlord 34 / opportunist 27 / builder 26 / merchant 25 — a 25–34% spread,
+unchanged; all victory kinds reached.
+
+**Verify:** typecheck ✓, 259 tests ✓ (+3: fires only for Scholarly nations,
+studying advances current research by 30 and raises unrest to +6, burning is a
+no-op), build ✓ (0 `fetch`, deps `{}`). Note: idle self-play players are
+conquered too fast to trigger this naturally in-browser (an artifact, not a bug —
+it fires correctly via the same `fireEvent` path in the unit tests). Browser
+smoke instead confirmed the unchanged choice modal still renders and resolves
+(seed 2 → a grain-aid decision) with zero console/page errors over ~27 turns.
+
+**Next ideas:** a Mercantile / Fertile / Industrious trait choice to complete the
+set; number-key shortcuts to pick a choice option; a choice with a lasting
+modifier.
+
+---
+
 ## 2026-07-13 — Trait-gated choice event: Martial "call the banners"
 
 First **trait-flavoured decision** — proof the choice framework and the trait
