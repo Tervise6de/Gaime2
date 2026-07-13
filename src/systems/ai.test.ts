@@ -10,6 +10,7 @@ import {
   runawayLeader,
   coalitionPowerAgainst,
   preferredTechBranch,
+  bestTarget,
 } from "@/systems/ai";
 import type { TraitId } from "@/data/traits";
 import type { Personality } from "@/systems/state";
@@ -397,6 +398,50 @@ describe("home defence (retreat / garrison)", () => {
       [mine, army({ id: 5, ownerId: ENEMY, regionId: 1, units: units({ infantry: 4 }) })],
     );
     expect(defendStep(s, mine, RIVAL)).toBe(null);
+  });
+});
+
+describe("bestTarget prizes valuable regions", () => {
+  function targetState(regions: Region[], armies: Army[]): GameState {
+    return { turn: 50, difficulty: "normal", treaties: {}, armies, nations: [], regions } as unknown as GameState;
+  }
+
+  it("prefers the higher-population target among equal, undefended options", () => {
+    const attacker = army({ id: 1, ownerId: RIVAL, regionId: 0, units: units({ infantry: 6 }) });
+    const s = targetState(
+      [
+        region({ id: 0, ownerId: RIVAL, adjacency: [1, 2] }),
+        region({ id: 1, ownerId: BARBARIAN_ID, population: 2, adjacency: [0] }),
+        region({ id: 2, ownerId: BARBARIAN_ID, population: 8, adjacency: [0] }), // richer prize
+      ],
+      [attacker],
+    );
+    expect(bestTarget(s, attacker, RIVAL)).toBe(2);
+  });
+
+  it("prefers a resource region over an equal-population one", () => {
+    const attacker = army({ id: 1, ownerId: RIVAL, regionId: 0, units: units({ infantry: 6 }) });
+    const s = targetState(
+      [
+        region({ id: 0, ownerId: RIVAL, adjacency: [1, 2] }),
+        region({ id: 1, ownerId: BARBARIAN_ID, population: 4, resource: null, adjacency: [0] }),
+        region({ id: 2, ownerId: BARBARIAN_ID, population: 4, resource: "iron", adjacency: [0] }),
+      ],
+      [attacker],
+    );
+    expect(bestTarget(s, attacker, RIVAL)).toBe(2);
+  });
+
+  it("still refuses a target it cannot beat", () => {
+    const attacker = army({ id: 1, ownerId: RIVAL, regionId: 0, units: units({ militia: 1 }) });
+    const s = targetState(
+      [
+        region({ id: 0, ownerId: RIVAL, adjacency: [1] }),
+        region({ id: 1, ownerId: BARBARIAN_ID, population: 8, fortification: 3, adjacency: [0] }),
+      ],
+      [attacker, army({ id: 5, ownerId: BARBARIAN_ID, regionId: 1, units: units({ infantry: 12 }) })],
+    );
+    expect(bestTarget(s, attacker, RIVAL)).toBe(null);
   });
 });
 

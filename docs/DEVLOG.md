@@ -6,6 +6,38 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — AI targets *valuable* regions (and it tightens balance)
+
+`bestTarget` (the rival AI's attack picker) claimed in its comment to "prefer
+richer regions" but the code only rewarded softer targets — so rivals would grab
+whatever was easiest, ignoring what was worth taking. Added the missing half: among
+winnable targets the AI now weighs the prize — `population × 1.5` (economic worth)
+plus a flat `+6` for a strategic-resource region (iron/horses unlock units) — on
+top of the existing win-margin and enemy-over-barbarian preference. Rivals now go
+for meaningful ground, so they feel purposeful rather than opportunistic.
+
+Deterministic and pure (no new RNG, no DOM); `bestTarget` is now exported for
+direct unit testing. Tests: it prefers the higher-population target among equal
+undefended options, prefers a resource region over an equal-population one, and
+still refuses a fight it can't win.
+
+**Balance (200-seed self-play probe, deleted before commit):** the change didn't
+just leave balance intact — it *tightened* it. Archetype win rates went from
+18–34% (builder the weak outlier) to **26–35%** (warlord 35, opportunist 31,
+builder 29, merchant 26), the flattest spread yet; all victory paths still reach
+(domination 666 / great works 131 / prestige 2 of 800 games) and games still
+complete. Smarter, more purposeful AI *and* fairer archetypes.
+
+**Verify:** typecheck ✓, 224 tests ✓ (+3 targeting), build ✓ (0 `fetch`, deps
+`{}`). 200-seed probe as above (deleted). Browser smoke: 30 turns played, log
+populated, zero console/page errors.
+
+**Next ideas:** let the AI value an enemy *capital* (crippling strike) and mass
+force before a hard assault; per-archetype target weighting (warlords chase
+capitals, merchants chase resources).
+
+---
+
 ## 2026-07-13 — Mid-game Standings panel (rankings + live score race)
 
 Rankings only appeared on the end screen, so mid-game you couldn't tell whether

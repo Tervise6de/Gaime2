@@ -735,7 +735,7 @@ export function planRecruitment(state: GameState, nationId: number): UnitType[] 
 }
 
 /** The best adjacent region for an army to attack, or null to hold. */
-function bestTarget(state: GameState, army: { id: number; regionId: number; units: Record<UnitType, number> }, nationId: number): number | null {
+export function bestTarget(state: GameState, army: { id: number; regionId: number; units: Record<UnitType, number> }, nationId: number): number | null {
   const region = state.regions[army.regionId];
   if (!region) return null;
   const atk = sideStrength(army.units, zeroUnits(), "attack");
@@ -759,8 +759,12 @@ function bestTarget(state: GameState, army: { id: number; regionId: number; unit
 
     // Winnable if our attack clearly exceeds their defence.
     if (atk > def * 1.1) {
-      // Prefer softer targets (bigger margin) and richer regions.
-      const score = atk - def + (isBarb ? 2 : 5);
+      // Among winnable targets, prefer a bigger margin, an enemy nation over
+      // neutral barbarians, and — the previously-missing half — a *valuable*
+      // prize: population is economic worth, a strategic resource unlocks units,
+      // and taking a rival's own land (not barbarian ground) bites deeper.
+      const value = target.population * REGION_POP_VALUE + (target.resource ? RESOURCE_VALUE : 0);
+      const score = atk - def + value + (isBarb ? 2 : 5);
       if (score > bestScore) {
         bestScore = score;
         best = nid;
@@ -769,6 +773,11 @@ function bestTarget(state: GameState, army: { id: number; regionId: number; unit
   }
   return best;
 }
+
+/** How much a point of target population weighs in AI attack targeting. */
+const REGION_POP_VALUE = 1.5;
+/** Bonus weight for a target region holding a strategic resource (iron/horses). */
+const RESOURCE_VALUE = 6;
 
 // --- small helpers ----------------------------------------------------------
 
