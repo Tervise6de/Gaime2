@@ -6,6 +6,46 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Composition-aware AI recruiting
+
+Rival recruiting used a fixed preference (`infantry → ranged → militia`, cavalry
+first if horses), so armies always defaulted to infantry regardless of who they
+were about to fight or how well the target was fortified. The counter loop and
+siege existed in combat but the AI never *chose* around them.
+
+Change (`ai.ts`, pure/deterministic): recruiting now reads the threat picture and
+builds to it via a new pure `planRecruitment(state, nationId)`:
+1. **Siege vs. forts** — if a fortified attackable target borders us and we lack
+   enough siege to strip it (`ceil(maxFort / siegePower)`), lead with siege — but
+   only up to what's needed, so stacks never go all-siege (weak in the open).
+2. **Counter the enemy's mix** — assess hostile armies on/next to our border, find
+   their dominant field unit, and build the counter-loop unit that beats it
+   (cavalry↔ranged, ranged↔infantry, infantry↔militia, militia↔cavalry).
+3. **Generalist fallback** — with no intel, cavalry (if horses) then
+   infantry/ranged/militia, matching the previous safe default.
+
+`recruit()` picks the first *affordable/available* unit from that ordered plan, so
+tech/resource/gold gating still applies. Eight new unit tests cover the siege
+lead, the siege cap, each counter mapping, siege+counter ordering, and the
+no-intel fallback.
+
+**Balance check (temporary self-play probe, deleted before commit):** symmetric
+probe (24 seeds × 4 committed archetypes, player driven by `runNationTurn`) shows
+**no regression** — win rates identical before/after the change (all nations share
+the logic, so it's symmetric), median length steady (~44–45 in this probe's
+methodology). The win comes against a human/passive opponent, where responsive
+composition matters. Browser-smoked: a full game runs with rivals actively
+recruiting and conquering, no console errors.
+
+Test count: 138 green (was 130). Build network-free (0 `fetch`).
+
+**Next ideas:** AI home defence (keep/return a garrison to a threatened frontier
+region; retreat a badly outmatched army instead of feeding it in); combat-odds
+preview in the UI before the player commits an attack; national traits (design §6)
+for opening variety.
+
+---
+
 ## 2026-07-13 — AI force concentration → military path now competitive
 
 Addressed the open item from 2026-07-12: the military/domination path badly

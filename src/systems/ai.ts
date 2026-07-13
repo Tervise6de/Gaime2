@@ -15,9 +15,9 @@
  * Pure over `GameState`; all randomness comes from the passed-in Rng.
  */
 
-import type { UnitType } from "@/data/units";
+import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
 import type { BuildingId } from "@/data/buildings";
-import { sideStrength } from "@/systems/combat";
+import { sideStrength, type UnitCounts } from "@/systems/combat";
 import {
   canRaiseUnit,
   moveArmy,
@@ -46,6 +46,7 @@ import {
   WONDER_GOAL,
   armySize,
   clampTax,
+  emptyUnits,
   type GameState,
   type Nation,
 } from "@/systems/state";
@@ -336,13 +337,114 @@ function recruit(state: GameState, nationId: number, rng: Rng): GameState {
     state.regions.find((r) => r.ownerId === nationId)?.id;
   if (home === undefined) return state;
 
-  const access = strategicAccess(state, nationId);
-  const pref: UnitType[] = ["infantry", "ranged", "militia"];
-  if (access.has("horses")) pref.unshift("cavalry");
+  // Composition-aware: bring siege against fortified frontier targets and units
+  // that counter the enemy's actual mix, falling back to a generalist plan when
+  // there's no intel — rather than always defaulting to infantry.
+  const pref = planRecruitment(state, nationId);
   const pick = pref.find((u) => canRaiseUnit(state, home, u, nationId).ok);
   if (!pick) return state;
   void rng;
   return raiseUnit(state, home, pick, nationId);
+}
+
+/** What this nation is likely to fight next: enemy mix + toughest target fort. */
+interface ThreatProfile {
+  /** Summed unit counts of hostile armies on or next to our border. */
+  composition: UnitCounts;
+  /** Highest fortification among attackable frontier targets. */
+  maxTargetFort: number;
+  /** Whether any attackable target borders our territory at all. */
+  hasTarget: boolean;
+}
+
+function assessThreat(state: GameState, nationId: number): ThreatProfile {
+  const owned = state.regions.filter((r) => r.ownerId === nationId);
+  const ownedIds = new Set(owned.map((r) => r.id));
+  const targetIds = new Set<number>();
+  let maxTargetFort = 0;
+  for (const r of owned) {
+    for (const nb of r.adjacency) {
+      if (isAttackable(state, nb, nationId)) {
+        targetIds.add(nb);
+        maxTargetFort = Math.max(maxTargetFort, state.regions[nb]!.fortification);
+      }
+    }
+  }
+
+  // Hostile armies within reach: standing on a target, or one step from our land.
+  const composition = emptyUnits();
+  for (const a of state.armies) {
+    if (a.ownerId === nationId || a.ownerId === null) continue;
+    const hostile = a.ownerId === BARBARIAN_ID || atWar(state, nationId, a.ownerId);
+    if (!hostile) continue;
+    const onTarget = targetIds.has(a.regionId);
+    const nearOurLand = state.regions[a.regionId]?.adjacency.some((n) => ownedIds.has(n));
+    if (onTarget || nearOurLand) {
+      for (const t of UNIT_TYPES) composition[t] += a.units[t];
+    }
+  }
+
+  return { composition, maxTargetFort, hasTarget: targetIds.size > 0 };
+}
+
+/** The counter-loop unit that beats a given enemy field unit (null for siege). */
+function counterTo(enemy: UnitType): UnitType | null {
+  for (const t of UNIT_TYPES) if (UNITS[t].counters === enemy) return t;
+  return null;
+}
+
+/** The enemy's most numerous field unit (siege excluded), or null if none seen. */
+function dominantFieldUnit(composition: UnitCounts): UnitType | null {
+  let best: UnitType | null = null;
+  let bestCount = 0;
+  for (const t of UNIT_TYPES) {
+    if (t === "siege") continue;
+    if (composition[t] > bestCount) {
+      bestCount = composition[t];
+      best = t;
+    }
+  }
+  return best;
+}
+
+function myUnitCount(state: GameState, nationId: number, unit: UnitType): number {
+  let sum = 0;
+  for (const a of state.armies) if (a.ownerId === nationId) sum += a.units[unit];
+  return sum;
+}
+
+/**
+ * Ordered recruitment preference for a nation given the current threat picture:
+ *   1. Siege, when a fortified target needs breaking and we lack enough of it.
+ *   2. The counter to the enemy's dominant field unit.
+ *   3. A generalist fallback (cavalry if we have horses, then infantry/ranged/militia).
+ * Pure and deterministic — a plain function of state, easily unit-tested.
+ */
+export function planRecruitment(state: GameState, nationId: number): UnitType[] {
+  const access = strategicAccess(state, nationId);
+  const threat = assessThreat(state, nationId);
+  const pref: UnitType[] = [];
+
+  // 1) Siege to strip forts a split field force can't crack — but only up to the
+  //    number of siege units needed for the toughest target, so armies don't turn
+  //    into all-siege stacks (siege is weak in the open field).
+  const neededSiege = Math.ceil(threat.maxTargetFort / UNITS.siege.siegePower);
+  if (threat.maxTargetFort >= 1 && myUnitCount(state, nationId, "siege") < neededSiege) {
+    pref.push("siege");
+  }
+
+  // 2) Counter the enemy's dominant field unit.
+  const dominant = dominantFieldUnit(threat.composition);
+  if (dominant) {
+    const counter = counterTo(dominant);
+    if (counter) pref.push(counter);
+  }
+
+  // 3) Generalist fallback / diversification.
+  if (access.has("horses")) pref.push("cavalry");
+  pref.push("infantry", "ranged", "militia");
+
+  return [...new Set(pref)];
 }
 
 /** The best adjacent region for an army to attack, or null to hold. */

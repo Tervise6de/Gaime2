@@ -1,10 +1,63 @@
 import { describe, it, expect } from "vitest";
-import { runNationTurn } from "@/systems/ai";
+import { runNationTurn, planRecruitment } from "@/systems/ai";
 import { createGame, resolveTurn } from "@/systems/turn";
 import { createRng } from "@/systems/rng";
-import { PLAYER_ID, BARBARIAN_ID, armySize } from "@/systems/state";
+import {
+  PLAYER_ID,
+  BARBARIAN_ID,
+  armySize,
+  emptyUnits,
+  type Army,
+  type GameState,
+  type Region,
+} from "@/systems/state";
+import type { UnitType } from "@/data/units";
 
 const RIVAL = 2;
+
+// --- planRecruitment fixtures ------------------------------------------------
+
+function region(over: Partial<Region> = {}): Region {
+  return {
+    id: 0,
+    name: "R",
+    terrain: "plains",
+    ownerId: RIVAL,
+    population: 4,
+    unrest: 0,
+    fortification: 0,
+    resource: null,
+    buildings: [],
+    construction: null,
+    adjacency: [],
+    x: 0.5,
+    y: 0.5,
+    ...over,
+  };
+}
+
+function units(over: Partial<Record<UnitType, number>>): Record<UnitType, number> {
+  return { ...emptyUnits(), ...over };
+}
+
+function army(over: Partial<Army> = {}): Army {
+  return { id: 1, ownerId: BARBARIAN_ID, regionId: 1, units: emptyUnits(), movesLeft: 1, ...over };
+}
+
+/** A rival (region 0) bordering one barbarian target (region 1). */
+function scenario(target: Partial<Region>, enemyArmy?: Partial<Army>, myResource?: "horses" | "iron"): GameState {
+  return {
+    turn: 50,
+    difficulty: "normal",
+    treaties: {},
+    armies: enemyArmy ? [army(enemyArmy)] : [],
+    nations: [],
+    regions: [
+      region({ id: 0, ownerId: RIVAL, adjacency: [1], resource: myResource ?? null }),
+      region({ id: 1, ownerId: BARBARIAN_ID, adjacency: [0], ...target }),
+    ],
+  } as unknown as GameState;
+}
 
 describe("runNationTurn", () => {
   it("is deterministic for the same state and rng seed", () => {
@@ -28,6 +81,70 @@ describe("runNationTurn", () => {
       (r, i) => r.ownerId !== RIVAL && r.construction !== null && g.regions[i]!.construction === null,
     );
     expect(builtElsewhere).toBe(false);
+  });
+});
+
+describe("planRecruitment (composition-aware)", () => {
+  it("leads with siege against a fortified target", () => {
+    const plan = planRecruitment(scenario({ fortification: 4 }), RIVAL);
+    expect(plan[0]).toBe("siege");
+  });
+
+  it("stops wanting siege once it already has enough for the target fort", () => {
+    const s = scenario({ fortification: 2 }, undefined);
+    // Give the rival two siege units (ceil(2/2) = 1 needed, so 2 is plenty).
+    (s.armies as Army[]).push(
+      army({ id: 9, ownerId: RIVAL, regionId: 0, units: units({ siege: 2 }) }),
+    );
+    expect(planRecruitment(s, RIVAL)).not.toContain("siege");
+  });
+
+  it("counters an enemy stack of cavalry with militia", () => {
+    const plan = planRecruitment(
+      scenario({ fortification: 0 }, { units: units({ cavalry: 4 }) }),
+      RIVAL,
+    );
+    expect(plan[0]).toBe("militia");
+  });
+
+  it("counters an enemy stack of ranged with cavalry", () => {
+    const plan = planRecruitment(
+      scenario({ fortification: 0 }, { units: units({ ranged: 5 }) }),
+      RIVAL,
+    );
+    expect(plan[0]).toBe("cavalry");
+  });
+
+  it("counters an enemy stack of infantry with ranged", () => {
+    const plan = planRecruitment(
+      scenario({ fortification: 0 }, { units: units({ infantry: 5 }) }),
+      RIVAL,
+    );
+    expect(plan[0]).toBe("ranged");
+  });
+
+  it("puts siege first and the counter unit second against a fortified, defended target", () => {
+    const plan = planRecruitment(
+      scenario({ fortification: 3 }, { units: units({ ranged: 4 }) }),
+      RIVAL,
+    );
+    expect(plan[0]).toBe("siege");
+    expect(plan[1]).toBe("cavalry");
+  });
+
+  it("falls back to a generalist plan with no enemy intel, favouring cavalry when horses are available", () => {
+    const withHorses = planRecruitment(scenario({ fortification: 0 }, undefined, "horses"), RIVAL);
+    expect(withHorses[0]).toBe("cavalry");
+    const without = planRecruitment(scenario({ fortification: 0 }, undefined), RIVAL);
+    expect(without[0]).toBe("infantry");
+  });
+
+  it("returns a de-duplicated preference covering the buildable units", () => {
+    const plan = planRecruitment(
+      scenario({ fortification: 2 }, { units: units({ cavalry: 3 }) }),
+      RIVAL,
+    );
+    expect(new Set(plan).size).toBe(plan.length);
   });
 });
 
