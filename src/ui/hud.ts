@@ -159,9 +159,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const legendToggle = btn("❔ Legend", "hud-legend-toggle", () => {
     legendPanel.style.display = legendPanel.style.display === "none" ? "block" : "none";
   });
+  legendToggle.title = "Decode the map markers. Shortcut: L";
   topBar.append(legendToggle);
   const helpToggle = btn("💡 Help", "hud-legend-toggle", () => showHints());
-  helpToggle.title = "Reopen the getting-started tips.";
+  helpToggle.title = "Reopen the getting-started tips. Shortcut: H";
   topBar.append(helpToggle);
   root.append(topBar);
 
@@ -291,22 +292,13 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     "Click a region to develop it: queue buildings and raise armies.",
     "Move / Attack an army onto a neighbour to expand or conquer.",
     "End turn to advance; watch the 🏆 victory progress up top.",
-    "Tap ❔ Legend anytime to decode the map markers.",
+    "Tap ❔ Legend (L) to decode markers; 💡 Help (H) reopens these tips.",
   ]) {
     const li = document.createElement("li");
     li.textContent = tip;
     hintsBody.append(li);
   }
-  const hintsBtn = btn("Got it", "hud-hints-btn", () => {
-    hints.style.display = "none";
-    hintsDismissed = true;
-    hintsForced = false;
-    try {
-      window.localStorage.setItem(HINTS_KEY, "1");
-    } catch {
-      /* storage unavailable — dismiss for this session only */
-    }
-  });
+  const hintsBtn = btn("Got it", "hud-hints-btn", () => dismissHints());
   hints.append(hintsTitle, hintsBody, hintsBtn);
   root.append(hints);
   let hintsDismissed = false;
@@ -318,10 +310,21 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   } catch {
     hintsDismissed = false;
   }
-  /** Reopen the getting-started tips on demand (Help button). */
+  /** Reopen the getting-started tips on demand (Help button / H key). */
   function showHints(): void {
     hintsForced = true;
     hints.style.display = "block";
+  }
+  /** Close the tips and remember they've been seen (Got it / H key / Esc). */
+  function dismissHints(): void {
+    hints.style.display = "none";
+    hintsDismissed = true;
+    hintsForced = false;
+    try {
+      window.localStorage.setItem(HINTS_KEY, "1");
+    } catch {
+      /* storage unavailable — dismiss for this session only */
+    }
   }
 
   // --- Transient toast (save/load feedback) ---------------------------------
@@ -363,6 +366,28 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   function closeTechTree(): void {
     techOverlay.style.display = "none";
   }
+
+  // --- Keyboard shortcuts for the overlays ----------------------------------
+  // L toggles the map legend, H toggles the getting-started tips, Esc closes
+  // whatever's open. Ignore while typing in a form control so the tax/seed
+  // inputs keep their own keys. (Enter/Space to end turn live in main.ts.)
+  window.addEventListener("keydown", (ev) => {
+    const target = ev.target as HTMLElement | null;
+    if (target && (target.tagName === "INPUT" || target.tagName === "SELECT")) return;
+    const key = ev.key.toLowerCase();
+    if (key === "l") {
+      ev.preventDefault();
+      legendPanel.style.display = legendPanel.style.display === "none" ? "block" : "none";
+    } else if (key === "h") {
+      ev.preventDefault();
+      if (hints.style.display !== "none") dismissHints();
+      else showHints();
+    } else if (ev.key === "Escape") {
+      closeTechTree();
+      legendPanel.style.display = "none";
+      if (hints.style.display !== "none") dismissHints();
+    }
+  });
 
   // --- Update ----------------------------------------------------------------
   function update(

@@ -6,6 +6,35 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Keyboard shortcuts for the overlays (L / H / Esc)
+
+Reaching for the mouse to peek at the legend or the tips breaks the flow of a
+turn-based game (backlog: "keyboard shortcut to toggle Help/Legend"). Added
+`L` to toggle the map legend, `H` to toggle the getting-started tips, and `Esc`
+to close whatever's open (tech tree, legend, or tips) in one press.
+
+The handler lives in the HUD next to the overlay elements it drives and mirrors
+main.ts's convention: it ignores keys while a form control (tax slider, seed,
+difficulty/rival selects) is focused, so those keep their own input, and it
+leaves Enter/Space (end turn) to main.ts. The "Got it" dismiss logic was pulled
+into a shared `dismissHints()` so the button, the `H` toggle, and `Esc` all take
+the same path (and persist the "seen" flag identically). The Legend/Help button
+tooltips now advertise their shortcut, and the turn-1 tip line mentions both
+keys.
+
+**Verify:** typecheck ✓, 220 tests ✓, build ✓ (0 `fetch`, deps `{}`).
+Browser-driven: `L` toggles the legend on then off, `H` opens the tips, `Esc`
+closes them, and typing into a focused input does **not** fire the shortcut
+(legend unchanged) — no console errors.
+
+Test count: 220 green (UI-only interaction, browser-verified).
+
+**Next ideas:** per-nation score lines on the end-game sparkline; a compact
+mid-game score trend in the top bar; a one-line shortcut hint in the legend
+footer.
+
+---
+
 ## 2026-07-13 — "Help" button to reopen the getting-started tips
 
 The first-time hints card only appeared once, on turn 1, and vanished forever
