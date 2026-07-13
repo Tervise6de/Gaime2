@@ -28,7 +28,7 @@ import {
 } from "@/systems/military";
 import { getRelation, getTreaty, wouldJoinWar, warTargetsFor } from "@/systems/diplomacy";
 import { nationScore } from "@/systems/victory";
-import { MANUAL_SLOTS, type SaveSlot } from "@/systems/save";
+import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
 import type { TurnSummary } from "@/systems/summary";
 import { deriveAlerts } from "@/ui/alerts";
 import { researchFrontier, isBuildingUnlockedFor } from "@/systems/tech";
@@ -253,10 +253,22 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     MANUAL_SLOTS[0]!,
   );
   slotSel.title = "Which checkpoint slot Save writes to and Load reads from.";
+  // Label each slot with its saved turn (or "empty"), refreshed as saves change.
+  function refreshSlotLabels(): void {
+    for (const opt of Array.from(slotSel.options)) {
+      const i = MANUAL_SLOTS.indexOf(opt.value as SaveSlot);
+      const info = slotInfo(opt.value as SaveSlot);
+      opt.textContent = `Slot ${i + 1} · ${info ? `T${info.turn}` : "empty"}`;
+    }
+  }
+  refreshSlotLabels();
   const saveBtn = document.createElement("button");
   saveBtn.className = "hud-newgame-btn";
   saveBtn.textContent = "Save";
-  saveBtn.addEventListener("click", () => callbacks.onSave(slotSel.value as SaveSlot));
+  saveBtn.addEventListener("click", () => {
+    callbacks.onSave(slotSel.value as SaveSlot);
+    refreshSlotLabels(); // reflect the just-written turn immediately
+  });
   const loadBtn = document.createElement("button");
   loadBtn.className = "hud-newgame-btn";
   loadBtn.textContent = "Load";
@@ -495,6 +507,8 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     }
     // Keep an open standings overlay live as turns resolve.
     if (standingsOverlay.style.display !== "none") renderStandingsOverlay();
+    // Keep the save-slot labels' turn markers current (e.g. after autosave/load).
+    refreshSlotLabels();
     const flow = nationalProduction(state, PLAYER_ID);
     const upkeep = totalUpkeep(state, PLAYER_ID);
     for (const key of RESOURCE_KEYS) {

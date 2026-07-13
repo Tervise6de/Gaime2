@@ -6,6 +6,30 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Save-slot picker shows each slot's saved turn
+
+The 3-slot save picker gave no hint what was *in* each slot — you had to load one
+to find out, clobbering the live game to peek. Now each option reads "Slot 1 · T9"
+or "Slot 2 · empty", so you can pick the right checkpoint at a glance. New
+`slotInfo(slot)` in save.ts reads the envelope and returns `{ turn, savedAt }` (or
+null) with the same guarded parse as `deserializeGame`; the HUD relabels the
+options from it — on build, immediately after a Save, and each `update()` so the
+autosave/load path stays current. Labels survive a page reload since they're read
+straight from localStorage.
+
+Storage/UI only — no sim/state/balance change, still fully offline. Widened the
+`.hud-slot` select so "Slot N · T##" fits.
+
+**Verify:** typecheck ✓, 228 tests ✓, build ✓ (0 `fetch`, deps `{}`). Browser-
+driven: fresh game showed all three "· empty"; saving at turn 5 → "Slot 2 · T5",
+saving at turn 9 → "Slot 1 · T9"; a page reload preserved both labels from
+localStorage. No console/page errors.
+
+**Next ideas:** a per-slot "clear" (✕) action; show the wall-clock save time on
+hover; a "jump to my capital" control.
+
+---
+
 ## 2026-07-13 — Capitals shown on the map (a crown that falls when captured)
 
 Now that capitals carry strategic weight (the AI drives at them and weights loot

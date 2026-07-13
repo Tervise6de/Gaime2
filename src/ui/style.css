@@ -260,7 +260,7 @@ body {
 /* The Save/Load slot picker sits inline with the buttons — keep its label readable. */
 .hud-slot {
   flex: 0 0 auto;
-  min-width: 68px;
+  min-width: 92px;
   padding-right: 4px;
 }
 

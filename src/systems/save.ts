@@ -82,3 +82,18 @@ export function hasLocalSave(slot: SaveSlot = "slot1"): boolean {
     return false;
   }
 }
+
+/** A slot's saved turn + timestamp for labelling the picker, or null if empty. */
+export function slotInfo(slot: SaveSlot): { turn: number; savedAt: number } | null {
+  try {
+    const json = localStorage.getItem(STORAGE_KEY[slot]);
+    if (!json) return null;
+    const parsed = JSON.parse(json) as SaveEnvelope;
+    if (!parsed || parsed.version !== SAVE_VERSION || typeof parsed.state?.turn !== "number") {
+      return null;
+    }
+    return { turn: parsed.state.turn, savedAt: parsed.savedAt };
+  } catch {
+    return null;
+  }
+}
