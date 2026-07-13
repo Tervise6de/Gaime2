@@ -6,6 +6,32 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Explanatory stat tooltips
+
+Complements the map legend + first-time hints with hover tooltips that explain the
+numbers a new player is staring at (backlog D). The four top-bar resources now
+carry `title` tooltips describing what each does and what the `/turn` figure means
+(gold = income minus upkeep, negative risks bankruptcy; food = growth vs. famine;
+materials = build/recruit; knowledge = research investment). The tax slider
+explains the gold↔unrest trade-off, and the region unrest bar spells out the
+thresholds (calm below the penalty start, output suffers above it, revolt at the
+cap) and what raises/calms it.
+
+Change (UI only, `title` attributes; no sim/balance impact): `tip` added to
+`RESOURCE_META` and set on each resource cell; titles on the tax slider and the
+region unrest bar.
+
+**Verify:** typecheck ✓, 216 tests ✓, build ✓ (0 `fetch`). Browser-driven: all
+four resource-cell tooltips, the tax-slider tooltip, and the unrest-bar tooltip
+(after selecting an owned region) are present and correct, no console errors.
+
+Test count: 216 green (unchanged — presentational tooltips, browser-verified).
+
+**Next ideas:** score-history sparkline on the end screen; a "?" to reopen hints;
+Voronoi map renderer; trait-aware AI tax/diplomacy.
+
+---
+
 ## 2026-07-13 — Trait-flavoured events
 
 The random-events pool was trait-blind. Added five **trait-gated events**, one per

@@ -104,11 +104,27 @@ export interface Hud {
   toast(message: string): void;
 }
 
-const RESOURCE_META: Record<ResourceKey, { label: string; icon: string }> = {
-  gold: { label: "Treasury", icon: "🪙" },
-  food: { label: "Food", icon: "🌾" },
-  materials: { label: "Materials", icon: "⛏️" },
-  knowledge: { label: "Knowledge", icon: "📖" },
+const RESOURCE_META: Record<ResourceKey, { label: string; icon: string; tip: string }> = {
+  gold: {
+    label: "Treasury",
+    icon: "🪙",
+    tip: "Gold funds armies (upkeep) and gifts. The /turn figure is income minus army upkeep — go negative for long and you risk bankruptcy (troops disband, unrest spikes).",
+  },
+  food: {
+    label: "Food",
+    icon: "🌾",
+    tip: "Food feeds population. Surplus grows your regions up to their capacity; a shortfall causes famine — population starves and unrest climbs. Stored food is capped by granaries.",
+  },
+  materials: {
+    label: "Materials",
+    icon: "⛏️",
+    tip: "Materials build structures and raise units. Buildings and armies both draw on this stockpile.",
+  },
+  knowledge: {
+    label: "Knowledge",
+    icon: "📖",
+    tip: "Knowledge funds research — the /turn figure is invested into your current technology each turn.",
+  },
 };
 
 export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
@@ -121,6 +137,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   for (const key of RESOURCE_KEYS) {
     const meta = RESOURCE_META[key];
     const cell = el("div", "hud-resource");
+    cell.title = meta.tip;
     const icon = el("span", "hud-resource-icon");
     icon.textContent = meta.icon;
     const body = el("div", "hud-resource-body");
@@ -168,6 +185,9 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   taxInput.max = String(Math.round(TAX_MAX * 100));
   taxInput.step = String(Math.round(TAX_STEP * 100));
   taxInput.className = "hud-tax-slider";
+  taxInput.title =
+    "Higher tax converts more of your regions' trade into gold, but steadily raises unrest. " +
+    "Ease off when regions grow restless.";
   taxInput.addEventListener("input", () => callbacks.onTaxChange(Number(taxInput.value) / 100));
   taxRow.append(taxInput, taxLabel);
   const upkeepLine = el("p", "hud-hint");
@@ -453,6 +473,11 @@ function renderOwnedRegion(
 
   // Unrest bar.
   const unrestWrap = el("div", "hud-unrest");
+  unrestWrap.title =
+    `Unrest throttles a region's output. Calm below ${UNREST_PENALTY_START}; ` +
+    `production suffers from ${UNREST_PENALTY_START}; at ${UNREST_REVOLT}+ the region revolts ` +
+    "and produces nothing. High taxes, famine, over-expansion and fresh conquests all raise it — " +
+    "temples and civics tech calm it.";
   const unrestLabel = el("div", "hud-unrest-label");
   unrestLabel.textContent = `Unrest ${fmt(region.unrest)}`;
   unrestLabel.append(unrestTag(region));
