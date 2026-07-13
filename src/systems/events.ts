@@ -138,6 +138,46 @@ const EVENTS: EventDef[] = [
       };
     },
   },
+  {
+    // Gold windfall — the coin counterpart to good_harvest / ore_discovery.
+    id: "market_boom",
+    weight: 3,
+    apply: (state, nationId) => ({
+      state: addStock(state, nationId, "gold", 18),
+      message: "A market boom fills the coffers.",
+    }),
+  },
+  {
+    // Knowledge windfall (advances the current tech, else banks knowledge).
+    id: "wandering_scholars",
+    weight: 2,
+    apply: (state, nationId) => {
+      const nation = state.nations.find((n) => n.id === nationId);
+      if (!nation) return null;
+      const nations = state.nations.map((n) =>
+        n.id === nationId
+          ? n.research.current
+            ? { ...n, research: { ...n.research, progress: round1(n.research.progress + 14) } }
+            : { ...n, stocks: { ...n.stocks, knowledge: round1(n.stocks.knowledge + 12) } }
+          : n,
+      );
+      return { state: { ...state, nations }, message: "Wandering scholars share new learning." };
+    },
+  },
+  {
+    // Unrest relief — a counterweight to plague / local_uprising, eases every
+    // owned region a little.
+    id: "festival",
+    weight: 2,
+    apply: (state, nationId) => {
+      const owned = state.regions.filter((r) => r.ownerId === nationId);
+      if (!owned.length) return null;
+      const regions = state.regions.map((r) =>
+        r.ownerId === nationId ? { ...r, unrest: Math.max(0, round1(r.unrest - 8)) } : r,
+      );
+      return { state: { ...state, regions }, message: "A grand festival lifts spirits — unrest eases." };
+    },
+  },
 
   // --- Trait-flavoured events: each fires only for a nation with that trait,
   // giving a modest windfall along its strength (design §6). ---

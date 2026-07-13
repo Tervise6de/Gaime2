@@ -72,4 +72,54 @@ describe("fireEvent", () => {
     }
     throw new Error("trade caravan never fired across 150 seeds");
   });
+
+  it("the market boom adds gold to any nation when it fires", () => {
+    const g = createGame({ seed: 12345, rivals: 2 });
+    const gold0 = g.nations[PLAYER_ID]!.stocks.gold;
+    for (let i = 1; i <= 200; i++) {
+      const next = fireEvent(g, PLAYER_ID, createRng(i));
+      if (next.log.some((l) => l.includes("market boom"))) {
+        expect(next.nations[PLAYER_ID]!.stocks.gold).toBeGreaterThan(gold0);
+        return;
+      }
+    }
+    throw new Error("market boom never fired across 200 seeds");
+  });
+
+  it("a festival eases unrest without ever pushing it below zero", () => {
+    // Start every player region at low unrest so the −8 relief would underflow.
+    const base = createGame({ seed: 12345, rivals: 2 });
+    const g = {
+      ...base,
+      regions: base.regions.map((r) => (r.ownerId === PLAYER_ID ? { ...r, unrest: 3 } : r)),
+    };
+    for (let i = 1; i <= 200; i++) {
+      const next = fireEvent(g, PLAYER_ID, createRng(i));
+      if (next.log.some((l) => l.includes("festival"))) {
+        const mine = next.regions.filter((r) => r.ownerId === PLAYER_ID);
+        expect(mine.every((r) => r.unrest >= 0)).toBe(true);
+        expect(mine.every((r) => r.unrest <= 3)).toBe(true); // relief, never a rise
+        return;
+      }
+    }
+    throw new Error("festival never fired across 200 seeds");
+  });
+
+  it("wandering scholars advance the current research when it fires", () => {
+    const base = createGame({ seed: 12345, rivals: 2 });
+    const g = {
+      ...base,
+      nations: base.nations.map((n) =>
+        n.id === PLAYER_ID ? { ...n, research: { current: "writing" as const, progress: 0, done: [] } } : n,
+      ),
+    };
+    for (let i = 1; i <= 200; i++) {
+      const next = fireEvent(g, PLAYER_ID, createRng(i));
+      if (next.log.some((l) => l.includes("scholars share"))) {
+        expect(next.nations[PLAYER_ID]!.research.progress).toBeGreaterThan(0);
+        return;
+      }
+    }
+    throw new Error("wandering scholars never fired across 200 seeds");
+  });
 });

@@ -6,6 +6,33 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Three more bounded events (gold, knowledge, unrest relief)
+
+The random-event pool had windfalls for food, materials, population and troops,
+but nothing for the other three levers — so gold, research and unrest never got a
+lucky break (or, for unrest, any positive event to counter plague/uprising).
+Added three generic bounded events (design §6 — texture, never game-swinging):
+**market_boom** (+18 gold, weight 3), **wandering_scholars** (advances the
+current tech by 14, else banks +12 knowledge, weight 2), and **festival** (eases
+every owned region's unrest by 8, floored at 0, weight 2). Pure and deterministic
+over the seeded RNG, same shape as the existing events.
+
+**Balance (200-seed × 4-archetype self-play probe, deleted before commit):** win
+rates warlord 32% / opportunist 28% / builder 28% / merchant 25% — a tight 25–32%
+spread, all victory kinds reached (domination 671 / great works 128 of 800),
+games complete. The extra positive events are symmetric texture at neutral
+balance.
+
+**Verify:** typecheck ✓, 237 tests ✓ (+3: market boom adds gold, festival eases
+unrest without underflowing past 0, scholars advance current research — each
+found by scanning seeds), build ✓ (0 `fetch`, deps `{}`). Browser smoke: 80 turns
+driven, zero console/page errors.
+
+**Next ideas:** a rare two-outcome event (a choice popup); event weights that
+lean on national trait; a small negative gold event for symmetry.
+
+---
+
 ## 2026-07-13 — Alarm when a rival nears victory
 
 The victory gauge (last entry) let you *check* the threat, but only if you opened
