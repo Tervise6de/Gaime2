@@ -58,38 +58,73 @@ leave the tree red or the build broken. Never commit failing tests.**
 
 ## Branches
 
-Work continues on `claude/milestone-1-playable-r0hjxb`. After each green push,
-keep `main` current too:
+**`main` is the trunk — commit and push there.** After each green push, keep the
+two `claude/*` mirror branches in sync so nothing diverges:
 
 ```
-git add -A && git commit -m "<msg>"
-git push origin claude/milestone-1-playable-r0hjxb
-git branch -f main claude/milestone-1-playable-r0hjxb
+git add -A && git commit -m "<msg>"           # concise Estonian subject + body
 git push origin main
+git branch -f claude/milestone-1-playable-r0hjxb main
+git branch -f claude/gaime2-autonomous-dev-y0q733 main
+git push origin claude/milestone-1-playable-r0hjxb
+git push origin claude/gaime2-autonomous-dev-y0q733
 ```
 
-If a push is rejected (a concurrent run pushed first): `git pull --rebase`,
-re-run `npm test`, then push again.
+If a push is rejected (a concurrent run pushed first): `git pull --rebase origin
+main`, re-run `npm test`, then push again. Never force-push `main`.
+
+## Current state (keep this fresh)
+
+Baseline as of the last cycle: **210 Vitest tests green** across 18 files;
+`typecheck`, `test`, `build` all pass; built bundle makes **zero** network calls
+(`grep -c 'fetch(' dist/assets/*.js` → 0); `package.json` `dependencies` is `{}`.
+The full v1 loop plus these extras are shipped (see `docs/DEVLOG.md` for details):
+composition-aware AI recruiting, AI home defence, combat-odds preview,
+national traits + trait-aware AI openings & tech rush, turn-summary panel,
+runaway-leader coalition wars + shared-enemy warmth, tech-tree screen, a
+critical-events alert strip, and "call to arms" (allies join your wars).
+Read the newest DEVLOG entries first — they list the live backlog and any
+balance numbers to preserve.
 
 ## Browser verification recipe
 
-Chromium is preinstalled. Install the driver, script the interaction, screenshot,
-then clean up (don't commit the driver or images):
+Playwright + Chromium are preinstalled globally — do NOT add them as deps. Build,
+serve the built bundle with `vite preview`, drive it from a scratch script that
+imports Playwright by absolute path, screenshot, read the screenshot, then clean
+up (keep the driver/images out of the repo — put them in the scratchpad):
 
-```bash
-npm install -D playwright-core >/dev/null 2>&1
-# dev server: npm run dev & (or reuse a running one on :5173)
-# executablePath: /opt/pw-browsers/chromium-1194/chrome-linux/chrome  (args: --no-sandbox)
-# ... goto http://localhost:5173, drive the UI, page.screenshot(...), read it ...
-npm uninstall playwright-core >/dev/null 2>&1   # keep dependencies: {}
-rm -f _*.mjs _*.png                              # keep the tree clean
+```js
+// scratch .mjs — run with: node scratch.mjs
+import pw from "/opt/node22/lib/node_modules/playwright/index.js";
+const { chromium } = pw;
+const browser = await chromium.launch({
+  executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
+  args: ["--no-sandbox"],
+});
+// newPage → goto http://localhost:4173 → drive the HUD → page.screenshot(...)
+// collect console/pageerror; assert errors is empty.
 ```
-Confirm the built bundle stays network-free:
-`npm run build && grep -c "fetch(" dist/assets/*.js` should be `0`.
+```bash
+npm run build && (npx vite preview --port 4173 >/dev/null 2>&1 &) && sleep 2
+node scratch.mjs                 # then Read the screenshot to eyeball it
+grep -c "fetch(" dist/assets/*.js   # must print 0
+# kill the preview server and delete the scratch driver+png afterwards
+```
+Note `#hud` is `pointer-events:none` (children opt in) — new full-screen overlays
+need `pointer-events:auto` to receive clicks. New-game state persists via
+localStorage autosave; a fresh Playwright context starts clean.
 
 ---
 
 ## Backlog (roughly priority order — pick the highest-value tractable item)
+
+**Fresh next-ideas (from the latest DEVLOG — good starting points):** end-game
+score/summary screen with a simple history graph; Voronoi-polygon map renderer
+over the *identical* graph logic (kept behind a fallback); trait-flavoured random
+events; per-enemy "call to arms" (choose which war to rally an ally into);
+tooltips/legend for every stat and map marker; a numbered, scrollable full log.
+When in doubt, do **A (balance)** — re-probe and keep committed-player win rate
+fair across archetypes (~15–30%) and games out of the too-fast zone.
 
 **A. Balance & anti-degeneracy (do this first, repeatedly).**
 Write a *temporary* vitest probe that self-plays many seeds × difficulties
