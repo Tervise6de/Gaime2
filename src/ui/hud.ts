@@ -171,6 +171,9 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const helpToggle = btn("💡 Help", "hud-legend-toggle", () => showHints());
   helpToggle.title = "Reopen the getting-started tips. Shortcut: H";
   topBar.append(helpToggle);
+  const standingsToggle = btn("📊 Standings", "hud-legend-toggle", () => toggleStandings());
+  standingsToggle.title = "See how you rank against every rival. Shortcut: S";
+  topBar.append(standingsToggle);
   root.append(topBar);
 
   // Critical-events alert strip (just below the resource bar).
@@ -412,6 +415,42 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     techOverlay.style.display = "none";
   }
 
+  // --- Standings overlay (mid-game rankings + score race, opened from the top) -
+  const standingsOverlay = el("div", "hud-techtree-overlay");
+  standingsOverlay.style.display = "none";
+  standingsOverlay.addEventListener("click", (ev) => {
+    if (ev.target === standingsOverlay) closeStandings(); // backdrop click closes
+  });
+  root.append(standingsOverlay);
+  let lastState: GameState | null = null;
+
+  function renderStandingsOverlay(): void {
+    if (!lastState) return;
+    standingsOverlay.innerHTML = "";
+    const panel = el("div", "hud-techtree-panel hud-standings-panel");
+    const head = el("div", "hud-techtree-head");
+    const title = el("h2", "hud-techtree-title");
+    title.textContent = `Standings — turn ${lastState.turn}`;
+    head.append(title, btn("✕", "hud-techtree-close", closeStandings));
+    panel.append(head);
+    const body = el("div", "hud-standings");
+    renderStandings(body, lastState);
+    panel.append(body);
+    standingsOverlay.append(panel);
+  }
+  function openStandings(): void {
+    if (!lastState) return;
+    renderStandingsOverlay();
+    standingsOverlay.style.display = "flex";
+  }
+  function closeStandings(): void {
+    standingsOverlay.style.display = "none";
+  }
+  function toggleStandings(): void {
+    if (standingsOverlay.style.display === "none") openStandings();
+    else closeStandings();
+  }
+
   // --- Keyboard shortcuts for the overlays ----------------------------------
   // L toggles the map legend, H toggles the getting-started tips, Esc closes
   // whatever's open. Ignore while typing in a form control so the tax/seed
@@ -427,8 +466,12 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       ev.preventDefault();
       if (hints.style.display !== "none") dismissHints();
       else showHints();
+    } else if (key === "s") {
+      ev.preventDefault();
+      toggleStandings();
     } else if (ev.key === "Escape") {
       closeTechTree();
+      closeStandings();
       legendPanel.style.display = "none";
       if (hints.style.display !== "none") dismissHints();
     }
@@ -445,10 +488,13 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     renderAlerts(alertStrip, state, summary ?? null);
     const player = playerNation(state);
     lastPlayer = player;
+    lastState = state;
     // Keep an open tech tree in sync with the latest research state.
     if (techOverlay.style.display !== "none") {
       renderTechTree(techOverlay, player, callbacks, closeTechTree);
     }
+    // Keep an open standings overlay live as turns resolve.
+    if (standingsOverlay.style.display !== "none") renderStandingsOverlay();
     const flow = nationalProduction(state, PLAYER_ID);
     const upkeep = totalUpkeep(state, PLAYER_ID);
     for (const key of RESOURCE_KEYS) {

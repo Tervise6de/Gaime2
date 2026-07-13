@@ -1027,6 +1027,11 @@ body {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
 
+/* Standings reuses the modal chrome but is much narrower than the tech grid. */
+.hud-standings-panel {
+  width: min(460px, 96vw);
+}
+
 .hud-techtree-head {
   display: flex;
   align-items: center;

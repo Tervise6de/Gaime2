@@ -6,6 +6,32 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Mid-game Standings panel (rankings + live score race)
+
+Rankings only appeared on the end screen, so mid-game you couldn't tell whether
+you were ahead or losing without eyeballing the map. Added a **📊 Standings**
+toggle (top bar, next to Legend/Help; shortcut **S**) that opens a modal with the
+ranked table — each nation's regions ⬢, wonders ★, techs 📖, and prestige score —
+plus the per-nation score-race sparkline, all for the *current* turn. Strategic
+awareness ("I'm 3rd, 57 behind the leader") is now one tap away.
+
+Pure reuse: it calls the same `renderStandings` (table + multi-line sparkline)
+the end-game banner uses, dropped into the existing tech-tree modal chrome
+(backdrop-click / ✕ / Esc to close), and re-renders live from `update()` so the
+numbers and graph track each resolved turn while it's open. `S` joins L/H/Esc in
+the one keyboard handler; a narrower `.hud-standings-panel` width keeps the modal
+from stretching to the tech-grid's 960px. UI-only — no sim/state/balance change.
+
+**Verify:** typecheck ✓, 221 tests ✓, build ✓ (0 `fetch`, deps `{}`).
+Browser-driven: after 8 turns the button opened one overlay titled "Standings —
+turn 9" with 3 ranked rows and a 3-line score sparkline; Esc closed it; the S key
+reopened it. No console errors.
+
+**Next ideas:** highlight the leading victory-condition per nation in the panel;
+click a standings row to focus that nation; per-slot saved-turn labels.
+
+---
+
 ## 2026-07-13 — Three named save slots with a picker
 
 The manual checkpoint was a single slot — saving overwrote your only backup, so
