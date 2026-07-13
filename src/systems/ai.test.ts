@@ -194,6 +194,13 @@ describe("trait-aware AI openings", () => {
   it("skips a building it already has and moves to the next preference", () => {
     expect(chooseBuilding(empty(["farm"]), [], 0, false, "fertile")).not.toBe("farm");
   });
+
+  it("builds the Guildhall only once Economics is researched", () => {
+    // With market+bank built but no Economics, the Guildhall (next in order) is
+    // still LOCKED — the AI skips it to Workshop. With the tech it's chosen.
+    expect(chooseBuilding(empty(["market", "bank"]), [], 0, false)).toBe("workshop");
+    expect(chooseBuilding(empty(["market", "bank"]), ["economics"], 0, false)).toBe("guildhall");
+  });
 });
 
 describe("trait-aware tech selection", () => {

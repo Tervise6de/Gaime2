@@ -6,6 +6,38 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — New building: the Guildhall (Economics)
+
+Content for the economy branch. The `economics` tech (tier 2) previously gave only
+a yield multiplier and unlocked no building — a build dead-end. Added the
+**Guildhall** (cost 30, +3 gold +3 materials), gated behind Economics: a
+combined workshop-and-market that rewards teching deep into economy. The AI
+builds it too — added to `BASE_BUILD_ORDER` (after bank) and to the mercantile /
+industrious trait priorities, so rivals use it and the content stays symmetric.
+
+**Caught a gating bug via browser verification** (why we always drive the UI):
+building unlocks are keyed off the *tech's* `unlockBuilding` field, not the
+building's `requiresTech`. I'd set `requiresTech` on the Guildhall but forgotten
+`unlockBuilding: "guildhall"` on the Economics tech, so `isBuildingUnlockedFor`
+found no gating tech and reported it **unlocked from turn 1**. Added the tech
+side and strengthened the AI test to assert the Guildhall is *skipped while
+locked* (so the bug can't recur).
+
+**Balance (200-seed × 4-archetype self-play probe, deleted before commit):**
+warlord 35 / opportunist 28 / builder 26 / merchant 23 — a 23–35% spread,
+unchanged from before; economic archetypes did not jump; all victory kinds
+reached. Symmetric content at neutral balance.
+
+**Verify:** typecheck ✓, 245 tests ✓ (+1: Guildhall locked without Economics,
+built with it), build ✓ (0 `fetch`, deps `{}`). Browser-driven: at turn 1 the
+build menu lists 11 buildings; the Guildhall shows "🔒 · Locked — research
+economics" (correctly gated after the fix). No console/page errors.
+
+**Next ideas:** a civics-branch building for an under-used tech; a coast-terrain
+building (needs terrain gating first); trait-dependent choice options.
+
+---
+
 ## 2026-07-13 — Two more choice events (expedition, grain aid)
 
 Put last cycle's choice-event framework to work — proof it generalises with zero

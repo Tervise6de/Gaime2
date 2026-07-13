@@ -98,7 +98,8 @@ export const TECHS: Record<TechId, TechDef> = {
   },
   economics: {
     id: "economics", name: "Economics", branch: "economy", tier: 2, cost: 54,
-    requires: ["banking"], yieldMult: { gold: 0.2, materials: 0.1 }, blurb: "+20% gold, +10% materials.",
+    requires: ["banking"], yieldMult: { gold: 0.2, materials: 0.1 }, unlockBuilding: "guildhall",
+    blurb: "+20% gold, +10% materials; unlocks the Guildhall.",
   },
   philosophy: {
     id: "philosophy", name: "Philosophy", branch: "civics", tier: 2, cost: 50,

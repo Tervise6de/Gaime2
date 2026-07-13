@@ -26,6 +26,7 @@ export type BuildingId =
   | "aqueduct"
   | "university"
   | "bank"
+  | "guildhall"
   | "fortress"
   | "wonder";
 
@@ -125,6 +126,16 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     unrest: 0,
     requiresTech: "banking",
     blurb: "+5 gold per turn. (Banking)",
+  },
+  guildhall: {
+    id: "guildhall",
+    name: "Guildhall",
+    cost: 30,
+    yield: { gold: 3, materials: 3 },
+    popCapacity: 0,
+    unrest: 0,
+    requiresTech: "economics",
+    blurb: "+3 gold, +3 materials — the economy branch's workshop-and-market in one. (Economics)",
   },
   fortress: {
     id: "fortress",
