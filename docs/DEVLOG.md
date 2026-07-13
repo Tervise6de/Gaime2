@@ -6,6 +6,29 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Per-enemy call to arms
+
+The "Call to arms" button only offered an ally the *first* war the player was
+fighting. Now an allied realm's diplomacy card shows **one button per open front**
+— every enemy the player is at war with that the ally isn't already fighting — so
+in a multi-war game you can rally an ally into a specific conflict.
+
+Change: new pure, tested `warTargetsFor(state, requester, ally)` in
+`diplomacy.ts` returns that list (excludes the player, barbarians, dead nations,
+and the two parties); the HUD loops it to render the buttons and drops the old
+single-target `callableEnemy` helper. Four new unit tests (lists a joinable
+enemy, excludes one the ally already fights, empty at peace, excludes the dead).
+No sim/balance impact — it's the same `callToArms` intent, just per front.
+
+**Verify:** typecheck ✓, 214 tests ✓ (was 210; +4), build ✓ (0 `fetch`).
+Browser-smoked a 15-turn game — the diplomacy panel renders the (now list-driven)
+call-to-arms path every turn with no console errors.
+
+**Next ideas:** first-time hints; score-history sparkline; tooltips for every
+stat; Voronoi map renderer; trait-flavoured events.
+
+---
+
 ## 2026-07-13 — Victory-progress readout
 
 There was no in-game sense of how close anyone was to winning — you found out only

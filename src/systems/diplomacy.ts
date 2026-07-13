@@ -261,6 +261,25 @@ export function playerPropose(
  * friend (alliance), the war is real, joining is not self-defeating, and it is
  * strong enough not to be signing its own death warrant.
  */
+/**
+ * The enemies `requester` is at war with that `ally` is not already fighting —
+ * i.e. the wars an ally could be called into. Excludes the player, barbarians,
+ * dead nations, and the two parties themselves. Pure; used to offer one
+ * "call to arms" per open front in the UI.
+ */
+export function warTargetsFor(
+  state: GameState,
+  requester: number,
+  ally: number,
+): number[] {
+  const out: number[] = [];
+  for (const n of state.nations) {
+    if (n.isBarbarian || !n.alive || n.id === requester || n.id === ally) continue;
+    if (atWar(state, requester, n.id) && !atWar(state, ally, n.id)) out.push(n.id);
+  }
+  return out;
+}
+
 export function wouldJoinWar(
   state: GameState,
   ally: number,

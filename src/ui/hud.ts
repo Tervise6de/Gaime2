@@ -26,7 +26,7 @@ import {
   totalUpkeep,
   unitCost,
 } from "@/systems/military";
-import { getRelation, getTreaty, atWar, wouldJoinWar } from "@/systems/diplomacy";
+import { getRelation, getTreaty, wouldJoinWar, warTargetsFor } from "@/systems/diplomacy";
 import { nationScore } from "@/systems/victory";
 import type { TurnSummary } from "@/systems/summary";
 import { deriveAlerts } from "@/ui/alerts";
@@ -845,10 +845,10 @@ function renderDiplomacy(
           btn("Alliance", "hud-diplo-btn", () => callbacks.onProposePact(rival.id, "alliance")),
         );
       }
-      // Call an ally to arms against an enemy the player is fighting but they aren't.
+      // Call an ally to arms — one button per open front (an enemy the player is
+      // fighting but this ally isn't).
       if (treaty === "alliance") {
-        const enemy = callableEnemy(state, rival.id);
-        if (enemy !== null) {
+        for (const enemy of warTargetsFor(state, PLAYER_ID, rival.id)) {
           const enemyName = state.nations.find((n) => n.id === enemy)?.name ?? "the enemy";
           const willing = wouldJoinWar(state, rival.id, PLAYER_ID, enemy);
           const b = btn(`Call to arms vs ${enemyName}`, "hud-diplo-btn", () =>
@@ -865,15 +865,6 @@ function renderDiplomacy(
     card.append(actions);
     container.append(card);
   }
-}
-
-/** An enemy the player is at war with that `ally` isn't already fighting, or null. */
-function callableEnemy(state: GameState, allyId: number): number | null {
-  for (const n of state.nations) {
-    if (n.isBarbarian || n.isPlayer || !n.alive || n.id === allyId) continue;
-    if (atWar(state, PLAYER_ID, n.id) && !atWar(state, allyId, n.id)) return n.id;
-  }
-  return null;
 }
 
 function renderResearch(

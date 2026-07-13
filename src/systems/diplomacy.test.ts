@@ -20,6 +20,7 @@ import {
   setTreaty,
   wouldJoinWar,
   callToArms,
+  warTargetsFor,
 } from "@/systems/diplomacy";
 import { createGame } from "@/systems/turn";
 import {
@@ -252,5 +253,33 @@ describe("call to arms", () => {
       expect(g.log.length).toBe(logLen);
       expect(atWar(g, RIVAL_A, RIVAL_B)).toBe(false);
     });
+  });
+});
+
+describe("warTargetsFor", () => {
+  const PLAYER = 0;
+
+  it("lists an enemy the requester fights that the ally does not", () => {
+    const s = setTreaty(game(), PLAYER, RIVAL_B, "war"); // player at war with B
+    const targets = warTargetsFor(s, PLAYER, RIVAL_A);   // could A be called in?
+    expect(targets).toContain(RIVAL_B);
+    expect(targets).not.toContain(RIVAL_A); // never the ally itself
+    expect(targets).not.toContain(PLAYER); // never the requester
+  });
+
+  it("excludes an enemy the ally is already fighting", () => {
+    let s = setTreaty(game(), PLAYER, RIVAL_B, "war");
+    s = setTreaty(s, RIVAL_A, RIVAL_B, "war"); // ally already at war with B
+    expect(warTargetsFor(s, PLAYER, RIVAL_A)).not.toContain(RIVAL_B);
+  });
+
+  it("is empty when the requester is at peace with everyone", () => {
+    expect(warTargetsFor(game(), PLAYER, RIVAL_A)).toEqual([]);
+  });
+
+  it("excludes eliminated nations even if still flagged at war", () => {
+    let s = setTreaty(game(), PLAYER, RIVAL_B, "war");
+    s = { ...s, nations: s.nations.map((n) => (n.id === RIVAL_B ? { ...n, alive: false } : n)) };
+    expect(warTargetsFor(s, PLAYER, RIVAL_A)).not.toContain(RIVAL_B);
   });
 });
