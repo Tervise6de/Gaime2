@@ -17,6 +17,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Agent / harness tooling state (ephemeral worktrees, etc.)
+.claude/
+
 # Editor / OS
 .vscode/*
 !.vscode/extensions.json
