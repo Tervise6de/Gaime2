@@ -446,7 +446,11 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     head.append(title, btn("✕", "hud-techtree-close", closeStandings));
     panel.append(head);
     const body = el("div", "hud-standings");
-    renderStandings(body, lastState);
+    // Rows are clickable here: jump to that nation's capital and close the modal.
+    renderStandings(body, lastState, (regionId) => {
+      callbacks.onSelectRegion(regionId);
+      closeStandings();
+    });
     panel.append(body);
     standingsOverlay.append(panel);
   }
@@ -927,7 +931,16 @@ function renderVictoryProgress(elm: HTMLElement, state: GameState): void {
  * prestige score, with a compact regions/wonders/techs breakdown. The player row
  * is highlighted and eliminated nations are marked.
  */
-function renderStandings(container: HTMLElement, state: GameState): void {
+/**
+ * Ranked nation standings + the score-race sparkline. When `onPick` is given
+ * (mid-game overlay), each row is clickable to jump to that nation's capital;
+ * omitted for the static end-game banner.
+ */
+function renderStandings(
+  container: HTMLElement,
+  state: GameState,
+  onPick?: (regionId: number) => void,
+): void {
   container.innerHTML = "";
   const rows = state.nations
     .filter((n) => !n.isBarbarian)
@@ -935,26 +948,38 @@ function renderStandings(container: HTMLElement, state: GameState): void {
       n,
       score: nationScore(state, n.id),
       regions: state.regions.filter((r) => r.ownerId === n.id).length,
+      // Still holding its own capital? (crown falls when the seat is taken.)
+      holdsCapital:
+        n.capitalRegionId !== undefined && state.regions[n.capitalRegionId]?.ownerId === n.id,
     }))
     .sort((a, b) => b.score - a.score);
 
   const table = el("div", "hud-standings-table");
   rows.forEach((row, i) => {
+    const canPick = onPick && row.n.capitalRegionId !== undefined;
     const tr = el(
       "div",
-      "hud-standings-row" + (row.n.isPlayer ? " you" : "") + (row.n.alive ? "" : " dead"),
+      "hud-standings-row" +
+        (row.n.isPlayer ? " you" : "") +
+        (row.n.alive ? "" : " dead") +
+        (canPick ? " pickable" : ""),
     );
     const rank = el("span", "hud-standings-rank");
     rank.textContent = String(i + 1);
     const sw = el("span", "hud-region-swatch");
     sw.style.background = row.n.color;
     const name = el("span", "hud-standings-name");
-    name.textContent = (row.n.isPlayer ? "You" : row.n.name) + (row.n.alive ? "" : " ✗");
+    name.textContent =
+      (row.n.isPlayer ? "You" : row.n.name) + (row.holdsCapital ? " 👑" : "") + (row.n.alive ? "" : " ✗");
     const detail = el("span", "hud-standings-detail");
     detail.textContent = `${row.regions}⬢ · ${row.n.wonders}★ · ${row.n.research.done.length}📖`;
     const score = el("span", "hud-standings-score");
     score.textContent = String(row.score);
     tr.append(rank, sw, name, detail, score);
+    if (canPick) {
+      tr.title = `Show ${row.n.isPlayer ? "your" : row.n.name + "’s"} capital on the map`;
+      tr.addEventListener("click", () => onPick!(row.n.capitalRegionId!));
+    }
     table.append(tr);
   });
   container.append(table);

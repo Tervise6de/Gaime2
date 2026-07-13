@@ -6,6 +6,31 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Standings rows show capitals and jump to them
+
+Tied the mid-game Standings panel to the map and the capital work. Each nation
+row now shows a 👑 while it still holds its own capital (same live ownership check
+as the map crown — it disappears the turn the seat falls), and in the mid-game
+overlay every row is clickable: it selects that nation's capital on the map and
+closes the modal, so "where is the leader's heart?" is one click from the
+rankings. The end-game banner keeps static rows (no capital to jump to once the
+game's decided) — `renderStandings` gained an optional `onPick`, present only for
+the overlay.
+
+Reuses the existing `onSelectRegion` intent and `capitalRegionId`; pure
+presentation, no sim/state/balance change.
+
+**Verify:** typecheck ✓, 228 tests ✓, build ✓ (0 `fetch`, deps `{}`). Browser-
+driven at turn 6: all three rows showed 👑 (all capitals held) and were pickable
+with correct tooltips ("Show Valdheim’s capital on the map" / "Show your capital
+on the map"); clicking a row closed the overlay and selected the right capital
+(the region panel showed Ironreach for the player). No console/page errors.
+
+**Next ideas:** a per-slot save "clear" (✕); tint/ring the capital node so it
+reads at full-board zoom; show each nation's leading victory condition in the row.
+
+---
+
 ## 2026-07-13 — Save-slot picker shows each slot's saved turn
 
 The 3-slot save picker gave no hint what was *in* each slot — you had to load one

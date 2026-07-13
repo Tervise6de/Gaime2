@@ -1188,6 +1188,15 @@ body {
   opacity: 0.55;
 }
 
+/* Mid-game rows jump to a nation's capital on click. */
+.hud-standings-row.pickable {
+  cursor: pointer;
+}
+
+.hud-standings-row.pickable:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .hud-standings-rank {
   flex: 0 0 18px;
   font-weight: 700;
