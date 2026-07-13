@@ -6,6 +6,32 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — "Help" button to reopen the getting-started tips
+
+The first-time hints card only appeared once, on turn 1, and vanished forever
+after "Got it" (backlog: "a '?' to reopen hints"). New players who dismissed it
+too early — or returning players — had no way back to the basics. Added a
+"💡 Help" toggle in the top bar beside "❔ Legend" that reopens the tips on
+demand, any turn.
+
+A `hintsForced` flag keeps the reopened card up past turn 1 until dismissed
+again, without disturbing the localStorage-backed "seen it" state used for the
+automatic turn-1 show. Both paths funnel through one visibility rule: tips show
+when `outcome === "playing"` and either the auto-condition (unseen + turn 1) or
+`hintsForced` holds — so the card never draws over the end-game banner.
+
+**Verify:** typecheck ✓, 220 tests ✓, build ✓ (0 `fetch`, deps `{}`).
+Browser-driven state machine: turn-1 auto-show → "Got it" hides → stays hidden
+across turns → Help reopens (turn 5) → persists through End turn → "Got it"
+hides again; two `.hud-legend-toggle` buttons present, no console errors.
+
+Test count: 220 green (UI-only interaction, browser-verified).
+
+**Next ideas:** per-nation score lines on the end-game sparkline; a compact
+mid-game score trend in the top bar; keyboard shortcut to toggle Help/Legend.
+
+---
+
 ## 2026-07-13 — End-game score-history sparkline
 
 The end-game standings now carry a small line chart of the player's prestige

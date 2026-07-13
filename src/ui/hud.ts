@@ -160,6 +160,9 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     legendPanel.style.display = legendPanel.style.display === "none" ? "block" : "none";
   });
   topBar.append(legendToggle);
+  const helpToggle = btn("💡 Help", "hud-legend-toggle", () => showHints());
+  helpToggle.title = "Reopen the getting-started tips.";
+  topBar.append(helpToggle);
   root.append(topBar);
 
   // Critical-events alert strip (just below the resource bar).
@@ -297,6 +300,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const hintsBtn = btn("Got it", "hud-hints-btn", () => {
     hints.style.display = "none";
     hintsDismissed = true;
+    hintsForced = false;
     try {
       window.localStorage.setItem(HINTS_KEY, "1");
     } catch {
@@ -306,10 +310,18 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   hints.append(hintsTitle, hintsBody, hintsBtn);
   root.append(hints);
   let hintsDismissed = false;
+  // Set when the player reopens the tips via the Help button, so they stay up
+  // past turn 1 until dismissed again.
+  let hintsForced = false;
   try {
     hintsDismissed = window.localStorage.getItem(HINTS_KEY) === "1";
   } catch {
     hintsDismissed = false;
+  }
+  /** Reopen the getting-started tips on demand (Help button). */
+  function showHints(): void {
+    hintsForced = true;
+    hints.style.display = "block";
   }
 
   // --- Transient toast (save/load feedback) ---------------------------------
@@ -387,9 +399,11 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
     renderVictoryProgress(victoryEl, state);
 
-    // First-time hints: only on turn 1 of a live game, until dismissed.
-    hints.style.display =
-      !hintsDismissed && state.turn === 1 && state.outcome === "playing" ? "block" : "none";
+    // Hints: auto on turn 1 of a live game until dismissed, or when reopened
+    // via the Help button (hintsForced). Never over the end-game banner.
+    const showTips =
+      state.outcome === "playing" && (hintsForced || (!hintsDismissed && state.turn === 1));
+    hints.style.display = showTips ? "block" : "none";
 
     taxInput.value = String(Math.round(player.taxRate * 100));
     taxLabel.textContent = `Tax ${Math.round(player.taxRate * 100)}%`;
