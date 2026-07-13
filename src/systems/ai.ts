@@ -45,6 +45,7 @@ import {
   BARBARIAN_ID,
   DIFFICULTY,
   FORT_PER_LEVEL,
+  FRIENDLY_THRESHOLD,
   PLAYER_ID,
   WONDER_GOAL,
   armySize,
@@ -176,6 +177,49 @@ function chooseTech(state: GameState, nationId: number, tech: TechId): GameState
 
 // --- diplomacy --------------------------------------------------------------
 
+/** A leader must be this much stronger than the next nation to be "runaway". */
+const LEADER_POWER_RATIO = 1.6;
+/** …and hold at least this share of all owned (non-barbarian) regions. */
+const LEADER_REGION_SHARE = 0.4;
+/** Join the coalition once its combined power reaches the leader × this. */
+const COALITION_MARGIN = 0.85;
+
+/**
+ * The runaway leader's id, or null. A runaway both out-powers the second-place
+ * nation by `LEADER_POWER_RATIO` and holds `LEADER_REGION_SHARE` of the map.
+ * Needs at least three living nations, so there's a coalition to form.
+ */
+export function runawayLeader(state: GameState): number | null {
+  const nations = state.nations.filter((n) => !n.isBarbarian && n.alive);
+  if (nations.length < 3) return null;
+  const powers = nations
+    .map((n) => ({ id: n.id, p: nationPower(state, n.id) }))
+    .sort((a, b) => b.p - a.p);
+  const first = powers[0]!;
+  const second = powers[1]!;
+  if (first.p < second.p * LEADER_POWER_RATIO) return null;
+  const owned = state.regions.filter(
+    (r) => r.ownerId !== null && r.ownerId !== BARBARIAN_ID,
+  ).length || 1;
+  const leaderRegions = state.regions.filter((r) => r.ownerId === first.id).length;
+  if (leaderRegions / owned < LEADER_REGION_SHARE) return null;
+  return first.id;
+}
+
+/** Combined power of `joinerId` plus everyone already at war with `leaderId`. */
+export function coalitionPowerAgainst(
+  state: GameState,
+  leaderId: number,
+  joinerId: number,
+): number {
+  let power = nationPower(state, joinerId);
+  for (const n of state.nations) {
+    if (n.isBarbarian || !n.alive || n.id === leaderId || n.id === joinerId) continue;
+    if (atWar(state, n.id, leaderId)) power += nationPower(state, n.id);
+  }
+  return power;
+}
+
 function doDiplomacy(state: GameState, nationId: number, rng: Rng): GameState {
   const me = state.nations.find((n) => n.id === nationId);
   if (!me) return state;
@@ -187,6 +231,7 @@ function doDiplomacy(state: GameState, nationId: number, rng: Rng): GameState {
     (n) => !n.isBarbarian && n.alive && n.id !== nationId,
   );
   const myPower = nationPower(state, nationId);
+  const leaderId = runawayLeader(state);
 
   let s = state;
   let actions = 0;
@@ -197,20 +242,38 @@ function doDiplomacy(state: GameState, nationId: number, rng: Rng): GameState {
     const theirPower = nationPower(s, o.id) || 1;
     const ratio = myPower / theirPower;
     const border = sharedBorders(s, nationId, o.id) > 0;
+    const earlyGraceForPlayer = o.isPlayer && s.turn < earlyPeaceTurns(s);
 
     if (treaty === "war") {
-      // Losing badly → sue for peace (more readily if unaggressive).
-      if (ratio < 0.7 - aggression * 0.2) {
+      // Losing badly → sue for peace (more readily if unaggressive). But hold the
+      // line against a runaway leader: don't hand the snowball an easy white peace.
+      if (ratio < 0.7 - aggression * 0.2 && o.id !== leaderId) {
         s = suePeace(s, nationId, o);
         actions++;
       }
       continue;
     }
 
+    // Gang up on a runaway leader: once the coalition already fighting it (plus
+    // me) collectively rivals its power, pile on — even at unfavourable 1v1 odds.
+    // This is the anti-snowball brake (design §5), respecting NAPs/alliances and
+    // the player's early grace.
+    if (
+      o.id === leaderId &&
+      border &&
+      treaty === "peace" &&
+      rel < FRIENDLY_THRESHOLD &&
+      !earlyGraceForPlayer &&
+      coalitionPowerAgainst(s, leaderId, nationId) >= nationPower(s, leaderId) * COALITION_MARGIN
+    ) {
+      s = openWar(s, nationId, o);
+      actions++;
+      continue;
+    }
+
     // Opportunistic war: hostile, bordering, and I'm stronger. Warlords pounce
     // at worse odds; peaceful types need a big edge. The player gets an
     // early-game grace period so a new realm isn't snuffed out immediately.
-    const earlyGraceForPlayer = o.isPlayer && s.turn < earlyPeaceTurns(s);
     const warThreshold = 1.5 - aggression;
     if (border && rel < -25 && ratio > warThreshold && !earlyGraceForPlayer) {
       s = openWar(s, nationId, o);

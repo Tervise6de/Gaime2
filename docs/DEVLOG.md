@@ -6,6 +6,37 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Gang up on a runaway leader (coalition wars)
+
+Nothing checked a snowballing nation: rivals fought their own 1v1s while one
+power ran away with the game. Now the AI forms convenient coalitions against a
+runaway leader (design §5).
+
+Change (`ai.ts`, pure/deterministic): `doDiplomacy` first computes
+`runawayLeader(state)` — a nation that both out-powers the second-place nation by
+≥1.6× **and** holds ≥40% of the owned map (needs ≥3 living nations, so there's a
+coalition to form). A non-leader that borders the leader, is at peace with it, and
+isn't friendly will **declare war once the coalition already fighting the leader,
+plus itself, collectively reaches ≥85% of the leader's power** — piling on even at
+unfavourable 1v1 odds. NAPs/alliances and the player's early grace are respected,
+and a coalition member won't sue for a cheap white peace with the leader. New
+exported helpers `runawayLeader` / `coalitionPowerAgainst`; five new tests
+(detection, no-runaway-when-balanced, coalition sum, a member joining the war, and
+grace-period restraint).
+
+**Balance check (temporary symmetric probe, deleted before commit):** the runaway
+aggressor is curbed and games run longer — warlord 21→17%, opportunist 21→25%,
+merchant/builder steady at 21%; **median length 31→36** (toward the 60–150 target).
+A healthy anti-snowball nudge, distribution still tight (17–25%). 96 probe games
+ran clean; browser-smoked, no console errors.
+
+Test count: 178 green (was 173). Build network-free (0 `fetch`).
+
+**Next ideas:** allies actively join *your* wars when asked; shared-enemy relation
+warmth between co-belligerents; tech-tree screen; trait-aware tech rush.
+
+---
+
 ## 2026-07-13 — Session summary (6 cycles: AI depth + traits + UX)
 
 Six verified cycles this session, each typecheck+test+build green, browser-checked

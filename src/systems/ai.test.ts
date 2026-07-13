@@ -7,8 +7,12 @@ import {
   retreatStep,
   defendStep,
   chooseBuilding,
+  runawayLeader,
+  coalitionPowerAgainst,
 } from "@/systems/ai";
 import type { BuildingId } from "@/data/buildings";
+import { atWar } from "@/systems/diplomacy";
+import { emptyResearch } from "@/systems/state";
 import { createGame, resolveTurn } from "@/systems/turn";
 import { createRng } from "@/systems/rng";
 import {
@@ -18,6 +22,7 @@ import {
   emptyUnits,
   type Army,
   type GameState,
+  type Nation,
   type Region,
 } from "@/systems/state";
 import type { UnitType } from "@/data/units";
@@ -277,6 +282,99 @@ describe("home defence (retreat / garrison)", () => {
       [mine, army({ id: 5, ownerId: ENEMY, regionId: 1, units: units({ infantry: 4 }) })],
     );
     expect(defendStep(s, mine, RIVAL)).toBe(null);
+  });
+});
+
+describe("gang up on a runaway leader", () => {
+  const LEADER = 2, JOINER = 3, ALLY = 0;
+
+  function mkNation(id: number, over: Partial<Nation> = {}): Nation {
+    return {
+      id,
+      name: `N${id}`,
+      color: "#fff",
+      isPlayer: id === 0,
+      isBarbarian: id === BARBARIAN_ID,
+      alive: true,
+      stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 },
+      taxRate: 0.15,
+      research: emptyResearch(),
+      wonders: 0,
+      famine: false,
+      bankrupt: false,
+      ...over,
+    };
+  }
+
+  /** Leader out-powers everyone and holds 40% of the map; ALLY already at war. */
+  function runawayState(): GameState {
+    const regions: Region[] = [
+      region({ id: 0, ownerId: LEADER, adjacency: [1, 2, 3] }),
+      region({ id: 1, ownerId: LEADER, adjacency: [0] }),
+      region({ id: 2, ownerId: JOINER, adjacency: [0] }), // borders leader
+      region({ id: 3, ownerId: ALLY, adjacency: [0, 4] }), // borders leader
+      region({ id: 4, ownerId: ALLY, adjacency: [3] }),
+    ];
+    const armies: Army[] = [
+      army({ id: 1, ownerId: LEADER, regionId: 0, units: units({ infantry: 9 }) }),
+      army({ id: 2, ownerId: JOINER, regionId: 2, units: units({ militia: 2, infantry: 1 }) }),
+      army({ id: 3, ownerId: ALLY, regionId: 3, units: units({ infantry: 5 }) }),
+    ];
+    return {
+      turn: 40,
+      difficulty: "normal",
+      relations: { "2-3": -20 },
+      treaties: { "0-2": "war" }, // ALLY already fights the LEADER
+      offers: [],
+      nextOfferId: 0,
+      regions,
+      armies,
+      nextArmyId: 4,
+      nations: [
+        mkNation(ALLY, { personality: { archetype: "warlord", aggression: 0.9, expansion: 0.8, economy: 0.3, trustworthiness: 0.2 } }),
+        mkNation(BARBARIAN_ID),
+        mkNation(LEADER, { personality: { archetype: "warlord", aggression: 0.9, expansion: 0.8, economy: 0.3, trustworthiness: 0.2 } }),
+        mkNation(JOINER, { personality: { archetype: "opportunist", aggression: 0.5, expansion: 0.5, economy: 0.5, trustworthiness: 0.3 } }),
+      ],
+      outcome: "playing",
+      log: [],
+    } as unknown as GameState;
+  }
+
+  it("identifies the runaway leader", () => {
+    expect(runawayLeader(runawayState())).toBe(LEADER);
+  });
+
+  it("finds no runaway when power is balanced", () => {
+    const g = createGame({ seed: 1, rivals: 2 });
+    expect(runawayLeader(g)).toBe(null);
+  });
+
+  it("sums the coalition already at war plus the prospective joiner", () => {
+    const s = runawayState();
+    const solo = coalitionPowerAgainst({ ...s, treaties: {} }, LEADER, JOINER);
+    const withAlly = coalitionPowerAgainst(s, LEADER, JOINER); // ALLY at war adds in
+    expect(withAlly).toBeGreaterThan(solo);
+  });
+
+  it("a coalition member declares war on the runaway leader", () => {
+    const s = runawayState();
+    expect(atWar(s, JOINER, LEADER)).toBe(false);
+    const after = runNationTurn(s, JOINER, createRng(1));
+    expect(atWar(after, JOINER, LEADER)).toBe(true);
+  });
+
+  it("does not pile on during the player's early grace period", () => {
+    const s = { ...runawayState(), turn: 3 } as GameState;
+    // Make the leader the player so the early-grace guard applies.
+    const withPlayerLeader = {
+      ...s,
+      nations: s.nations.map((n) =>
+        n.id === LEADER ? { ...n, isPlayer: true } : n.id === ALLY ? { ...n, isPlayer: false } : n,
+      ),
+    } as GameState;
+    const after = runNationTurn(withPlayerLeader, JOINER, createRng(1));
+    expect(atWar(after, JOINER, LEADER)).toBe(false);
   });
 });
 
