@@ -30,6 +30,20 @@ describe("createGame", () => {
     // Rival nations exist.
     expect(g.nations.some((n) => !n.isPlayer && !n.isBarbarian)).toBe(true);
   });
+
+  it("records each nation's capital: an owned, lightly fortified region", () => {
+    const g = createGame({ seed: 42 });
+    for (const n of g.nations) {
+      if (n.isBarbarian) {
+        expect(n.capitalRegionId).toBeUndefined();
+        continue;
+      }
+      const capital = g.regions[n.capitalRegionId!];
+      expect(capital).toBeDefined();
+      expect(capital!.ownerId).toBe(n.id);
+      expect(capital!.fortification).toBe(1);
+    }
+  });
 });
 
 describe("clampTax", () => {

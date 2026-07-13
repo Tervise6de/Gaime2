@@ -136,6 +136,7 @@ export function createGame(options: NewGameOptions): GameState {
 
   nationIds.forEach((nationId, idx) => {
     const capital = capitals[idx]!;
+    nations[nationId]!.capitalRegionId = capital; // remembered so the AI can aim crippling strikes
     const owned = new Set<number>([capital]);
     for (const n of regions[capital]!.adjacency) {
       if (owned.size >= START_REGIONS) break;

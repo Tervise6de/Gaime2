@@ -6,6 +6,44 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — AI aims crippling strikes at enemy capitals, weighted by archetype
+
+The follow-up the last entry asked for: rivals now *covet enemy capitals*, and
+what "valuable" means now depends on who's asking. `Nation` gained an optional
+`capitalRegionId` (recorded at `createGame`; optional, so legacy saves load
+unchanged and simply grant no capital bonus). In `bestTarget`, a winnable target
+that is a living enemy's capital earns a `CAPITAL_VALUE` (10) bonus scaled by
+the attacker's **aggression** (`× 0.5+aggr` → warlord 14, merchant 7), and the
+existing strategic-resource bonus is now scaled by **economy** (`× 0.5+econ` →
+merchant 8.4, warlord 4.8). Net effect: warlords drive at the enemy's heart,
+merchants and builders peel off its resource regions — same scoring code,
+personality decides the prize. Pure, deterministic, no new RNG.
+
+Tests (+4): enemy capital preferred over an equal ordinary region; a warlord
+picks the capital over a resource region while a merchant picks the resource
+over the capital (the archetype split, both directions); `createGame` records
+every non-barbarian nation's capital as an owned, fort-1 region.
+
+**Balance (temporary self-play probe, deleted before commit):** drove the player
+with `runNationTurn` for symmetric skill, 500 seeds × 4 player archetypes =
+2000 games (probe methodology rebuilt this session — win attribution and RNG
+derivation differ from last entry's probe, so compare only within this run).
+Before → after: warlord 43.6 → 43.5%, opportunist 35.2 → 35.5%, builder
+28.0 → 28.0%, merchant 26.6 → 26.4% — every delta ≤ 0.3 pp, pure noise. All
+victory kinds still reached (domination 1686 / great works 286 / prestige 18 /
+elimination 10 of 2000), avg game length 44.6 → 44.5 turns, 0 incomplete. The
+change is behavioural flavour at neutral balance.
+
+**Verify:** typecheck ✓, 228 tests ✓ (+4), build ✓ (0 `fetch`, deps `{}`).
+Browser smoke: 30 turns driven, zero console/page errors; the log showed the
+rival visibly overrunning the idle smoke-player's realm capital-first.
+
+**Next ideas:** mass force before a hard assault (don't trickle single armies at
+a fortified capital); show a ★/keep marker on capital regions in the map + region
+panel so the player can read the new AI behaviour.
+
+---
+
 ## 2026-07-13 — AI targets *valuable* regions (and it tightens balance)
 
 `bestTarget` (the rival AI's attack picker) claimed in its comment to "prefer

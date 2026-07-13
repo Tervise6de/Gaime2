@@ -740,6 +740,13 @@ export function bestTarget(state: GameState, army: { id: number; regionId: numbe
   if (!region) return null;
   const atk = sideStrength(army.units, zeroUnits(), "attack");
 
+  // Archetype-weighted prizes: warlike nations covet enemy capitals (a
+  // crippling strike at the rival's heartland), economic ones covet strategic
+  // resources. Same scoring code, personality shifts what "valuable" means.
+  const p = state.nations.find((n) => n.id === nationId)?.personality;
+  const capitalValue = CAPITAL_VALUE * (0.5 + (p?.aggression ?? 0.4));
+  const resourceValue = RESOURCE_VALUE * (0.5 + (p?.economy ?? 0.5));
+
   let best: number | null = null;
   let bestScore = 0;
   for (const nid of region.adjacency) {
@@ -760,10 +767,16 @@ export function bestTarget(state: GameState, army: { id: number; regionId: numbe
     // Winnable if our attack clearly exceeds their defence.
     if (atk > def * 1.1) {
       // Among winnable targets, prefer a bigger margin, an enemy nation over
-      // neutral barbarians, and — the previously-missing half — a *valuable*
-      // prize: population is economic worth, a strategic resource unlocks units,
-      // and taking a rival's own land (not barbarian ground) bites deeper.
-      const value = target.population * REGION_POP_VALUE + (target.resource ? RESOURCE_VALUE : 0);
+      // neutral barbarians, and a *valuable* prize: population is economic
+      // worth, a strategic resource unlocks units, an enemy CAPITAL is a
+      // crippling strike — each weighted by this nation's archetype above.
+      const isCapital =
+        isEnemy &&
+        state.nations.some((n) => n.id === target.ownerId && n.capitalRegionId === target.id);
+      const value =
+        target.population * REGION_POP_VALUE +
+        (target.resource ? resourceValue : 0) +
+        (isCapital ? capitalValue : 0);
       const score = atk - def + value + (isBarb ? 2 : 5);
       if (score > bestScore) {
         bestScore = score;
@@ -776,8 +789,10 @@ export function bestTarget(state: GameState, army: { id: number; regionId: numbe
 
 /** How much a point of target population weighs in AI attack targeting. */
 const REGION_POP_VALUE = 1.5;
-/** Bonus weight for a target region holding a strategic resource (iron/horses). */
+/** Base weight for a target region holding a strategic resource (iron/horses). */
 const RESOURCE_VALUE = 6;
+/** Base weight for an enemy nation's capital (scaled by attacker aggression). */
+const CAPITAL_VALUE = 10;
 
 // --- small helpers ----------------------------------------------------------
 

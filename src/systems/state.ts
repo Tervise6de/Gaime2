@@ -218,6 +218,8 @@ export interface Nation {
   personality?: Personality;
   /** National trait drawn per game; undefined for barbarians. */
   trait?: TraitId;
+  /** Founding capital's region id (undefined for barbarians and legacy saves). */
+  capitalRegionId?: number;
   /** Research state (techs done, current, progress). */
   research: Research;
   /** Great Works completed (economic victory progress). */

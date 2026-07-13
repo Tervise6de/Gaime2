@@ -24,6 +24,7 @@ import {
   BARBARIAN_ID,
   armySize,
   emptyUnits,
+  pairKey,
   type Army,
   type GameState,
   type Nation,
@@ -442,6 +443,69 @@ describe("bestTarget prizes valuable regions", () => {
       [attacker, army({ id: 5, ownerId: BARBARIAN_ID, regionId: 1, units: units({ infantry: 12 }) })],
     );
     expect(bestTarget(s, attacker, RIVAL)).toBe(null);
+  });
+});
+
+describe("bestTarget capital strikes (archetype-weighted)", () => {
+  const ENEMY = 3;
+  const WARLORD: Personality = { archetype: "warlord", aggression: 0.9, expansion: 0.8, economy: 0.3, trustworthiness: 0.2 };
+  const MERCHANT: Personality = { archetype: "merchant", aggression: 0.2, expansion: 0.5, economy: 0.9, trustworthiness: 0.85 };
+
+  /** RIVAL (with `personality`) at war with ENEMY, whose capital is region 1. */
+  function warState(regions: Region[], armies: Army[], personality: Personality): GameState {
+    return {
+      turn: 50,
+      difficulty: "normal",
+      treaties: { [pairKey(RIVAL, ENEMY)]: "war" },
+      armies,
+      nations: [
+        { id: RIVAL, alive: true, personality },
+        { id: ENEMY, alive: true, capitalRegionId: 1 },
+      ] as unknown as Nation[],
+      regions,
+    } as unknown as GameState;
+  }
+
+  it("prefers the enemy capital over an equal ordinary region", () => {
+    const attacker = army({ id: 1, ownerId: RIVAL, regionId: 0, units: units({ infantry: 6 }) });
+    const s = warState(
+      [
+        region({ id: 0, ownerId: RIVAL, adjacency: [1, 2] }),
+        region({ id: 1, ownerId: ENEMY, population: 4, adjacency: [0] }), // the capital
+        region({ id: 2, ownerId: ENEMY, population: 4, adjacency: [0] }),
+      ],
+      [attacker],
+      WARLORD,
+    );
+    expect(bestTarget(s, attacker, RIVAL)).toBe(1);
+  });
+
+  it("a warlord strikes the capital rather than a resource region", () => {
+    const attacker = army({ id: 1, ownerId: RIVAL, regionId: 0, units: units({ infantry: 6 }) });
+    const s = warState(
+      [
+        region({ id: 0, ownerId: RIVAL, adjacency: [1, 2] }),
+        region({ id: 1, ownerId: ENEMY, population: 4, adjacency: [0] }), // the capital
+        region({ id: 2, ownerId: ENEMY, population: 4, resource: "iron", adjacency: [0] }),
+      ],
+      [attacker],
+      WARLORD,
+    );
+    expect(bestTarget(s, attacker, RIVAL)).toBe(1);
+  });
+
+  it("a merchant grabs the resource region rather than the capital", () => {
+    const attacker = army({ id: 1, ownerId: RIVAL, regionId: 0, units: units({ infantry: 6 }) });
+    const s = warState(
+      [
+        region({ id: 0, ownerId: RIVAL, adjacency: [1, 2] }),
+        region({ id: 1, ownerId: ENEMY, population: 4, adjacency: [0] }), // the capital
+        region({ id: 2, ownerId: ENEMY, population: 4, resource: "iron", adjacency: [0] }),
+      ],
+      [attacker],
+      MERCHANT,
+    );
+    expect(bestTarget(s, attacker, RIVAL)).toBe(2);
   });
 });
 
