@@ -6,6 +6,31 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Three named save slots with a picker
+
+The manual checkpoint was a single slot — saving overwrote your only backup, so
+you couldn't keep, say, a pre-war position alongside an experiment. Added a
+**Slot 1/2/3** picker beside Save/Load; Save writes to the chosen slot and Load
+reads from it, each independent (plus the continuous autosave, untouched). Toasts
+name the slot ("Saved to Slot 2.", "Slot 1 is empty.", "Loaded Slot 2.").
+
+`SaveSlot` grew from `auto | manual` to `auto | slot1 | slot2 | slot3`, with
+`slot1` deliberately keeping the *legacy* localStorage key so anyone's existing
+checkpoint still loads. `MANUAL_SLOTS` drives the picker so the list stays in one
+place. `onSave`/`onLoad` now carry the slot; `main.ts` maps it and labels the
+toast. Storage-only change — no sim/state/balance impact; still fully offline
+(localStorage, no network).
+
+**Verify:** typecheck ✓, 221 tests ✓, build ✓ (0 `fetch`, deps `{}`).
+Browser-driven the isolation: saved at turn 6 to Slot 2, advanced to turn 12,
+loading Slot 1 reported "empty" (turn unchanged), loading Slot 2 restored turn 6.
+Picker label renders ("Slot 1"). No console errors.
+
+**Next ideas:** show each slot's saved turn/timestamp in the picker; a per-slot
+"clear" action; also link nation names in the log to diplomacy.
+
+---
+
 ## 2026-07-13 — Click a log entry to find that region on the map
 
 The turn log names places ("Suzerain of Kael won at Wyrmholt — Wyrmholt

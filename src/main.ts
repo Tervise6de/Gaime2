@@ -59,21 +59,21 @@ function main(): void {
       lastSummary = null;
       commit();
     },
-    onSave() {
-      const ok = saveToLocal(state, nowStamp(), "manual");
-      hud.toast(ok ? "Checkpoint saved." : "Save failed (storage unavailable).");
+    onSave(slot) {
+      const ok = saveToLocal(state, nowStamp(), slot);
+      hud.toast(ok ? `Saved to ${slotLabel(slot)}.` : "Save failed (storage unavailable).");
     },
-    onLoad() {
-      const loaded = loadFromLocal("manual");
+    onLoad(slot) {
+      const loaded = loadFromLocal(slot);
       if (loaded) {
         state = loaded;
         selectedRegion = null;
         moveArmyId = null;
         lastSummary = null;
         commit(); // make the restored checkpoint the live autosave too
-        hud.toast("Checkpoint loaded.");
+        hud.toast(`Loaded ${slotLabel(slot)}.`);
       } else {
-        hud.toast("No saved checkpoint.");
+        hud.toast(`${slotLabel(slot)} is empty.`);
       }
     },
     onExport() {
@@ -218,6 +218,12 @@ function main(): void {
 /** A wall-clock stamp for saves. Kept out of the sim (which forbids Date). */
 function nowStamp(): number {
   return Date.now();
+}
+
+/** "slot2" → "Slot 2" for user-facing save/load toasts. */
+function slotLabel(slot: string): string {
+  const n = slot.replace("slot", "");
+  return `Slot ${n}`;
 }
 
 /** Trigger a client-side file download of text — fully local, no network. */

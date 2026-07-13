@@ -11,14 +11,19 @@ import type { GameState } from "@/systems/state";
 
 const SAVE_VERSION = 1;
 /**
- * Two slots: `auto` is written continuously for refresh/crash recovery (the
- * game resumes from it on load); `manual` is a checkpoint the player writes with
- * the Save button and restores with Load.
+ * Save slots: `auto` is written continuously for refresh/crash recovery (the
+ * game resumes from it on load); `slot1..slot3` are named checkpoints the player
+ * writes with the Save button and restores with Load. `slot1` keeps the original
+ * single-checkpoint key so pre-existing saves still load.
  */
-export type SaveSlot = "auto" | "manual";
+export type SaveSlot = "auto" | "slot1" | "slot2" | "slot3";
+/** The player-writable checkpoint slots, in display order. */
+export const MANUAL_SLOTS: readonly SaveSlot[] = ["slot1", "slot2", "slot3"];
 const STORAGE_KEY: Record<SaveSlot, string> = {
   auto: "gaime2.save.auto.v1",
-  manual: "gaime2.save.manual.v1",
+  slot1: "gaime2.save.manual.v1", // legacy key — keeps older checkpoints loadable
+  slot2: "gaime2.save.slot2.v1",
+  slot3: "gaime2.save.slot3.v1",
 };
 
 interface SaveEnvelope {
@@ -50,7 +55,7 @@ export function deserializeGame(json: string): GameState | null {
 }
 
 /** Write a save to a localStorage slot. Returns false if storage is unavailable. */
-export function saveToLocal(state: GameState, savedAt: number, slot: SaveSlot = "manual"): boolean {
+export function saveToLocal(state: GameState, savedAt: number, slot: SaveSlot = "slot1"): boolean {
   try {
     localStorage.setItem(STORAGE_KEY[slot], serializeGame(state, savedAt));
     return true;
@@ -60,7 +65,7 @@ export function saveToLocal(state: GameState, savedAt: number, slot: SaveSlot = 
 }
 
 /** Read a save from a slot, or null. */
-export function loadFromLocal(slot: SaveSlot = "manual"): GameState | null {
+export function loadFromLocal(slot: SaveSlot = "slot1"): GameState | null {
   try {
     const json = localStorage.getItem(STORAGE_KEY[slot]);
     return json ? deserializeGame(json) : null;
@@ -70,7 +75,7 @@ export function loadFromLocal(slot: SaveSlot = "manual"): GameState | null {
 }
 
 /** Whether a save exists in a slot. */
-export function hasLocalSave(slot: SaveSlot = "manual"): boolean {
+export function hasLocalSave(slot: SaveSlot = "slot1"): boolean {
   try {
     return localStorage.getItem(STORAGE_KEY[slot]) !== null;
   } catch {

@@ -28,6 +28,7 @@ import {
 } from "@/systems/military";
 import { getRelation, getTreaty, wouldJoinWar, warTargetsFor } from "@/systems/diplomacy";
 import { nationScore } from "@/systems/victory";
+import { MANUAL_SLOTS, type SaveSlot } from "@/systems/save";
 import type { TurnSummary } from "@/systems/summary";
 import { deriveAlerts } from "@/ui/alerts";
 import { researchFrontier, isBuildingUnlockedFor } from "@/systems/tech";
@@ -63,8 +64,8 @@ export interface HudCallbacks {
   onTaxChange(rate: number): void;
   onEndTurn(): void;
   onNewGame(config: NewGameConfig): void;
-  onSave(): void;
-  onLoad(): void;
+  onSave(slot: SaveSlot): void;
+  onLoad(slot: SaveSlot): void;
   /** Download the current game as a JSON file (backup / sharing). */
   onExport(): void;
   /** Load a game from an uploaded save-file's JSON text. */
@@ -242,15 +243,22 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       rivals: Number(rivalsSel.value),
     });
   });
+  // Save/Load act on the chosen checkpoint slot (3 named slots + the autosave).
+  const slotSel = select(
+    "hud-select hud-slot",
+    MANUAL_SLOTS.map((s, i) => [s, `Slot ${i + 1}`] as [string, string]),
+    MANUAL_SLOTS[0]!,
+  );
+  slotSel.title = "Which checkpoint slot Save writes to and Load reads from.";
   const saveBtn = document.createElement("button");
   saveBtn.className = "hud-newgame-btn";
   saveBtn.textContent = "Save";
-  saveBtn.addEventListener("click", () => callbacks.onSave());
+  saveBtn.addEventListener("click", () => callbacks.onSave(slotSel.value as SaveSlot));
   const loadBtn = document.createElement("button");
   loadBtn.className = "hud-newgame-btn";
   loadBtn.textContent = "Load";
-  loadBtn.addEventListener("click", () => callbacks.onLoad());
-  btnRow.append(newGameBtn, saveBtn, loadBtn);
+  loadBtn.addEventListener("click", () => callbacks.onLoad(slotSel.value as SaveSlot));
+  btnRow.append(newGameBtn, slotSel, saveBtn, loadBtn);
   controls.append(btnRow);
 
   // Export / import a save as a downloadable file (backup / sharing) — fully
