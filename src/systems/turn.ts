@@ -17,6 +17,7 @@
 import { BUILDINGS, type BuildingId } from "@/data/buildings";
 import { UNITS, type UnitType } from "@/data/units";
 import { ARCHETYPES } from "@/data/personalities";
+import { TRAIT_IDS } from "@/data/traits";
 import { TECHS, type TechId } from "@/data/techs";
 import { generateMap, type MapGenOptions } from "@/systems/mapgen";
 import { nationalProduction, round1 } from "@/systems/economy";
@@ -164,6 +165,17 @@ export function createGame(options: NewGameOptions): GameState {
     armies.push({ id: nextArmyId++, ownerId: BARBARIAN_ID, regionId: r.id, units: garrison, movesLeft: 0 });
     return { ...r, ownerId: BARBARIAN_ID, fortification: fort };
   });
+
+  // Draw a distinct national trait for each non-barbarian nation (player +
+  // rivals), for opening variety. Done last so existing seeded map/capital
+  // layouts are unaffected by the added RNG draws.
+  const traitPool = shuffled(TRAIT_IDS, rng);
+  let traitIdx = 0;
+  for (const n of nations) {
+    if (n.isBarbarian) continue;
+    n.trait = traitPool[traitIdx % traitPool.length];
+    traitIdx += 1;
+  }
 
   const playerCapitalName = regions[capitals[0]!]!.name;
 

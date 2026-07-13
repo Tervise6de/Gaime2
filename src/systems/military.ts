@@ -14,6 +14,7 @@
 
 import { UNITS, type UnitType } from "@/data/units";
 import { TERRAIN, type StrategicResource } from "@/data/terrain";
+import { traitUnitCostMult } from "@/data/traits";
 import { createRng } from "@/systems/rng";
 import { resolveCombat, type UnitCounts } from "@/systems/combat";
 import { atWar, declareWar } from "@/systems/diplomacy";
@@ -26,8 +27,16 @@ import {
   emptyUnits,
   type Army,
   type GameState,
+  type Nation,
   type Region,
 } from "@/systems/state";
+
+/** Unit gold+materials cost after the owner's national trait (Martial discount). */
+export function unitCost(nation: Nation | undefined, unit: UnitType): { gold: number; materials: number } {
+  const c = UNITS[unit].cost;
+  const m = traitUnitCostMult(nation?.trait);
+  return { gold: Math.round(c.gold * m), materials: Math.round(c.materials * m) };
+}
 
 /** The army of a given owner standing in a region, if any. */
 export function armyAt(
@@ -86,8 +95,9 @@ export function canRaiseUnit(
   if (def.requiresTech && !nation.research.done.includes(def.requiresTech)) {
     return { ok: false, reason: `Requires ${def.requiresTech.replace(/_/g, " ")}.` };
   }
-  if (nation.stocks.gold < def.cost.gold) return { ok: false, reason: "Not enough gold." };
-  if (nation.stocks.materials < def.cost.materials) {
+  const cost = unitCost(nation, unit);
+  if (nation.stocks.gold < cost.gold) return { ok: false, reason: "Not enough gold." };
+  if (nation.stocks.materials < cost.materials) {
     return { ok: false, reason: "Not enough materials." };
   }
   if (def.requires && !strategicAccess(state, ownerId).has(def.requires)) {
@@ -104,7 +114,8 @@ export function raiseUnit(
   ownerId = PLAYER_ID,
 ): GameState {
   if (!canRaiseUnit(state, regionId, unit, ownerId).ok) return state;
-  const def = UNITS[unit];
+  const owner = state.nations.find((n) => n.id === ownerId);
+  const cost = unitCost(owner, unit);
 
   const nations = state.nations.map((n) =>
     n.id === ownerId
@@ -112,8 +123,8 @@ export function raiseUnit(
           ...n,
           stocks: {
             ...n.stocks,
-            gold: round1(n.stocks.gold - def.cost.gold),
-            materials: round1(n.stocks.materials - def.cost.materials),
+            gold: round1(n.stocks.gold - cost.gold),
+            materials: round1(n.stocks.materials - cost.materials),
           },
         }
       : n,

@@ -22,10 +22,12 @@ import {
   UNREST_REVOLT,
   ZERO_FLOW,
   type GameState,
+  type Nation,
   type Region,
   type ResourceFlow,
 } from "@/systems/state";
 import { techMultipliers } from "@/systems/tech";
+import { traitYield } from "@/data/traits";
 
 const NO_MULT: ResourceYield = { food: 1, materials: 1, gold: 1, knowledge: 1 };
 
@@ -87,6 +89,21 @@ export function regionProduction(
   };
 }
 
+/**
+ * A nation's combined yield multiplier: research bonuses × its national trait.
+ * Used for its own production and for the HUD's region breakdown so both agree.
+ */
+export function nationYieldMult(nation: Nation): ResourceYield {
+  const t = techMultipliers(nation.research.done);
+  const tr = traitYield(nation.trait);
+  return {
+    food: t.food * tr.food,
+    materials: t.materials * tr.materials,
+    gold: t.gold * tr.gold,
+    knowledge: t.knowledge * tr.knowledge,
+  };
+}
+
 /** Sum of production across all regions a nation owns (at its own tax rate). */
 export function nationalProduction(
   state: GameState,
@@ -94,7 +111,7 @@ export function nationalProduction(
 ): ResourceFlow {
   const nation = state.nations.find((n) => n.id === ownerId);
   const taxRate = nation?.taxRate ?? 0;
-  const mult = nation ? techMultipliers(nation.research.done) : NO_MULT;
+  const mult = nation ? nationYieldMult(nation) : NO_MULT;
   return state.regions
     .filter((r) => r.ownerId === ownerId)
     .reduce<ResourceFlow>((acc, region) => {

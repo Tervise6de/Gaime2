@@ -6,6 +6,45 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — National traits for opening variety
+
+Each nation (player + rivals) now draws one of five national traits per game
+(design §6), nudging different openings: **Fertile** +25% food, **Industrious**
++25% materials, **Mercantile** +20% gold, **Scholarly** +30% knowledge, and
+**Martial** −20% unit cost.
+
+Change:
+- `data/traits.ts` (new): pure trait table with per-resource yield multipliers
+  and a unit-cost multiplier, plus `traitYield`/`traitUnitCostMult` accessors.
+- `state.ts`: optional `trait` on `Nation` (barbarians get none).
+- `turn.ts` `createGame`: draws distinct traits from a seeded shuffle — done
+  *after* all other setup RNG so existing seeded map/capital layouts are
+  unchanged.
+- `economy.ts`: new `nationYieldMult(nation)` folds the trait multiplier into the
+  research multiplier; `nationalProduction` and the HUD region breakdown both use
+  it, so display and sim agree.
+- `military.ts`: `unitCost(nation, unit)` applies the Martial discount; wired into
+  `canRaiseUnit`, `raiseUnit`, and the HUD raise menu.
+- `hud.ts`: player trait in the turn badge, rival traits on the diplomacy cards
+  (with blurb tooltips).
+
+**Balance check (temporary symmetric probe, deleted before commit):** traits
+*lift the weakest archetypes* and narrow the spread — merchant/builder 4→13%,
+opportunist 13→25%, warlord 38→42% (win rates), i.e. healthier variety, no
+runaway. Median length dips modestly in-probe (44→36). Browser-verified: player
+badge shows its trait, rivals show archetype · trait, no console errors.
+
+**Note:** the added trait RNG shifted the global stream, so the "wars break out"
+test's five pinned seeds no longer all war within 60 turns; rewrote it to scan a
+dozen seeds (war still erupts in ~40% of seeds within 80 turns — no regression).
+
+Test count: 162 green (was 153). Build network-free (0 `fetch`).
+
+**Next ideas:** trait-aware AI openings (Martial → earlier army, Scholarly →
+tech rush); turn-summary panel; tech-tree screen; ask allies to join wars.
+
+---
+
 ## 2026-07-13 — Combat-odds preview in the UI
 
 Attacking was a blind commit: the player picked a highlighted target with no idea

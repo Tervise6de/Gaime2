@@ -15,7 +15,7 @@
 import { BUILDINGS, BUILDING_IDS, type BuildingId } from "@/data/buildings";
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
 import { TERRAIN } from "@/data/terrain";
-import { regionProduction, nationalProduction } from "@/systems/economy";
+import { regionProduction, nationalProduction, nationYieldMult } from "@/systems/economy";
 import { regionCapacity } from "@/systems/population";
 import { previewCombat } from "@/systems/combat";
 import {
@@ -24,10 +24,12 @@ import {
   canRaiseUnit,
   reachableRegions,
   totalUpkeep,
+  unitCost,
 } from "@/systems/military";
 import { getRelation, getTreaty } from "@/systems/diplomacy";
-import { researchFrontier, isBuildingUnlockedFor, techMultipliers } from "@/systems/tech";
+import { researchFrontier, isBuildingUnlockedFor } from "@/systems/tech";
 import { ARCHETYPE_LABEL } from "@/data/personalities";
+import { TRAITS } from "@/data/traits";
 import { TECHS, type TechId } from "@/data/techs";
 import { WONDER_GOAL, type Difficulty } from "@/systems/state";
 import {
@@ -262,7 +264,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     turnBadge.textContent =
       (player.famine ? "⚠ FAMINE · " : "") +
       (player.bankrupt ? "⚠ BANKRUPT · " : "") +
-      `Turn ${state.turn} · ${state.difficulty} · seed ${state.seed}`;
+      `Turn ${state.turn} · ${state.difficulty}` +
+      (player.trait ? ` · ${TRAITS[player.trait].label}` : "") +
+      ` · seed ${state.seed}`;
+    turnBadge.title = player.trait ? TRAITS[player.trait].blurb : "";
     turnBadge.classList.toggle("famine", player.famine || player.bankrupt);
 
     taxInput.value = String(Math.round(player.taxRate * 100));
@@ -342,7 +347,7 @@ function renderOwnedRegion(
   callbacks: HudCallbacks,
 ): void {
   const player = playerNation(state);
-  const flow = regionProduction(region, player.taxRate, techMultipliers(player.research.done));
+  const flow = regionProduction(region, player.taxRate, nationYieldMult(player));
 
   // Unrest bar.
   const unrestWrap = el("div", "hud-unrest");
@@ -441,9 +446,10 @@ function renderArmySection(
     btn.title = check.ok
       ? `${def.attack}⚔ / ${def.defense}🛡 · ${def.upkeep}g upkeep${def.requires ? ` · needs ${def.requires}` : ""}`
       : check.reason ?? "";
+    const cost = unitCost(playerNation(state), t);
     btn.innerHTML =
       `<span class="hud-unit-name">${def.short}</span>` +
-      `<span class="hud-unit-cost">${def.cost.gold}g ${def.cost.materials}⛏</span>`;
+      `<span class="hud-unit-cost">${cost.gold}g ${cost.materials}⛏</span>`;
     if (check.ok) btn.addEventListener("click", () => callbacks.onRaiseUnit(region.id, t));
     menu.append(btn);
   }
@@ -588,7 +594,10 @@ function renderDiplomacy(
     const nm = el("span", "hud-diplo-name");
     nm.textContent = rival.name;
     const arch = el("span", "hud-diplo-arch");
-    arch.textContent = rival.personality ? ARCHETYPE_LABEL[rival.personality.archetype] : "";
+    const archLabel = rival.personality ? ARCHETYPE_LABEL[rival.personality.archetype] : "";
+    const traitLabel = rival.trait ? TRAITS[rival.trait].label : "";
+    arch.textContent = [archLabel, traitLabel].filter(Boolean).join(" · ");
+    if (rival.trait) arch.title = TRAITS[rival.trait].blurb;
     head.append(sw, nm, arch);
     card.append(head);
 

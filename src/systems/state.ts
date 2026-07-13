@@ -15,6 +15,7 @@ import type { BuildingId } from "@/data/buildings";
 import type { ResourceYield, StrategicResource, TerrainId } from "@/data/terrain";
 import type { UnitType } from "@/data/units";
 import type { TechId } from "@/data/techs";
+import type { TraitId } from "@/data/traits";
 
 /** Owner id 0 is always the human player. */
 export const PLAYER_ID = 0;
@@ -215,6 +216,8 @@ export interface Nation {
   taxRate: number;
   /** AI archetype; undefined for the player and barbarians. */
   personality?: Personality;
+  /** National trait drawn per game; undefined for barbarians. */
+  trait?: TraitId;
   /** Research state (techs done, current, progress). */
   research: Research;
   /** Great Works completed (economic victory progress). */
