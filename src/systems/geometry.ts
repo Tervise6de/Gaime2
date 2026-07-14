@@ -143,6 +143,94 @@ export function circumcenter(a: Point, b: Point, c: Point): Point {
   };
 }
 
+export interface Bounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+const UNIT_BOUNDS: Bounds = { minX: 0, minY: 0, maxX: 1, maxY: 1 };
+
+/**
+ * Voronoi cell polygons, one per site, computed as the intersection of the
+ * bisector half-planes against each site's neighbours, clipped to `bounds`.
+ *
+ * This half-plane method is robust for hull sites (whose naive circumcentre
+ * cells are open to infinity) and deterministic. `neighbors[i]` should be site
+ * i's adjacency — a Delaunay-derived neighbour set makes every bisector an
+ * active constraint, but a superset (e.g. the logic graph with extra
+ * connectivity links) only adds redundant, still-correct constraints.
+ */
+export function voronoiCells(
+  sites: Point[],
+  neighbors: number[][],
+  bounds: Bounds = UNIT_BOUNDS,
+): Point[][] {
+  return sites.map((site, i) => {
+    let poly: Point[] = [
+      { x: bounds.minX, y: bounds.minY },
+      { x: bounds.maxX, y: bounds.minY },
+      { x: bounds.maxX, y: bounds.maxY },
+      { x: bounds.minX, y: bounds.maxY },
+    ];
+    for (const j of neighbors[i] ?? []) {
+      const other = sites[j];
+      if (!other) continue;
+      // Keep the half-plane closer to `site`: normal points from other → site.
+      const nx = site.x - other.x;
+      const ny = site.y - other.y;
+      const mx = (site.x + other.x) / 2;
+      const my = (site.y + other.y) / 2;
+      poly = clipHalfPlane(poly, nx, ny, mx, my);
+      if (poly.length === 0) break;
+    }
+    // Degenerate fallback: a tiny square around the site.
+    if (poly.length < 3) {
+      const e = 0.01;
+      return [
+        { x: site.x - e, y: site.y - e },
+        { x: site.x + e, y: site.y - e },
+        { x: site.x + e, y: site.y + e },
+        { x: site.x - e, y: site.y + e },
+      ];
+    }
+    return poly;
+  });
+}
+
+/** Sutherland–Hodgman clip of a polygon to the half-plane n·(p − m) ≥ 0. */
+function clipHalfPlane(poly: Point[], nx: number, ny: number, mx: number, my: number): Point[] {
+  const out: Point[] = [];
+  const side = (p: Point) => nx * (p.x - mx) + ny * (p.y - my);
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i];
+    const b = poly[(i + 1) % poly.length];
+    const da = side(a);
+    const db = side(b);
+    if (da >= 0) out.push(a);
+    if ((da >= 0) !== (db >= 0)) {
+      const t = da / (da - db);
+      out.push({ x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) });
+    }
+  }
+  return out;
+}
+
+/** True if point (px,py) lies inside a polygon (ray-casting). */
+export function pointInPolygon(poly: Point[], px: number, py: number): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x;
+    const yi = poly[i].y;
+    const xj = poly[j].x;
+    const yj = poly[j].y;
+    const intersect = yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
 function inCircumcircle(p: Point, a: Point, b: Point, c: Point): boolean {
   const cc = circumcenter(a, b, c);
   const r2 = dist2(cc, a);

@@ -23,4 +23,4 @@ never touch the DOM; never commit red; never force-push; no PRs.
 3. **Voronoi-polygon map renderer** — transformative visuals over the identical
    adjacency graph, shipped behind a toggle with the node+edge renderer as
    fallback.
-   *Status: ⏳ pending.*
+   *Status: ✅ done (2026-07-14).*

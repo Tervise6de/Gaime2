@@ -9,7 +9,7 @@ import {
   raiseUnits,
 } from "@/systems";
 import type { GameState, UnitType } from "@/systems";
-import { nodeEdgeRenderer, type MapRenderer, type RenderState, type View } from "@/render";
+import { nodeEdgeRenderer, voronoiRenderer, type MapRenderer, type RenderState, type View } from "@/render";
 import { createHud, type Hud } from "@/ui/hud";
 import { createEndScreen } from "@/ui/endscreen";
 
@@ -28,7 +28,11 @@ function main(): void {
   if (!ctx) throw new Error("Unable to acquire 2D rendering context");
 
   let state: GameState = createInitialState({ seed: pickSeed() });
-  const renderer: MapRenderer = nodeEdgeRenderer;
+  // Node+edge is the always-available fallback; Voronoi is the visual upgrade
+  // over the identical adjacency graph.
+  const renderers: MapRenderer[] = [nodeEdgeRenderer, voronoiRenderer];
+  let rendererIdx = 0;
+  let renderer: MapRenderer = renderers[rendererIdx];
   let selected = -1;
   let hovered = -1;
 
@@ -71,7 +75,14 @@ function main(): void {
       endScreen.hide();
       refresh();
     },
+    onToggleMap: () => {
+      rendererIdx = (rendererIdx + 1) % renderers.length;
+      renderer = renderers[rendererIdx];
+      hud.setMapLabel(`Kaart: ${renderer.label}`);
+    },
   });
+
+  hud.setMapLabel(`Kaart: ${renderer.label}`);
 
   function playerId(): number {
     return state.nations.find((n) => n.isPlayer)!.id;

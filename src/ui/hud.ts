@@ -19,10 +19,12 @@ export interface HudHandlers {
   onBuildFort(): void;
   onSetTax(rate: number): void;
   onNewGame(): void;
+  onToggleMap(): void;
 }
 
 export interface Hud {
   update(state: GameState, selected: number): void;
+  setMapLabel(label: string): void;
   root: HTMLElement;
 }
 
@@ -54,11 +56,18 @@ export function createHud(root: HTMLElement, handlers: HudHandlers): Hud {
   tax.step = "1";
   tax.addEventListener("input", () => handlers.onSetTax(Number(tax.value) / 100));
 
+  const mapBtn = el("button", "hud-btn", "Kaart");
+  mapBtn.title = "Vaheta kaardi kuvamist";
+  mapBtn.addEventListener("click", () => handlers.onToggleMap());
   const endBtn = el("button", "hud-btn hud-btn-primary", "Lõpeta käik");
   endBtn.addEventListener("click", () => handlers.onEndTurn());
   const newBtn = el("button", "hud-btn", "Uus mäng");
   newBtn.addEventListener("click", () => handlers.onNewGame());
-  controls.append(taxLabel, tax, endBtn, newBtn);
+  controls.append(taxLabel, tax, mapBtn, endBtn, newBtn);
+
+  function setMapLabel(label: string): void {
+    mapBtn.textContent = label;
+  }
 
   function update(state: GameState, selected: number): void {
     const player = state.nations.find((n) => n.isPlayer)!;
@@ -146,7 +155,7 @@ export function createHud(root: HTMLElement, handlers: HudHandlers): Hud {
     return wrap;
   }
 
-  return { update, root };
+  return { update, setMapLabel, root };
 }
 
 const TERRAIN_ET: Record<string, string> = {

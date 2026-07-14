@@ -8,3 +8,4 @@
 
 export * from "@/render/types";
 export { nodeEdgeRenderer } from "@/render/nodeEdge";
+export { voronoiRenderer } from "@/render/voronoi";

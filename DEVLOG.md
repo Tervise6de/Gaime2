@@ -5,6 +5,38 @@ committed slice.
 
 ---
 
+## 2026-07-14 — Voronoi-polygon map renderer
+
+**Development 3 of 3.** A transformative map visual (`render/voronoi.ts`) over
+the *identical* adjacency graph, behind a toggle with node+edge as the fallback.
+
+- **Voronoi cells** (`systems/geometry.ts::voronoiCells`) computed as the
+  intersection of bisector half-planes against each region's neighbours, clipped
+  to the map box — robust for hull cells and deterministic. Derived from the
+  same region sites that define adjacency, so the logic graph is untouched.
+- **Renderer**: filled cells (colour = owner, terrain tint), dark cell outlines,
+  brighter frontier edges between different owners, population labels with a
+  legibility halo, fort pips, army badges, and selection/hover/reachable
+  highlights. Cell geometry is cached per map; only re-projection runs per frame.
+- Implements the same `MapRenderer` interface as node+edge, including
+  `regionAt` via point-in-polygon hit-testing, so `main.ts` swaps the two with a
+  HUD toggle ("Kaart: …") over zero game-logic change. Node+edge stays the
+  default fallback.
+
+### Verification
+
+- `npm run typecheck` ✓, `npm test` ✓ (15 — added 3 Voronoi geometry tests:
+  each cell is a valid polygon containing its own site, sites fall in their
+  cell, cells stay within bounds), `npm run build` ✓; `fetch` in bundle == 0.
+- Playwright browser verification ✓: toggled node+edge → Voronoi → back, cells
+  render and tile the map, hit-testing selected the correct cell ("Harlow"),
+  gameplay continued (ownership spread visibly across turns), zero console
+  errors, zero external network.
+- Rendering-only change (new geometry covered by unit tests), so no self-play
+  probe was needed.
+
+---
+
 ## 2026-07-14 — End-game summary screen
 
 **Development 2 of 3.** A real post-game overlay (`ui/endscreen.ts`) that opens
