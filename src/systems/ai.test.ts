@@ -6,6 +6,8 @@ import {
   isBadlyOutmatched,
   retreatStep,
   defendStep,
+  focusTarget,
+  musterRegion,
   chooseBuilding,
   runawayLeader,
   coalitionPowerAgainst,
@@ -438,6 +440,107 @@ describe("home defence (retreat / garrison)", () => {
       [mine, army({ id: 5, ownerId: ENEMY, regionId: 1, units: units({ infantry: 4 }) })],
     );
     expect(defendStep(s, mine, RIVAL)).toBe(null);
+  });
+});
+
+describe("concentration of force", () => {
+  const ENEMY = 3;
+  function warState(regions: Region[], armies: Army[]): GameState {
+    return {
+      turn: 50,
+      difficulty: "normal",
+      treaties: { "2-3": "war" },
+      armies,
+      nations: [],
+      regions,
+    } as unknown as GameState;
+  }
+
+  it("focusTarget flags a strong bordering enemy region no single army can crack", () => {
+    const s = warState(
+      [
+        region({ id: 0, ownerId: RIVAL, adjacency: [1] }),
+        region({ id: 1, ownerId: ENEMY, adjacency: [0], population: 6, fortification: 2 }),
+      ],
+      [
+        army({ id: 1, ownerId: RIVAL, regionId: 0, units: units({ militia: 1 }) }),
+        army({ id: 5, ownerId: ENEMY, regionId: 1, units: units({ infantry: 10 }) }),
+      ],
+    );
+    expect(focusTarget(s, RIVAL)).toBe(1);
+  });
+
+  it("focusTarget ignores a target a single army already beats (normal attack takes it)", () => {
+    const s = warState(
+      [
+        region({ id: 0, ownerId: RIVAL, adjacency: [1] }),
+        region({ id: 1, ownerId: ENEMY, adjacency: [0], population: 2 }),
+      ],
+      [
+        army({ id: 1, ownerId: RIVAL, regionId: 0, units: units({ infantry: 8 }) }),
+        army({ id: 5, ownerId: ENEMY, regionId: 1, units: units({ militia: 1 }) }),
+      ],
+    );
+    expect(focusTarget(s, RIVAL)).toBe(null);
+  });
+
+  it("musterRegion gathers on the owned neighbour holding the most friendly force", () => {
+    const s = warState(
+      [
+        region({ id: 0, ownerId: RIVAL, adjacency: [1] }),
+        region({ id: 1, ownerId: ENEMY, adjacency: [0, 2], population: 6, fortification: 2 }),
+        region({ id: 2, ownerId: RIVAL, adjacency: [1] }),
+      ],
+      [
+        army({ id: 1, ownerId: RIVAL, regionId: 0, units: units({ militia: 1 }) }),
+        army({ id: 2, ownerId: RIVAL, regionId: 2, units: units({ infantry: 5 }) }),
+        army({ id: 5, ownerId: ENEMY, regionId: 1, units: units({ infantry: 10 }) }),
+      ],
+    );
+    expect(musterRegion(s, RIVAL, 1)).toBe(2); // region 2 holds the bigger stack — the anvil
+  });
+
+  it("two split armies mass and merge, then take a region neither beat alone", () => {
+    // Two rival stacks in owned regions 0 and 2 (connected through own land),
+    // both eventually adjacent to a strong enemy region 1. Driven over turns the
+    // rival should concentrate and capture it, where each army alone cannot.
+    const build = (): GameState =>
+      ({
+        turn: 50,
+        difficulty: "normal",
+        treaties: { "2-3": "war" },
+        rngState: 123,
+        nextArmyId: 10,
+        offers: [],
+        relations: {},
+        log: [],
+        nations: [
+          { id: RIVAL, name: "R", color: "#000", isPlayer: false, isBarbarian: false, alive: true, stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, taxRate: 0.2, research: emptyResearch(), wonders: 0, famine: false, bankrupt: false, personality: { archetype: "warlord", aggression: 0.9, expansion: 0.8, economy: 0.3, trustworthiness: 0.2 } },
+          { id: ENEMY, name: "E", color: "#fff", isPlayer: false, isBarbarian: false, alive: true, stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, taxRate: 0.2, research: emptyResearch(), wonders: 0, famine: false, bankrupt: false },
+        ],
+        regions: [
+          region({ id: 0, ownerId: RIVAL, adjacency: [1, 2] }),
+          region({ id: 1, ownerId: ENEMY, adjacency: [0, 2], population: 3, fortification: 0 }),
+          region({ id: 2, ownerId: RIVAL, adjacency: [0, 1] }),
+        ],
+        armies: [
+          // Each 5-inf stack (atk 25) loses to the 5-inf defender (def 30) alone,
+          // but the merged 10-inf stack (atk 50) wins — so only massing takes it.
+          army({ id: 1, ownerId: RIVAL, regionId: 0, units: units({ infantry: 5 }), movesLeft: 1 }),
+          army({ id: 2, ownerId: RIVAL, regionId: 2, units: units({ infantry: 5 }), movesLeft: 1 }),
+          army({ id: 5, ownerId: ENEMY, regionId: 1, units: units({ infantry: 5 }), movesLeft: 0 }),
+        ],
+      }) as unknown as GameState;
+
+    let s = build();
+    const rng = createRng(99);
+    let captured = false;
+    for (let t = 0; t < 14 && !captured; t++) {
+      s = runNationTurn(s, RIVAL, rng);
+      s = { ...s, armies: s.armies.map((a) => ({ ...a, movesLeft: 1 })) }; // refresh moves each turn
+      captured = s.regions[1]!.ownerId === RIVAL;
+    }
+    expect(captured).toBe(true);
   });
 });
 

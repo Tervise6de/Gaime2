@@ -442,9 +442,33 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
       continue; // if nowhere safer, hold and sell it dearly rather than advance
     }
 
+    // Concentration of force: gather toward the anvil next to a high-value target
+    // that no single army can crack, massing (and merging) over turns until the
+    // combined stack wins — instead of dribbling armies onto the front piecemeal.
+    // This takes priority over a *passive* garrison (the anvil is itself on the
+    // front), but never overrides the retreat above, and never strips the
+    // capital's own garrison — a realm keeps its seat of power defended.
+    const capitalId = s.nations.find((n) => n.id === nationId)?.capitalRegionId;
+    const holdingCapital = live.regionId === capitalId && regionIsThreatened(s, live.regionId, nationId);
+    if (!holdingCapital) {
+      const focus = focusTarget(s, nationId);
+      if (focus !== null) {
+        const muster = musterRegion(s, nationId, focus);
+        if (muster !== null) {
+          if (live.regionId === muster) continue; // already massing here — hold and build up
+          const toMuster = firstStepTowards(s, live.regionId, nationId, (rid) => rid === muster);
+          if (toMuster !== null) {
+            s = moveArmy(s, live.id, toMuster);
+            continue;
+          }
+        }
+      }
+    }
+
     // Defensible and already under threat here → garrison in place.
     if (regionIsThreatened(s, live.regionId, nationId)) continue;
 
+    // Otherwise reinforce the nearest threatened region, then stage at the front.
     const defend = defendStep(s, live, nationId);
     if (defend !== null) {
       s = moveArmy(s, live.id, defend);
@@ -560,13 +584,19 @@ export function retreatStep(state: GameState, army: Army, nationId: number): num
 }
 
 /**
- * First step (an owned neighbour) along the shortest own-land path toward the
- * nearest threatened owned region — reinforcing where enemies are massing.
- * Null if the army is already at the threatened region or none is reachable.
+ * Breadth-first march through *own land only*: the first step (an owned
+ * neighbour) along the shortest owned path from `start` to the nearest region
+ * satisfying `isGoal`. Null if `start` already satisfies `isGoal` or no owned
+ * path reaches one. Shared by the defend / advance / muster routers so they
+ * never blunder a march through hostile territory.
  */
-export function defendStep(state: GameState, army: Army, nationId: number): number | null {
-  const start = army.regionId;
-  if (regionIsThreatened(state, start, nationId)) return null; // already defending
+function firstStepTowards(
+  state: GameState,
+  start: number,
+  nationId: number,
+  isGoal: (regionId: number) => boolean,
+): number | null {
+  if (isGoal(start)) return null;
   const visited = new Set<number>([start]);
   const queue: { node: number; first: number | null }[] = [{ node: start, first: null }];
   while (queue.length) {
@@ -577,11 +607,22 @@ export function defendStep(state: GameState, army: Army, nationId: number): numb
       if (!nbR || nbR.ownerId !== nationId) continue; // march only through own land
       visited.add(nb);
       const step = first ?? nb;
-      if (regionIsThreatened(state, nb, nationId)) return step;
+      if (isGoal(nb)) return step;
       queue.push({ node: nb, first: step });
     }
   }
   return null;
+}
+
+/**
+ * First step (an owned neighbour) along the shortest own-land path toward the
+ * nearest threatened owned region — reinforcing where enemies are massing.
+ * Null if the army is already at the threatened region or none is reachable.
+ */
+export function defendStep(state: GameState, army: Army, nationId: number): number | null {
+  return firstStepTowards(state, army.regionId, nationId, (rid) =>
+    regionIsThreatened(state, rid, nationId),
+  );
 }
 
 /** Whether a nation may attack into a region (hostile, honouring player grace). */
@@ -604,30 +645,95 @@ function advanceStep(
   army: { regionId: number },
   nationId: number,
 ): number | null {
-  const start = army.regionId;
   const isFrontier = (rid: number): boolean => {
     const r = state.regions[rid];
     return (
       !!r && r.ownerId === nationId && r.adjacency.some((n) => isAttackable(state, n, nationId))
     );
   };
-  if (isFrontier(start)) return null; // already staged at the front
+  return firstStepTowards(state, army.regionId, nationId, isFrontier);
+}
 
-  const visited = new Set<number>([start]);
-  const queue: { node: number; first: number | null }[] = [{ node: start, first: null }];
-  while (queue.length) {
-    const { node, first } = queue.shift()!;
-    for (const nb of state.regions[node]!.adjacency) {
-      if (visited.has(nb)) continue;
-      const nbR = state.regions[nb];
-      if (!nbR || nbR.ownerId !== nationId) continue; // march only through own land
-      visited.add(nb);
-      const step = first ?? nb;
-      if (isFrontier(nb)) return step;
-      queue.push({ node: nb, first: step });
+// --- concentration of force -------------------------------------------------
+
+/**
+ * Whether some single owned army adjacent to `targetId` can already win there on
+ * its own (mirrors `bestTarget`'s winnable test). If so, the target needs no
+ * massing — normal attack handling takes it.
+ */
+function soloWinnable(state: GameState, targetId: number, nationId: number): boolean {
+  const target = state.regions[targetId];
+  if (!target) return false;
+  const defender = state.armies.find((a) => a.regionId === targetId && a.ownerId !== nationId);
+  for (const a of state.armies) {
+    if (a.ownerId !== nationId) continue;
+    const ar = state.regions[a.regionId];
+    if (!ar || !ar.adjacency.includes(targetId)) continue;
+    const atk = sideStrength(a.units, zeroUnits(), "attack");
+    const def = defender
+      ? sideStrength(defender.units, a.units, "defense") * 1.2 + target.fortification * 3
+      : 0;
+    if (atk > def * 1.1) return true;
+  }
+  return false;
+}
+
+/**
+ * A high-value enemy region worth *massing* against: attackable, bordering our
+ * land, and NOT already beatable by a single adjacent army (else normal attack
+ * takes it). Prize weighting mirrors `bestTarget` (population, resource, an enemy
+ * capital), scaled by archetype. Deterministic — highest score, ties by lowest
+ * id. Null when nothing needs massing.
+ */
+export function focusTarget(state: GameState, nationId: number): number | null {
+  const owned = state.regions.filter((r) => r.ownerId === nationId);
+  const p = state.nations.find((n) => n.id === nationId)?.personality;
+  const capW = CAPITAL_VALUE * (0.5 + (p?.aggression ?? 0.4));
+  const resW = RESOURCE_VALUE * (0.5 + (p?.economy ?? 0.5));
+  const candidates = new Set<number>();
+  for (const r of owned) {
+    for (const nb of r.adjacency) if (isAttackable(state, nb, nationId)) candidates.add(nb);
+  }
+  let best: number | null = null;
+  let bestScore = -Infinity;
+  for (const id of [...candidates].sort((a, b) => a - b)) {
+    if (soloWinnable(state, id, nationId)) continue; // handled by ordinary attack
+    const t = state.regions[id]!;
+    const isEnemy = t.ownerId !== null && t.ownerId !== BARBARIAN_ID && atWar(state, nationId, t.ownerId);
+    const isCapital =
+      isEnemy && state.nations.some((n) => n.id === t.ownerId && n.capitalRegionId === id);
+    const value =
+      t.population * REGION_POP_VALUE + (t.resource ? resW : 0) + (isCapital ? capW : 0) + (isEnemy ? 5 : 2);
+    if (value > bestScore) {
+      bestScore = value;
+      best = id;
     }
   }
-  return null;
+  return best;
+}
+
+/**
+ * The owned staging region (an "anvil") next to `focusId` where the nation should
+ * gather its armies — the adjacent owned region already holding the most friendly
+ * force, ties by lowest id. Null if no owned region borders the focus.
+ */
+export function musterRegion(state: GameState, nationId: number, focusId: number): number | null {
+  const focus = state.regions[focusId];
+  if (!focus) return null;
+  let best: number | null = null;
+  let bestForce = -1;
+  for (const nb of [...focus.adjacency].sort((a, b) => a - b)) {
+    const r = state.regions[nb];
+    if (!r || r.ownerId !== nationId) continue;
+    const force = state.armies
+      .filter((a) => a.ownerId === nationId && a.regionId === nb)
+      .reduce((s, a) => s + armySize(a.units), 0);
+    if (force > bestForce) {
+      bestForce = force;
+      best = nb;
+    }
+  }
+  return best;
 }
 
 function recruit(state: GameState, nationId: number, rng: Rng): GameState {

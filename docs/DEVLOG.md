@@ -6,6 +6,50 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — AI concentration of force (handoff dev #1)
+
+First of the three "further the game a lot" developments (see
+`docs/next-3-developments.md`). **The AI now masses armies instead of attacking
+piecemeal.** Before, each rival stack independently took its own winnable target
+and idle armies dribbled onto the front; a region or capital too strong for any
+single stack was effectively safe, so wars went toothless once someone forted up.
+
+Now, when a high-value bordering enemy region can't be cracked by any single
+adjacent army (`focusTarget`), idle armies route to a shared **anvil** — the
+owned frontier region already holding the most friendly force (`musterRegion`) —
+and *merge* there over successive turns (the military layer already merges
+friendly stacks) until the combined force wins, then strike. Prize weighting
+mirrors `bestTarget` (population, resource, an enemy capital), archetype-scaled,
+so warlords mass on capitals while economic realms mass on resources.
+
+Safety is preserved by ordering in `doMilitary`: an outmatched army still
+**retreats** first (never masses into death), and an army **holding a threatened
+capital never leaves it** — concentration only overrides a *passive* garrison,
+since the anvil sits on the same front. Refactored the three own-land marchers
+(defend / advance / muster) onto one shared BFS (`firstStepTowards`), trimming
+two duplicate loops.
+
+**Verify:** typecheck ✓, 286 tests ✓ (+4: `focusTarget` flags an uncrackable
+target and ignores a solo-winnable one; `musterRegion` gathers on the
+strongest-held neighbour; an end-to-end test where two 5-inf stacks — each of
+which loses alone — merge to 10 and capture a region neither beats), build ✓ (0
+`fetch`, deps `{}`). Browser smoke (25 turns, seed 12345): no console/page errors.
+
+**Balance (200-seed × 4-archetype self-play probe, rivals 3, deleted before
+commit):** with vs. without the change — win spread 18/18/18/20% (was
+22/22/22/20%): rivals are now *tougher* (they mass too), so the symmetric-AI
+player wins a touch less, but no archetype collapses or dominates. Avg game length
+58.8 turns (baseline 61.3) and games ending before turn 40 were 262 vs a baseline
+250 — statistically flat, so concentration makes wars *more decisive* without
+ending games too fast. All victory kinds still reached.
+
+**Next ideas (handoff dev #2 next):** the end-game summary screen with the
+prestige-history graph; then the Voronoi map renderer. Also: let a massing AI
+also *recruit* toward the anvil, and abandon a stale focus if the target is taken
+or reinforced beyond reach.
+
+---
+
 ## 2026-07-14 — Unrest's cost, made concrete in the region panel
 
 Unrest silently throttles a region's whole output, but the panel only stated the
