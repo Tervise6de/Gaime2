@@ -325,6 +325,24 @@ describe("choice events", () => {
     expect(built.regions.filter((r) => r.ownerId === PLAYER_ID).every((r) => r.unrest === 12)).toBe(true);
   });
 
+  it("golden jubilee: proclaiming pays 20 gold and grants a 5-turn prosperity modifier", () => {
+    const s = pendingChoiceState("golden_jubilee");
+    const gold0 = s.nations[PLAYER_ID]!.stocks.gold;
+    expect(gold0).toBeGreaterThanOrEqual(20);
+    const proclaimed = resolveChoice(s, "proclaim");
+    expect(proclaimed.pendingChoice).toBeUndefined();
+    expect(proclaimed.nations[PLAYER_ID]!.stocks.gold).toBe(gold0 - 20);
+    expect(proclaimed.nations[PLAYER_ID]!.modifiers).toEqual([{ id: "prosperity", turnsLeft: 5 }]);
+  });
+
+  it("golden jubilee: passing leaves gold and modifiers untouched", () => {
+    const s = pendingChoiceState("golden_jubilee");
+    const gold0 = s.nations[PLAYER_ID]!.stocks.gold;
+    const passed = resolveChoice(s, "pass");
+    expect(passed.nations[PLAYER_ID]!.stocks.gold).toBe(gold0);
+    expect(passed.nations[PLAYER_ID]!.modifiers ?? []).toEqual([]);
+  });
+
   it("each trait choice fires only for its own trait", () => {
     // A single non-matching trait (opportunist has none of these) never sees them.
     const g = createGame({ seed: 12345, rivals: 2 });

@@ -227,7 +227,27 @@ export interface Nation {
   /** Last turn's flags, for the HUD. */
   famine: boolean;
   bankrupt: boolean;
+  /** Temporary effects with a per-turn countdown (undefined = none / legacy saves). */
+  modifiers?: NationModifier[];
 }
+
+/** Kinds of temporary national effect (each with its own gameplay effect). */
+export type ModifierId = "prosperity";
+
+/** A temporary national effect that ticks down and expires. Serialisable. */
+export interface NationModifier {
+  id: ModifierId;
+  /** Turns of effect remaining; the modifier applies while > 0, then is dropped. */
+  turnsLeft: number;
+}
+
+/** Player-facing labels for active modifiers (HUD chips). */
+export const MODIFIER_LABEL: Record<ModifierId, string> = {
+  prosperity: "✨ Prosperity",
+};
+
+/** Gold-yield multiplier granted by a prosperity modifier. */
+export const PROSPERITY_GOLD_MULT = 1.25;
 
 /** Diplomatic standing between two nations. */
 export type TreatyStatus = "war" | "peace" | "nap" | "alliance";

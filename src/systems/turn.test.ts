@@ -223,6 +223,22 @@ describe("construction", () => {
   });
 });
 
+describe("temporary modifiers", () => {
+  it("tick down each turn and expire", () => {
+    const base = createGame({ seed: 1, rivals: 0 });
+    let s = {
+      ...base,
+      nations: base.nations.map((n) =>
+        n.id === PLAYER_ID ? { ...n, modifiers: [{ id: "prosperity" as const, turnsLeft: 2 }] } : n,
+      ),
+    };
+    s = resolveTurn(s);
+    expect(playerNation(s).modifiers).toEqual([{ id: "prosperity", turnsLeft: 1 }]);
+    s = resolveTurn(s);
+    expect(playerNation(s).modifiers).toBeUndefined(); // expired, dropped
+  });
+});
+
 describe("score history", () => {
   it("seeds a one-entry series per non-barbarian nation at game start", () => {
     const g = createGame({ seed: 7, rivals: 2 });

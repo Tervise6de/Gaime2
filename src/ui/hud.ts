@@ -35,7 +35,7 @@ import { researchFrontier, isBuildingUnlockedFor } from "@/systems/tech";
 import { ARCHETYPE_LABEL } from "@/data/personalities";
 import { TRAITS } from "@/data/traits";
 import { TECHS, TECH_IDS, type TechId, type TechBranch } from "@/data/techs";
-import { WONDER_GOAL, DOMINATION_FRACTION, TURN_LIMIT, type Difficulty } from "@/systems/state";
+import { WONDER_GOAL, DOMINATION_FRACTION, TURN_LIMIT, MODIFIER_LABEL, type Difficulty } from "@/systems/state";
 import {
   PLAYER_ID,
   RESOURCE_KEYS,
@@ -584,11 +584,16 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       resourceEls[key].flow.classList.toggle("negative", f < 0);
     }
     resourceEls.food.flow.classList.toggle("negative", player.famine || flow.food < 0);
+    const activeMods = (player.modifiers ?? [])
+      .filter((m) => m.turnsLeft > 0)
+      .map((m) => `${MODIFIER_LABEL[m.id]} (${m.turnsLeft})`)
+      .join(" · ");
     turnBadge.textContent =
       (player.famine ? "⚠ FAMINE · " : "") +
       (player.bankrupt ? "⚠ BANKRUPT · " : "") +
       `Turn ${state.turn} · ${state.difficulty}` +
       (player.trait ? ` · ${TRAITS[player.trait].label}` : "") +
+      (activeMods ? ` · ${activeMods}` : "") +
       ` · seed ${state.seed}`;
     turnBadge.title = player.trait ? TRAITS[player.trait].blurb : "";
     turnBadge.classList.toggle("famine", player.famine || player.bankrupt);

@@ -6,6 +6,37 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Lasting modifiers: temporary national effects (Prosperity)
+
+A new state dimension that unlocks a whole class of future content: **timed
+national modifiers**. `Nation.modifiers?: NationModifier[]` holds effects that
+tick down each turn and expire — the first being **prosperity** (+25% gold
+income). It threads cleanly through the existing pipeline: `nationYieldMult`
+folds in a `modifierMultipliers` factor (economy.ts); `advanceNationEconomy`
+counts each modifier down one turn and drops the expired (turn.ts); the top-bar
+badge shows an "✨ Prosperity (N)" chip; and the optional field round-trips through
+the generic JSON save (legacy saves simply have none).
+
+Surfaced via a new generic choice event — **golden jubilee**: invest 20 gold now
+for 5 turns of +25% gold (a spend-to-earn timing bet; the AI proclaims it when
+funded and economy-minded). Pure/deterministic throughout.
+
+**Balance (200-seed × 4-archetype self-play probe, deleted before commit):**
+warlord 32 / opportunist 26 / builder 27 / merchant 26 — a tight 26–32% spread,
+unchanged; all victory kinds reached.
+
+**Verify:** typecheck ✓, 273 tests ✓ (+5: modifierMultipliers boosts only gold /
+is inert once expired, national gold output rises while active, modifiers tick
+down and expire over resolveTurn, the jubilee proclaim pays 20g & grants a 5-turn
+prosperity, passing is a no-op), build ✓ (0 `fetch`, deps `{}`). Browser-driven
+(seed 260 easy): proclaiming via the "1" key put "✨ Prosperity (5)" in the badge
+and raised gold income from +10.5 to +14/turn. No console/page errors.
+
+**Next ideas:** more modifier kinds (a war-weariness debuff, a research surge); a
+modifier that decays gracefully; a trait event granting a lasting buff.
+
+---
+
 ## 2026-07-13 — Number-key shortcuts for choice decisions
 
 Small UX polish that finishes the choice-event feature. A pending decision's

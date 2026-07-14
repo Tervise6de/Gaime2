@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { regionProduction, nationalProduction } from "@/systems/economy";
+import { regionProduction, nationalProduction, modifierMultipliers } from "@/systems/economy";
 import { TERRAIN } from "@/data/terrain";
-import { PLAYER_ID, type GameState, type Region } from "@/systems/state";
+import { PLAYER_ID, PROSPERITY_GOLD_MULT, type GameState, type Region } from "@/systems/state";
 
 function region(overrides: Partial<Region> = {}): Region {
   return {
@@ -68,5 +68,28 @@ describe("national production", () => {
     const flow = nationalProduction(state, PLAYER_ID);
     // Two owned plains regions, base food 4 each.
     expect(flow.food).toBe(TERRAIN.plains.base.food * 2);
+  });
+});
+
+describe("prosperity modifier", () => {
+  it("multiplies only gold while active, and is inert once expired", () => {
+    expect(modifierMultipliers([{ id: "prosperity", turnsLeft: 3 }])).toEqual({
+      food: 1, materials: 1, gold: PROSPERITY_GOLD_MULT, knowledge: 1,
+    });
+    expect(modifierMultipliers([{ id: "prosperity", turnsLeft: 0 }]).gold).toBe(1);
+    expect(modifierMultipliers([]).gold).toBe(1);
+    expect(modifierMultipliers(undefined).gold).toBe(1);
+  });
+
+  it("raises a nation's gold output when active", () => {
+    const base = {
+      nations: [{ id: PLAYER_ID, taxRate: 0.2, research: { current: null, progress: 0, done: [] } }],
+      regions: [region({ id: 0, terrain: "plains", population: 4, ownerId: PLAYER_ID })],
+    } as unknown as GameState;
+    const boosted = {
+      ...base,
+      nations: [{ ...base.nations[0], modifiers: [{ id: "prosperity", turnsLeft: 2 }] }],
+    } as unknown as GameState;
+    expect(nationalProduction(boosted, PLAYER_ID).gold).toBeGreaterThan(nationalProduction(base, PLAYER_ID).gold);
   });
 });

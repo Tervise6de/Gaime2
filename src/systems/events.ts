@@ -17,10 +17,21 @@ import {
   UNREST_MAX,
   emptyUnits,
   type GameState,
+  type ModifierId,
   type Region,
 } from "@/systems/state";
 import { round1 } from "@/systems/economy";
 import type { TraitId } from "@/data/traits";
+
+/** Add (or refresh) a temporary national modifier for `turns` turns. Pure. */
+function addModifier(state: GameState, nationId: number, id: ModifierId, turns: number): GameState {
+  const nations = state.nations.map((n) => {
+    if (n.id !== nationId) return n;
+    const others = (n.modifiers ?? []).filter((m) => m.id !== id);
+    return { ...n, modifiers: [...others, { id, turnsLeft: turns }] };
+  });
+  return { ...state, nations };
+}
 import type { UnitType } from "@/data/units";
 
 type EventOutcome = { state: GameState; message: string } | null;
@@ -223,6 +234,39 @@ const EVENTS: EventDef[] = [
         r.ownerId === nationId ? { ...r, unrest: Math.max(0, round1(r.unrest - 8)) } : r,
       );
       return { state: { ...state, regions }, message: "A grand festival lifts spirits — unrest eases." };
+    },
+  },
+  {
+    // DECISION: pay upfront to kick off a run of prosperity (a lasting +gold modifier).
+    id: "golden_jubilee",
+    weight: 2,
+    choice: {
+      prompt: "Merchants propose a golden jubilee — invest 20 gold to spark a boom?",
+      options: [
+        {
+          id: "proclaim",
+          label: "Proclaim it (−20g)",
+          detail: "Spend 20 gold; +25% gold income for 5 turns.",
+          apply: (state, nationId) => {
+            const n = state.nations.find((x) => x.id === nationId);
+            if (!n || n.stocks.gold < 20) return { state, message: "The treasury cannot fund a jubilee." };
+            const paid = addStock(state, nationId, "gold", -20);
+            return { state: addModifier(paid, nationId, "prosperity", 5), message: "A golden jubilee begins — trade booms for five turns." };
+          },
+        },
+        {
+          id: "pass",
+          label: "Not now",
+          detail: "Keep the gold; skip the festivities.",
+          apply: (state) => ({ state, message: "You let the jubilee pass." }),
+        },
+      ],
+      // A funded, economy-minded AI invests in the boom.
+      aiPick: (state, nationId) => {
+        const n = state.nations.find((x) => x.id === nationId);
+        const econ = n?.personality?.economy ?? 0.5;
+        return n && n.stocks.gold >= 40 && econ >= 0.5 ? "proclaim" : "pass";
+      },
     },
   },
   {

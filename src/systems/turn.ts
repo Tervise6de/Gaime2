@@ -47,6 +47,7 @@ import {
   type Difficulty,
   type GameState,
   type Nation,
+  type NationModifier,
   type Region,
   type ResourceStocks,
 } from "@/systems/state";
@@ -205,6 +206,13 @@ export function createGame(options: NewGameOptions): GameState {
   return game;
 }
 
+/** Count a nation's temporary modifiers down one turn, dropping any that expire. */
+function tickModifiers(modifiers: NationModifier[] | undefined): NationModifier[] | undefined {
+  if (!modifiers || modifiers.length === 0) return modifiers;
+  const next = modifiers.map((m) => ({ ...m, turnsLeft: m.turnsLeft - 1 })).filter((m) => m.turnsLeft > 0);
+  return next.length ? next : undefined;
+}
+
 /**
  * Append the current per-nation prestige scores to the running history, keeping
  * one aligned series per non-barbarian nation (dead nations included, so all
@@ -343,7 +351,9 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
   }
 
   const nations = state.nations.map((n) =>
-    n.id === nationId ? { ...n, stocks, research, wonders: n.wonders + wondersBuilt, famine, bankrupt } : n,
+    n.id === nationId
+      ? { ...n, stocks, research, wonders: n.wonders + wondersBuilt, famine, bankrupt, modifiers: tickModifiers(n.modifiers) }
+      : n,
   );
 
   let log = state.log;

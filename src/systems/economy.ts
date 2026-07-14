@@ -18,15 +18,26 @@
 import { BUILDINGS } from "@/data/buildings";
 import { TERRAIN, type ResourceYield } from "@/data/terrain";
 import {
+  PROSPERITY_GOLD_MULT,
   UNREST_PENALTY_START,
   UNREST_REVOLT,
   ZERO_FLOW,
   type GameState,
   type Nation,
+  type NationModifier,
   type Region,
   type ResourceFlow,
 } from "@/systems/state";
 import { techMultipliers } from "@/systems/tech";
+
+/** Yield multiplier from a nation's active temporary modifiers (e.g. prosperity). */
+export function modifierMultipliers(modifiers: NationModifier[] = []): ResourceYield {
+  let gold = 1;
+  for (const m of modifiers) {
+    if (m.turnsLeft > 0 && m.id === "prosperity") gold *= PROSPERITY_GOLD_MULT;
+  }
+  return { food: 1, materials: 1, gold, knowledge: 1 };
+}
 import { traitYield } from "@/data/traits";
 
 const NO_MULT: ResourceYield = { food: 1, materials: 1, gold: 1, knowledge: 1 };
@@ -96,11 +107,12 @@ export function regionProduction(
 export function nationYieldMult(nation: Nation): ResourceYield {
   const t = techMultipliers(nation.research.done);
   const tr = traitYield(nation.trait);
+  const md = modifierMultipliers(nation.modifiers);
   return {
-    food: t.food * tr.food,
-    materials: t.materials * tr.materials,
-    gold: t.gold * tr.gold,
-    knowledge: t.knowledge * tr.knowledge,
+    food: t.food * tr.food * md.food,
+    materials: t.materials * tr.materials * md.materials,
+    gold: t.gold * tr.gold * md.gold,
+    knowledge: t.knowledge * tr.knowledge * md.knowledge,
   };
 }
 
