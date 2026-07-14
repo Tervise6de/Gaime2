@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { fireEvent, resolveChoice } from "@/systems/events";
 import { createGame } from "@/systems/turn";
 import { createRng } from "@/systems/rng";
-import { PLAYER_ID, RESEARCH_SURGE_TURNS, type GameState } from "@/systems/state";
+import { PLAYER_ID, BARBARIAN_ID, RESEARCH_SURGE_TURNS, type GameState } from "@/systems/state";
 
 /** Fire seeds until a specific choice event pends for the player; throws if it never does. */
 function pendingChoiceState(eventId: string): GameState {
@@ -417,5 +417,51 @@ describe("choice events", () => {
     expect(tried.nations[PLAYER_ID]!.stocks.materials).toBe(5);
     const fortBefore = s.regions.reduce((a, r) => a + r.fortification, 0);
     expect(tried.regions.reduce((a, r) => a + r.fortification, 0)).toBe(fortBefore);
+  });
+
+  // A player region (0) bordering a fortified barbarian region (1), with a
+  // sap_the_walls decision pending.
+  const sapState = (gold: number, targetFort = 2): GameState => {
+    const reg = (over: Record<string, unknown>) =>
+      ({
+        id: 0, name: "R", terrain: "plains", ownerId: PLAYER_ID, population: 3, unrest: 0,
+        fortification: 0, resource: null, buildings: [], construction: null, adjacency: [], x: 0.5, y: 0.5, ...over,
+      });
+    return {
+      turn: 30, treaties: {}, offers: [], armies: [], log: [], nextArmyId: 5,
+      pendingChoice: { eventId: "sap_the_walls", prompt: "", options: [] },
+      nations: [
+        { id: PLAYER_ID, isPlayer: true, isBarbarian: false, alive: true, stocks: { gold, food: 0, materials: 0, knowledge: 0 } },
+        { id: BARBARIAN_ID, isPlayer: false, isBarbarian: true, alive: true, stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 } },
+      ],
+      regions: [
+        reg({ id: 0, ownerId: PLAYER_ID, adjacency: [1] }),
+        reg({ id: 1, ownerId: BARBARIAN_ID, fortification: targetFort, adjacency: [0] }),
+      ],
+    } as unknown as GameState;
+  };
+
+  it("Sap the walls: spends 25 gold to weaken a bordering hostile fort by 1", () => {
+    const after = resolveChoice(sapState(40, 2), "hire");
+    expect(after.pendingChoice).toBeUndefined();
+    expect(after.nations[PLAYER_ID]!.stocks.gold).toBe(15);
+    expect(after.regions[1]!.fortification).toBe(1); // 2 → 1
+    expect(after.log.some((l) => /undermine/.test(l))).toBe(true);
+  });
+
+  it("Sap the walls with too little gold is a safe no-op beyond clearing the prompt", () => {
+    const after = resolveChoice(sapState(10, 2), "hire");
+    expect(after.pendingChoice).toBeUndefined();
+    expect(after.nations[PLAYER_ID]!.stocks.gold).toBe(10);
+    expect(after.regions[1]!.fortification).toBe(2); // unchanged
+  });
+
+  it("sap_the_walls only fires when a fortified hostile fort borders you", () => {
+    // No fortified hostile neighbour → the event is ineligible and never pends.
+    const g = createGame({ seed: 12345, rivals: 2 });
+    const noForts = { ...g, regions: g.regions.map((r) => ({ ...r, fortification: 0 })) };
+    for (let i = 1; i <= 300; i++) {
+      expect(fireEvent(noForts, PLAYER_ID, createRng(i)).pendingChoice?.eventId).not.toBe("sap_the_walls");
+    }
   });
 });

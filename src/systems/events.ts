@@ -11,6 +11,7 @@
 
 import type { Rng } from "@/systems/rng";
 import {
+  BARBARIAN_ID,
   GRANARY_CAP,
   MIN_POPULATION,
   PLAYER_ID,
@@ -21,6 +22,7 @@ import {
   type ModifierId,
   type Region,
 } from "@/systems/state";
+import { atWar } from "@/systems/diplomacy";
 import { round1 } from "@/systems/economy";
 import type { TraitId } from "@/data/traits";
 
@@ -128,6 +130,31 @@ function frontierRegion(state: GameState, nationId: number): Region | null {
   return frontier.reduce((best, r) =>
     r.fortification < best.fortification || (r.fortification === best.fortification && r.id < best.id) ? r : best,
   );
+}
+
+/**
+ * A fortified hostile region (barbarian, or a rival the nation is at war with)
+ * bordering the nation's land — the most-fortified such neighbour, ties by id.
+ * Null if none. The sap-the-walls target: weaken it before an assault.
+ */
+function hostileFortNeighbour(state: GameState, nationId: number): Region | null {
+  const owned = state.regions.filter((r) => r.ownerId === nationId);
+  let best: Region | null = null;
+  const seen = new Set<number>();
+  for (const r of owned) {
+    for (const nb of r.adjacency) {
+      if (seen.has(nb)) continue;
+      seen.add(nb);
+      const n = state.regions[nb];
+      if (!n || n.ownerId === null || n.ownerId === nationId || n.fortification < 1) continue;
+      const hostile = n.ownerId === BARBARIAN_ID || atWar(state, nationId, n.ownerId);
+      if (!hostile) continue;
+      if (!best || n.fortification > best.fortification || (n.fortification === best.fortification && n.id < best.id)) {
+        best = n;
+      }
+    }
+  }
+  return best;
 }
 
 const EVENTS: EventDef[] = [
@@ -435,6 +462,46 @@ const EVENTS: EventDef[] = [
       aiPick: (state, nationId) => {
         const n = state.nations.find((x) => x.id === nationId);
         return n && n.stocks.materials >= 35 && frontierRegion(state, nationId) !== null ? "fund" : "decline";
+      },
+    },
+  },
+  {
+    // DECISION (offered only when a fortified hostile fort borders you): hire
+    // sappers to undermine an enemy stronghold before an assault — the offensive
+    // counterpart to reinforce_walls, a siege-prep lever for aggressive play.
+    id: "sap_the_walls",
+    weight: 2,
+    eligible: (state, nationId) => hostileFortNeighbour(state, nationId) !== null,
+    choice: {
+      prompt: "Sappers offer to undermine a bordering enemy stronghold — hire them for 25 gold?",
+      options: [
+        {
+          id: "hire",
+          label: "Hire the sappers (−25g)",
+          detail: "Spend 25 gold; −1 fortification on the toughest hostile fort on your border.",
+          apply: (state, nationId) => {
+            const n = state.nations.find((x) => x.id === nationId);
+            if (!n || n.stocks.gold < 25) return { state, message: "Too little gold to hire the sappers." };
+            const target = hostileFortNeighbour(state, nationId);
+            if (!target) return { state, message: "No enemy stronghold stands within reach." };
+            const paid = addStock(state, nationId, "gold", -25);
+            const regions = paid.regions.map((r) =>
+              r.id === target.id ? { ...r, fortification: Math.max(0, r.fortification - 1) } : r,
+            );
+            return { state: { ...paid, regions }, message: `Sappers undermine the walls of ${target.name} (−1 fortification).` };
+          },
+        },
+        {
+          id: "decline",
+          label: "Not now",
+          detail: "Keep the gold; storm the walls the hard way.",
+          apply: (state) => ({ state, message: "You send the sappers away." }),
+        },
+      ],
+      // A funded nation with a fortified enemy on its border pays to soften it.
+      aiPick: (state, nationId) => {
+        const n = state.nations.find((x) => x.id === nationId);
+        return n && n.stocks.gold >= 45 ? "hire" : "decline";
       },
     },
   },

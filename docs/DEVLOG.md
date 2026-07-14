@@ -6,6 +6,43 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — New event: sap an enemy's walls (offensive siege-prep)
+
+The offensive counterpart to `reinforce_walls`, and a small nudge for the
+aggressive play the balance probe keeps showing trails. When a fortified hostile
+stronghold (a barbarian hold, or a rival you're at war with) borders your land,
+**sappers offer to undermine it for 25 gold → −1 fortification** on the toughest
+such fort — softening it before an assault. Fortification is a stiff defensive
+multiplier (`FORT_PER_LEVEL` +20%/level), so shaving a level off a wall you're
+about to storm is a real, affordable edge.
+
+New `sap_the_walls` choice event, gated by a new pure `hostileFortNeighbour`
+helper (returns the most-fortified hostile bordering region, or null) so it's only
+offered when there's actually a fort to break. A funded AI (gold ≥ 45) with such a
+neighbour hires. (I first spent the cycle on the residual archetype gap from the
+Great Works fix, but re-probing showed reweighting `nationScore` — wonders 40→28,
+regions 10→18 — flipped *no* games: the economic score lead is too structural for
+a tiebreak tweak. Reverted, and shipped this instead.)
+
+**Verify:** typecheck ✓, **327 tests ✓** (+3: hiring spends 25 gold and drops the
+target fort by 1 with the log line; too little gold is a safe no-op; the event
+stays ineligible — never fires — when no fortified hostile fort borders you),
+build ✓ (0 `fetch`, deps `{}`). Browser-driven (seed 153, rivals 2): the modal
+renders at turn 2 with the prompt and both numbered options, and clears cleanly on
+pick; no console/page errors.
+
+**Balance (temp probe: 40 seeds × 3 difficulties × {2,3} rivals = 240 games,
+deleted):** no crashes; medians **83–118** turns, diverse victory mix, fair win
+rates; sap/game 0.03–0.23 (a rare texture pick). The probe also confirms last
+cycle's `WONDER_GOAL` fix landing — domination is now the common plurality and
+Great Works has receded — so conquest has real room.
+
+**Next ideas:** let the AI hire sappers specifically when it's massing to assault
+that fort; a companion "storm the breach" bonus the turn after a fort is sapped;
+show a besieged/sapped region briefly tinted on the map.
+
+---
+
 ## 2026-07-14 — Balance: rein in the Great Works runaway (archetype fairness)
 
 Backlog **A**, the dedicated balance pass the playbook says is always worth
