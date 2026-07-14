@@ -203,15 +203,36 @@ function main(): void {
     sync();
   });
 
-  // Keyboard: Enter / Space ends the turn (unless typing in an input).
-  window.addEventListener("keydown", (ev) => {
-    const target = ev.target as HTMLElement | null;
-    if (target && (target.tagName === "INPUT" || target.tagName === "SELECT")) return;
-    if ((ev.key === "Enter" || ev.key === " ") && state.outcome === "playing") {
-      ev.preventDefault();
-      advanceTurn();
+  // Keyboard: Enter / Space ends the turn (unless typing in an input, or a modal
+  // is open — the confirm dialog, tutorial, tech tree, standings and event-choice
+  // panels own Enter while up, so ending the turn behind them would be a footgun).
+  // Capture phase: evaluate the modal guard *before* a modal's own bubble-phase
+  // key handler can remove itself from the DOM (the confirm dialog closes on Enter),
+  // which would otherwise let the turn advance behind the just-closed modal.
+  window.addEventListener(
+    "keydown",
+    (ev) => {
+      const target = ev.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "SELECT")) return;
+      if (modalOpen()) return;
+      if ((ev.key === "Enter" || ev.key === " ") && state.outcome === "playing") {
+        ev.preventDefault();
+        advanceTurn();
+      }
+    },
+    true,
+  );
+
+  /** True while any blocking overlay is on screen (guards the end-turn hotkey). */
+  function modalOpen(): boolean {
+    // Confirm dialog and tutorial exist in the DOM only while open.
+    if (document.querySelector(".confirm-overlay, .tut-overlay")) return true;
+    // Tech tree / standings / event choice share one overlay class, toggled by display.
+    for (const o of document.querySelectorAll<HTMLElement>(".hud-techtree-overlay")) {
+      if (o.style.display !== "none") return true;
     }
-  });
+    return false;
+  }
 
   /** Resolve one turn, capturing a summary of what changed for the player. */
   function advanceTurn(): void {

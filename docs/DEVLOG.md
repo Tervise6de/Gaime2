@@ -6,6 +6,39 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — ROADMAP A4: UI bug-bash — end-turn hotkey leaked through modals
+
+Fourth and final Phase-A item of `docs/roadmap-to-ready.md`, closing the gate to
+**testing-ready (~75)**. Two-pronged bug-bash: a randomized Playwright fuzz plus
+targeted code inspection.
+
+**Fuzz:** 220 iterations of random HUD-button clicks, map clicks, tax-slider
+nudges and end-turns against a live game (deterministic PRNG for reproducibility).
+Result: 100 clicks, **52 turns played**, 3 confirm dialogs exercised, HUD and canvas
+still alive, **zero page errors, zero console errors**. The UI is robust under
+random stress.
+
+**Bug found (inspection, then fixed):** the global **Enter / Space = end turn**
+hotkey didn't account for open modals. Pressing Enter to confirm a dialog *also*
+advanced the turn behind it; Enter over the tutorial, tech tree, standings or an
+event-choice panel silently ended the turn. Fixed with a `modalOpen()` guard on the
+hotkey — and critically registered in the **capture phase**, because the confirm
+dialog removes itself on Enter during the bubble phase, so a bubble-phase guard
+would check for the overlay *after* it was already gone. Capture evaluates the guard
+first, before any modal mutates the DOM.
+
+**Verify:** typecheck ✓, **338 tests ✓**, build ✓ (0 `fetch`, deps `{}`). Browser
+(Playwright) proves all three: (A) tutorial + Enter keeps the turn put, (B) plain
+Enter still advances, (C) confirm + Enter closes the dialog **without** double-
+advancing the turn; no page errors.
+
+**Phase A complete.** Onboarding (A1 tutorial), safety (A2 confirm dialogs),
+orientation (A3 capital jump) and this bug-bash (A4) land the project at a genuine
+**~75 — testing-ready**. **Next:** Phase B opens with **B1 procedural audio**
+(Web Audio API — synthesised SFX, no asset files, deps stay `{}`).
+
+---
+
 ## 2026-07-14 — ROADMAP A3: First-run UX sweep — orient the newcomer
 
 Third Phase-A item of `docs/roadmap-to-ready.md`: a browser-driven sweep of the
