@@ -321,6 +321,13 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       context.fillText("🔨", p.x, p.y - NODE_RADIUS - 8);
     }
 
+    // Fortification marker (bottom-centre) — a defended region is harder to take.
+    // Bottom-centre is free: the crown sits bottom-left, the army badge bottom-right.
+    if (region.fortification > 0) {
+      context.font = "600 10px system-ui, sans-serif";
+      context.fillText(`🛡${region.fortification}`, p.x, p.y + NODE_RADIUS - 7);
+    }
+
     // Region name below.
     context.fillStyle = "#c9cedb";
     context.font = "500 11px system-ui, sans-serif";

@@ -6,6 +6,34 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — Fortification marker on the map (legibility)
+
+Follow-on to the wall-reinforcement event (and a step into the renderer, a fresh
+surface). Fortification strongly shapes combat — a defended region is much harder
+to take, and the new event lets you raise it — but it was invisible on the map:
+you had to click each region to learn its fort level. Now a **🛡N marker** sits at
+the bottom-centre of any region with fortification > 0, so you can read the whole
+board's defensive picture at a glance when planning an attack or shoring up a
+front.
+
+Drawn in the shared `drawMarkers` (`systems/renderer.ts`), so it appears in **both**
+the node+edge and Voronoi layouts; placed bottom-centre, the one free corner (the
+crown sits bottom-left, the army badge bottom-right, the unrest dot top-right). A
+matching legend row ("🛡 Fortification level — harder to capture; siege strips it")
+keeps the map key complete.
+
+**Verify:** typecheck ✓, 324 tests ✓ (unchanged — pure rendering), build ✓
+(0 `fetch`, deps `{}`). Browser-driven (default game, seed 12345): screenshots of
+both layouts show the 🛡 marker with its level on fortified regions (barbarian
+holds and the fort-1 capitals), distinct from the red army badge; the legend lists
+the fort row; no console/page errors. No sim change → no balance probe.
+
+**Next ideas:** a companion "raze the walls" event on capturing a fort; have the AI
+prefer siege units against high-fort targets it wants; a subtle ring thickness for
+fort level as an alternative to the glyph.
+
+---
+
 ## 2026-07-14 — New event: reinforce your frontier walls (content)
 
 A deliberate step out of the AI/instability cluster (many cycles deep) into

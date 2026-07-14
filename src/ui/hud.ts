@@ -1106,6 +1106,7 @@ function buildLegend(): HTMLElement {
   row('<span class="hud-legend-ico">⚒</span>', "Iron deposit");
   row('<span class="hud-legend-ico">🐎</span>', "Horses");
   row('<span class="hud-legend-ico">🔨</span>', "Building under construction");
+  row('<span class="hud-legend-ico">🛡</span>', "Fortification level (harder to capture; siege strips it)");
   row('<span class="hud-legend-ico">👑</span>', "Capital — crown + double ring (a nation's seat of power)");
   row('<span class="hud-legend-badge">3</span>', "Army (owner colour, unit count)");
 
