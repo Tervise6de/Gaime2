@@ -110,6 +110,26 @@ function reinforce(state: GameState, nationId: number, unit: UnitType, count: nu
   return { ...state, armies, nextArmyId: state.nextArmyId + 1 };
 }
 
+/**
+ * The nation's most exposed border region — an owned region bordering land it
+ * does not hold — preferring the least-fortified (ties by id). Null if the realm
+ * has no frontier. Deterministic; used to place a wall-reinforcement.
+ */
+function frontierRegion(state: GameState, nationId: number): Region | null {
+  const frontier = state.regions.filter(
+    (r) =>
+      r.ownerId === nationId &&
+      r.adjacency.some((nb) => {
+        const n = state.regions[nb];
+        return n !== undefined && n.ownerId !== nationId;
+      }),
+  );
+  if (!frontier.length) return null;
+  return frontier.reduce((best, r) =>
+    r.fortification < best.fortification || (r.fortification === best.fortification && r.id < best.id) ? r : best,
+  );
+}
+
 const EVENTS: EventDef[] = [
   {
     id: "good_harvest",
@@ -377,6 +397,44 @@ const EVENTS: EventDef[] = [
       aiPick: (state, nationId) => {
         const n = state.nations.find((x) => x.id === nationId);
         return n && n.stocks.food >= 24 ? "aid" : "refuse";
+      },
+    },
+  },
+  {
+    // DECISION: invest materials in fortifying your most exposed border region —
+    // the only source of fortification besides the tech-gated Fortress building.
+    id: "reinforce_walls",
+    weight: 2,
+    choice: {
+      prompt: "Master masons offer to reinforce a frontier stronghold — fund the works for 20 materials?",
+      options: [
+        {
+          id: "fund",
+          label: "Reinforce the walls (−20 materials)",
+          detail: "Spend 20 materials; +1 fortification on your most exposed border region.",
+          apply: (state, nationId) => {
+            const n = state.nations.find((x) => x.id === nationId);
+            if (!n || n.stocks.materials < 20) return { state, message: "Too few materials to reinforce the walls." };
+            const target = frontierRegion(state, nationId);
+            if (!target) return { state, message: "No frontier stronghold needs reinforcing." };
+            const paid = addStock(state, nationId, "materials", -20);
+            const regions = paid.regions.map((r) =>
+              r.id === target.id ? { ...r, fortification: r.fortification + 1 } : r,
+            );
+            return { state: { ...paid, regions }, message: `The walls of ${target.name} are reinforced (+1 fortification).` };
+          },
+        },
+        {
+          id: "decline",
+          label: "Not now",
+          detail: "Leave the walls as they stand.",
+          apply: (state) => ({ state, message: "You defer the wall-works." }),
+        },
+      ],
+      // A materials-rich nation with an exposed frontier invests in its walls.
+      aiPick: (state, nationId) => {
+        const n = state.nations.find((x) => x.id === nationId);
+        return n && n.stocks.materials >= 35 && frontierRegion(state, nationId) !== null ? "fund" : "decline";
       },
     },
   },

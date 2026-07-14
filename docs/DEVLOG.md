@@ -6,6 +6,43 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — New event: reinforce your frontier walls (content)
+
+A deliberate step out of the AI/instability cluster (many cycles deep) into
+backlog **C**. Fortification is a real combat lever — `FORT_PER_LEVEL` gives a
+defender +20% strength per level — but the *only* way to raise it was the
+Fortress building, gated behind the Engineering tech. Now a bounded **choice
+event** offers to reinforce your most exposed frontier for **20 materials → +1
+fortification**, giving even an early or non-military realm a way to shore up a
+threatened border, and a fresh materials-spending decision.
+
+New `reinforce_walls` choice event in `events.ts` (general, not trait-gated), plus
+a pure `frontierRegion(state, nationId)` helper that finds the owned region
+bordering foreign land with the *lowest* fortification (ties by id) — so the
+reinforcement lands where it's most exposed. A materials-rich AI (≥35) with a
+frontier funds it.
+
+**Verify:** typecheck ✓, **323 tests ✓** (+2: funding spends 20 materials and adds
+exactly +1 fortification to a genuine border region; too few materials is a safe
+no-op), build ✓ (0 `fetch`, deps `{}`). Browser-driven (seed 153, rivals 2): the
+event modal renders at turn 2 with the prompt and both numbered options ("+1
+fortification on your most exposed border region"), and clears cleanly on pick; no
+console/page errors.
+
+**Balance (temp probe: 40 seeds × 3 difficulties × {2,3} rivals = 240 games,
+deleted):** no crashes; medians **66–99** turns, diverse victory mix (all four
+kinds), fair win rates. The event fires occasionally for rivals (walls/game
+0.0–0.35, rising with more rivals/materials) — a low-frequency texture pick, not a
+staple. Adding it to the event pool reshuffles event-selection RNG so trajectories
+differ from prior probes (expected), but every aggregate stays in the healthy
+band; a +1 fort here and there doesn't bend conquest pacing.
+
+**Next ideas:** a companion "raze the walls" event when you capture a fort; let the
+AI value a target's fortification more when choosing what to besiege; show a
+region's fort level with a small shield marker on the map.
+
+---
+
 ## 2026-07-14 — "Reeling" read: show the player the weakness the AI exploits
 
 Last cycle taught the AI to **strike a reeling rival** — one gripped by famine,

@@ -382,4 +382,40 @@ describe("choice events", () => {
       expect(gated).not.toContain(id);
     }
   });
+
+  it("Reinforce walls: spends 20 materials for +1 fortification on a border region", () => {
+    const base = pendingChoiceState("reinforce_walls");
+    const s = {
+      ...base,
+      nations: base.nations.map((n) =>
+        n.id === PLAYER_ID ? { ...n, stocks: { ...n.stocks, materials: 30 } } : n,
+      ),
+    };
+    const fortBefore = s.regions.filter((r) => r.ownerId === PLAYER_ID).reduce((a, r) => a + r.fortification, 0);
+    const funded = resolveChoice(s, "fund");
+    expect(funded.pendingChoice).toBeUndefined();
+    expect(funded.nations[PLAYER_ID]!.stocks.materials).toBe(10);
+    const fortAfter = funded.regions.filter((r) => r.ownerId === PLAYER_ID).reduce((a, r) => a + r.fortification, 0);
+    expect(fortAfter).toBe(fortBefore + 1);
+    // The reinforced region is a genuine border region (borders land it doesn't own).
+    const raised = funded.regions.find(
+      (r, i) => r.ownerId === PLAYER_ID && r.fortification > s.regions[i]!.fortification,
+    )!;
+    expect(raised.adjacency.some((nb) => funded.regions[nb]!.ownerId !== PLAYER_ID)).toBe(true);
+  });
+
+  it("Reinforce walls with too few materials is a safe no-op beyond clearing the prompt", () => {
+    const base = pendingChoiceState("reinforce_walls");
+    const s = {
+      ...base,
+      nations: base.nations.map((n) =>
+        n.id === PLAYER_ID ? { ...n, stocks: { ...n.stocks, materials: 5 } } : n,
+      ),
+    };
+    const tried = resolveChoice(s, "fund");
+    expect(tried.pendingChoice).toBeUndefined();
+    expect(tried.nations[PLAYER_ID]!.stocks.materials).toBe(5);
+    const fortBefore = s.regions.reduce((a, r) => a + r.fortification, 0);
+    expect(tried.regions.reduce((a, r) => a + r.fortification, 0)).toBe(fortBefore);
+  });
 });
