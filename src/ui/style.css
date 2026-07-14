@@ -1859,3 +1859,132 @@ a:focus-visible,
 .confirm-btn.danger:hover {
   filter: brightness(1.08);
 }
+
+/* ===================================================================== *
+ * Responsive & touch (B6)
+ *
+ * The desktop HUD is a picture frame of fixed-width panels around the map.
+ * These breakpoints shrink and reflow that frame so it fits tablets and
+ * phones without horizontal overflow, and enlarge tap targets for touch.
+ * ===================================================================== */
+
+/* No 300ms tap delay / double-tap zoom on the map and controls. */
+#app,
+#game-canvas {
+  touch-action: manipulation;
+}
+
+/* Coarse pointers (touch): give every control a comfortable minimum hit area. */
+@media (pointer: coarse) {
+  .hud-legend-toggle,
+  .hud-newgame-btn,
+  .hud-diplo-btn,
+  .hud-hints-btn,
+  .hud-techtree-close,
+  .confirm-btn,
+  .hud-region-jump {
+    min-height: 40px;
+  }
+  .hud-endturn {
+    padding: 14px;
+  }
+  .hud-tax-slider,
+  .hud-opt-range {
+    height: 30px;
+  }
+}
+
+/* Tablet / small laptop: tighten the frame so the six panels still fit. */
+@media (max-width: 1024px) {
+  .hud-topbar {
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: calc(100vw - 24px);
+  }
+  .hud-diplo,
+  .hud-right {
+    width: 216px;
+  }
+  .hud-left {
+    width: 232px;
+  }
+  .hud-log {
+    width: 264px;
+  }
+  .hud-research {
+    width: min(520px, calc(100vw - 520px));
+    min-width: 300px;
+  }
+}
+
+/* Phone: reflow the frame into four capped corner panels with the research
+   bar as a full-width strip along the bottom edge. The map shows through the
+   middle. Everything is height-capped and scrolls internally — no overlap. */
+@media (max-width: 640px) {
+  /* One compact row that scrolls sideways — wrapping would grow tall and cover
+     the corner panels below it. */
+  .hud-topbar {
+    top: 6px;
+    gap: 6px;
+    padding: 6px 8px;
+    font-size: 12px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-width: calc(100vw - 12px);
+    justify-content: flex-start; /* start at the resources, not the middle */
+    scrollbar-width: none;
+  }
+  .hud-topbar::-webkit-scrollbar {
+    display: none;
+  }
+  .hud-topbar > * {
+    flex: 0 0 auto;
+  }
+  .hud-resource {
+    padding: 2px 5px;
+    gap: 5px;
+  }
+  .hud-resource-icon {
+    font-size: 15px;
+  }
+  .hud-resource-stock {
+    font-size: 14px;
+  }
+
+  .hud-diplo {
+    left: 6px;
+    top: 62px;
+    width: 46vw;
+    max-height: 32vh;
+  }
+  .hud-right {
+    right: 6px;
+    top: 62px;
+    width: 46vw;
+    max-height: 32vh;
+  }
+  .hud-left {
+    left: 6px;
+    bottom: 88px;
+    width: 46vw;
+    max-height: 30vh;
+    overflow-y: auto;
+  }
+  .hud-log {
+    right: 6px;
+    bottom: 88px;
+    width: 46vw;
+    max-height: 22vh;
+  }
+  .hud-research {
+    left: 6px;
+    right: 6px;
+    bottom: 6px;
+    width: auto;
+    min-width: 0;
+    transform: none;
+  }
+  .hud-panel {
+    padding: 10px;
+  }
+}

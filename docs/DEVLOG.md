@@ -6,6 +6,41 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — ROADMAP B6: Responsive & touch layout (Phase B closes → ~85)
+
+Sixth and final Phase-B item of `docs/roadmap-to-ready.md`. The desktop HUD is a
+picture frame of six fixed-width panels around the map; on anything narrower they
+overlapped and overflowed. Pure CSS — no markup or JS change — so the sim and desktop
+layout are untouched.
+
+**Breakpoints:**
+- **≤1024px (tablet/small laptop):** tighten every panel and let the top bar wrap so
+  the frame still fits.
+- **≤640px (phone):** reflow into four height-capped corner panels (diplomacy /
+  region up top, fiscal + turn-log at the bottom) with the research bar as a
+  full-width strip along the bottom edge; the map shows through the middle. The top
+  bar becomes a **single horizontally-scrollable row** (wrapping grew it tall enough
+  to cover the panels below) that starts at the resources.
+
+**Touch:** `touch-action: manipulation` on the map/app kills the 300ms tap delay and
+double-tap zoom; a `@media (pointer: coarse)` block gives every button/slider a ≥40px
+hit target. Region select/move already ran on `click`, which fires on tap — so touch
+play needed no JS.
+
+**Verify:** typecheck ✓, **348 tests ✓**, build ✓ (0 `fetch`, deps `{}`). Browser
+(Playwright, four viewports 1280/900/768/390): every one reports **no horizontal
+overflow, all panels within bounds, end-turn reachable, zero page errors**; a
+touch-tap on the phone canvas selects a region; a phone screenshot confirms the
+four-corner + bottom-strip reflow with the resources visible and no overlap.
+
+**Phase B complete (B1–B6).** Procedural audio + ambient, options panel, colour-blind
+palette + a11y, visual juice, and now responsive/touch put the project at **~85 —
+"feel & platform"**. **Next:** Phase C opens with **C1 meta-progression** — per-profile
+stats and achievements in localStorage with a stats/awards screen (reads outcomes, no
+gameplay change).
+
+---
+
 ## 2026-07-14 — ROADMAP B5: Visual juice — capture ripples + modal transitions
 
 Fifth Phase-B item of `docs/roadmap-to-ready.md`: motion feedback, no art assets,
