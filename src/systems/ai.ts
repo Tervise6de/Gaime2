@@ -50,6 +50,8 @@ import {
   FRIENDLY_THRESHOLD,
   PLAYER_ID,
   WONDER_GOAL,
+  UNREST_REVOLT,
+  SECESSION_REVOLT_TURNS,
   armySize,
   clampTax,
   emptyUnits,
@@ -468,6 +470,23 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
     // Defensible and already under threat here → garrison in place.
     if (regionIsThreatened(s, live.regionId, nationId)) continue;
 
+    // Internal order: an army standing in one of the nation's own revolting
+    // regions is suppressing it (a garrison resets the secession counter), so
+    // hold there rather than let the province break away.
+    const here = s.regions[live.regionId];
+    if (here && here.ownerId === nationId && here.unrest >= UNREST_REVOLT) continue;
+
+    // Otherwise, if a restless region is about to secede, march to quell it
+    // before reinforcing the front — losing a province to revolt is a free loss.
+    const atRisk = secessionRiskRegion(s, nationId);
+    if (atRisk !== null) {
+      const toRisk = firstStepTowards(s, live.regionId, nationId, (rid) => rid === atRisk);
+      if (toRisk !== null) {
+        s = moveArmy(s, live.id, toRisk);
+        continue;
+      }
+    }
+
     // Otherwise reinforce the nearest threatened region, then stage at the front.
     const defend = defendStep(s, live, nationId);
     if (defend !== null) {
@@ -501,6 +520,30 @@ export function regionIsThreatened(state: GameState, regionId: number, nationId:
   const r = state.regions[regionId];
   if (!r || r.ownerId !== nationId) return false;
   return adjacentThreats(state, regionId, nationId).length > 0;
+}
+
+/**
+ * The nation's owned region most in danger of seceding — in full revolt, with no
+ * friendly garrison to hold it, and within a couple of turns of breaking away —
+ * or null. Prefers the region closest to seceding, then the most populous (worth
+ * saving most). Lets the AI march a spare army in to suppress the revolt.
+ */
+export function secessionRiskRegion(state: GameState, nationId: number): number | null {
+  const imminent = Math.max(1, SECESSION_REVOLT_TURNS - 2);
+  let best: { id: number; turns: number; pop: number } | null = null;
+  for (const r of state.regions) {
+    if (r.ownerId !== nationId || r.unrest < UNREST_REVOLT) continue;
+    if ((r.revoltTurns ?? 0) < imminent) continue;
+    const garrisoned = state.armies.some(
+      (a) => a.regionId === r.id && a.ownerId === nationId && armySize(a.units) > 0,
+    );
+    if (garrisoned) continue;
+    const turns = r.revoltTurns ?? 0;
+    if (!best || turns > best.turns || (turns === best.turns && r.population > best.pop)) {
+      best = { id: r.id, turns, pop: r.population };
+    }
+  }
+  return best ? best.id : null;
 }
 
 /** Our defensive strength for `units` standing in `regionId` against `enemy`. */

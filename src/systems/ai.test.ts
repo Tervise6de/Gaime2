@@ -13,6 +13,7 @@ import {
   coalitionPowerAgainst,
   preferredTechBranch,
   bestTarget,
+  secessionRiskRegion,
 } from "@/systems/ai";
 import type { TraitId } from "@/data/traits";
 import type { Personality } from "@/systems/state";
@@ -855,5 +856,39 @@ describe("tribute demands", () => {
     expect(first.offers.filter((o) => o.type === "tribute")).toHaveLength(1);
     const second = runNationTurn(first, R, createRng(2));
     expect(second.offers.filter((o) => o.type === "tribute")).toHaveLength(1); // dedup holds
+  });
+});
+
+describe("secessionRiskRegion (AI defends against revolt)", () => {
+  const build = (regions: Region[], armies: Army[]): GameState =>
+    ({ turn: 40, difficulty: "normal", treaties: {}, nations: [], armies, regions } as unknown as GameState);
+
+  it("flags an ungarrisoned region in sustained revolt", () => {
+    const s = build([region({ id: 0, ownerId: RIVAL, unrest: 85, revoltTurns: 1, population: 6 })], []);
+    expect(secessionRiskRegion(s, RIVAL)).toBe(0);
+  });
+
+  it("ignores it once a friendly garrison holds it", () => {
+    const s = build(
+      [region({ id: 0, ownerId: RIVAL, unrest: 85, revoltTurns: 2 })],
+      [army({ id: 1, ownerId: RIVAL, regionId: 0, units: units({ militia: 2 }) })],
+    );
+    expect(secessionRiskRegion(s, RIVAL)).toBeNull();
+  });
+
+  it("ignores a calm region and one only just entering revolt", () => {
+    expect(secessionRiskRegion(build([region({ id: 0, ownerId: RIVAL, unrest: 40, revoltTurns: 0 })], []), RIVAL)).toBeNull();
+    expect(secessionRiskRegion(build([region({ id: 0, ownerId: RIVAL, unrest: 85, revoltTurns: 0 })], []), RIVAL)).toBeNull();
+  });
+
+  it("prefers the region closest to seceding", () => {
+    const s = build(
+      [
+        region({ id: 0, ownerId: RIVAL, unrest: 80, revoltTurns: 1, population: 9 }),
+        region({ id: 1, ownerId: RIVAL, unrest: 80, revoltTurns: 2, population: 3 }),
+      ],
+      [],
+    );
+    expect(secessionRiskRegion(s, RIVAL)).toBe(1);
   });
 });

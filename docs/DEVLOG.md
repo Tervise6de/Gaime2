@@ -6,6 +6,42 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — AI defends against revolt (garrisons secession-risk regions)
+
+Backlog **B** follow-on to the secession mechanic. The AI already fights well —
+concentration of force on offence, plus retreat / garrison-the-threatened-front
+on defence — but all of that defensive logic keyed on *enemy* armies. It had no
+answer to the *internal* threat secession introduced: a rival could sit and
+watch an over-taxed, over-extended province rise up and break away for free.
+
+**Change** (`systems/ai.ts`): a new pure `secessionRiskRegion(state, nationId)`
+finds the nation's own region nearest to seceding — in full revolt
+(`unrest ≥ UNREST_REVOLT`), ungarrisoned, and within a turn or two of breaking
+away (`revoltTurns ≥ SECESSION_REVOLT_TURNS − 2`) — preferring the one closest to
+seceding, then the most populous. In `doMilitary`'s repositioning phase an idle
+army (no winnable attack, not retreating, not needed at the offensive muster)
+first **holds a revolting region it already stands in** (a garrison resets the
+secession counter), and otherwise **marches to quell the most at-risk province**
+before drifting to the front — losing land to revolt is a free loss worth
+pre-empting. Deterministic and pure; no capital special-case needed — the AI
+simply garrisons an at-risk capital like any other region.
+
+**Verify:** typecheck ✓, **302 tests ✓** (+4: `secessionRiskRegion` flags an
+ungarrisoned sustained revolt, ignores it once garrisoned, ignores calm or
+just-started revolts, and prefers the region closest to seceding), build ✓
+(0 `fetch`, deps `{}`). Browser smoke: boots and plays 15 turns, zero console
+errors. Balance re-probed (480 self-play games, then deleted): **no crashes**,
+secessions/game fell ~**0.10 → 0.05–0.07** (nations now defend ~a third to a
+half of would-be break-aways), pacing stayed in-target (medians **68–109**
+turns), and victory types stayed well spread — so smarter defence, same healthy
+balance.
+
+**Next ideas:** have the AI ease taxes in a province tipping into revolt (a
+cheaper fix than marching an army), and factor secession risk into how far it
+pushes conquest (stop expanding when it can't hold what it has).
+
+---
+
 ## 2026-07-14 — Secession: revolt can cost you territory (design §3.3)
 
 Implemented the previously-missing half of the unrest brake. Until now unrest was
