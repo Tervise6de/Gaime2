@@ -6,6 +6,36 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — Yield breakdown tells you *why*: multiplier attribution tooltips
+
+The region panel showed each resource's per-turn flow but never *why* it was
+boosted or dented. Now every row of the production breakdown carries a tooltip
+that, on top of the base explanation, names the multipliers folded into that
+resource — e.g. "Multipliers: Tech ×1.20 · Mercantile ×1.20 · ✨ Prosperity
+×1.25." A player running a modifier or a strong trait can finally see the maths
+behind the number instead of guessing.
+
+To feed it honestly I refactored the modifier maths into a single source of
+truth: a new pure `singleModifierMult(m)` returns one modifier's per-resource
+effect, and `modifierMultipliers` now just folds those — so the UI's
+per-modifier attribution and the sim's economy can never disagree about what a
+modifier does. A companion `yieldFactors(nation)` exposes the three multiplier
+sources (tech / trait / modifiers) that `nationYieldMult` had been collapsing.
+Behaviour is unchanged — `nationYieldMult` returns exactly what it did — so no
+balance shift (confirmed by the untouched economy suite still passing).
+
+**Verify:** typecheck ✓, 282 tests ✓ (+2: `singleModifierMult` isolates one
+modifier and the fold equals the product of the singles; `yieldFactors` keeps
+tech/trait/modifier apart), build ✓ (0 `fetch`, deps `{}`). Browser-driven (seed
+5, Mercantile player, rivals 2): selecting an owned region shows the Gold row's
+tooltip ending "Multipliers: Mercantile ×1.20."; no console/page errors.
+
+**Next ideas:** surface the same attribution on the top resource-bar /turn
+figures; show a region's unrest production penalty in its tooltip too; a
+Mercantile/Industrious lasting modifier for axis symmetry.
+
+---
+
 ## 2026-07-14 — Map legend: a key for the border edges
 
 The legend explained every node marker (terrain, owner ring, unrest dots, crown,

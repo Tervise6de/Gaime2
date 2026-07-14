@@ -31,23 +31,42 @@ import {
   type ResourceFlow,
 } from "@/systems/state";
 import { techMultipliers } from "@/systems/tech";
-
-/** Yield multiplier from a nation's active temporary modifiers (prosperity, war-weariness, research surge). */
-export function modifierMultipliers(modifiers: NationModifier[] = []): ResourceYield {
-  let gold = 1;
-  let knowledge = 1;
-  for (const m of modifiers) {
-    if (m.turnsLeft <= 0) continue;
-    if (m.id === "prosperity") gold *= PROSPERITY_GOLD_MULT;
-    // War-weariness compounds per simultaneous war (stacks; absent = 1).
-    else if (m.id === "war_weary") gold *= WAR_WEARY_GOLD_MULT ** Math.max(1, m.stacks ?? 1);
-    else if (m.id === "research_surge") knowledge *= RESEARCH_SURGE_KNOWLEDGE_MULT;
-  }
-  return { food: 1, materials: 1, gold, knowledge };
-}
 import { traitYield } from "@/data/traits";
 
 const NO_MULT: ResourceYield = { food: 1, materials: 1, gold: 1, knowledge: 1 };
+
+/**
+ * The yield multipliers a single active modifier applies (NO_MULT = no effect,
+ * e.g. an expired modifier). One switch, so `modifierMultipliers` and the UI's
+ * per-modifier attribution can never disagree about what a modifier does. Pure.
+ */
+export function singleModifierMult(m: NationModifier): ResourceYield {
+  if (m.turnsLeft <= 0) return NO_MULT;
+  switch (m.id) {
+    case "prosperity":
+      return { ...NO_MULT, gold: PROSPERITY_GOLD_MULT };
+    // War-weariness compounds per simultaneous war (stacks; absent = 1).
+    case "war_weary":
+      return { ...NO_MULT, gold: WAR_WEARY_GOLD_MULT ** Math.max(1, m.stacks ?? 1) };
+    case "research_surge":
+      return { ...NO_MULT, knowledge: RESEARCH_SURGE_KNOWLEDGE_MULT };
+    default:
+      return NO_MULT;
+  }
+}
+
+/** Yield multiplier from a nation's active temporary modifiers (folds each modifier). */
+export function modifierMultipliers(modifiers: NationModifier[] = []): ResourceYield {
+  const out: ResourceYield = { ...NO_MULT };
+  for (const m of modifiers) {
+    const s = singleModifierMult(m);
+    out.food *= s.food;
+    out.materials *= s.materials;
+    out.gold *= s.gold;
+    out.knowledge *= s.knowledge;
+  }
+  return out;
+}
 
 /** Each unit of population works the land at these per-head rates. */
 const FOOD_PER_WORKER = 0.6;
@@ -112,14 +131,22 @@ export function regionProduction(
  * Used for its own production and for the HUD's region breakdown so both agree.
  */
 export function nationYieldMult(nation: Nation): ResourceYield {
-  const t = techMultipliers(nation.research.done);
-  const tr = traitYield(nation.trait);
-  const md = modifierMultipliers(nation.modifiers);
+  const { tech, trait, modifier } = yieldFactors(nation);
   return {
-    food: t.food * tr.food * md.food,
-    materials: t.materials * tr.materials * md.materials,
-    gold: t.gold * tr.gold * md.gold,
-    knowledge: t.knowledge * tr.knowledge * md.knowledge,
+    food: tech.food * trait.food * modifier.food,
+    materials: tech.materials * trait.materials * modifier.materials,
+    gold: tech.gold * trait.gold * modifier.gold,
+    knowledge: tech.knowledge * trait.knowledge * modifier.knowledge,
+  };
+}
+
+/** The three multiplier sources `nationYieldMult` folds together, kept separate so
+ * the UI can attribute a region's yield to research, national trait, and modifiers. Pure. */
+export function yieldFactors(nation: Nation): { tech: ResourceYield; trait: ResourceYield; modifier: ResourceYield } {
+  return {
+    tech: techMultipliers(nation.research.done),
+    trait: traitYield(nation.trait),
+    modifier: modifierMultipliers(nation.modifiers),
   };
 }
 

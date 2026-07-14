@@ -15,7 +15,7 @@
 import { BUILDINGS, BUILDING_IDS, type BuildingId } from "@/data/buildings";
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
 import { TERRAIN, TERRAIN_IDS } from "@/data/terrain";
-import { regionProduction, nationalProduction, nationYieldMult } from "@/systems/economy";
+import { regionProduction, nationalProduction, nationYieldMult, yieldFactors, singleModifierMult } from "@/systems/economy";
 import { EDGE_COLOR, WAR_EDGE_COLOR } from "@/systems/renderer";
 import { regionCapacity } from "@/systems/population";
 import { previewCombat } from "@/systems/combat";
@@ -703,6 +703,25 @@ function renderRegion(
   }
 }
 
+/**
+ * A per-resource tooltip for the region breakdown: the base explanation plus,
+ * when any apply, the tech / trait / active-modifier multipliers folded into
+ * this resource's yield (named, so the player sees *why* it's boosted or dented).
+ */
+function flowTooltip(key: ResourceKey, player: Nation): string {
+  const f = yieldFactors(player);
+  const pct = (v: number) => `×${v.toFixed(2)}`;
+  const parts: string[] = [];
+  if (f.tech[key] !== 1) parts.push(`Tech ${pct(f.tech[key])}`);
+  if (f.trait[key] !== 1) parts.push(`${player.trait ? TRAITS[player.trait].label : "Trait"} ${pct(f.trait[key])}`);
+  for (const m of player.modifiers ?? []) {
+    const s = singleModifierMult(m);
+    if (s[key] !== 1) parts.push(`${MODIFIER_LABEL[m.id]} ${pct(s[key])}`);
+  }
+  const base = RESOURCE_META[key].tip;
+  return parts.length ? `${base}\n\nMultipliers: ${parts.join(" · ")}.` : base;
+}
+
 function renderOwnedRegion(
   container: HTMLElement,
   state: GameState,
@@ -731,10 +750,12 @@ function renderOwnedRegion(
   unrestWrap.append(unrestLabel, bar);
   container.append(unrestWrap);
 
-  // Production breakdown.
+  // Production breakdown — each row's tooltip attributes the yield to the tech,
+  // trait and modifier multipliers folded into this region's output.
   const table = el("div", "hud-region-flows");
   for (const key of RESOURCE_KEYS) {
     const row = el("div", "hud-region-flow");
+    row.title = flowTooltip(key, player);
     const k = el("span", "");
     k.textContent = RESOURCE_META[key].label;
     const v = el("span", "hud-region-flow-val");

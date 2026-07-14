@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { regionProduction, nationalProduction, modifierMultipliers } from "@/systems/economy";
+import { regionProduction, nationalProduction, modifierMultipliers, singleModifierMult, yieldFactors } from "@/systems/economy";
 import { TERRAIN } from "@/data/terrain";
 import { PLAYER_ID, PROSPERITY_GOLD_MULT, WAR_WEARY_GOLD_MULT, RESEARCH_SURGE_KNOWLEDGE_MULT, type GameState, type Region } from "@/systems/state";
 
@@ -111,6 +111,34 @@ describe("prosperity modifier", () => {
     expect(m.gold).toBe(1);
     expect(m.food).toBe(1);
     expect(modifierMultipliers([{ id: "research_surge", turnsLeft: 0 }]).knowledge).toBe(1);
+  });
+
+  it("singleModifierMult isolates one modifier's effect and modifierMultipliers folds them", () => {
+    expect(singleModifierMult({ id: "prosperity", turnsLeft: 2 })).toEqual({
+      food: 1, materials: 1, gold: PROSPERITY_GOLD_MULT, knowledge: 1,
+    });
+    // Expired modifier is inert.
+    expect(singleModifierMult({ id: "prosperity", turnsLeft: 0 }).gold).toBe(1);
+    // The fold equals the product of the singles.
+    const mods = [
+      { id: "war_weary" as const, turnsLeft: 2, stacks: 2 },
+      { id: "research_surge" as const, turnsLeft: 2 },
+    ];
+    const folded = modifierMultipliers(mods);
+    expect(folded.gold).toBeCloseTo(singleModifierMult(mods[0]).gold, 5);
+    expect(folded.knowledge).toBeCloseTo(singleModifierMult(mods[1]).knowledge, 5);
+  });
+
+  it("yieldFactors keeps tech, trait and modifier multipliers separate for the UI", () => {
+    const nation = {
+      research: { current: null, progress: 0, done: [] },
+      trait: undefined,
+      modifiers: [{ id: "prosperity", turnsLeft: 3 }],
+    } as never;
+    const f = yieldFactors(nation);
+    expect(f.modifier.gold).toBe(PROSPERITY_GOLD_MULT);
+    expect(f.tech.gold).toBe(1); // no tech done
+    expect(f.trait.gold).toBe(1); // no trait
   });
 
   it("raises a nation's gold output when active", () => {
