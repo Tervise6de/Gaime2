@@ -1675,6 +1675,24 @@ body {
   filter: brightness(1.08);
 }
 
+/* First-run orientation: jump to the player's capital from the empty region panel. */
+.hud-region-jump {
+  margin-top: 10px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  background: rgba(244, 210, 122, 0.1);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.hud-region-jump:hover {
+  border-color: var(--accent);
+  background: rgba(244, 210, 122, 0.18);
+}
+
 /* Confirmation dialog — modal prompt before irreversible / heavy actions. */
 .confirm-overlay {
   position: fixed;

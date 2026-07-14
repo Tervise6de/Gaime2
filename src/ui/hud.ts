@@ -793,6 +793,14 @@ function renderRegion(
     const hint = el("p", "hud-hint");
     hint.textContent = "Click a region to inspect, develop, and defend it.";
     container.append(hint);
+    // Orient a newcomer: one click to select and centre their own capital.
+    const player = state.nations.find((n) => n.isPlayer);
+    const cap = player?.capitalRegionId;
+    if (cap !== undefined && state.regions[cap]?.ownerId === PLAYER_ID) {
+      const jump = btn("👑 Show your capital", "hud-region-jump", () => callbacks.onSelectRegion(cap));
+      jump.title = "Select and highlight your seat of power on the map.";
+      container.append(jump);
+    }
     return;
   }
   const region = state.regions[selectedRegionId];

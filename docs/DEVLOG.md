@@ -6,6 +6,32 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — ROADMAP A3: First-run UX sweep — orient the newcomer
+
+Third Phase-A item of `docs/roadmap-to-ready.md`: a browser-driven sweep of the
+resting first-run HUD (fresh session, tutorial dismissed) to find where a newcomer
+stalls. The layout held up — every control carries a tooltip, the region panel has
+a clear empty state ("Click a region to inspect…"), and the turn log opens with a
+narrative hook naming the player's home region. The one real gap: a brand-new
+player doesn't immediately know *which* dot on the map is theirs.
+
+**Fix:** the empty region panel now offers a **👑 Show your capital** button that
+selects and highlights the player's seat of power in one click (only shown while
+the player still holds their capital). It's a zero-risk orientation aid — pure
+intent through the existing `onSelectRegion` callback, no sim change.
+
+**Verify:** typecheck ✓, **338 tests ✓**, build ✓ (0 `fetch`, deps `{}`). Browser
+(Playwright, fresh session): the button appears in the unselected panel, clicking
+it selects the capital (region title flips to "Ironreach") and the button gives way
+to the region detail; no page errors. Screenshotted the resting HUD to confirm the
+overall first-run frame reads cleanly.
+
+**Next (roadmap order):** A4 UI fuzz/bug-bash closes the Phase-A gate
+(**~75 testing-ready**); then Phase B opens with **procedural audio** (Web Audio,
+no assets/deps).
+
+---
+
 ## 2026-07-14 — ROADMAP A2: Confirmation dialogs for irreversible actions
 
 Second Phase-A item of `docs/roadmap-to-ready.md`: guard the handful of clicks a
