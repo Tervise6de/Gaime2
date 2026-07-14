@@ -10,7 +10,7 @@ import {
 import { nationalProduction } from "@/systems/economy";
 import { totalUpkeep } from "@/systems/military";
 import { BUILDINGS } from "@/data/buildings";
-import { PLAYER_ID, TAX_MAX, TAX_MIN, clampTax, playerNation } from "@/systems/state";
+import { PLAYER_ID, TAX_MAX, TAX_MIN, clampTax, playerNation, type GameState } from "@/systems/state";
 
 describe("createGame", () => {
   it("is deterministic for a seed", () => {
@@ -245,7 +245,7 @@ describe("war-weariness", () => {
 
   it("accrues while at war and lingers, then decays after peace", () => {
     // Put the player at war with rival 2 from the start.
-    let s = { ...createGame({ seed: 1, rivals: 2 }), treaties: { "0-2": "war" as const } };
+    let s: GameState = { ...createGame({ seed: 1, rivals: 2 }), treaties: { "0-2": "war" } };
     s = resolveTurn(s);
     expect(wearyOf(s)?.turnsLeft).toBe(3); // refreshed while at war
     s = resolveTurn(s);

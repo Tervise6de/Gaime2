@@ -6,6 +6,32 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — War fronts on the map (red border edges) + a typecheck fix
+
+**Front lines at a glance.** The map drew every adjacency edge the same faint
+grey, so who was fighting whom was invisible without opening the diplomacy panel.
+Now a border between two different, non-barbarian owners **at war** is drawn as a
+thicker red edge (`WAR_EDGE_COLOR`); everything else stays grey. You can read the
+whole war map instantly — the fronts radiate between the belligerents. Renderer
+reads state only (imports the pure `atWar`); no sim/balance impact.
+
+**Also fixed a latent typecheck error** I let slip into last cycle's commit: a
+war-weariness test typed `s` by an `as const` treaty literal, so a later
+`treaties: {}` reassignment failed `tsc` — but `npm test` (vitest/esbuild)
+doesn't run `tsc`, so it passed tests while `npm run build` would have caught it.
+Annotated `s: GameState`. Lesson: run `npm run build`/`tsc` *after* editing tests,
+as the final gate — which is how this cycle caught it.
+
+**Verify:** typecheck ✓ (now clean again), 275 tests ✓, build ✓ (0 `fetch`, deps
+`{}`). Browser-driven (seed 2, turn 15): red war-front edges render between the
+warring rivals while neutral borders stay grey (~1.7k red pixels sampled); no
+console/page errors.
+
+**Next ideas:** dash or animate the war edge; tint a besieged region; a legend
+row for the red front line.
+
+---
+
 ## 2026-07-13 — War-weariness: a lingering cost of prolonged war
 
 Second use of the modifier framework, and the first *systemic* one (applied by

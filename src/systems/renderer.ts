@@ -10,7 +10,7 @@
  */
 
 import { TERRAIN } from "@/data/terrain";
-import { armySize } from "@/systems/state";
+import { armySize, BARBARIAN_ID } from "@/systems/state";
 import {
   UNREST_PENALTY_START,
   UNREST_REVOLT,
@@ -18,9 +18,12 @@ import {
   type GameState,
   type Region,
 } from "@/systems/state";
+import { atWar } from "@/systems/diplomacy";
 
 const BACKGROUND = "#11151c";
 const EDGE_COLOR = "rgba(230, 233, 239, 0.14)";
+/** A border between two nations at war — the map's front line. */
+const WAR_EDGE_COLOR = "rgba(232, 119, 107, 0.6)";
 const NODE_RADIUS = 26;
 const SELECT_COLOR = "#f4d27a";
 const HIGHLIGHT_COLOR = "#63c7d6";
@@ -86,7 +89,6 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   }
 
   function drawEdges(s: GameState): void {
-    context.lineWidth = 2;
     for (const region of s.regions) {
       const a = project(region);
       for (const neighbourId of region.adjacency) {
@@ -94,13 +96,22 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         const neighbour = s.regions[neighbourId];
         if (!neighbour) continue;
         const b = project(neighbour);
-        context.strokeStyle = EDGE_COLOR;
+        // A front line: two different, non-barbarian owners at war across this border.
+        const oa = region.ownerId;
+        const ob = neighbour.ownerId;
+        const isFront =
+          oa !== null && ob !== null && oa !== ob &&
+          oa !== BARBARIAN_ID && ob !== BARBARIAN_ID &&
+          atWar(s, oa, ob);
+        context.strokeStyle = isFront ? WAR_EDGE_COLOR : EDGE_COLOR;
+        context.lineWidth = isFront ? 3 : 2;
         context.beginPath();
         context.moveTo(a.x, a.y);
         context.lineTo(b.x, b.y);
         context.stroke();
       }
     }
+    context.lineWidth = 2;
   }
 
   function drawNodes(s: GameState): void {
