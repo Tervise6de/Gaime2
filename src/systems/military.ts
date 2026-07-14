@@ -220,9 +220,12 @@ export function moveArmy(
 
   const log: string[] = [];
   const atkName = state.nations.find((n) => n.id === owner)?.name ?? "Army";
+  const myLoss = armySize(result.attackerLosses);
+  const theirLoss = armySize(result.defenderLosses);
   log.push(
     `${atkName} ${result.attackerWins ? "won" : "was repelled"} at ${target.name}` +
-      (result.captured ? ` — ${target.name} captured!` : "."),
+      (result.captured ? ` — ${target.name} captured!` : ".") +
+      ` (losses ${myLoss} vs ${theirLoss})`,
   );
 
   // Update both armies with survivors; drop empty stacks.

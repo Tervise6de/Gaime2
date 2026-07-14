@@ -6,6 +6,31 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — Battle casualties in the log (combat feedback)
+
+Backlog **D**, a fresh surface (combat feedback) after several economy/event
+cycles. The combat log said who *won*, *was repelled*, or *captured* a region —
+but never the **cost**. You'd attack, read "won at Northgate," and have no idea
+whether it cost you one militia or half your stack, which makes it hard to judge
+whether a fight was worth it or to plan the next move. `resolveCombat` already
+computes both sides' losses; they were just thrown away at the log line.
+
+**Change** (`systems/military.ts`): the battle log entry now ends with
+"(losses N vs M)" — your casualties vs the enemy's — for every resolved fight.
+One line, reusing the already-computed `attackerLosses`/`defenderLosses` totals;
+no combat-maths or balance change.
+
+**Verify:** typecheck ✓, **328 tests ✓** (+1: a defended battle logs a
+"(losses N vs M)" line), build ✓ (0 `fetch`, deps `{}`). Browser-driven (hard, 3
+rivals, ~40 turns of idle end-turns): a real rival battle logged "…captured!
+(losses 2 vs 1)"; no console/page errors. Logging-only → no balance probe.
+
+**Next ideas:** colour the casualty numbers (green when you come out ahead, red
+when you bleed); a compact per-unit-type loss breakdown in a tooltip; surface a
+big battle in the alerts strip / turn summary.
+
+---
+
 ## 2026-07-14 — New event: sap an enemy's walls (offensive siege-prep)
 
 The offensive counterpart to `reinforce_walls`, and a small nudge for the

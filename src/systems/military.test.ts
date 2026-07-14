@@ -149,6 +149,12 @@ describe("moveArmy", () => {
     expect(next.rngState).not.toBe(g.rngState);
   });
 
+  it("logs both sides' casualties after a defended battle", () => {
+    const g = battlefield({ infantry: 8, ranged: 4 }, { militia: 3, infantry: 1 });
+    const next = moveArmy(g, 0, 1);
+    expect(next.log.some((l) => /\(losses \d+ vs \d+\)/.test(l))).toBe(true);
+  });
+
   it("refuses to move without moves left or across a non-edge", () => {
     const g = battlefield({ infantry: 2 }, {});
     g.armies[0]!.movesLeft = 0;
