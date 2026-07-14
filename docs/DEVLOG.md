@@ -6,6 +6,46 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — Voronoi-polygon map renderer (handoff dev #3)
+
+Third of the three "further the game a lot" developments. The map can now be
+drawn as **filled territory polygons** instead of only nodes + edges — the
+biggest presentation lever left — **behind a toggle, with the node+edge view
+kept as the default fallback** so nothing regresses.
+
+- New pure module `systems/voronoi.ts`: `computeVoronoiCells(sites)` builds each
+  region's Voronoi cell as the intersection of the perpendicular-bisector
+  half-planes against **every** other site (the k-nearest adjacency is not the
+  Delaunay graph, so a subset would leave cells too big), clipped to the map box.
+  Each cell edge is labelled with the neighbouring site that created it (or -1
+  for a box edge), so shared borders — including **war fronts** — render exactly.
+  Plus `pointInPolygon` for hit-testing. Deterministic and unit-tested.
+- `renderer.ts` gains a `layout` mode (`"node"` | `"voronoi"`) via `setLayout`.
+  The Voronoi pass fills each cell with terrain colour + an owner tint, strokes
+  cell borders, overlays **red war-front edges** on shared borders between
+  warring non-barbarian owners, and draws selection/target-highlight outlines.
+  **Every marker** (population — now with a legibility halo so it reads over any
+  fill — strategic resource, capital crown/ring, unrest dot, construction hammer,
+  region name, army badges) is shared between both layouts. Cells are cached and
+  recomputed only when the map geometry changes, never per animation frame; the
+  renderer stays read-only over state.
+- HUD: a "🗺 Map: Nodes/Territory" top-bar toggle (shortcut **M**) calls the new
+  `onSetMapLayout` callback; `main.ts` flips the renderer layout (view-only).
+
+**Verify:** typecheck ✓, 293 tests ✓ (+4: `computeVoronoiCells` is
+deterministic, every site lies in its own cell, a grid of points hit-tests to its
+nearest site — proving the partition is correct — and cells stay within the box),
+build ✓ (0 `fetch`, deps `{}`). Browser-driven both ways: toggled node → territory
+→ back, the territory view fills the map with owner-tinted terrain cells and all
+markers, click-to-select hit the right cell ("Kelmoor") and populated the region
+panel with a gold selection outline, and the node+edge fallback still renders
+unchanged. No console/page errors. No sim change, so no balance probe.
+
+**Next ideas:** war-front polish (thicker/animated fronts, coastline styling);
+per-terrain cell textures; a subtle sea/hull backdrop behind the polygons.
+
+---
+
 ## 2026-07-14 — End-game summary screen (handoff dev #2)
 
 Second of the three "further the game a lot" developments. Winning or losing used

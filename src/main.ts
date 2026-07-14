@@ -164,6 +164,10 @@ function main(): void {
       state = resolveChoice(state, optionId);
       commit();
     },
+    onSetMapLayout(mapLayout) {
+      // View-only: the continuous render loop picks up the new layout next frame.
+      renderer.setLayout(mapLayout);
+    },
   });
 
   renderer.onRegionClick((regionId) => {

@@ -16,7 +16,7 @@ import { BUILDINGS, BUILDING_IDS, type BuildingId } from "@/data/buildings";
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
 import { TERRAIN, TERRAIN_IDS } from "@/data/terrain";
 import { regionProduction, nationalProduction, nationYieldMult, yieldFactors, singleModifierMult, unrestPenalty } from "@/systems/economy";
-import { EDGE_COLOR, WAR_EDGE_COLOR } from "@/systems/renderer";
+import { EDGE_COLOR, WAR_EDGE_COLOR, type MapLayout } from "@/systems/renderer";
 import { regionCapacity } from "@/systems/population";
 import { previewCombat } from "@/systems/combat";
 import {
@@ -90,6 +90,8 @@ export interface HudCallbacks {
   onSelectRegion(regionId: number): void;
   /** Resolve the pending choice event by picking one of its options. */
   onResolveChoice(optionId: string): void;
+  /** Switch the map between the node+edge fallback and the Voronoi polygon view. */
+  onSetMapLayout(layout: MapLayout): void;
 }
 
 const BRANCH_COLOR: Record<string, string> = {
@@ -179,6 +181,17 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const standingsToggle = btn("📊 Standings", "hud-legend-toggle", () => toggleStandings());
   standingsToggle.title = "See how you rank against every rival. Shortcut: S";
   topBar.append(standingsToggle);
+
+  // Map layout toggle: node+edge fallback ⇄ Voronoi polygon view.
+  let mapLayout: MapLayout = "node";
+  const mapLayoutLabel = (l: MapLayout): string => (l === "voronoi" ? "🗺 Map: Territory" : "🗺 Map: Nodes");
+  const mapToggle = btn(mapLayoutLabel(mapLayout), "hud-legend-toggle", () => {
+    mapLayout = mapLayout === "voronoi" ? "node" : "voronoi";
+    mapToggle.textContent = mapLayoutLabel(mapLayout);
+    callbacks.onSetMapLayout(mapLayout);
+  });
+  mapToggle.title = "Switch between the node/edge map and the Voronoi territory map. Shortcut: M";
+  topBar.append(mapToggle);
   root.append(topBar);
 
   // Critical-events alert strip (just below the resource bar).
@@ -588,6 +601,9 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     } else if (key === "s") {
       ev.preventDefault();
       toggleStandings();
+    } else if (key === "m") {
+      ev.preventDefault();
+      mapToggle.click();
     } else if (ev.key === "Escape") {
       closeTechTree();
       closeStandings();
