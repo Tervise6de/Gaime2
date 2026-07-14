@@ -55,6 +55,15 @@ export const REBEL_GARRISON = 2;
 export const UNREST_DRIFT = 6;
 /** Unrest spike applied to a region during a national famine. */
 export const FAMINE_UNREST_SPIKE = 18;
+/**
+ * A stationed friendly army polices its region, lowering its unrest target by
+ * this much per unit (design §3.3: garrisons calm). Capped by GARRISON_CALM_MAX
+ * so a huge stack can't zero unrest — and armies cost upkeep, so keeping the
+ * peace by force is a real, ongoing gold trade-off, not a free fix.
+ */
+export const GARRISON_CALM_PER_UNIT = 2;
+/** Maximum unrest reduction a garrison can contribute, however large. */
+export const GARRISON_CALM_MAX = 12;
 
 /** Population tuning (M2). */
 export const GROWTH_BASE = 0.35;

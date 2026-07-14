@@ -6,6 +6,43 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — Garrisons calm their region (design §3.3)
+
+Design §3.3 lists garrisons among the things that *lower unrest*, but they never
+did — a stationed army only reset the secession countdown, it didn't actually
+calm the province. Now **a friendly garrison lowers its region's unrest target**
+by `GARRISON_CALM_PER_UNIT` (2) per unit, capped at `GARRISON_CALM_MAX` (12). This
+gives armies a real *peacetime* purpose — policing restless or freshly-conquered
+land — and makes the advice we already give the player ("station an army here")
+genuinely fix the province, not just pause its countdown. Because armies cost gold
+upkeep, holding the peace by force is an ongoing trade-off, not a free fix — and
+overexpansion unrest still scales with region count, so it doesn't unleash the
+territorial snowball.
+
+New pure `garrisonCalm(size)` in `stability.ts`; `unrestTarget`/`nextUnrest` gain
+an optional trailing `garrisonSize` term (existing callers unaffected); `turn.ts`
+sums each region's friendly garrison and threads it in.
+
+**Verify:** typecheck ✓, **308 tests ✓** (+3: `garrisonCalm` scales and caps and
+never goes negative; `unrestTarget` drops by exactly the per-unit calm; end-to-end
+over 8 turns a garrisoned region settles lower-unrest than an ungarrisoned one),
+build ✓ (0 `fetch`, deps `{}`). Browser smoke (15 turns): no console/page errors.
+
+**Balance (temp probe: 40 seeds × 3 difficulties × {2,3} rivals = 240 games,
+deleted):** no crashes; medians **70–104** turns, diverse victory mix, and
+secessions/game steady at **~0.025** — identical to the prior pass, i.e. **no
+regression**: the upkeep cost and overexpansion unrest keep garrison-calm from
+easing the snowball. The effect is subtle in symmetric self-play (neither side
+parks policing garrisons much) but is a real new lever for a human player holding
+a restless conquest.
+
+**Next ideas:** show the garrison's calming contribution in the region unrest
+tooltip (legibility — the number drops but the panel doesn't say why); let the AI
+weigh garrison-for-calm vs. army upkeep when its treasury is thin; factor
+secession risk into how far the AI pushes conquest.
+
+---
+
 ## 2026-07-14 — AI eases taxes to save a province from revolt
 
 Backlog **B** follow-on — the cheaper half of the AI's secession defence. The AI

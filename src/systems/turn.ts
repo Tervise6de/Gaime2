@@ -397,15 +397,20 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
   const famine = rawFood < 0;
   stocks.food = round1(Math.max(0, Math.min(GRANARY_CAP, rawFood)));
 
-  // Population & unrest for this nation's regions (tech eases unrest).
+  // Population & unrest for this nation's regions (tech eases unrest; a stationed
+  // garrison polices its region and calms it — design §3.3).
   const ownedCount = regions.filter((r) => r.ownerId === nationId).length;
   const techCalm = techUnrestReduction(research.done);
+  const garrisonIn = (regionId: number): number =>
+    state.armies
+      .filter((a) => a.regionId === regionId && a.ownerId === nationId)
+      .reduce((sum, a) => sum + armySize(a.units), 0);
   regions = regions.map((r) =>
     r.ownerId === nationId
       ? {
           ...r,
           population: nextPopulation(r, famine),
-          unrest: nextUnrest(r, nation.taxRate, famine, ownedCount, techCalm),
+          unrest: nextUnrest(r, nation.taxRate, famine, ownedCount, techCalm, garrisonIn(r.id)),
         }
       : r,
   );

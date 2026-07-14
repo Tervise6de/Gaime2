@@ -14,6 +14,8 @@ import { BUILDINGS } from "@/data/buildings";
 import {
   FAMINE_UNREST_SPIKE,
   FREE_REGIONS,
+  GARRISON_CALM_MAX,
+  GARRISON_CALM_PER_UNIT,
   OVEREXPANSION_UNREST,
   TAX_MAX,
   UNREST_BASE,
@@ -35,12 +37,18 @@ export function overexpansionUnrest(ownedRegionCount: number): number {
   return Math.max(0, ownedRegionCount - FREE_REGIONS) * OVEREXPANSION_UNREST;
 }
 
+/** Unrest reduction from a friendly garrison of `garrisonSize` units (design §3.3). */
+export function garrisonCalm(garrisonSize: number): number {
+  return Math.min(GARRISON_CALM_MAX, Math.max(0, garrisonSize) * GARRISON_CALM_PER_UNIT);
+}
+
 /** The steady-state unrest a region trends toward under current policy. */
 export function unrestTarget(
   region: Region,
   taxRate: number,
   ownedRegionCount: number,
   techReduction = 0,
+  garrisonSize = 0,
 ): number {
   const taxPressure = (taxRate / TAX_MAX) * UNREST_TAX_MAX;
   const target =
@@ -48,13 +56,14 @@ export function unrestTarget(
     taxPressure +
     overexpansionUnrest(ownedRegionCount) -
     buildingCalm(region) -
-    techReduction;
+    techReduction -
+    garrisonCalm(garrisonSize);
   return clampUnrest(target);
 }
 
 /**
- * Next unrest for a region: drift toward the tax/expansion/building/tech target
- * (capped per turn), then add a famine spike so starvation bites immediately.
+ * Next unrest for a region: drift toward the tax/expansion/building/tech/garrison
+ * target (capped per turn), then add a famine spike so starvation bites immediately.
  */
 export function nextUnrest(
   region: Region,
@@ -62,8 +71,9 @@ export function nextUnrest(
   famine: boolean,
   ownedRegionCount: number,
   techReduction = 0,
+  garrisonSize = 0,
 ): number {
-  const target = unrestTarget(region, taxRate, ownedRegionCount, techReduction);
+  const target = unrestTarget(region, taxRate, ownedRegionCount, techReduction, garrisonSize);
   const delta = clamp(target - region.unrest, -UNREST_DRIFT, UNREST_DRIFT);
   let next = region.unrest + delta;
   if (famine) next += FAMINE_UNREST_SPIKE;

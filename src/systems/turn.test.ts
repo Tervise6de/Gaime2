@@ -146,6 +146,33 @@ describe("resolveTurn", () => {
     expect(resolveTurn(g).turn).toBe(g.turn + 1);
   });
 
+  it("a stationed garrison calms its region's unrest over a turn", () => {
+    const base = createGame({ seed: 1, rivals: 0 });
+    const rid = base.regions.findIndex((r) => r.ownerId === PLAYER_ID);
+    // Raise this region's unrest and clear any army already standing on it.
+    const raised: GameState = {
+      ...base,
+      regions: base.regions.map((r) => (r.id === rid ? { ...r, unrest: 50 } : r)),
+      armies: base.armies.filter((a) => a.regionId !== rid),
+    };
+    const garrisoned: GameState = {
+      ...raised,
+      armies: [
+        ...raised.armies,
+        { id: 999, ownerId: PLAYER_ID, regionId: rid, units: { ...emptyUnits(), infantry: 5 }, movesLeft: 0 },
+      ],
+    };
+    // Unrest drifts a capped amount per turn, so let several turns pass for the
+    // lower garrisoned target to separate from the ungarrisoned trajectory.
+    let a = raised;
+    let b = garrisoned;
+    for (let i = 0; i < 8; i++) {
+      a = resolveTurn(a);
+      b = resolveTurn(b);
+    }
+    expect(b.regions[rid]!.unrest).toBeLessThan(a.regions[rid]!.unrest);
+  });
+
   it("adds national production to stocks, net of army upkeep", () => {
     const g = createGame({ seed: 1, rivals: 0 });
     const flow = nationalProduction(g, PLAYER_ID);

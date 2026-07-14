@@ -1,11 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { unrestTarget, nextUnrest } from "@/systems/stability";
+import { unrestTarget, nextUnrest, garrisonCalm } from "@/systems/stability";
 import { unrestPenalty } from "@/systems/economy";
 import {
   TAX_MAX,
   UNREST_DRIFT,
   UNREST_PENALTY_START,
   UNREST_REVOLT,
+  GARRISON_CALM_MAX,
+  GARRISON_CALM_PER_UNIT,
   type Region,
 } from "@/systems/state";
 
@@ -47,6 +49,22 @@ describe("unrestTarget", () => {
     const small = unrestTarget(region(), 0, 3);
     const sprawling = unrestTarget(region(), 0, 20);
     expect(sprawling).toBeGreaterThan(small);
+  });
+
+  it("is lowered by a stationed garrison", () => {
+    const ungarrisoned = unrestTarget(region(), TAX_MAX, SMALL_REALM, 0, 0);
+    const garrisoned = unrestTarget(region(), TAX_MAX, SMALL_REALM, 0, 4);
+    expect(garrisoned).toBeLessThan(ungarrisoned);
+    expect(ungarrisoned - garrisoned).toBeCloseTo(4 * GARRISON_CALM_PER_UNIT, 5);
+  });
+});
+
+describe("garrisonCalm", () => {
+  it("scales with garrison size, capped at the maximum", () => {
+    expect(garrisonCalm(0)).toBe(0);
+    expect(garrisonCalm(3)).toBe(3 * GARRISON_CALM_PER_UNIT);
+    expect(garrisonCalm(1000)).toBe(GARRISON_CALM_MAX); // huge stack can't zero unrest
+    expect(garrisonCalm(-5)).toBe(0); // defensive: never negative
   });
 });
 
