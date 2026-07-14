@@ -113,6 +113,8 @@ export interface HudCallbacks {
   onSetMapLayout(layout: MapLayout): void;
   /** Colour-blind palette toggled — the parent repaints the canvas + HUD. */
   onSetColourblind(on: boolean): void;
+  /** Reduce-motion toggled — the parent tells the renderer to suppress motion. */
+  onSetReduceMotion(on: boolean): void;
 }
 
 const BRANCH_COLOR: Record<string, string> = {
@@ -703,7 +705,15 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       ),
     );
     panel.append(
-      checkboxRow("Reduce motion", isReduceMotion, (v) => setReduceMotion(v), "Disable non-essential UI transitions and animation."),
+      checkboxRow(
+        "Reduce motion",
+        isReduceMotion,
+        (v) => {
+          setReduceMotion(v);
+          callbacks.onSetReduceMotion(v);
+        },
+        "Disable non-essential UI transitions and animation.",
+      ),
     );
 
     // Display ----------------------------------------------------------------

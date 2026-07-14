@@ -58,6 +58,10 @@ export interface Renderer {
   getLayout(): MapLayout;
   /** Remap owner colours to the colour-blind-safe palette (or back). */
   setColourblind(on: boolean): void;
+  /** Suppress cosmetic motion (capture ripples) when true. */
+  setReduceMotion(on: boolean): void;
+  /** Flash a capture ripple at a region that just changed hands. */
+  pulseCapture(regionId: number): void;
   onRegionClick(handler: (regionId: number | null) => void): void;
 }
 
@@ -73,7 +77,14 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   let highlights = new Set<number>();
   let layout: MapLayout = "node";
   let colourblind = false;
+  let reduceMotion = false;
   let clickHandler: (regionId: number | null) => void = () => {};
+
+  // Transient capture ripples: a battle-flash → owner-colour ring at a region that
+  // changed hands. Purely cosmetic; aged by a frame tick so no wall-clock is used.
+  const RIPPLE_FRAMES = 42;
+  let tick = 0;
+  let ripples: { regionId: number; color: string; born: number }[] = [];
 
   // Voronoi cells (normalised space) cached until the map geometry changes.
   let cells: VoronoiCell[] = [];
@@ -125,8 +136,43 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         drawNodes(state);
       }
       drawArmies(state);
+      drawRipples(state);
     }
+    tick += 1;
     frame = window.requestAnimationFrame(render);
+  }
+
+  /** Draw and age the capture ripples: a quick flash, then an expanding fading ring. */
+  function drawRipples(s: GameState): void {
+    if (ripples.length === 0) return;
+    for (const r of ripples) {
+      const region = s.regions[r.regionId];
+      if (!region) continue;
+      const p = project(region);
+      const age = tick - r.born;
+      const t = age / RIPPLE_FRAMES; // 0..1 progress
+      // Opening flash (first ~25%): a bright disc that fades fast.
+      if (t < 0.25) {
+        context.save();
+        context.globalAlpha = 0.5 * (1 - t / 0.25);
+        context.fillStyle = "#fff2cf";
+        context.beginPath();
+        context.arc(p.x, p.y, NODE_RADIUS * 0.9, 0, Math.PI * 2);
+        context.fill();
+        context.restore();
+      }
+      // Expanding owner-colour ring across the whole lifetime.
+      context.save();
+      context.globalAlpha = Math.max(0, 1 - t);
+      context.strokeStyle = r.color;
+      context.lineWidth = 3;
+      context.beginPath();
+      context.arc(p.x, p.y, NODE_RADIUS + t * 46, 0, Math.PI * 2);
+      context.stroke();
+      context.restore();
+    }
+    context.lineWidth = 2;
+    ripples = ripples.filter((r) => tick - r.born < RIPPLE_FRAMES);
   }
 
   /** Capitals still held by their nation — the crown/double-ring vanishes on capture. */
@@ -435,6 +481,14 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     },
     setColourblind(on: boolean): void {
       colourblind = on;
+    },
+    setReduceMotion(on: boolean): void {
+      reduceMotion = on;
+      if (on) ripples = []; // drop any in-flight motion
+    },
+    pulseCapture(regionId: number): void {
+      if (reduceMotion) return;
+      ripples.push({ regionId, color: ownerColor(state?.regions[regionId]?.ownerId ?? null), born: tick });
     },
     onRegionClick(handler: (regionId: number | null) => void): void {
       clickHandler = handler;

@@ -1675,6 +1675,35 @@ body {
   filter: brightness(1.08);
 }
 
+/* Visual juice: modals fade + rise in when opened. The reduce-motion rule below
+   collapses these to ~instant, so opt-in accessibility overrides the flourish. */
+@keyframes hud-modal-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes hud-panel-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.hud-techtree-overlay,
+.confirm-overlay {
+  animation: hud-modal-in 0.16s ease-out;
+}
+.hud-techtree-panel,
+.confirm-panel {
+  animation: hud-panel-rise 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 /* Accessibility: a clear keyboard focus ring on every interactive control.
    :focus-visible keeps it keyboard-only (mouse clicks don't show the ring). */
 button:focus-visible,

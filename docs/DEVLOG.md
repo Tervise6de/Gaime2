@@ -6,6 +6,43 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — ROADMAP B5: Visual juice — capture ripples + modal transitions
+
+Fifth Phase-B item of `docs/roadmap-to-ready.md`: motion feedback, no art assets,
+all gated by the reduce-motion flag B3 added.
+
+**Capture ripple (canvas):** when a region changes hands, the renderer flashes a
+transient effect at that region — a quick bright core, then an expanding fading ring
+in the new owner's colour (colour-blind palette respected, since it reuses
+`ownerColor`). Purely cosmetic and aged by a frame **tick** (no wall-clock, no sim
+touch). The renderer gained `pulseCapture(regionId)` and `setReduceMotion(on)`;
+`main.ts` diffs region owners after each turn and pulses every region that flipped,
+and honours the saved motion pref at boot. Toggling reduce-motion mid-game clears
+in-flight ripples live via a new `onSetReduceMotion` callback.
+
+**Modal transitions (CSS):** the tech-tree/standings/options/confirm modals now fade
+in and rise (`hud-panel-rise`). The existing `:root[data-reduce-motion]` rule
+collapses these to ~instant, so the accessibility opt-in overrides the flourish
+automatically.
+
+**Verify:** typecheck ✓, **348 tests ✓**, build ✓ (0 `fetch`, deps `{}`). Browser
+(Playwright, differential canvas-hash): idle frames are identical (no idle
+animation), so motion is detectable as frame-to-frame change. With motion on,
+**27/30 turns showed ripple animation** (captures happen as rivals fight); with
+reduce-motion on, **0/22 turns animated** — ripples fully suppressed — and the
+options-panel animation duration collapses to 0.001s. No page errors.
+
+**Scoped out (noted as follow-ups):** resource-count tweening and a battle
+flash/shake distinct from capture need a per-frame HUD tween loop and a combat-event
+signal from the sim respectively — larger than one cycle; the capture ripple already
+covers the highest-value "something happened here" feedback.
+
+**Phase B nearly done:** B1–B5 shipped; only **B6 responsive/touch layout** remains
+before Phase B closes (~85). **Next:** B6 — `@media` breakpoints so panels reflow on
+narrow screens, pointer/touch handlers, larger tap targets.
+
+---
+
 ## 2026-07-14 — ROADMAP B4: Accessibility — colour-blind palette, focus, ARIA
 
 Fourth Phase-B item of `docs/roadmap-to-ready.md`. The map encodes ownership purely

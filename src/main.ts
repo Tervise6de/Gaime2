@@ -24,7 +24,7 @@ import { PLAYER_ID, type GameState } from "@/systems/state";
 import { createHud } from "@/ui/hud";
 import { runTutorial, hasSeenTutorial } from "@/ui/tutorial";
 import { play, outcomeCue, armAmbientOnGesture } from "@/ui/audio";
-import { applyDisplaySettings, isColourblind } from "@/ui/settings";
+import { applyDisplaySettings, isColourblind, isReduceMotion } from "@/ui/settings";
 import "@/ui/style.css";
 
 /**
@@ -64,6 +64,7 @@ function main(): void {
 
   const renderer = createRenderer(canvas);
   renderer.setColourblind(isColourblind()); // honour the saved palette preference at boot
+  renderer.setReduceMotion(isReduceMotion()); // honour the saved motion preference at boot
   const hud = createHud(hudRoot, {
     onTaxChange(rate) {
       state = setTaxRate(state, rate);
@@ -196,6 +197,9 @@ function main(): void {
       renderer.setColourblind(on);
       sync(); // repaint HUD swatches immediately (canvas repaints each frame)
     },
+    onSetReduceMotion(on) {
+      renderer.setReduceMotion(on);
+    },
   });
 
   renderer.onRegionClick((regionId) => {
@@ -259,6 +263,11 @@ function main(): void {
     lastSummary = summarizeTurn(before, state);
     moveArmyId = null;
     commit();
+    // Cosmetic: ripple every region that changed hands this turn (gated inside the
+    // renderer by reduce-motion). Uses ids, not the summary's names.
+    for (const after of state.regions) {
+      if (before.regions[after.id]?.ownerId !== after.ownerId) renderer.pulseCapture(after.id);
+    }
     // A win/lose fanfare trumps the per-turn news; otherwise sound the top event.
     if (state.outcome === "victory") play("victory");
     else if (state.outcome === "defeat") play("defeat");
