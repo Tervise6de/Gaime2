@@ -35,6 +35,11 @@ import {
   BANKRUPTCY_UNREST,
   WAR_WEARY_TURNS,
   WAR_WEARY_MAX_STACKS,
+  UNREST_BASE,
+  UNREST_REVOLT,
+  SECESSION_REVOLT_TURNS,
+  REBEL_GARRISON,
+  armySize,
   BARBARIAN_ID,
   DEFAULT_TAX,
   DIFFICULTY,
@@ -230,6 +235,50 @@ function applyWarWeariness(state: GameState): GameState {
   return { ...state, nations };
 }
 
+/**
+ * Secession (design §3.3): a region held in full revolt for SECESSION_REVOLT_TURNS
+ * consecutive turns — with no friendly garrison to hold it together — breaks away
+ * to the barbarians, spawning a rebel militia that must be reconquered. A friendly
+ * army in the region (or unrest dropping below the revolt threshold) resets the
+ * counter, so stationing troops or easing unrest is the counterplay. Pure.
+ */
+export function applySecession(state: GameState): GameState {
+  const secededIds: number[] = [];
+  const regions = state.regions.map((r) => {
+    const owner = r.ownerId;
+    if (owner === null || owner === BARBARIAN_ID) return r;
+    const inRevolt = r.unrest >= UNREST_REVOLT;
+    const garrisoned =
+      inRevolt &&
+      state.armies.some((a) => a.regionId === r.id && a.ownerId === owner && armySize(a.units) > 0);
+    if (!inRevolt || garrisoned) {
+      return r.revoltTurns ? { ...r, revoltTurns: 0 } : r;
+    }
+    const turns = (r.revoltTurns ?? 0) + 1;
+    if (turns < SECESSION_REVOLT_TURNS) return { ...r, revoltTurns: turns };
+    secededIds.push(r.id);
+    return { ...r, ownerId: BARBARIAN_ID, unrest: UNREST_BASE, construction: null, revoltTurns: 0 };
+  });
+  if (secededIds.length === 0) return { ...state, regions };
+
+  let armies = state.armies;
+  let nextArmyId = state.nextArmyId;
+  let log = state.log;
+  for (const id of secededIds) {
+    armies = [
+      ...armies,
+      { id: nextArmyId, ownerId: BARBARIAN_ID, regionId: id, units: { ...emptyUnits(), militia: REBEL_GARRISON }, movesLeft: 0 },
+    ];
+    nextArmyId += 1;
+    const former = state.nations.find((n) => n.id === state.regions[id]!.ownerId);
+    log = [
+      ...log,
+      `${state.regions[id]!.name} rises in revolt and secedes from ${former?.isPlayer ? "your realm" : (former?.name ?? "its ruler")}.`,
+    ].slice(-50);
+  }
+  return { ...state, regions, armies, nextArmyId, log };
+}
+
 /** Count a nation's temporary modifiers down one turn, dropping any that expire. */
 function tickModifiers(modifiers: NationModifier[] | undefined): NationModifier[] | undefined {
   if (!modifiers || modifiers.length === 0) return modifiers;
@@ -410,6 +459,11 @@ export function resolveTurn(state: GameState): GameState {
     if (nation.isBarbarian || !nation.alive) continue;
     s = advanceNationEconomy(s, nation.id);
   }
+
+  // 1.5. Secession: regions held in prolonged, ungarrisoned revolt break away —
+  // a territorial brake on overexpansion. Runs before the AI so rivals can react
+  // (e.g. move to reconquer a region that just seceded).
+  s = applySecession(s);
 
   // 2. Rival AI turns (deterministic RNG stream).
   const rng: Rng = createRng(s.rngState);

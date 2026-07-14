@@ -6,11 +6,27 @@ import {
   queueBuilding,
   cancelConstruction,
   canQueueBuilding,
+  applySecession,
 } from "@/systems/turn";
 import { nationalProduction } from "@/systems/economy";
 import { totalUpkeep } from "@/systems/military";
 import { BUILDINGS } from "@/data/buildings";
-import { PLAYER_ID, TAX_MAX, TAX_MIN, clampTax, playerNation, type GameState } from "@/systems/state";
+import {
+  PLAYER_ID,
+  BARBARIAN_ID,
+  UNREST_REVOLT,
+  SECESSION_REVOLT_TURNS,
+  REBEL_GARRISON,
+  armySize,
+  emptyUnits,
+  TAX_MAX,
+  TAX_MIN,
+  clampTax,
+  playerNation,
+  type GameState,
+  type Region,
+  type Army,
+} from "@/systems/state";
 
 describe("createGame", () => {
   it("is deterministic for a seed", () => {
@@ -61,6 +77,66 @@ describe("setTaxRate", () => {
     expect(playerNation(next).taxRate).toBe(0.3);
     expect(playerNation(g).taxRate).not.toBe(0.3);
     expect(next).not.toBe(g);
+  });
+});
+
+describe("secession (revolt → break away)", () => {
+  function reg(over: Partial<Region> = {}): Region {
+    return {
+      id: 0, name: "Rebelton", terrain: "plains", ownerId: PLAYER_ID, population: 3,
+      unrest: UNREST_REVOLT, fortification: 0, resource: null, buildings: [],
+      construction: null, adjacency: [], x: 0.5, y: 0.5, ...over,
+    };
+  }
+  function stateOf(regions: Region[], armies: Army[] = []): GameState {
+    return {
+      turn: 20, armies, log: [], nextArmyId: 100,
+      nations: [
+        { id: PLAYER_ID, name: "You", isPlayer: true, isBarbarian: false },
+        { id: BARBARIAN_ID, name: "Free Peoples", isPlayer: false, isBarbarian: true },
+      ],
+      regions,
+    } as unknown as GameState;
+  }
+
+  it("counts up turns in ungarrisoned revolt without seceding before the threshold", () => {
+    let s = stateOf([reg({ revoltTurns: 0 })]);
+    for (let i = 1; i < SECESSION_REVOLT_TURNS; i++) {
+      s = applySecession(s);
+      expect(s.regions[0]!.ownerId).toBe(PLAYER_ID); // still ours
+      expect(s.regions[0]!.revoltTurns).toBe(i);
+    }
+  });
+
+  it("secedes to the barbarians at the threshold, spawning a rebel garrison", () => {
+    const s = applySecession(stateOf([reg({ revoltTurns: SECESSION_REVOLT_TURNS - 1 })]));
+    expect(s.regions[0]!.ownerId).toBe(BARBARIAN_ID);
+    expect(s.regions[0]!.revoltTurns).toBe(0);
+    expect(s.regions[0]!.construction).toBeNull();
+    const rebels = s.armies.find((a) => a.regionId === 0 && a.ownerId === BARBARIAN_ID);
+    expect(rebels && armySize(rebels.units)).toBe(REBEL_GARRISON);
+    expect(s.log.some((l) => /secedes/.test(l))).toBe(true);
+  });
+
+  it("a friendly garrison holds the region — it never secedes while troops stand there", () => {
+    const armies: Army[] = [
+      { id: 1, ownerId: PLAYER_ID, regionId: 0, units: { ...emptyUnits(), infantry: 2 }, movesLeft: 0 },
+    ];
+    const s = applySecession(stateOf([reg({ revoltTurns: SECESSION_REVOLT_TURNS - 1 })], armies));
+    expect(s.regions[0]!.ownerId).toBe(PLAYER_ID);
+    expect(s.regions[0]!.revoltTurns).toBe(0); // garrison resets the countdown
+  });
+
+  it("calm below the revolt threshold resets the countdown", () => {
+    const s = applySecession(stateOf([reg({ unrest: UNREST_REVOLT - 1, revoltTurns: 2 })]));
+    expect(s.regions[0]!.ownerId).toBe(PLAYER_ID);
+    expect(s.regions[0]!.revoltTurns).toBe(0);
+  });
+
+  it("leaves barbarian-held regions alone", () => {
+    const s = applySecession(stateOf([reg({ ownerId: BARBARIAN_ID, revoltTurns: 5 })]));
+    expect(s.regions[0]!.ownerId).toBe(BARBARIAN_ID);
+    expect(s.armies.length).toBe(0); // no new rebels spawned
   });
 });
 

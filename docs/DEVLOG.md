@@ -6,6 +6,47 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — Secession: revolt can cost you territory (design §3.3)
+
+Implemented the previously-missing half of the unrest brake. Until now unrest was
+purely *economic* — a revolting region only stopped producing, it never changed
+hands. Now a region held in **full revolt (unrest ≥ 75) for 3 consecutive turns
+with no friendly garrison secedes to the barbarians**, resetting its unrest,
+dropping construction, and spawning a `REBEL_GARRISON` militia you must reconquer.
+A friendly army in the region (or unrest easing below the revolt line) resets the
+countdown — so **stationing troops or lowering tax is the counterplay**. This is a
+*territorial* anti-snowball (design §3.3): an empire that conquers or overtaxes
+faster than it can keep order sheds the land it can't hold.
+
+New pure `applySecession(state)` runs as pipeline step 1.5 (after the economy sets
+unrest, before AI turns so rivals can react to a region that just broke away). New
+`Region.revoltTurns` counter (optional — legacy saves default to 0) and constants
+`SECESSION_REVOLT_TURNS` / `REBEL_GARRISON` in `state.ts`.
+
+**Verify:** typecheck ✓, 298 tests ✓ (+5: counts up without seceding before the
+threshold; secedes + spawns rebels + logs at it; a garrison holds the region
+indefinitely; calm resets the countdown; barbarian regions are ignored), build ✓
+(0 `fetch`, deps `{}`). Browser smoke (25 turns): no console/page errors.
+
+**Balance (temp probe: 40 seeds × 3 difficulties × {2,3} rivals = 240 games,
+deleted):** no crashes; medians 78–96 turns and a diverse victory mix
+(domination / great works / elimination / prestige all appear) — unchanged from
+the prior balance pass, i.e. **no regression**. Secession fired in ~1/40 balanced
+games: it only bites *sustained* full revolt, which needs overexpansion stacking
+(many freshly-conquered regions past the free-region cap + high tax), not tax
+alone (tax tops unrest out ~33 on a small realm). So it's a **targeted, rare
+safety valve** for the runaway-conqueror case — precisely design §3.3's intent —
+and stays out of the way of normal play. Because it's this rare, **kept
+`DOMINATION_FRACTION` at 0.6** rather than relaxing it as earlier speculated.
+
+**Next ideas:** if we want secession to bite harder, raise overexpansion/conquest
+unrest so a rampant conqueror reaches the revolt line sooner (then re-probe and
+possibly relax `DOMINATION_FRACTION` toward 0.55); tint a seceding region on the
+map in its final revolt turn as a warning; let the AI prioritise garrisoning a
+region on the brink.
+
+---
+
 ## 2026-07-14 — Balance: domination pacing (anti-snowball)
 
 Backlog item **A** after the three handoff developments landed — re-probed

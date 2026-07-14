@@ -43,6 +43,14 @@ export const UNREST_TAX_MAX = 28;
 export const UNREST_PENALTY_START = 30;
 /** At/above this, the region revolts: production stops, population falls. */
 export const UNREST_REVOLT = 75;
+/**
+ * Turns a region may sit in full revolt (ungarrisoned) before it secedes to the
+ * barbarians — a *territorial* anti-snowball brake (design §3.3): an empire that
+ * overexpands or overtaxes past its ability to keep order sheds land it can't hold.
+ */
+export const SECESSION_REVOLT_TURNS = 3;
+/** Barbarian militia that garrison a region the turn it secedes (must be reconquered). */
+export const REBEL_GARRISON = 2;
 /** Unrest moves at most this far toward its target each turn (gradual). */
 export const UNREST_DRIFT = 6;
 /** Unrest spike applied to a region during a national famine. */
@@ -161,6 +169,12 @@ export interface Region {
   construction: ConstructionOrder | null;
   /** Ids of adjacent regions (the pure logic graph). */
   adjacency: number[];
+  /**
+   * Consecutive turns this region has sat in full revolt (unrest ≥ revolt
+   * threshold) without a friendly garrison. At SECESSION_REVOLT_TURNS the region
+   * secedes to the barbarians. Absent/0 = calm or freshly settled (legacy saves).
+   */
+  revoltTurns?: number;
   /** Layout position for the renderer, in world units [0, 1]. */
   x: number;
   y: number;
