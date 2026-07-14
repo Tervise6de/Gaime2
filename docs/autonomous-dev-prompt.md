@@ -118,6 +118,16 @@ localStorage autosave; a fresh Playwright context starts clean.
 
 ## Backlog (roughly priority order — pick the highest-value tractable item)
 
+> **PRIMARY DIRECTIVE (2026-07-14 onward): follow `docs/roadmap-to-ready.md`.**
+> The v1 game systems are complete; the project is now pushing from ~68 toward
+> testing-ready (75) and market-ready (100). Each cycle, pick the **lowest-numbered
+> unfinished roadmap item** (Phase A first — onboarding is the gate to 75) and do
+> one complete verified cycle. The lettered backlog below (A balance … G code
+> health) still applies as the *method* — especially **A (re-probe balance after
+> any sim change)** — but the *what to build next* now comes from the roadmap.
+> `[RESOURCE]`-tagged items need an artist/humans; do their code-side scaffolding
+> and flag what external input is needed.
+
 **Fresh next-ideas (from the latest DEVLOG — good starting points):** end-game
 score/summary screen with a simple history graph; Voronoi-polygon map renderer
 over the *identical* graph logic (kept behind a fallback); trait-flavoured random
