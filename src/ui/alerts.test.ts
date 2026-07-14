@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { deriveAlerts, type Alert } from "@/ui/alerts";
 import { createGame } from "@/systems/turn";
-import { PLAYER_ID, UNREST_REVOLT, type GameState } from "@/systems/state";
+import { PLAYER_ID, UNREST_REVOLT, WONDER_GOAL, type GameState } from "@/systems/state";
 import type { TurnSummary } from "@/systems/summary";
 
 /** A quiet (nothing-happened) summary; individual tests override fields. */
@@ -56,7 +56,7 @@ describe("deriveAlerts", () => {
   it("raises a danger alert when a rival nears a victory", () => {
     const g = calmGame();
     const rival = g.nations.find((n) => !n.isPlayer && !n.isBarbarian)!;
-    rival.wonders = 3; // 3/4 = 75% toward a Great Works win
+    rival.wonders = WONDER_GOAL - 1; // one wonder short — ≥75% toward a Great Works win
     const alerts = deriveAlerts(g, quietSummary());
     expect(
       alerts.some((a) => a.severity === "danger" && a.text.startsWith(`${rival.name} nears a great works victory`)),

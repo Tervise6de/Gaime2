@@ -6,6 +6,45 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — Balance: rein in the Great Works runaway (archetype fairness)
+
+Backlog **A**, the dedicated balance pass the playbook says is always worth
+doing. A broad probe (150 seeds × 4 archetypes × {normal,hard}, rivals 3) exposed
+a real skew: driving the player by each archetype, **aggressive realms won ~9%
+while economic ones won ~36%** — a 27-point gap, well outside the fair ~15–30%
+band. Root cause: the **Great Works (wonder) victory dominated** (327/600 games),
+and warlords/opportunists are gated out of pursuing wonders (`pursuesWonders =
+economy ≥ 0.6`), so a peaceful rival wonder-rush routinely ended the game before
+an aggressive player could conquer.
+
+**Change:** `WONDER_GOAL` 4 → **5** (`systems/state.ts`) — one more Great Work to
+win. That's a national project built one-at-a-time, so it meaningfully slows the
+wonder path and gives the conquest/prestige paths room to matter. One constant, no
+code change. (Probed and rejected two other levers first: `DOMINATION_FRACTION`
+0.6→0.55 barely moved the spread since it eases *everyone's* conquest equally, and
+bumping region weight in `nationScore` did nothing because wonder/tech score
+dominance never let a region tweak flip a prestige tiebreak — reverted both.)
+
+**Probe, before → after (normal, 120 seeds/archetype):**
+- warlord **9% → 13%**, opportunist **9% → 14%**, merchant/builder **36% → 31%** —
+  the gap narrows from 27 to ~18 points, aggressive play climbs toward the band,
+  economic eases below the ceiling.
+- Victory mix rebalances: Great Works 220 → 154, prestige 45 → 123, domination/
+  elimination steady — no path unreachable, none dominant.
+- Pacing stays in-window: avg length ~95 → ~106–113 turns, too-fast games *down*
+  (13 → 4–13). No crashes across the runs.
+
+**Verify:** typecheck ✓, **324 tests ✓** (updated one alerts test that hard-coded
+"3/4 = 75%" to derive `WONDER_GOAL − 1` from the constant, so it tracks the goal),
+build ✓ (0 `fetch`, deps `{}`). Browser: the victory bar reads "⭐ 0/5"; no
+console/page errors.
+
+**Next ideas:** if aggressive archetypes still trail, give conquest a score/tempo
+edge (region-weight lever needs wonders' score dominance trimmed first); revisit
+after any further AI-aggression changes.
+
+---
+
 ## 2026-07-14 — Fortification marker on the map (legibility)
 
 Follow-on to the wall-reinforcement event (and a step into the renderer, a fresh
