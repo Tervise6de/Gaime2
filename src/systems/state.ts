@@ -115,6 +115,17 @@ export const HOSTILE_THRESHOLD = -30;
 export const FRIENDLY_THRESHOLD = 40;
 
 /**
+ * Trade tuning (economic diplomacy). An active trade route pays both partners
+ * `TRADE_INCOME_BASE + TRADE_INCOME_PER_REGION × (smaller partner's region count)`
+ * gold each turn, capped at `TRADE_INCOME_MAX`. Trading with a big neighbour is
+ * lucrative, but bounded by your own size — and war severs the route, so peace is
+ * profitable and aggression carries an opportunity cost.
+ */
+export const TRADE_INCOME_BASE = 1;
+export const TRADE_INCOME_PER_REGION = 0.3;
+export const TRADE_INCOME_MAX = 5;
+
+/**
  * Tech / victory / events tuning (M5, docs/game-design.md §3.6, §6).
  */
 /** Fraction of all regions a nation must hold for a domination victory. */
@@ -297,7 +308,7 @@ export interface DiplomaticOffer {
   id: number;
   from: number;
   to: number;
-  type: "peace" | "nap" | "alliance" | "tribute";
+  type: "peace" | "nap" | "alliance" | "tribute" | "trade";
   /** Gold the sender offers (tribute/gift sweetener), if any. */
   gold?: number;
 }
@@ -319,6 +330,12 @@ export interface GameState {
   relations: Record<string, number>;
   /** Pairwise treaty status, keyed by pairKey(a,b). Missing = peace. */
   treaties: Record<string, TreatyStatus>;
+  /**
+   * Active trade routes, keyed by pairKey(a,b) → true. A route pays both partners
+   * gold each turn (economic diplomacy) and is severed the moment they go to war.
+   * Optional so legacy saves load as "no trades".
+   */
+  trades?: Record<string, boolean>;
   /** Offers from AI nations awaiting the player's response. */
   offers: DiplomaticOffer[];
   nextOfferId: number;

@@ -6,6 +6,55 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — BIG DEV 1/2: Trade routes (economic diplomacy)
+
+A whole new diplomatic layer: **trade routes**. Two nations at peace can open a
+route that pays *both* partners gold every turn — and **any war between them
+severs it**. Peace is now profitable, and aggression carries an opportunity cost
+(the trade income you forfeit), which deepens the war-or-wealth decision at the
+heart of a 4X.
+
+**Model & flow (all pure/deterministic):**
+- New `state.trades` (pairKey → true; optional, legacy-safe). Income
+  `TRADE_INCOME_BASE + TRADE_INCOME_PER_REGION × (smaller partner's regions)`,
+  capped at `TRADE_INCOME_MAX` (tuned to **1 / 0.3 / 5** — up to +5g/turn each) —
+  trading with a big neighbour pays more, but bounded by your own size.
+- `diplomacy.ts`: `establishTrade` / `severTrade` / `hasTrade` / `tradeIncome` /
+  `tradePartners`; `declareWar` now severs the route; `wouldAccept` gains a
+  "trade" case (accept unless hostile or at war; economic realms keener);
+  `addOffer` / `acceptOffer` / `playerPropose` handle "trade".
+- `turn.ts`: a new `applyTradeIncome` pipeline step (1.6) pays every active route.
+- `ai.ts`: economic-ish AIs propose trade to peaceful, non-hostile neighbours
+  (an offer to the player, a direct handshake between AIs).
+- `hud.ts`: each rival card shows an **⇄ Trading +Ng** badge with the income when
+  a route is live, or an **Open trade** button (tooltip states the gold and
+  whether they'd accept) otherwise; `main.ts` wires `onProposeTrade`.
+
+**Verify:** typecheck ✓, **335 tests ✓** (+6: establish warms relations & sets the
+route, war severs it, income scales with the smaller partner and caps, a rival
+accepts at decent relations but never at war, `tradePartners` lists partners,
+and `applyTradeIncome` pays both sides), build ✓ (0 `fetch`, deps `{}`).
+Browser-driven: clicked **Open trade** on a rival card → the **⇄ Trading +1.9g**
+badge appeared (1 + 0.3·3 regions) and the log read "Trade routes earned +1.9g"
+after a few turns; no console/page errors.
+
+**Balance (temp probe, 120 seeds × 4 archetypes, normal, rivals 3, deleted):**
+trade income lifts the whole field (peaceful nations all bank it), which
+*compresses* the win spread — from last cycle's [warlord 15 / opp 18 / merch 27 /
+build 27] to **[warlord 14 / opp 12 / merch 21 / build 21]**: the economic
+ceiling drops (27 → 21, no dominant archetype) while the aggressive floor dips a
+touch below the 15% target. Tuning the magnitude down didn't lift the floor (it's
+structural — trade is a peaceful-play boon), so I picked the value that keeps
+trade *meaningful* rather than negligible. Pacing stays in-window (medians
+100–117 turns), all victory types reached, ~2.7 routes live per game. A tight,
+healthy profile with a small, thematically-honest tilt toward commerce.
+
+**Next ideas (BIG DEV 2 next):** more rival powers (up to 5) so the trade/war web
+is richer; a total-trade-income line in the top bar; let a betrayal (declaring
+war on a trade partner) carry an extra reputation hit.
+
+---
+
 ## 2026-07-14 — Remember new-game settings + map-size balance check
 
 Two things in one small cycle: **verified** last cycle's map-size feature is

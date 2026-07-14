@@ -31,13 +31,16 @@ import {
   atWar,
   callToArms,
   declareWar,
+  establishTrade,
   getRelation,
   getTreaty,
   gift,
+  hasTrade,
   makePeace,
   nationPower,
   setPact,
   sharedBorders,
+  wouldAccept,
   wouldJoinWar,
 } from "@/systems/diplomacy";
 import { researchFrontier, selectTech, isBuildingUnlockedFor } from "@/systems/tech";
@@ -379,6 +382,28 @@ function doDiplomacy(state: GameState, nationId: number, rng: Rng): GameState {
       s = offerPact(s, nationId, o, rel > 45 ? "alliance" : "nap");
       actions++;
       continue;
+    }
+
+    // Open a trade route with a peaceful, non-hostile neighbour — economic realms
+    // especially. Profitable for both, and a future war would sever it. The player
+    // gets an offer to weigh; a willing AI opens the route directly.
+    if (
+      border &&
+      rel > -10 &&
+      (p?.economy ?? 0.5) >= 0.45 &&
+      !hasTrade(s, nationId, o.id)
+    ) {
+      if (o.isPlayer) {
+        if (!s.offers.some((of) => of.from === nationId && of.to === o.id && of.type === "trade")) {
+          s = addOffer(s, nationId, o.id, "trade");
+          actions++;
+          continue;
+        }
+      } else if (wouldAccept(s, nationId, o.id, "trade")) {
+        s = establishTrade(s, nationId, o.id);
+        actions++;
+        continue;
+      }
     }
 
     // A merchant appeases a much stronger, unfriendly neighbour with a gift.

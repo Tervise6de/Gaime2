@@ -25,7 +25,7 @@ import { advanceConstruction } from "@/systems/construction";
 import { nextPopulation } from "@/systems/population";
 import { nextUnrest } from "@/systems/stability";
 import { armyMoves, totalUpkeep } from "@/systems/military";
-import { driftRelations, atWar } from "@/systems/diplomacy";
+import { driftRelations, atWar, tradePartners, tradeIncome } from "@/systems/diplomacy";
 import { runNationTurn } from "@/systems/ai";
 import { advanceResearch, techUnrestReduction, isBuildingUnlockedFor, selectTech } from "@/systems/tech";
 import { fireEvent } from "@/systems/events";
@@ -453,6 +453,32 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
   return { ...state, nations, regions, armies, log };
 }
 
+/**
+ * Trade income: each active trade route pays *both* partners gold this turn
+ * (economic diplomacy — peace is profitable, and a war that severs a route costs
+ * you the income). Pure; logs the player's total.
+ */
+export function applyTradeIncome(state: GameState): GameState {
+  if (!state.trades || Object.keys(state.trades).length === 0) return state;
+  const gain = new Map<number, number>();
+  for (const n of state.nations) {
+    if (n.isBarbarian || !n.alive) continue;
+    let total = 0;
+    for (const partner of tradePartners(state, n.id)) total += tradeIncome(state, n.id, partner);
+    if (total > 0) gain.set(n.id, round1(total));
+  }
+  if (gain.size === 0) return state;
+  const nations = state.nations.map((n) => {
+    const g = gain.get(n.id);
+    return g ? { ...n, stocks: { ...n.stocks, gold: round1(n.stocks.gold + g) } } : n;
+  });
+  const playerGain = gain.get(PLAYER_ID);
+  const log = playerGain
+    ? [...state.log, `Trade routes earned +${playerGain}g.`].slice(-50)
+    : state.log;
+  return { ...state, nations, log };
+}
+
 /** Advance the game by one turn. Pure: returns a new GameState, input untouched. */
 export function resolveTurn(state: GameState): GameState {
   if (state.outcome !== "playing") return state;
@@ -469,6 +495,9 @@ export function resolveTurn(state: GameState): GameState {
   // a territorial brake on overexpansion. Runs before the AI so rivals can react
   // (e.g. move to reconquer a region that just seceded).
   s = applySecession(s);
+
+  // 1.6. Trade income: active trade routes pay both partners (economic diplomacy).
+  s = applyTradeIncome(s);
 
   // 2. Rival AI turns (deterministic RNG stream).
   const rng: Rng = createRng(s.rngState);

@@ -29,7 +29,7 @@ import {
   totalUpkeep,
   unitCost,
 } from "@/systems/military";
-import { getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, nationPower, TRIBUTE_DEMAND } from "@/systems/diplomacy";
+import { getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, nationPower, hasTrade, tradeIncome, TRIBUTE_DEMAND } from "@/systems/diplomacy";
 import { nationScore, victoryProgress, endGameSummary } from "@/systems/victory";
 import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
 import type { TurnSummary } from "@/systems/summary";
@@ -86,6 +86,7 @@ export interface HudCallbacks {
   onDeclareWar(targetId: number): void;
   onMakePeace(targetId: number): void;
   onProposePact(targetId: number, kind: "nap" | "alliance"): void;
+  onProposeTrade(targetId: number): void;
   onCallToArms(allyId: number, enemyId: number): void;
   onGift(targetId: number, amount: number): void;
   onDemandTribute(targetId: number): void;
@@ -1484,6 +1485,23 @@ function renderDiplomacy(
         ? `${rival.name} is cowed enough to pay — but will resent it.`
         : `${rival.name} would scorn the demand (needs to be far weaker).`;
       actions.append(demand);
+
+      // Trade: an active route earns gold each turn (severed by war); otherwise
+      // offer to open one, gated by relations.
+      const inc = tradeIncome(state, PLAYER_ID, rival.id);
+      if (hasTrade(state, PLAYER_ID, rival.id)) {
+        const badge = el("span", "hud-diplo-trade");
+        badge.textContent = `⇄ Trading +${inc}g`;
+        badge.title = `An active trade route earns you +${inc} gold each turn. Going to war would sever it.`;
+        actions.append(badge);
+      } else {
+        const willing = wouldAccept(state, PLAYER_ID, rival.id, "trade");
+        const tradeBtn = btn("Open trade", "hud-diplo-btn", () => callbacks.onProposeTrade(rival.id));
+        tradeBtn.title = willing
+          ? `Open a trade route — +${inc} gold/turn for each of you. ${rival.name} would accept.`
+          : `${rival.name} is too cool toward you to trade (improve relations first).`;
+        actions.append(tradeBtn);
+      }
     }
     card.append(actions);
     container.append(card);

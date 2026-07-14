@@ -131,6 +131,10 @@ function main(): void {
       state = playerPropose(state, targetId, kind);
       commit();
     },
+    onProposeTrade(targetId) {
+      state = playerPropose(state, targetId, "trade");
+      commit();
+    },
     onCallToArms(allyId, enemyId) {
       state = callToArms(state, PLAYER_ID, allyId, enemyId);
       commit();

@@ -7,9 +7,11 @@ import {
   cancelConstruction,
   canQueueBuilding,
   applySecession,
+  applyTradeIncome,
 } from "@/systems/turn";
 import { nationalProduction } from "@/systems/economy";
 import { totalUpkeep } from "@/systems/military";
+import { establishTrade, tradeIncome } from "@/systems/diplomacy";
 import { DEFAULT_MAP_OPTIONS } from "@/systems/mapgen";
 import { BUILDINGS } from "@/data/buildings";
 import {
@@ -46,6 +48,20 @@ describe("createGame", () => {
     expect(g.armies.some((a) => a.ownerId === PLAYER_ID)).toBe(true);
     // Rival nations exist.
     expect(g.nations.some((n) => !n.isPlayer && !n.isBarbarian)).toBe(true);
+  });
+
+  it("applyTradeIncome pays both partners of an active trade route", () => {
+    const RIVAL = 2;
+    const s = establishTrade(createGame({ seed: 1, rivals: 2 }), PLAYER_ID, RIVAL);
+    const inc = tradeIncome(s, PLAYER_ID, RIVAL);
+    expect(inc).toBeGreaterThan(0);
+    const p0 = s.nations[PLAYER_ID]!.stocks.gold;
+    const r0 = s.nations.find((n) => n.id === RIVAL)!.stocks.gold;
+    const next = applyTradeIncome(s);
+    expect(next.nations[PLAYER_ID]!.stocks.gold).toBeCloseTo(p0 + inc, 5);
+    expect(next.nations.find((n) => n.id === RIVAL)!.stocks.gold).toBeCloseTo(r0 + inc, 5);
+    // No trades → no-op.
+    expect(applyTradeIncome(createGame({ seed: 1, rivals: 2 }))).toEqual(createGame({ seed: 1, rivals: 2 }));
   });
 
   it("respects a custom map size and still seats every nation", () => {

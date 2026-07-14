@@ -727,6 +727,17 @@ body {
   gap: 4px;
 }
 
+/* Active trade-route badge (economic diplomacy). */
+.hud-diplo-trade {
+  align-self: center;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  color: #82c99a;
+  background: rgba(130, 201, 154, 0.16);
+}
+
 .hud-diplo-btn {
   flex: 1 1 auto;
   padding: 5px 8px;
