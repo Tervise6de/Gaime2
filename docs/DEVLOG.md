@@ -6,6 +6,43 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — End-game summary screen (handoff dev #2)
+
+Second of the three "further the game a lot" developments. Winning or losing used
+to just flip a small banner; now the decided game raises a **full modal recap**:
+- A headline (**Victory!** / **Defeat**) tinted by outcome, with a subline naming
+  who prevailed, by which path, on what turn, and your finishing rank.
+- A **large prestige-history line graph** (one line per nation over the whole
+  game, player emphasised) — the existing `buildSparkline` made size-configurable
+  and blown up to 520×170, so the arc of the game reads at a glance.
+- A **superlative** line: your peak prestige and the turn you peaked, plus final
+  regions/wonders/techs.
+- The final **scoreboard** (reusing `renderStandings`, its mini-sparkline
+  suppressed since the big graph sits above it).
+- **New game** and **Keep viewing the map** actions (the latter dismisses the
+  recap for the current finished game; it re-arms on the next new game).
+
+The recap is fed by a new **pure** `endGameSummary(state)` in `victory.ts` —
+outcome, winner (the player on a win, else the leading living rival), per-nation
+final + peak-prestige rows sorted by score, and the player's rank — so the UI
+just renders it. Replaced the old outcome banner (its dead `.hud-banner` CSS is
+left in place, harmless).
+
+**Verify:** typecheck ✓, 289 tests ✓ (+3: `endGameSummary` ranks by prestige and
+tags the player rank + names the winner; a rival wins on the player's defeat; peak
+prestige/turn are read from the score history), build ✓ (0 `fetch`, deps `{}`).
+Browser-driven (default game, ended by a rival's turn-29 domination): the overlay
+shows "Defeat — Suzerain of Kael prevails by Domination on turn 29 — you finished
+#3 of 3", a 170px-tall three-line prestige graph, the peak-prestige superlative, a
+3-row scoreboard, and both buttons; "Keep viewing the map" dismisses it. No
+console/page errors. No sim change, so no balance probe.
+
+**Next ideas (handoff dev #3 next):** the Voronoi-polygon map renderer behind a
+toggle. Also: track wars-fought / largest-empire-reached for richer end-screen
+superlatives; a shareable end-game seed line.
+
+---
+
 ## 2026-07-14 — AI concentration of force (handoff dev #1)
 
 First of the three "further the game a lot" developments (see

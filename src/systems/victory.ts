@@ -99,3 +99,77 @@ export function checkVictory(state: GameState): VictoryCheck | null {
 function decide(winnerId: number, kind: string): VictoryCheck {
   return { outcome: winnerId === PLAYER_ID ? "victory" : "defeat", kind };
 }
+
+/** One nation's line in the end-game summary. */
+export interface EndSummaryRow {
+  id: number;
+  score: number;
+  regions: number;
+  wonders: number;
+  techs: number;
+  /** Highest prestige this nation ever reached, and the turn it peaked. */
+  peakScore: number;
+  peakTurn: number;
+  alive: boolean;
+}
+
+/** The whole-game recap shown on the end screen. */
+export interface EndSummary {
+  outcome: "victory" | "defeat";
+  kind: string | undefined;
+  /** Who actually won: the player on a victory, else the leading living rival. */
+  winnerId: number;
+  turns: number;
+  /** Every non-barbarian nation, sorted by final prestige (highest first). */
+  rows: EndSummaryRow[];
+  /** The player's 1-based finishing rank among all non-barbarian nations. */
+  playerRank: number;
+}
+
+/**
+ * Build the end-of-game recap from final state + the prestige history. Pure and
+ * deterministic (no RNG, no DOM) so the UI just renders it. Safe to call at any
+ * time, but meaningful once `state.outcome !== "playing"`.
+ */
+export function endGameSummary(state: GameState): EndSummary {
+  const history = state.scoreHistory ?? {};
+  const rows: EndSummaryRow[] = state.nations
+    .filter((n) => !n.isBarbarian)
+    .map((n) => {
+      const series = history[n.id] ?? [];
+      let peakScore = 0;
+      let peakTurn = 1;
+      series.forEach((v, i) => {
+        if (v > peakScore) {
+          peakScore = v;
+          peakTurn = i + 1; // history is sampled from turn 1
+        }
+      });
+      const score = nationScore(state, n.id);
+      if (score > peakScore) {
+        peakScore = score;
+        peakTurn = state.turn;
+      }
+      return {
+        id: n.id,
+        score,
+        regions: state.regions.filter((r) => r.ownerId === n.id).length,
+        wonders: n.wonders,
+        techs: n.research.done.length,
+        peakScore,
+        peakTurn,
+        alive: n.alive,
+      };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  const outcome = state.outcome === "victory" ? "victory" : "defeat";
+  // The winner: the player when they won, otherwise the top-scoring living rival.
+  const winnerId =
+    outcome === "victory"
+      ? PLAYER_ID
+      : (rows.find((r) => r.alive && r.id !== PLAYER_ID)?.id ?? rows[0]?.id ?? PLAYER_ID);
+  const playerRank = rows.findIndex((r) => r.id === PLAYER_ID) + 1;
+
+  return { outcome, kind: state.victoryKind, winnerId, turns: state.turn, rows, playerRank };
+}

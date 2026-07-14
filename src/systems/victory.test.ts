@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkVictory, nationScore, victoryProgress } from "@/systems/victory";
+import { checkVictory, nationScore, victoryProgress, endGameSummary } from "@/systems/victory";
 import { createGame } from "@/systems/turn";
 import { DOMINATION_FRACTION, PLAYER_ID, WONDER_GOAL, TURN_LIMIT } from "@/systems/state";
 
@@ -55,6 +55,53 @@ describe("checkVictory", () => {
       r.ownerId = i < Math.ceil(owned.length * 0.7) ? 2 : r.ownerId;
     });
     expect(checkVictory(g)?.outcome).toBe("defeat");
+  });
+});
+
+describe("endGameSummary", () => {
+  it("ranks nations by final prestige, marks the player rank, and names the winner", () => {
+    const g = { ...createGame({ seed: 1, rivals: 2 }), outcome: "victory" as const, victoryKind: "domination" };
+    const sum = endGameSummary(g);
+    expect(sum.outcome).toBe("victory");
+    expect(sum.kind).toBe("domination");
+    expect(sum.winnerId).toBe(PLAYER_ID); // the player won
+    // rows are sorted highest-score-first, and cover every non-barbarian nation.
+    expect(sum.rows.length).toBe(3); // player + 2 rivals
+    for (let i = 1; i < sum.rows.length; i++) {
+      expect(sum.rows[i - 1]!.score).toBeGreaterThanOrEqual(sum.rows[i]!.score);
+    }
+    expect(sum.playerRank).toBeGreaterThanOrEqual(1);
+    expect(sum.rows.find((r) => r.id === PLAYER_ID)).toBeTruthy();
+  });
+
+  it("on a defeat, the winner is the leading living rival (not the player)", () => {
+    let g = createGame({ seed: 2, rivals: 2 });
+    // Rival 2 sweeps the map; player is dead.
+    g = {
+      ...g,
+      outcome: "defeat",
+      victoryKind: "domination",
+      regions: g.regions.map((r) => (r.ownerId !== null ? { ...r, ownerId: 2 } : r)),
+      nations: g.nations.map((n) => (n.id === PLAYER_ID ? { ...n, alive: false } : n)),
+    };
+    const sum = endGameSummary(g);
+    expect(sum.outcome).toBe("defeat");
+    expect(sum.winnerId).toBe(2);
+    expect(sum.winnerId).not.toBe(PLAYER_ID);
+  });
+
+  it("reports each nation's peak prestige and the turn it peaked from the history", () => {
+    const base = createGame({ seed: 3, rivals: 2 });
+    const g = {
+      ...base,
+      turn: 5,
+      outcome: "victory" as const,
+      victoryKind: "prestige score",
+      scoreHistory: { ...base.scoreHistory, [PLAYER_ID]: [10, 90, 40, 30, 25] }, // peaked turn 2
+    };
+    const row = endGameSummary(g).rows.find((r) => r.id === PLAYER_ID)!;
+    expect(row.peakScore).toBeGreaterThanOrEqual(90);
+    expect(row.peakTurn).toBe(2);
   });
 });
 

@@ -28,7 +28,7 @@ import {
   unitCost,
 } from "@/systems/military";
 import { getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, TRIBUTE_DEMAND } from "@/systems/diplomacy";
-import { nationScore, victoryProgress } from "@/systems/victory";
+import { nationScore, victoryProgress, endGameSummary } from "@/systems/victory";
 import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
 import type { TurnSummary } from "@/systems/summary";
 import { deriveAlerts } from "@/ui/alerts";
@@ -341,17 +341,67 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   researchPanel.append(researchBody);
   root.append(researchPanel);
 
-  // --- Outcome banner (hidden until decided) --------------------------------
-  const banner = el("div", "hud-banner");
-  banner.style.display = "none";
-  const bannerText = el("span", "hud-banner-text");
-  const bannerStandings = el("div", "hud-standings");
-  const bannerBtn = document.createElement("button");
-  bannerBtn.className = "hud-banner-btn";
-  bannerBtn.textContent = "New game";
-  bannerBtn.addEventListener("click", () => newGameBtn.click());
-  banner.append(bannerText, bannerStandings, bannerBtn);
-  root.append(banner);
+  // --- End-game screen (a full modal recap, hidden until the game is decided) --
+  const endOverlay = el("div", "hud-techtree-overlay hud-end-overlay");
+  endOverlay.style.display = "none";
+  endOverlay.addEventListener("click", (ev) => {
+    if (ev.target === endOverlay) dismissEnd(); // backdrop click keeps viewing the map
+  });
+  root.append(endOverlay);
+  // Once the player chooses "Keep viewing the map", the recap stays closed for
+  // this finished game (re-armed when a new game starts).
+  let endDismissed = false;
+
+  function dismissEnd(): void {
+    endDismissed = true;
+    endOverlay.style.display = "none";
+  }
+
+  function renderEndScreen(state: GameState): void {
+    endOverlay.innerHTML = "";
+    const sum = endGameSummary(state);
+    const win = sum.outcome === "victory";
+    const winner = state.nations.find((n) => n.id === sum.winnerId);
+    const kindLabel = sum.kind ? sum.kind.charAt(0).toUpperCase() + sum.kind.slice(1) : "";
+
+    const panel = el("div", "hud-techtree-panel hud-end-panel");
+
+    const title = el("h2", "hud-end-title " + (win ? "win" : "lose"));
+    title.textContent = win ? "Victory!" : "Defeat";
+    if (winner) title.style.color = winner.color;
+    const sub = el("p", "hud-end-sub");
+    const who = win ? "Your realm" : winner && !winner.isPlayer ? winner.name : "A rival";
+    sub.textContent =
+      `${who} prevails${kindLabel ? ` by ${kindLabel}` : ""} on turn ${sum.turns} — ` +
+      `you finished #${sum.playerRank} of ${sum.rows.length}.`;
+    panel.append(title, sub);
+
+    const graph = buildSparkline(state.scoreHistory ?? {}, state.nations, { width: 520, height: 170, pad: 6 });
+    if (graph) {
+      graph.classList.add("large");
+      panel.append(graph);
+    }
+
+    const pr = sum.rows.find((r) => r.id === PLAYER_ID);
+    if (pr) {
+      const sup = el("p", "hud-end-super");
+      sup.textContent = `Your peak prestige: ${pr.peakScore} (turn ${pr.peakTurn}). Final: ${pr.score} · ${pr.regions}⬢ · ${pr.wonders}★ · ${pr.techs}📖.`;
+      panel.append(sup);
+    }
+
+    const board = el("div", "hud-standings");
+    renderStandings(board, state, undefined, false); // big graph above replaces the mini one
+    panel.append(board);
+
+    const btns = el("div", "hud-end-btns");
+    btns.append(
+      btn("New game", "hud-end-btn primary", () => newGameBtn.click()),
+      btn("Keep viewing the map", "hud-end-btn", dismissEnd),
+    );
+    panel.append(btns);
+
+    endOverlay.append(panel);
+  }
 
   // --- First-time hints (shown once, until dismissed) -----------------------
   const hints = el("div", "hud-hints");
@@ -619,14 +669,11 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     renderResearch(researchBody, player, callbacks, openTechTree);
 
     if (state.outcome === "playing") {
-      banner.style.display = "none";
-    } else {
-      banner.style.display = "flex";
-      banner.className = "hud-banner " + (state.outcome === "victory" ? "win" : "lose");
-      const kind = state.victoryKind ? ` (${state.victoryKind})` : "";
-      bannerText.textContent =
-        state.outcome === "victory" ? `Victory${kind}!` : `Defeat${kind} — your realm has fallen.`;
-      renderStandings(bannerStandings, state);
+      endDismissed = false; // re-arm the recap for the next decided game
+      endOverlay.style.display = "none";
+    } else if (!endDismissed) {
+      renderEndScreen(state);
+      endOverlay.style.display = "flex";
     }
 
     // Full log: newest first, numbered chronologically, scrollable. The buffer
@@ -1065,6 +1112,7 @@ function renderStandings(
   container: HTMLElement,
   state: GameState,
   onPick?: (regionId: number) => void,
+  showSpark = true,
 ): void {
   container.innerHTML = "";
   const rows = state.nations
@@ -1119,8 +1167,10 @@ function renderStandings(
   });
   container.append(table);
 
-  const spark = buildSparkline(state.scoreHistory ?? {}, state.nations);
-  if (spark) container.append(spark);
+  if (showSpark) {
+    const spark = buildSparkline(state.scoreHistory ?? {}, state.nations);
+    if (spark) container.append(spark);
+  }
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -1135,6 +1185,7 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 function buildSparkline(
   scoreHistory: Record<number, number[]>,
   nations: Nation[],
+  opts: { width?: number; height?: number; pad?: number } = {},
 ): HTMLElement | null {
   const series = nations
     .filter((n) => !n.isBarbarian && (scoreHistory[n.id]?.length ?? 0) >= 2)
@@ -1146,9 +1197,9 @@ function buildSparkline(
   const max = Math.max(...all);
   const min = Math.min(...all);
   const span = max - min || 1;
-  const w = 240;
-  const h = 48;
-  const pad = 3;
+  const w = opts.width ?? 240;
+  const h = opts.height ?? 48;
+  const pad = opts.pad ?? 3;
   const stepX = (w - pad * 2) / (turns - 1 || 1);
   const toPoints = (values: number[]): string =>
     values
@@ -1167,6 +1218,10 @@ function buildSparkline(
   svg.setAttribute("class", "hud-sparkline-svg");
   svg.setAttribute("preserveAspectRatio", "none");
 
+  // Line weights scale gently with height so the large end-game graph reads well.
+  const playerW = Math.max(2.2, h * 0.02);
+  const rivalW = Math.max(1.3, h * 0.012);
+  const dotR = Math.max(2.5, h * 0.02);
   // Rivals first (dimmer, thinner), player last so it sits on top.
   const ordered = [...series].sort((a, b) => Number(a.nation.isPlayer) - Number(b.nation.isPlayer));
   for (const s of ordered) {
@@ -1174,7 +1229,7 @@ function buildSparkline(
     poly.setAttribute("points", toPoints(s.values));
     poly.setAttribute("fill", "none");
     poly.setAttribute("stroke", s.nation.color);
-    poly.setAttribute("stroke-width", s.nation.isPlayer ? "2.2" : "1.3");
+    poly.setAttribute("stroke-width", String(round1(s.nation.isPlayer ? playerW : rivalW)));
     poly.setAttribute("stroke-opacity", s.nation.isPlayer ? "1" : "0.65");
     poly.setAttribute("stroke-linejoin", "round");
     poly.setAttribute("stroke-linecap", "round");
@@ -1184,7 +1239,7 @@ function buildSparkline(
       const dot = document.createElementNS(SVG_NS, "circle");
       dot.setAttribute("cx", last[0]!);
       dot.setAttribute("cy", last[1]!);
-      dot.setAttribute("r", "2.5");
+      dot.setAttribute("r", String(round1(dotR)));
       dot.setAttribute("fill", s.nation.color);
       svg.append(dot);
     }
