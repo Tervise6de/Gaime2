@@ -23,7 +23,7 @@ import { summarizeTurn, type TurnSummary } from "@/systems/summary";
 import { PLAYER_ID, type GameState } from "@/systems/state";
 import { createHud } from "@/ui/hud";
 import { runTutorial, hasSeenTutorial } from "@/ui/tutorial";
-import { play, outcomeCue } from "@/ui/audio";
+import { play, outcomeCue, armAmbientOnGesture } from "@/ui/audio";
 import "@/ui/style.css";
 
 /**
@@ -280,6 +280,9 @@ function main(): void {
 
   renderer.start();
   sync();
+
+  // If the ambient bed was left on last session, start it on the first gesture.
+  armAmbientOnGesture();
 
   // Launch the coached tour once the HUD has laid out (first-ever session only).
   if (firstEver) window.setTimeout(runTutorial, 500);

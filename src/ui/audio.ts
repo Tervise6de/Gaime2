@@ -149,3 +149,119 @@ export function play(cue: Cue): void {
     osc.stop(end + 0.02);
   }
 }
+
+/* ------------------------------------------------------------------ *
+ * Ambient bed — an optional, sparse generative motif (off by default).
+ *
+ * Not a continuous drone: every ~11s a soft, low pentatonic pad drifts by,
+ * stepping through a fixed sequence (deterministic — no RNG, so it's testable
+ * and never jarring). It sits behind its own persisted toggle and is silenced by
+ * the master mute like every other cue.
+ * ------------------------------------------------------------------ */
+
+const AMBIENT_KEY = "gaime2:ambient";
+const AMBIENT_PERIOD_MS = 11_000;
+
+/** A fixed procession of calm pads (C-pentatonic voicings), looped forever. */
+const AMBIENT_SEQUENCE: number[][] = [
+  [131, 196, 262], // C  G  C
+  [147, 220, 294], // D  A  D
+  [165, 247, 330], // E  B  E
+  [110, 165, 262], // A  E  C
+  [131, 196, 247], // C  G  B
+  [98, 147, 220], //  G  D  A
+];
+
+/** Pure: the pad voiced at `index` in the endless ambient loop. Testable. */
+export function ambientMotif(index: number): number[] {
+  const n = AMBIENT_SEQUENCE.length;
+  return AMBIENT_SEQUENCE[((index % n) + n) % n]!;
+}
+
+let ambientEnabled = readAmbient();
+let ambientTimer: number | null = null;
+let ambientIndex = 0;
+
+function readAmbient(): boolean {
+  try {
+    return localStorage.getItem(AMBIENT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Whether the ambient bed is currently enabled (drives its toggle). */
+export function isAmbientEnabled(): boolean {
+  return ambientEnabled;
+}
+
+/** Play one soft pad chord — slow attack + long release, very quiet. */
+function playPad(notes: number[]): void {
+  if (muted) return;
+  const ac = audioContext();
+  if (!ac) return;
+  if (ac.state === "suspended") void ac.resume();
+  const t0 = ac.currentTime;
+  const len = 4.5;
+  for (const freq of notes) {
+    const osc = ac.createOscillator();
+    const g = ac.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.05, t0 + 1.2); // gentle swell
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + len);
+    osc.connect(g).connect(ac.destination);
+    osc.start(t0);
+    osc.stop(t0 + len + 0.05);
+  }
+}
+
+function ambientTick(): void {
+  if (!ambientEnabled || muted) return; // master mute silences the bed too
+  playPad(ambientMotif(ambientIndex));
+  ambientIndex += 1;
+}
+
+function startAmbientLoop(): void {
+  if (typeof window === "undefined" || ambientTimer !== null) return;
+  ambientTick(); // sound the first pad immediately for feedback
+  ambientTimer = window.setInterval(ambientTick, AMBIENT_PERIOD_MS);
+}
+
+function stopAmbientLoop(): void {
+  if (ambientTimer !== null) {
+    clearInterval(ambientTimer);
+    ambientTimer = null;
+  }
+}
+
+/** Enable/disable and persist the ambient bed; starts/stops the loop. */
+export function setAmbientEnabled(next: boolean): boolean {
+  ambientEnabled = next;
+  try {
+    localStorage.setItem(AMBIENT_KEY, next ? "1" : "0");
+  } catch {
+    /* storage unavailable — preference just won't persist */
+  }
+  if (next) startAmbientLoop();
+  else stopAmbientLoop();
+  return ambientEnabled;
+}
+
+/** Flip and persist the ambient bed; returns the new state. */
+export function toggleAmbient(): boolean {
+  return setAmbientEnabled(!ambientEnabled);
+}
+
+/**
+ * On boot: if the ambient bed was left enabled in a prior session, arm it to
+ * start on the first user gesture (the autoplay policy blocks audio until then).
+ * A no-op when disabled or already running.
+ */
+export function armAmbientOnGesture(): void {
+  if (typeof window === "undefined" || !ambientEnabled) return;
+  const start = (): void => startAmbientLoop();
+  window.addEventListener("pointerdown", start, { once: true });
+  window.addEventListener("keydown", start, { once: true });
+}

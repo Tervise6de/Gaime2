@@ -6,6 +6,41 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — ROADMAP B2: Procedural ambient bed (optional, off by default)
+
+Second Phase-B item of `docs/roadmap-to-ready.md`: atmosphere without asset files.
+Extends `ui/audio.ts` with an optional ambient music bed — **still zero audio files,
+deps `{}`**, everything synthesised.
+
+**Design decision:** not a continuous drone (those grate). Instead a **sparse
+generative motif** — every ~11s a soft, low C-pentatonic pad (slow 1.2s swell, long
+release, ~0.05 gain) drifts by, stepping through a **fixed six-chord sequence**. The
+sequence is deterministic (no RNG) so it's testable and never jarring. It lives
+behind **its own toggle, off by default**, and the master mute silences it like any
+other cue. `ambientMotif(index)` is a pure, wrap-safe function (handles negative
+indices) so it's unit-tested in the DOM-less env.
+
+Kept it distinct from the SFX mute (a separate design call from the roadmap's "same
+toggle" note): players who want music opt in without it riding on the SFX switch.
+A persisted-enabled bed re-arms on the first user gesture (autoplay policy) via
+`armAmbientOnGesture()`, called on boot.
+
+**Wiring:** a **🎵 Ambient** top-bar toggle (dimmed when off); `main.ts` arms it on
+boot if it was left on.
+
+**Verify:** typecheck ✓, **343 tests ✓** (+2: the motif loops a non-empty chord
+sequence and wraps deterministically incl. negatives), build ✓ (0 `fetch`, deps
+`{}`). Browser (Playwright, AudioContext instrumented): the toggle is off by default;
+enabling sounds the first pad immediately (+3 oscillators for the 3-note chord),
+flips the label, and writes `gaime2:ambient=1`; while muted no pad fires; the state
+survives a reload; no page errors.
+
+**Next (roadmap order):** B3 options panel (volume slider + mute + colourblind and
+reduce-motion toggles + default map layout, all persisted) — it will absorb these
+top-bar audio toggles into one place.
+
+---
+
 ## 2026-07-14 — ROADMAP B1: Procedural audio — synthesised SFX (Phase B opens)
 
 First item of Phase B (`docs/roadmap-to-ready.md`), the push from testing-ready

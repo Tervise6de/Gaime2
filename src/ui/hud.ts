@@ -19,7 +19,7 @@ import { regionProduction, nationalProduction, nationYieldMult, yieldFactors, si
 import { garrisonCalm } from "@/systems/stability";
 import { runTutorial } from "@/ui/tutorial";
 import { confirmAction } from "@/ui/confirm";
-import { isMuted, toggleMuted, play } from "@/ui/audio";
+import { isMuted, toggleMuted, play, isAmbientEnabled, toggleAmbient } from "@/ui/audio";
 import { EDGE_COLOR, WAR_EDGE_COLOR, type MapLayout } from "@/systems/renderer";
 import { DEFAULT_MAP_OPTIONS, type MapGenOptions } from "@/systems/mapgen";
 import { regionCapacity } from "@/systems/population";
@@ -217,6 +217,17 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   soundToggle.classList.toggle("muted", isMuted());
   soundToggle.title = "Mute or unmute the game's sound cues.";
   topBar.append(soundToggle);
+
+  // Ambient bed — off by default, its own toggle, silenced by the master mute.
+  const ambientLabel = (): string => (isAmbientEnabled() ? "🎵 Ambient" : "🎵 Ambient: off");
+  const ambientToggle = btn(ambientLabel(), "hud-legend-toggle", () => {
+    const on = toggleAmbient();
+    ambientToggle.textContent = ambientLabel();
+    ambientToggle.classList.toggle("muted", !on);
+  });
+  ambientToggle.classList.toggle("muted", !isAmbientEnabled());
+  ambientToggle.title = "Toggle a soft ambient music bed (off by default).";
+  topBar.append(ambientToggle);
   root.append(topBar);
 
   // Critical-events alert strip (just below the resource bar).

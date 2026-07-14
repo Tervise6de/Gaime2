@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { outcomeCue } from "@/ui/audio";
+import { outcomeCue, ambientMotif } from "@/ui/audio";
 import type { TurnSummary } from "@/systems/summary";
 
 function summary(over: Partial<TurnSummary>): TurnSummary {
@@ -40,5 +40,20 @@ describe("outcomeCue", () => {
     expect(outcomeCue(s)).toBe("loss");
     // Danger outranks good news but not an actual loss of territory.
     expect(outcomeCue(summary({ bankrupt: true, regionsGained: ["B"] }))).toBe("alert");
+  });
+});
+
+describe("ambientMotif", () => {
+  it("loops a non-empty fixed sequence of chords", () => {
+    const first = ambientMotif(0);
+    expect(Array.isArray(first)).toBe(true);
+    expect(first.length).toBeGreaterThan(0);
+    for (const f of first) expect(typeof f).toBe("number");
+  });
+
+  it("wraps deterministically (including negative indices)", () => {
+    expect(ambientMotif(0)).toEqual(ambientMotif(6)); // sequence length is 6
+    expect(ambientMotif(1)).toEqual(ambientMotif(7));
+    expect(ambientMotif(-1)).toEqual(ambientMotif(5)); // no NaN / undefined on negatives
   });
 });
