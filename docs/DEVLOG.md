@@ -6,6 +6,42 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — ROADMAP B1: Procedural audio — synthesised SFX (Phase B opens)
+
+First item of Phase B (`docs/roadmap-to-ready.md`), the push from testing-ready
+toward *feel & platform*. A game with no sound feels lifeless; now key moments have
+a cue — **with zero audio files and deps still `{}`**, because every sound is
+synthesised at play time from Web Audio oscillators + gain envelopes.
+
+**New module (`ui/audio.ts`, UI-only, never touches the sim):** a small synth with
+hand-tuned little motifs — end-turn tick, build/raise confirm, tech chime, a rising
+*capture* vs falling *loss* two-tone, low sawtooth *war*, soft *peace*, triumphant
+*eliminate*, a *victory* fanfare, a descending *defeat*, and an urgent *alert* for
+famine/bankruptcy. Rising = good, falling = bad, dense-and-low = danger. A **master
+mute** persists to localStorage and no-ops all playback; the AudioContext is created
+lazily on the first cue (which always follows a click/keypress) to satisfy the
+browser autoplay policy.
+
+**Cue selection is a pure function** — `outcomeCue(TurnSummary)` returns the single
+most salient cue for a resolved turn, ordered so bad/urgent news wins when several
+things happen at once (losing territory over a captured region, danger over good
+news). That purity means it's unit-tested in the DOM-less env.
+
+**Wiring:** `main.ts` sounds the tick on end-turn, then win/lose fanfare or the
+top event cue; queue-building / raise-unit get a soft confirm blip. A **🔊/🔇 Sound**
+top-bar toggle flips and persists mute (dimmed when muted).
+
+**Verify:** typecheck ✓, **341 tests ✓** (+3: the cue map and its priority order),
+build ✓ (0 `fetch`, deps `{}`, bundle +~2 kB). Browser (Playwright, AudioContext
+instrumented): ending a turn synthesises oscillators; muting flips the label to 🔇,
+writes `gaime2:muted=1`, and produces **zero** oscillators on the next turn; the mute
+survives a reload; no page errors.
+
+**Next (roadmap order):** B2 optional ambient bed (same toggle, off by default),
+then B3 options panel (volume/mute + colourblind + reduce-motion toggles).
+
+---
+
 ## 2026-07-14 — ROADMAP A4: UI bug-bash — end-turn hotkey leaked through modals
 
 Fourth and final Phase-A item of `docs/roadmap-to-ready.md`, closing the gate to

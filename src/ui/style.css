@@ -1675,6 +1675,11 @@ body {
   filter: brightness(1.08);
 }
 
+/* Muted sound toggle reads dimmer than the other top-bar chips. */
+.hud-legend-toggle.muted {
+  opacity: 0.6;
+}
+
 /* First-run orientation: jump to the player's capital from the empty region panel. */
 .hud-region-jump {
   margin-top: 10px;

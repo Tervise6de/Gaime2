@@ -23,6 +23,7 @@ import { summarizeTurn, type TurnSummary } from "@/systems/summary";
 import { PLAYER_ID, type GameState } from "@/systems/state";
 import { createHud } from "@/ui/hud";
 import { runTutorial, hasSeenTutorial } from "@/ui/tutorial";
+import { play, outcomeCue } from "@/ui/audio";
 import "@/ui/style.css";
 
 /**
@@ -113,6 +114,7 @@ function main(): void {
     },
     onQueueBuilding(regionId, building) {
       state = queueBuilding(state, regionId, building);
+      play("build");
       commit();
     },
     onCancelConstruction(regionId) {
@@ -121,6 +123,7 @@ function main(): void {
     },
     onRaiseUnit(regionId, unit) {
       state = raiseUnit(state, regionId, unit);
+      play("build");
       commit();
     },
     onBeginMove(armyId) {
@@ -242,10 +245,18 @@ function main(): void {
       return;
     }
     const before = state;
+    play("endTurn"); // the tick fires on the commit action itself
     state = resolveTurn(state);
     lastSummary = summarizeTurn(before, state);
     moveArmyId = null;
     commit();
+    // A win/lose fanfare trumps the per-turn news; otherwise sound the top event.
+    if (state.outcome === "victory") play("victory");
+    else if (state.outcome === "defeat") play("defeat");
+    else {
+      const cue = outcomeCue(lastSummary);
+      if (cue) play(cue);
+    }
   }
 
   /** Re-render the view and persist the continuous autosave. */

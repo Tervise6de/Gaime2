@@ -19,6 +19,7 @@ import { regionProduction, nationalProduction, nationYieldMult, yieldFactors, si
 import { garrisonCalm } from "@/systems/stability";
 import { runTutorial } from "@/ui/tutorial";
 import { confirmAction } from "@/ui/confirm";
+import { isMuted, toggleMuted, play } from "@/ui/audio";
 import { EDGE_COLOR, WAR_EDGE_COLOR, type MapLayout } from "@/systems/renderer";
 import { DEFAULT_MAP_OPTIONS, type MapGenOptions } from "@/systems/mapgen";
 import { regionCapacity } from "@/systems/population";
@@ -204,6 +205,18 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   });
   mapToggle.title = "Switch between the node/edge map and the Voronoi territory map. Shortcut: M";
   topBar.append(mapToggle);
+
+  // Master sound toggle — persisted, synthesised cues (no audio files).
+  const soundLabel = (): string => (isMuted() ? "🔇 Sound" : "🔊 Sound");
+  const soundToggle = btn(soundLabel(), "hud-legend-toggle", () => {
+    const nowMuted = toggleMuted();
+    soundToggle.textContent = soundLabel();
+    soundToggle.classList.toggle("muted", nowMuted);
+    if (!nowMuted) play("build"); // a quick blip confirms sound is back on
+  });
+  soundToggle.classList.toggle("muted", isMuted());
+  soundToggle.title = "Mute or unmute the game's sound cues.";
+  topBar.append(soundToggle);
   root.append(topBar);
 
   // Critical-events alert strip (just below the resource bar).
