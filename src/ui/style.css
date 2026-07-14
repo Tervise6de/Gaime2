@@ -1675,6 +1675,18 @@ body {
   filter: brightness(1.08);
 }
 
+/* Accessibility: a clear keyboard focus ring on every interactive control.
+   :focus-visible keeps it keyboard-only (mouse clicks don't show the ring). */
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 /* Options panel — sound / accessibility / display preferences. */
 .hud-options-panel {
   width: min(420px, 94vw);

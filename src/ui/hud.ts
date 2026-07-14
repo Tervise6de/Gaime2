@@ -28,6 +28,7 @@ import {
   getDefaultMapLayout,
   setDefaultMapLayout,
 } from "@/ui/settings";
+import { cbSafe } from "@/data/palette";
 import { EDGE_COLOR, WAR_EDGE_COLOR, type MapLayout } from "@/systems/renderer";
 import { DEFAULT_MAP_OPTIONS, type MapGenOptions } from "@/systems/mapgen";
 import { regionCapacity } from "@/systems/population";
@@ -110,6 +111,8 @@ export interface HudCallbacks {
   onResolveChoice(optionId: string): void;
   /** Switch the map between the node+edge fallback and the Voronoi polygon view. */
   onSetMapLayout(layout: MapLayout): void;
+  /** Colour-blind palette toggled — the parent repaints the canvas + HUD. */
+  onSetColourblind(on: boolean): void;
 }
 
 const BRANCH_COLOR: Record<string, string> = {
@@ -356,6 +359,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const clearBtn = document.createElement("button");
   clearBtn.className = "hud-newgame-btn hud-clear-btn";
   clearBtn.textContent = "✕";
+  clearBtn.setAttribute("aria-label", "Clear the selected save slot");
   clearBtn.title = "Clear the selected slot's checkpoint (the live game is untouched).";
   clearBtn.addEventListener("click", () => {
     const slot = slotSel.value as SaveSlot;
@@ -460,7 +464,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
     const title = el("h2", "hud-end-title " + (win ? "win" : "lose"));
     title.textContent = win ? "Victory!" : "Defeat";
-    if (winner) title.style.color = winner.color;
+    if (winner) title.style.color = cbSafe(winner.color, isColourblind());
     const sub = el("p", "hud-end-sub");
     const who = win ? "Your realm" : winner && !winner.isPlayer ? winner.name : "A rival";
     sub.textContent =
@@ -598,7 +602,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     const head = el("div", "hud-techtree-head");
     const title = el("h2", "hud-techtree-title");
     title.textContent = `Standings — turn ${lastState.turn}`;
-    head.append(title, btn("✕", "hud-techtree-close", closeStandings));
+    head.append(title, closeButton(closeStandings));
     panel.append(head);
     const body = el("div", "hud-standings");
     // Rows are clickable here: jump to that nation's capital and close the modal.
@@ -651,7 +655,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     const head = el("div", "hud-techtree-head");
     const title = el("h2", "hud-techtree-title");
     title.textContent = "Options";
-    head.append(title, btn("✕", "hud-techtree-close", closeOptions));
+    head.append(title, closeButton(closeOptions));
     panel.append(head);
 
     // Sound ------------------------------------------------------------------
@@ -688,7 +692,15 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     // Accessibility ----------------------------------------------------------
     panel.append(sectionHeading("Accessibility"));
     panel.append(
-      checkboxRow("Colour-blind-safe palette", isColourblind, (v) => setColourblind(v), "A higher-contrast owner/relation palette."),
+      checkboxRow(
+        "Colour-blind-safe palette",
+        isColourblind,
+        (v) => {
+          setColourblind(v);
+          callbacks.onSetColourblind(v); // repaint canvas + HUD with the new palette
+        },
+        "A colour-blind-safe owner palette (map + panels).",
+      ),
     );
     panel.append(
       checkboxRow("Reduce motion", isReduceMotion, (v) => setReduceMotion(v), "Disable non-essential UI transitions and animation."),
@@ -1385,7 +1397,7 @@ function renderStandings(
     const rank = el("span", "hud-standings-rank");
     rank.textContent = String(i + 1);
     const sw = el("span", "hud-region-swatch");
-    sw.style.background = row.n.color;
+    sw.style.background = cbSafe(row.n.color, isColourblind());
     const name = el("span", "hud-standings-name");
     name.textContent =
       (row.n.isPlayer ? "You" : row.n.name) + (row.holdsCapital ? " 👑" : "") + (row.n.alive ? "" : " ✗");
@@ -1473,7 +1485,7 @@ function buildSparkline(
     const poly = document.createElementNS(SVG_NS, "polyline");
     poly.setAttribute("points", toPoints(s.values));
     poly.setAttribute("fill", "none");
-    poly.setAttribute("stroke", s.nation.color);
+    poly.setAttribute("stroke", cbSafe(s.nation.color, isColourblind()));
     poly.setAttribute("stroke-width", String(round1(s.nation.isPlayer ? playerW : rivalW)));
     poly.setAttribute("stroke-opacity", s.nation.isPlayer ? "1" : "0.65");
     poly.setAttribute("stroke-linejoin", "round");
@@ -1485,7 +1497,7 @@ function buildSparkline(
       dot.setAttribute("cx", last[0]!);
       dot.setAttribute("cy", last[1]!);
       dot.setAttribute("r", String(round1(dotR)));
-      dot.setAttribute("fill", s.nation.color);
+      dot.setAttribute("fill", cbSafe(s.nation.color, isColourblind()));
       svg.append(dot);
     }
   }
@@ -1577,7 +1589,7 @@ function renderDiplomacy(
 
     const head = el("div", "hud-diplo-head");
     const sw = el("span", "hud-region-swatch");
-    sw.style.background = rival.color;
+    sw.style.background = cbSafe(rival.color, isColourblind());
     const nm = el("span", "hud-diplo-name");
     nm.textContent = rival.name;
     const arch = el("span", "hud-diplo-arch");
@@ -1769,7 +1781,7 @@ function renderTechTree(
   const head = el("div", "hud-techtree-head");
   const ttTitle = el("h2", "hud-techtree-title");
   ttTitle.textContent = "Technology tree";
-  head.append(ttTitle, btn("✕", "hud-techtree-close", onClose));
+  head.append(ttTitle, closeButton(onClose));
   panel.append(head);
 
   const grid = el("div", "hud-techtree-grid");
@@ -1858,6 +1870,13 @@ function btn(label: string, className: string, onClick: () => void): HTMLButtonE
   b.className = className;
   b.textContent = label;
   b.addEventListener("click", onClick);
+  return b;
+}
+
+/** A ✕ close button carrying an accessible name for screen readers. */
+function closeButton(onClick: () => void): HTMLButtonElement {
+  const b = btn("✕", "hud-techtree-close", onClick);
+  b.setAttribute("aria-label", "Close");
   return b;
 }
 

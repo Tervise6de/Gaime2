@@ -6,6 +6,46 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — ROADMAP B4: Accessibility — colour-blind palette, focus, ARIA
+
+Fourth Phase-B item of `docs/roadmap-to-ready.md`. The map encodes ownership purely
+by colour, and the default rivals include a green and a red-orange — the classic
+red/green confusion. This delivers the colour-blind-safe palette the B3 toggle was
+already wired for, plus two broad accessibility wins.
+
+**Colour-blind-safe palette** (`data/palette.ts`, serialisable content): when the
+option is on, each nation's base colour maps to an Okabe-Ito-derived replacement
+chosen for maximum separation under deuteranopia/protanopia (green→bluish-green,
+red-orange→vermillion, the two blues split by lightness, etc.). `cbSafe(hex, on)` is
+a pure, case-insensitive lookup so the **canvas and the HUD share one mapping**. The
+renderer gained `setColourblind()` and remaps at its single `ownerColor()` choke
+point; the HUD wraps every nation-colour swatch (diplomacy, standings, Voronoi
+minimap, win banner). Toggling repaints canvas + HUD live via a new
+`onSetColourblind` callback, and the preference is honoured at boot.
+
+**Focus rings:** a clear `:focus-visible` outline (keyboard-only, mouse clicks stay
+ringless) on every button, select, input and link — keyboard users can finally see
+where they are.
+
+**ARIA:** the icon-only ✕ close buttons and the ✕ clear-slot button now carry
+accessible names (`aria-label`) instead of reading as a bare glyph.
+
+**Verify:** typecheck ✓, **348 tests ✓** (+5: `cbSafe` off/on/case/unknown/distinct),
+build ✓ (0 `fetch`, deps `{}`). Browser (Playwright): enabling the palette flips the
+map (canvas pixels change) and the diplomacy swatch `#5b8bd0`→`#56b4e9`, and both
+survive a reload (renderer honours the saved pref at boot); a close button reports
+`aria-label="Close"`; tabbing to a control shows a 2px focus ring; no page errors.
+
+**Follow-up noted:** deeper keyboard navigation (selecting/moving map regions without
+the mouse) is a larger pass — native tab order + focus rings cover the HUD controls
+today; region-by-keyboard can come in a later a11y cycle.
+
+**Next (roadmap order):** B5 visual juice — battle flash/shake, capture ripple,
+resource-count tweening, panel transitions, all gated by the reduce-motion flag B3
+added.
+
+---
+
 ## 2026-07-14 — ROADMAP B3: Options panel — one home for sound/access/display
 
 Third Phase-B item of `docs/roadmap-to-ready.md`: a single **⚙ Options** panel that

@@ -24,7 +24,7 @@ import { PLAYER_ID, type GameState } from "@/systems/state";
 import { createHud } from "@/ui/hud";
 import { runTutorial, hasSeenTutorial } from "@/ui/tutorial";
 import { play, outcomeCue, armAmbientOnGesture } from "@/ui/audio";
-import { applyDisplaySettings } from "@/ui/settings";
+import { applyDisplaySettings, isColourblind } from "@/ui/settings";
 import "@/ui/style.css";
 
 /**
@@ -63,6 +63,7 @@ function main(): void {
   }
 
   const renderer = createRenderer(canvas);
+  renderer.setColourblind(isColourblind()); // honour the saved palette preference at boot
   const hud = createHud(hudRoot, {
     onTaxChange(rate) {
       state = setTaxRate(state, rate);
@@ -190,6 +191,10 @@ function main(): void {
     onSetMapLayout(mapLayout) {
       // View-only: the continuous render loop picks up the new layout next frame.
       renderer.setLayout(mapLayout);
+    },
+    onSetColourblind(on) {
+      renderer.setColourblind(on);
+      sync(); // repaint HUD swatches immediately (canvas repaints each frame)
     },
   });
 

@@ -16,6 +16,7 @@
  */
 
 import { TERRAIN } from "@/data/terrain";
+import { cbSafe } from "@/data/palette";
 import { armySize, BARBARIAN_ID } from "@/systems/state";
 import {
   UNREST_PENALTY_START,
@@ -55,6 +56,8 @@ export interface Renderer {
   /** Switch between the node+edge fallback and the Voronoi polygon view. */
   setLayout(layout: MapLayout): void;
   getLayout(): MapLayout;
+  /** Remap owner colours to the colour-blind-safe palette (or back). */
+  setColourblind(on: boolean): void;
   onRegionClick(handler: (regionId: number | null) => void): void;
 }
 
@@ -69,6 +72,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   let selected: number | null = null;
   let highlights = new Set<number>();
   let layout: MapLayout = "node";
+  let colourblind = false;
   let clickHandler: (regionId: number | null) => void = () => {};
 
   // Voronoi cells (normalised space) cached until the map geometry changes.
@@ -86,7 +90,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
   function ownerColor(ownerId: number | null): string {
     if (ownerId === null || !state) return NEUTRAL_OWNER;
-    return state.nations.find((n) => n.id === ownerId)?.color ?? NEUTRAL_OWNER;
+    const base = state.nations.find((n) => n.id === ownerId)?.color ?? NEUTRAL_OWNER;
+    return cbSafe(base, colourblind);
   }
 
   function projectXY(x: number, y: number): Point {
@@ -427,6 +432,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     },
     getLayout(): MapLayout {
       return layout;
+    },
+    setColourblind(on: boolean): void {
+      colourblind = on;
     },
     onRegionClick(handler: (regionId: number | null) => void): void {
       clickHandler = handler;
