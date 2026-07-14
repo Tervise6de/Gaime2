@@ -21,9 +21,10 @@ import {
 import { atWar } from "@/systems/diplomacy";
 
 const BACKGROUND = "#11151c";
-const EDGE_COLOR = "rgba(230, 233, 239, 0.14)";
+/** Adjacency edge (a normal border). Exported so the map legend matches exactly. */
+export const EDGE_COLOR = "rgba(230, 233, 239, 0.14)";
 /** A border between two nations at war — the map's front line. */
-const WAR_EDGE_COLOR = "rgba(232, 119, 107, 0.6)";
+export const WAR_EDGE_COLOR = "rgba(232, 119, 107, 0.6)";
 const NODE_RADIUS = 26;
 const SELECT_COLOR = "#f4d27a";
 const HIGHLIGHT_COLOR = "#63c7d6";

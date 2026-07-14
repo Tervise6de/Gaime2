@@ -6,6 +6,33 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — Map legend: a key for the border edges
+
+The legend explained every node marker (terrain, owner ring, unrest dots, crown,
+army badge) but said nothing about the *edges* — including last cycle's red
+war-front line, which had no key at all. Added a **Borders (edges)** section with
+two rows: the faint grey **adjacency** edge (regions connected, armies may march)
+and the red **war front** (a border between two nations at war). The swatches now
+pull their colours from the renderer itself — `EDGE_COLOR` and `WAR_EDGE_COLOR`
+are exported and imported by the legend, so the key can never drift from what the
+canvas actually draws (previously the legend re-typed every colour by hand).
+
+UI/content only, no sim touch: a new `.hud-legend-line` swatch style and one
+section in `buildLegend()`.
+
+**Verify:** typecheck ✓, 280 tests ✓ (unchanged — no logic touched), build ✓ (0
+`fetch`, deps `{}`). Browser-driven: pressing **L** opens the legend; the new
+"Borders (edges)" section renders both rows, the line swatches computed-style to
+exactly `rgba(230,233,239,0.14)` and `rgba(232,119,107,0.6)` (the renderer
+constants); screenshot confirms the red front line reads clearly and the grey
+adjacency line is subtly visible, matching the map. No console/page errors.
+
+**Next ideas:** dash the war-front line on the map for extra emphasis; a legend
+row for the modifier HUD chips; group the legend into collapsible sections if it
+grows.
+
+---
+
 ## 2026-07-14 — Research surge: a Scholarly academy that quickens learning
 
 First modifier on a **new effect axis** — knowledge, not gold. A Scholarly realm

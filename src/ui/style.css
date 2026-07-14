@@ -928,6 +928,14 @@ body {
   border-style: dashed;
 }
 
+.hud-legend-line {
+  width: 18px;
+  height: 0;
+  border-top-width: 3px;
+  border-top-style: solid;
+  display: inline-block;
+}
+
 .hud-legend-num {
   font-weight: 700;
   font-size: 13px;

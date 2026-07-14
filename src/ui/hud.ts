@@ -16,6 +16,7 @@ import { BUILDINGS, BUILDING_IDS, type BuildingId } from "@/data/buildings";
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
 import { TERRAIN, TERRAIN_IDS } from "@/data/terrain";
 import { regionProduction, nationalProduction, nationYieldMult } from "@/systems/economy";
+import { EDGE_COLOR, WAR_EDGE_COLOR } from "@/systems/renderer";
 import { regionCapacity } from "@/systems/population";
 import { previewCombat } from "@/systems/combat";
 import {
@@ -961,6 +962,8 @@ function buildLegend(): HTMLElement {
     `<span class="hud-legend-mdot" style="background:${color}"></span>`;
   const ring = (color: string, dashed = false): string =>
     `<span class="hud-legend-ring${dashed ? " dashed" : ""}" style="border-color:${color}"></span>`;
+  const line = (color: string): string =>
+    `<span class="hud-legend-line" style="border-top-color:${color}"></span>`;
 
   section("Terrain (node fill)");
   for (const t of TERRAIN_IDS) row(disc(TERRAIN[t].color), TERRAIN[t].name);
@@ -975,6 +978,10 @@ function buildLegend(): HTMLElement {
   row('<span class="hud-legend-ico">🔨</span>', "Building under construction");
   row('<span class="hud-legend-ico">👑</span>', "Capital — crown + double ring (a nation's seat of power)");
   row('<span class="hud-legend-badge">3</span>', "Army (owner colour, unit count)");
+
+  section("Borders (edges)");
+  row(line(EDGE_COLOR), "Adjacency — regions connected (armies may march)");
+  row(line(WAR_EDGE_COLOR), "War front — a border between two nations at war");
 
   section("Selection");
   row(ring("#f4d27a"), "Selected region");
