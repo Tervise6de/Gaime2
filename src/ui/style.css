@@ -1,7 +1,13 @@
 :root {
   color-scheme: dark;
   --bg: #11151c;
+  --panel: #1a2029;
+  --panel-border: #2b333f;
   --fg: #e6e9ef;
+  --muted: #97a0ae;
+  --accent: #4f9cf0;
+  --good: #6fcf7f;
+  --bad: #f0776f;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
@@ -27,4 +33,235 @@ body {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* --- HUD overlay ---------------------------------------------------------- */
+.hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none; /* clicks fall through to the canvas... */
+}
+
+.hud > * {
+  pointer-events: auto; /* ...except on actual HUD chrome */
+}
+
+.hud-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 10px 16px;
+  background: linear-gradient(to bottom, rgba(17, 21, 28, 0.92), rgba(17, 21, 28, 0));
+}
+
+.hud-turn {
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+}
+
+.hud-stats {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.hud-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 10px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.hud-stat-icon {
+  color: var(--accent);
+}
+
+.hud-stat-label {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.hud-stat-value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-stat-delta {
+  color: var(--good);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-stat-delta.is-negative {
+  color: var(--bad);
+}
+
+.hud-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 14px 16px;
+  background: linear-gradient(to top, rgba(17, 21, 28, 0.92), rgba(17, 21, 28, 0));
+}
+
+.hud-tax {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+}
+
+.hud-tax-label {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.hud-tax-slider {
+  width: 160px;
+  accent-color: var(--accent);
+}
+
+.hud-tax-value {
+  min-width: 36px;
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-endturn {
+  padding: 10px 22px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0b1017;
+  background: var(--accent);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: filter 0.12s ease;
+}
+
+.hud-endturn:hover {
+  filter: brightness(1.08);
+}
+
+.hud-endturn:active {
+  filter: brightness(0.94);
+}
+
+/* --- Region detail panel -------------------------------------------------- */
+.hud-region {
+  position: absolute;
+  top: 64px;
+  right: 16px;
+  width: 240px;
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.hud-region--empty {
+  color: var(--muted);
+}
+
+.hud-hint {
+  margin: 0;
+  font-size: 13px;
+}
+
+.hud-region-name {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.hud-region-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.hud-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--swatch);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.hud-region-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+
+.hud-region-facts dt {
+  color: var(--muted);
+}
+
+.hud-region-facts dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-region-sub {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.hud-prod {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hud-prod li {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.hud-prod-icon {
+  color: var(--accent);
+  text-align: center;
+}
+
+.hud-prod-label {
+  color: var(--muted);
+}
+
+.hud-prod-val {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }

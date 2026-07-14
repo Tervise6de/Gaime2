@@ -1,24 +1,23 @@
-import { createRenderer } from "@/systems/renderer";
+import { startGame } from "@/game";
 import "@/ui/style.css";
 
 /**
  * Application entry point.
  *
- * Infrastructure only for now: acquire the canvas, size it to the viewport,
- * and start an empty render loop that clears to the background colour each
- * frame. No game systems are wired up yet.
+ * Acquire the canvas and HUD mount, then hand off to the game controller which
+ * generates the world and wires the simulation to the renderer and HUD.
  */
 function main(): void {
   const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas");
   if (!canvas) {
     throw new Error("Canvas element #game-canvas not found");
   }
+  const app = document.querySelector<HTMLElement>("#app");
+  if (!app) {
+    throw new Error("App container #app not found");
+  }
 
-  const renderer = createRenderer(canvas);
-  renderer.start();
-
-  // eslint-disable-next-line no-console
-  console.info("Gaime2 booted — blank canvas ready.");
+  startGame(canvas, app);
 }
 
 main();

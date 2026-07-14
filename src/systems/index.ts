@@ -8,4 +8,16 @@
  * Re-export systems here as they are added.
  */
 export { createRenderer } from "@/systems/renderer";
-export type { Renderer } from "@/systems/renderer";
+export type { Renderer, RenderOptions } from "@/systems/renderer";
+
+export { generateGame } from "@/systems/mapgen";
+
+export {
+  computeRegionProduction,
+  computeNationEconomy,
+  computePlayerEconomy,
+} from "@/systems/economy";
+export type { RegionProduction, NationEconomy } from "@/systems/economy";
+
+export { resolveTurn } from "@/systems/turn";
+export type { TurnResult } from "@/systems/turn";

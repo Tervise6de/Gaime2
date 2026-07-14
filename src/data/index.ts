@@ -8,4 +8,5 @@
  *
  * Export data tables here as they are added.
  */
-export {};
+export { TERRAIN, TERRAIN_LIST, COASTAL_GOLD_BONUS } from "@/data/terrain";
+export type { TerrainDef } from "@/data/terrain";
