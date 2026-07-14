@@ -45,6 +45,7 @@ import {
   TAX_STEP,
   UNREST_PENALTY_START,
   UNREST_REVOLT,
+  SECESSION_REVOLT_TURNS,
   armySize,
   emptyUnits,
   playerNation,
@@ -824,6 +825,21 @@ function renderOwnedRegion(
   bar.append(fill);
   unrestWrap.append(unrestLabel, bar);
   container.append(unrestWrap);
+
+  // Secession warning: a revolting region breaks away to rebels unless held.
+  // Surface the countdown and the two ways to stop it, so the mechanic is fair.
+  if (region.unrest >= UNREST_REVOLT) {
+    const garrison = armyAt(state, region.id, PLAYER_ID);
+    const held = garrison !== undefined && armySize(garrison.units) > 0;
+    const warn = el("div", `hud-secession ${held ? "held" : "danger"}`);
+    if (held) {
+      warn.textContent = "⚑ Revolt held down by your garrison — it won't secede while troops remain.";
+    } else {
+      const left = Math.max(1, SECESSION_REVOLT_TURNS - (region.revoltTurns ?? 0));
+      warn.textContent = `⚠ Secedes to rebels in ${left} turn${left === 1 ? "" : "s"} — station an army here or cut taxes to calm it.`;
+    }
+    container.append(warn);
+  }
 
   // Production breakdown — each row's tooltip attributes the yield to the tech,
   // trait and modifier multipliers folded into this region's output.

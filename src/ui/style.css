@@ -363,6 +363,27 @@ body {
   background: var(--accent);
 }
 
+/* Secession warning (a revolting region about to break away). */
+.hud-secession {
+  margin-top: 8px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.hud-secession.danger {
+  background: rgba(232, 119, 107, 0.16);
+  border: 1px solid rgba(232, 119, 107, 0.5);
+  color: #f0b9b1;
+}
+
+.hud-secession.held {
+  background: rgba(99, 199, 214, 0.12);
+  border: 1px solid rgba(99, 199, 214, 0.4);
+  color: #a9dbe4;
+}
+
 /* --- Buildings / construction --------------------------------------------- */
 .hud-region-built {
   margin: 10px 0 0;

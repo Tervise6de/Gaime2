@@ -6,6 +6,35 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — Secession warning in the region panel (legibility)
+
+Backlog **D** follow-on completing the secession arc (mechanic → AI response →
+now player legibility). A revolting region breaks away to rebels, but the panel
+only said "in revolt — produces nothing"; it never warned that the province was
+about to be *lost*, so the mechanic could feel like it came out of nowhere. That
+breaks the "legible complexity" design pillar.
+
+**Change** (`ui/hud.ts` `renderOwnedRegion` + a little CSS): when a player region
+is in revolt (`unrest ≥ UNREST_REVOLT`), the panel now shows, right under the
+unrest bar, either a red **"⚠ Secedes to rebels in N turns — station an army here
+or cut taxes to calm it."** countdown (from `SECESSION_REVOLT_TURNS − revoltTurns`)
+or, if a garrison is present, a calmer **"⚑ Revolt held down by your garrison"**.
+So the two ways to save the province (garrison it, or ease unrest) are stated at
+the exact moment they matter. Pure presentation — reads state, no sim change.
+
+**Verify:** typecheck ✓, 302 tests ✓ (unchanged — presentation only), build ✓
+(0 `fetch`, deps `{}`). Browser-verified by importing a crafted save with a
+revolting region (Millbrook, unrest 90, revoltTurns 1) and selecting it via its
+topbar revolt alert: the panel showed "Unrest 90 · REVOLT" and the red warning
+"Secedes to rebels in 2 turns — station an army here or cut taxes to calm it."
+(3 − 1 = 2, correct), no console errors. Screenshot eyeballed.
+
+**Next ideas:** a small map marker on secession-imminent regions (the unrest dot
+already flags revolt, but not the countdown); and have the AI ease national tax
+when several of its provinces tip toward revolt.
+
+---
+
 ## 2026-07-14 — AI defends against revolt (garrisons secession-risk regions)
 
 Backlog **B** follow-on to the secession mechanic. The AI already fights well —
