@@ -1516,6 +1516,7 @@ function renderResearch(
     b.style.borderLeftColor = BRANCH_COLOR[def.branch];
     b.innerHTML =
       `<span class="hud-tech-name">${def.name}</span>` +
+      `<span class="hud-tech-blurb">${def.blurb}</span>` +
       `<span class="hud-tech-cost">${def.cost}📖 · ${def.branch}</span>`;
     b.addEventListener("click", () => callbacks.onChooseResearch(id));
     menu.append(b);

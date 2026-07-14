@@ -6,6 +6,32 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — Tech effects shown inline in the research menu (legibility)
+
+Backlog **D**, a fresh surface (the research panel). The research menu's tech
+buttons showed only *name · cost · branch* — what each tech actually *does* (its
+blurb: "+20% food", "Unlock Cavalry", "Unlock the Aqueduct") was hidden in a hover
+tooltip. So choosing research meant either hovering each option or already knowing
+the tree. The blurbs are short and punchy, so there's no reason to hide them.
+
+**Change** (`ui/hud.ts` `renderResearch` + CSS): each frontier tech button now
+shows its effect inline as a middle line (name → **effect** → cost·branch), in a
+lightly-muted, width-capped, wrapping style so the menu stays tidy. The hover
+tooltip stays as a redundant backup. Pure presentation reading the existing
+`TECHS[id].blurb`.
+
+**Verify:** typecheck ✓, 328 tests ✓ (unchanged — presentation only), build ✓
+(0 `fetch`, deps `{}`). Browser-driven (default game, turn 1): the four tier-0
+frontier techs render their effects inline — "+20% food.", "Unlock Ranged units.",
+"+15% gold.", "+25% knowledge." — in the name→effect→cost layout; no console/page
+errors.
+
+**Next ideas:** a tiny branch-coloured icon per tech; show what a tech leads to
+(its unlocks-chain) in the full tech-tree overlay tooltips; a recommended-next
+hint by the player's trait/personality.
+
+---
+
 ## 2026-07-14 — Battle casualties in the log (combat feedback)
 
 Backlog **D**, a fresh surface (combat feedback) after several economy/event
