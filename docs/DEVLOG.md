@@ -6,6 +6,48 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — Balance: domination pacing (anti-snowball)
+
+Backlog item **A** after the three handoff developments landed — re-probed
+balance (the concentration-of-force AI from dev #1 is a balance-affecting change)
+and fixed the biggest problem it surfaced: **games ended far too fast, almost
+always by domination.**
+
+A temporary symmetric self-play probe (player driven by `runNationTurn`, 40
+seeds × 3 difficulties × {2,3} rivals; deleted before commit) showed the map's
+only real victory path was racing to hold half the regions. Unrest is purely an
+*economic* brake — a region at revolt only stops producing, it never changes
+hands — so nothing slowed the *territorial* snowball, and one nation hit the 50%
+bar long before the intended ~60–150-turn arc (design §1).
+
+**Change:** `DOMINATION_FRACTION` 0.5 → **0.6** (`systems/state.ts`) — a nation
+now needs 60% of the map to win by conquest, giving the economy/tech/wonder and
+prestige paths room to matter. One constant, no code change.
+
+**Probe, before → after (median game length · too-fast games <40t · victory-kind
+mix):**
+- 2 rivals, normal: median **35 → 68** turns · too-fast **24 → 11** of 40 ·
+  domination 36/40 → a spread of domination 21, great works 13, elimination 5,
+  prestige 1.
+- 2 rivals (easy/hard): medians 41/33 → **74/74**; too-fast 20/22 → 11/10.
+- 3 rivals (easy/normal/hard): medians 55/53/49 → **102/93/88**; great works and
+  prestige now regularly appear.
+- No crashes in any of the 480 games; symmetric-player win rate stayed in a fair
+  band (8–25%; the neutral-personality player trails archetyped rivals, and hard
+  gives rivals an economy bonus by design). Domination is still reachable, just
+  no longer the only outcome.
+
+**Verify:** typecheck ✓, 293 tests ✓ (unchanged; `victory.test.ts` derives its
+setup from the constant, so it tracks the new bar), build ✓ (0 `fetch`, deps
+`{}`). Data-only balance change → probe was the verification (then deleted); no
+browser check needed.
+
+**Next ideas:** implement design §3.3 *secession* (a region stuck in revolt
+flips to barbarians) so unrest brakes territory too, a true anti-snowball; then
+re-probe and possibly relax `DOMINATION_FRACTION` back toward 0.55.
+
+---
+
 ## 2026-07-14 — Voronoi-polygon map renderer (handoff dev #3)
 
 Third of the three "further the game a lot" developments. The map can now be
