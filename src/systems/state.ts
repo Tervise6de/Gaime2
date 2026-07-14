@@ -232,7 +232,7 @@ export interface Nation {
 }
 
 /** Kinds of temporary national effect (each with its own gameplay effect). */
-export type ModifierId = "prosperity" | "war_weary";
+export type ModifierId = "prosperity" | "war_weary" | "research_surge";
 
 /** A temporary national effect that ticks down and expires. Serialisable. */
 export interface NationModifier {
@@ -250,6 +250,7 @@ export interface NationModifier {
 export const MODIFIER_LABEL: Record<ModifierId, string> = {
   prosperity: "✨ Prosperity",
   war_weary: "⚔ War-weariness",
+  research_surge: "📚 Research surge",
 };
 
 /** Gold-yield multiplier granted by a prosperity modifier. */
@@ -260,6 +261,10 @@ export const WAR_WEARY_GOLD_MULT = 0.85;
 export const WAR_WEARY_TURNS = 3;
 /** War-weariness stacks with each simultaneous war, but no worse than this. */
 export const WAR_WEARY_MAX_STACKS = 3;
+/** Knowledge-yield multiplier while a research surge is active (a founded academy). */
+export const RESEARCH_SURGE_KNOWLEDGE_MULT = 1.4;
+/** Turns a research surge lasts. */
+export const RESEARCH_SURGE_TURNS = 4;
 
 /** Diplomatic standing between two nations. */
 export type TreatyStatus = "war" | "peace" | "nap" | "alliance";

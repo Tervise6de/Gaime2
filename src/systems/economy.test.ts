@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { regionProduction, nationalProduction, modifierMultipliers } from "@/systems/economy";
 import { TERRAIN } from "@/data/terrain";
-import { PLAYER_ID, PROSPERITY_GOLD_MULT, WAR_WEARY_GOLD_MULT, type GameState, type Region } from "@/systems/state";
+import { PLAYER_ID, PROSPERITY_GOLD_MULT, WAR_WEARY_GOLD_MULT, RESEARCH_SURGE_KNOWLEDGE_MULT, type GameState, type Region } from "@/systems/state";
 
 function region(overrides: Partial<Region> = {}): Region {
   return {
@@ -103,6 +103,14 @@ describe("prosperity modifier", () => {
       WAR_WEARY_GOLD_MULT ** 3,
       5,
     );
+  });
+
+  it("research surge multiplies only knowledge while active", () => {
+    const m = modifierMultipliers([{ id: "research_surge", turnsLeft: 3 }]);
+    expect(m.knowledge).toBe(RESEARCH_SURGE_KNOWLEDGE_MULT);
+    expect(m.gold).toBe(1);
+    expect(m.food).toBe(1);
+    expect(modifierMultipliers([{ id: "research_surge", turnsLeft: 0 }]).knowledge).toBe(1);
   });
 
   it("raises a nation's gold output when active", () => {

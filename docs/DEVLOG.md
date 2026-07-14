@@ -6,6 +6,42 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — Research surge: a Scholarly academy that quickens learning
+
+First modifier on a **new effect axis** — knowledge, not gold. A Scholarly realm
+can now be offered a **grand academy** (a trait-gated choice event): endow it with
+30 materials for a **research surge**, +40% knowledge for 4 turns. It converts a
+stockpile into research *tempo* over several turns, which is distinct from the
+existing one-shot Scholarly events (`scholarly_breakthrough`, `forbidden_lore`)
+and from `forbidden_lore`'s power-at-a-cost — this one has no downside beyond the
+materials, a pure investment decision. A materials-rich AI (≥45) endows; others
+decline.
+
+Small and framework-shaped: `modifierMultipliers` now also accumulates a
+knowledge factor (`RESEARCH_SURGE_KNOWLEDGE_MULT`), a new `research_surge`
+ModifierId + label ("📚 Research surge"), and one choice event reusing the
+`addModifier` helper. The HUD chip and save round-trip come free from the modifier
+framework; no new UI code. Pure/deterministic.
+
+**Balance (200-seed × 4-archetype self-play probe, rivals 3, deleted before
+commit):** warlord 22% / merchant 22% / builder 22% / opportunist 20% — a 2-point
+spread, unchanged from the prior probe; avg game length 61 turns (design window
+60–150); domination 120 / great works 49 reached. The event is trait-gated,
+event-gated, and costs materials, so its footprint is modest.
+
+**Verify:** typecheck ✓, 280 tests ✓ (+3: research surge multiplies only
+knowledge; the academy spends 30 materials for the modifier; it's a safe no-op
+when materials are short), build ✓ (0 `fetch`, deps `{}`). Browser-driven (seed
+1146, Scholarly player, rivals 2): the academy modal renders at turn 2 with both
+numbered options and the "+40% knowledge for 4 turns" detail, and clears cleanly
+on pick; no console/page errors.
+
+**Next ideas:** a Mercantile/Industrious lasting modifier on the materials or gold
+axis for symmetry; show modifier effects in the region-yield breakdown tooltip;
+let the AI weigh research-surge value by whether it has a tech in progress.
+
+---
+
 ## 2026-07-14 — War-weariness scales with simultaneous wars
 
 A two-front war should hurt more than one. War-weariness was a flat −15% gold no

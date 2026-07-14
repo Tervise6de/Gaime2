@@ -20,6 +20,7 @@ import { TERRAIN, type ResourceYield } from "@/data/terrain";
 import {
   PROSPERITY_GOLD_MULT,
   WAR_WEARY_GOLD_MULT,
+  RESEARCH_SURGE_KNOWLEDGE_MULT,
   UNREST_PENALTY_START,
   UNREST_REVOLT,
   ZERO_FLOW,
@@ -31,16 +32,18 @@ import {
 } from "@/systems/state";
 import { techMultipliers } from "@/systems/tech";
 
-/** Yield multiplier from a nation's active temporary modifiers (prosperity, war-weariness). */
+/** Yield multiplier from a nation's active temporary modifiers (prosperity, war-weariness, research surge). */
 export function modifierMultipliers(modifiers: NationModifier[] = []): ResourceYield {
   let gold = 1;
+  let knowledge = 1;
   for (const m of modifiers) {
     if (m.turnsLeft <= 0) continue;
     if (m.id === "prosperity") gold *= PROSPERITY_GOLD_MULT;
     // War-weariness compounds per simultaneous war (stacks; absent = 1).
     else if (m.id === "war_weary") gold *= WAR_WEARY_GOLD_MULT ** Math.max(1, m.stacks ?? 1);
+    else if (m.id === "research_surge") knowledge *= RESEARCH_SURGE_KNOWLEDGE_MULT;
   }
-  return { food: 1, materials: 1, gold, knowledge: 1 };
+  return { food: 1, materials: 1, gold, knowledge };
 }
 import { traitYield } from "@/data/traits";
 

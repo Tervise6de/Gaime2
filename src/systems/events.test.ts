@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { fireEvent, resolveChoice } from "@/systems/events";
 import { createGame } from "@/systems/turn";
 import { createRng } from "@/systems/rng";
-import { PLAYER_ID, type GameState } from "@/systems/state";
+import { PLAYER_ID, RESEARCH_SURGE_TURNS, type GameState } from "@/systems/state";
 
 /** Fire seeds until a specific choice event pends for the player; throws if it never does. */
 function pendingChoiceState(eventId: string): GameState {
@@ -285,6 +285,35 @@ describe("choice events", () => {
     const burned = resolveChoice(s, "burn");
     expect(burned.pendingChoice).toBeUndefined();
     expect(burned.nations[PLAYER_ID]!.stocks.knowledge).toBe(know0);
+  });
+
+  it("Scholarly grand academy: spends 30 materials for a research-surge modifier", () => {
+    const base = pendingTraitChoice("grand_academy", "scholarly");
+    const s = {
+      ...base,
+      nations: base.nations.map((n) =>
+        n.id === PLAYER_ID ? { ...n, stocks: { ...n.stocks, materials: 40 } } : n,
+      ),
+    };
+    const endowed = resolveChoice(s, "endow");
+    expect(endowed.pendingChoice).toBeUndefined();
+    expect(endowed.nations[PLAYER_ID]!.stocks.materials).toBe(10);
+    const surge = endowed.nations[PLAYER_ID]!.modifiers?.find((m) => m.id === "research_surge");
+    expect(surge?.turnsLeft).toBe(RESEARCH_SURGE_TURNS);
+  });
+
+  it("Grand academy with too few materials is a safe no-op beyond clearing the prompt", () => {
+    const base = pendingTraitChoice("grand_academy", "scholarly");
+    const s = {
+      ...base,
+      nations: base.nations.map((n) =>
+        n.id === PLAYER_ID ? { ...n, stocks: { ...n.stocks, materials: 5 }, modifiers: undefined } : n,
+      ),
+    };
+    const tried = resolveChoice(s, "endow");
+    expect(tried.pendingChoice).toBeUndefined();
+    expect(tried.nations[PLAYER_ID]!.stocks.materials).toBe(5);
+    expect(tried.nations[PLAYER_ID]!.modifiers).toBeUndefined();
   });
 
   it("Mercantile monopoly charter: +40 gold at +6 unrest, trait-gated", () => {

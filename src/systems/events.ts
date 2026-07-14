@@ -14,6 +14,7 @@ import {
   GRANARY_CAP,
   MIN_POPULATION,
   PLAYER_ID,
+  RESEARCH_SURGE_TURNS,
   UNREST_MAX,
   emptyUnits,
   type GameState,
@@ -457,6 +458,44 @@ const EVENTS: EventDef[] = [
         const owned = state.regions.filter((r) => r.ownerId === nationId);
         const avgUnrest = owned.length ? owned.reduce((a, r) => a + r.unrest, 0) / owned.length : 100;
         return avgUnrest < 35 ? "study" : "burn";
+      },
+    },
+  },
+  {
+    // TRAIT DECISION (Scholarly): invest materials in an academy for a lasting
+    // research surge — resources converted into research tempo (a +knowledge
+    // modifier, not a one-off), distinct from forbidden_lore's power-at-a-cost.
+    id: "grand_academy",
+    weight: 2,
+    eligible: hasTrait("scholarly"),
+    choice: {
+      prompt: "Your savants petition to found a grand academy — endow it with 30 materials?",
+      options: [
+        {
+          id: "endow",
+          label: "Endow the academy (−30 materials)",
+          detail: `Spend 30 materials; +40% knowledge for ${RESEARCH_SURGE_TURNS} turns.`,
+          apply: (state, nationId) => {
+            const n = state.nations.find((x) => x.id === nationId);
+            if (!n || n.stocks.materials < 30) return { state, message: "Too few materials to endow an academy." };
+            const paid = addStock(state, nationId, "materials", -30);
+            return {
+              state: addModifier(paid, nationId, "research_surge", RESEARCH_SURGE_TURNS),
+              message: "A grand academy is founded — learning quickens across the realm.",
+            };
+          },
+        },
+        {
+          id: "decline",
+          label: "Not now",
+          detail: "Keep the materials for walls and workshops.",
+          apply: (state) => ({ state, message: "You set the academy aside for now." }),
+        },
+      ],
+      // A scholarly AI with materials to spare endows the academy.
+      aiPick: (state, nationId) => {
+        const n = state.nations.find((x) => x.id === nationId);
+        return n && n.stocks.materials >= 45 ? "endow" : "decline";
       },
     },
   },
