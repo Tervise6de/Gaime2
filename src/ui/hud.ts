@@ -15,7 +15,7 @@
 import { BUILDINGS, BUILDING_IDS, type BuildingId } from "@/data/buildings";
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
 import { TERRAIN, TERRAIN_IDS } from "@/data/terrain";
-import { regionProduction, nationalProduction, nationYieldMult, yieldFactors, singleModifierMult } from "@/systems/economy";
+import { regionProduction, nationalProduction, nationYieldMult, yieldFactors, singleModifierMult, unrestPenalty } from "@/systems/economy";
 import { EDGE_COLOR, WAR_EDGE_COLOR } from "@/systems/renderer";
 import { regionCapacity } from "@/systems/population";
 import { previewCombat } from "@/systems/combat";
@@ -708,7 +708,7 @@ function renderRegion(
  * when any apply, the tech / trait / active-modifier multipliers folded into
  * this resource's yield (named, so the player sees *why* it's boosted or dented).
  */
-function flowTooltip(key: ResourceKey, player: Nation): string {
+function flowTooltip(key: ResourceKey, player: Nation, region: Region): string {
   const f = yieldFactors(player);
   const pct = (v: number) => `×${v.toFixed(2)}`;
   const parts: string[] = [];
@@ -718,6 +718,10 @@ function flowTooltip(key: ResourceKey, player: Nation): string {
     const s = singleModifierMult(m);
     if (s[key] !== 1) parts.push(`${MODIFIER_LABEL[m.id]} ${pct(s[key])}`);
   }
+  // Unrest throttles every resource equally; it's already baked into the flow,
+  // so name it here too when it bites (or has fully choked a revolting region).
+  const uMult = unrestPenalty(region.unrest);
+  if (uMult !== 1) parts.push(`Unrest ${pct(uMult)}`);
   const base = RESOURCE_META[key].tip;
   return parts.length ? `${base}\n\nMultipliers: ${parts.join(" · ")}.` : base;
 }
@@ -732,13 +736,21 @@ function renderOwnedRegion(
   const player = playerNation(state);
   const flow = regionProduction(region, player.taxRate, nationYieldMult(player));
 
-  // Unrest bar.
+  // Unrest bar. The tooltip states this region's *current* output penalty so the
+  // cost of unrest is concrete, not just the general rule.
+  const uMult = unrestPenalty(region.unrest);
+  const penaltyNote =
+    uMult >= 1
+      ? "This region is calm — full output."
+      : uMult <= 0
+        ? "This region is in revolt — it produces nothing."
+        : `Right now this region produces ${Math.round(uMult * 100)}% of its output (−${Math.round((1 - uMult) * 100)}%).`;
   const unrestWrap = el("div", "hud-unrest");
   unrestWrap.title =
     `Unrest throttles a region's output. Calm below ${UNREST_PENALTY_START}; ` +
     `production suffers from ${UNREST_PENALTY_START}; at ${UNREST_REVOLT}+ the region revolts ` +
     "and produces nothing. High taxes, famine, over-expansion and fresh conquests all raise it — " +
-    "temples and civics tech calm it.";
+    `temples and civics tech calm it.\n\n${penaltyNote}`;
   const unrestLabel = el("div", "hud-unrest-label");
   unrestLabel.textContent = `Unrest ${fmt(region.unrest)}`;
   unrestLabel.append(unrestTag(region));
@@ -755,7 +767,7 @@ function renderOwnedRegion(
   const table = el("div", "hud-region-flows");
   for (const key of RESOURCE_KEYS) {
     const row = el("div", "hud-region-flow");
-    row.title = flowTooltip(key, player);
+    row.title = flowTooltip(key, player, region);
     const k = el("span", "");
     k.textContent = RESOURCE_META[key].label;
     const v = el("span", "hud-region-flow-val");

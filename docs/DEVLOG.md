@@ -6,6 +6,31 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — Unrest's cost, made concrete in the region panel
+
+Unrest silently throttles a region's whole output, but the panel only stated the
+general rule. Now it shows the *current* penalty for the selected region: the
+unrest-bar tooltip appends "…produces 60% of its output (−40%)", or "calm — full
+output" / "in revolt — produces nothing" at the extremes. And because the unrest
+throttle is already baked into every flow figure, the per-resource breakdown
+tooltips now name it too ("… · Unrest ×0.60"), completing last cycle's multiplier
+attribution — the listed factors now account for the number in full.
+
+Pure presentation reusing the already-tested `unrestPenalty`; no sim/logic touch,
+no new pure logic to test.
+
+**Verify:** typecheck ✓, 282 tests ✓ (unchanged — UI only), build ✓ (0 `fetch`,
+deps `{}`). Browser-driven (default game): a calm region reads "calm — full
+output"; after cranking tax to max and ending ~22 turns a region tips into revolt
+and reads "in revolt — produces nothing", with its flow tooltips showing "Unrest
+×0.00". No console/page errors.
+
+**Next ideas:** surface the same attribution on the top resource-bar /turn
+totals; a combat-odds line for the *defender* too; a Mercantile/Industrious
+lasting modifier for axis symmetry.
+
+---
+
 ## 2026-07-14 — Yield breakdown tells you *why*: multiplier attribution tooltips
 
 The region panel showed each resource's per-turn flow but never *why* it was
