@@ -18,7 +18,7 @@ never touch the DOM; never commit red; never force-push; no PRs.
 2. **End-game summary screen** — a real post-game overlay with the
    prestige-history graph and final scoreboard (data already exists in
    `state.scoreHistory`).
-   *Status: ⏳ pending.*
+   *Status: ✅ done (2026-07-14).*
 
 3. **Voronoi-polygon map renderer** — transformative visuals over the identical
    adjacency graph, shipped behind a toggle with the node+edge renderer as

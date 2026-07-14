@@ -33,7 +33,10 @@ const ARCHETYPES: Record<Archetype, Personality> = {
   opportunist: { archetype: "opportunist", aggression: 0.6, expansion: 0.7, economy: 0.5 },
 };
 
-const NATION_COLORS = ["#4f86b0", "#c0554d", "#5aa469", "#b98a3c", "#8a5fb0", "#43a9a0"];
+// Categorical nation palette — validated for CVD separation and chroma (see
+// DEVLOG 2026-07-14). Colour follows the nation everywhere (map, badges, graph),
+// with nation names as the always-present secondary encoding.
+const NATION_COLORS = ["#4a90d9", "#e2574c", "#56b26a", "#e0a33c", "#a06bd6", "#2bb0a6"];
 const NATION_NAMES = ["Sinilipp", "Punakoda", "Rohumaa", "Kuldhõim", "Öövalve", "Merevald"];
 
 export function createInitialState(options: Partial<GameOptions> = {}): GameState {

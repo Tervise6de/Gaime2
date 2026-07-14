@@ -5,6 +5,40 @@ committed slice.
 
 ---
 
+## 2026-07-14 — End-game summary screen
+
+**Development 2 of 3.** A real post-game overlay (`ui/endscreen.ts`) that opens
+when a game ends, built as a pure read of existing state.
+
+- **Prestige-history line graph** from `state.scoreHistory` (SVG): one line per
+  nation, coloured by the nation entity (identical to the map). Recessive
+  gridlines, x/y axis labels, direct end-labels with a vertical de-collision
+  pass, and a hover crosshair + per-turn tooltip ranking every nation. Follows
+  the dataviz method (change-over-time → lines; colour by identity; names as the
+  always-present secondary encoding).
+- **Final scoreboard**: rank, nation (swatch + name), regions, prestige, status,
+  sorted by prestige with the winner highlighted.
+- **Nation palette** promoted to a CVD-validated categorical set (validated with
+  the dataviz palette checker: chroma + CVD-separation + contrast pass). One
+  source of truth in `state.ts`, so the map, army badges, and graph all agree.
+- Wired into `main.ts` (replaces the cycle-1 placeholder banner); "Uus mäng"
+  starts a fresh seeded game and dismisses the overlay.
+
+### Verification
+
+- `npm run typecheck` ✓, `npm test` ✓ (12), `npm run build` ✓; `fetch` in
+  bundle == 0.
+- Playwright browser verification ✓: played to a decisive end, overlay shows
+  4 prestige lines, a 4-row scoreboard with the winner highlighted, working
+  hover tooltip, and "Uus mäng" dismisses it — zero console errors, zero
+  external network. Verification also caught and fixed a real bug: a
+  `.endscreen { display:flex }` rule was overriding the `hidden` attribute, so
+  the invisible overlay was swallowing all map clicks (fixed with
+  `.endscreen[hidden]{display:none}`).
+- No AI/balance change this cycle, so no self-play probe was needed.
+
+---
+
 ## 2026-07-14 — AI concentration of force (+ game foundation)
 
 **Development 1 of 3.** The AI now masses and merges armies to crack defenders

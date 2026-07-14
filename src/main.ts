@@ -11,6 +11,7 @@ import {
 import type { GameState, UnitType } from "@/systems";
 import { nodeEdgeRenderer, type MapRenderer, type RenderState, type View } from "@/render";
 import { createHud, type Hud } from "@/ui/hud";
+import { createEndScreen } from "@/ui/endscreen";
 
 /**
  * Application entry point / orchestrator.
@@ -34,17 +35,20 @@ function main(): void {
   const hudRoot = document.createElement("div");
   hudRoot.id = "hud";
   app.append(hudRoot);
-  const banner = document.createElement("div");
-  banner.id = "end-banner";
-  banner.hidden = true;
-  app.append(banner);
 
   const view: View = { width: canvas.clientWidth, height: canvas.clientHeight };
+
+  const endScreen = createEndScreen(app, () => {
+    state = createInitialState({ seed: pickSeed() });
+    selected = -1;
+    endScreen.hide();
+    refresh();
+  });
 
   const hud: Hud = createHud(hudRoot, {
     onEndTurn: () => {
       state = endTurn(state);
-      if (state.phase === "ended") showEnd();
+      if (state.phase === "ended") endScreen.show(state);
       refresh();
     },
     onRaise: (type: UnitType) => {
@@ -64,7 +68,7 @@ function main(): void {
     onNewGame: () => {
       state = createInitialState({ seed: pickSeed() });
       selected = -1;
-      banner.hidden = true;
+      endScreen.hide();
       refresh();
     },
   });
@@ -137,13 +141,8 @@ function main(): void {
     refresh();
   });
 
-  function showEnd(): void {
-    const winner = state.winner !== null ? state.nations[state.winner] : null;
-    banner.textContent = winner
-      ? `${winner.name} võitis! (${state.turn}. käik)`
-      : "Mäng läbi";
-    banner.hidden = false;
-  }
+  // If the game was already over on load (e.g. after a resume), show the summary.
+  if (state.phase === "ended") endScreen.show(state);
 
   window.addEventListener("resize", () => {
     resize();
