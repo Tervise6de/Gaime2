@@ -6,6 +6,41 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — Balance: ease conquest unrest so aggression pays (archetype fairness)
+
+Backlog **A**, finishing the archetype-fairness thread the `WONDER_GOAL` change
+started. Aggressive archetypes still trailed — a fresh probe (120 seeds ×
+4 archetypes, rivals 3, normal) put **warlord 12% / opportunist 15%** against
+**merchant/builder 33%**. Root cause on the *conquest* side: a captured region
+took a **+40 unrest** slap (`CONQUEST_UNREST`), so freshly-won land produced
+little and flirted with secession — the aggressive path was expensive to hold.
+With `WONDER_GOAL 5` and secession now braking the snowball, that slap could ease.
+
+**Change:** `CONQUEST_UNREST` 40 → **30** (`systems/state.ts`). Conquered regions
+recover faster, so conquest is more rewarding without removing the brake (fresh
+land still spikes and can still secede if left ungarrisoned/overtaxed).
+
+**Probe, before → after (normal, 120 seeds/archetype):**
+- warlord **12% → 15%**, opportunist **15% → 18%**, merchant/builder **33% →
+  27%** — **all four now sit inside the ~15–30% fair band**; the spread narrows
+  from 21 to 12 points.
+- Pacing holds: avg length 106–110 → 97–112 turns, no fast-game spike, and
+  domination did *not* snowball (147 → 125) — the secession/wonder brakes hold.
+- Hard stays punishing for aggression (warlord/opportunist ~5–6%), as designed —
+  economically-boosted rivals make reckless war costly; that's the difficulty
+  doing its job, unchanged in character from prior cycles.
+
+**Verify:** typecheck ✓, 328 tests ✓ (unchanged — `military.test` checks conquest
+unrest is *raised*, not a hard-coded 40, so it tracks the constant), build ✓
+(0 `fetch`, deps `{}`). Browser smoke (15 turns): no console/page errors.
+Data-only change → the probe is the verification.
+
+**Next ideas:** if aggression still wants a nudge, a small tempo/score reward for
+holding conquered land a while; re-probe after any further war-cost change
+(war-weariness, upkeep).
+
+---
+
 ## 2026-07-14 — Tech effects shown inline in the research menu (legibility)
 
 Backlog **D**, a fresh surface (the research panel). The research menu's tech

@@ -88,7 +88,7 @@ export const COMBAT_VARIANCE = 0.15;
 /** Fraction of the losing side's army destroyed in a decisive fight. */
 export const CASUALTY_SCALE = 0.6;
 /** Unrest added to a region the turn it is conquered (foreign population). */
-export const CONQUEST_UNREST = 40;
+export const CONQUEST_UNREST = 30;
 /** Regions you can hold before overexpansion unrest kicks in. */
 export const FREE_REGIONS = 5;
 /** Extra unrest per region held beyond FREE_REGIONS. */
