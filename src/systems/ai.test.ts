@@ -14,6 +14,7 @@ import {
   preferredTechBranch,
   bestTarget,
   secessionRiskRegion,
+  desiredTaxRate,
 } from "@/systems/ai";
 import type { TraitId } from "@/data/traits";
 import type { Personality } from "@/systems/state";
@@ -235,6 +236,36 @@ describe("trait-aware AI openings", () => {
     // Same position on plains → the Harbor never fits; skips to Workshop
     // (bank/guildhall still locked).
     expect(chooseBuilding(empty(["market"]), [], 0, false)).toBe("workshop");
+  });
+});
+
+describe("desiredTaxRate (eases tax to save a province)", () => {
+  const CALM: Personality = { archetype: "builder", aggression: 0.2, expansion: 0.3, economy: 0.9, trustworthiness: 0.6 };
+  const nat = (over: Partial<Nation> = {}): Nation =>
+    ({ id: RIVAL, personality: CALM, stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, ...over } as unknown as Nation);
+
+  it("cuts tax hard when one province is in revolt, even if the average is low", () => {
+    // One province at 90, three calm at 5 → average is low, but the worst is revolting.
+    const calm = [region({ unrest: 5 }), region({ id: 1, unrest: 5 }), region({ id: 2, unrest: 5 }), region({ id: 3, unrest: 5 })];
+    const withRevolt = [region({ unrest: 90 }), region({ id: 1, unrest: 5 }), region({ id: 2, unrest: 5 }), region({ id: 3, unrest: 5 })];
+    expect(desiredTaxRate(nat(), withRevolt)).toBeLessThan(desiredTaxRate(nat(), calm));
+  });
+
+  it("applies a smaller cut for a province merely trending toward revolt", () => {
+    const calm = [region({ unrest: 10 })];
+    const nearing = [region({ unrest: 65 })]; // ≥60, below the 75 revolt line
+    const revolting = [region({ unrest: 80 })];
+    const cCalm = desiredTaxRate(nat(), calm);
+    const cNear = desiredTaxRate(nat(), nearing);
+    const cRevolt = desiredTaxRate(nat(), revolting);
+    expect(cNear).toBeLessThan(cCalm);
+    expect(cRevolt).toBeLessThan(cNear); // revolt cuts harder than merely nearing
+  });
+
+  it("stays within the legal tax band", () => {
+    const rate = desiredTaxRate(nat(), [region({ unrest: 100 })]);
+    expect(rate).toBeGreaterThanOrEqual(0);
+    expect(rate).toBeLessThanOrEqual(0.4);
   });
 });
 

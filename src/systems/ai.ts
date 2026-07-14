@@ -58,6 +58,7 @@ import {
   type Army,
   type GameState,
   type Nation,
+  type Region,
 } from "@/systems/state";
 
 /** Turns rivals leave the player alone at the start (scales with difficulty). */
@@ -90,13 +91,11 @@ function manageEconomy(state: GameState, nationId: number): GameState {
     if (pick) s = chooseTech(s, nationId, pick);
   }
 
-  // Tax policy: aim higher when calm and poorer; ease off when unrest bites.
-  const avgUnrest = owned.reduce((a, r) => a + r.unrest, 0) / owned.length;
+  // Tax policy: aim higher when calm and poorer; ease off when unrest bites, and
+  // cut hard when any one province is tipping toward secession (a cheaper save
+  // than marching an army to garrison it).
   const p = nation.personality;
-  let target = 0.15 + (p?.economy ?? 0.5) * 0.1 + (p?.aggression ?? 0.4) * 0.1;
-  if (avgUnrest > 45) target -= 0.1;
-  if (nation.stocks.gold > 300) target -= 0.05;
-  s = setTax(s, nationId, target);
+  s = setTax(s, nationId, desiredTaxRate(nation, owned));
 
   // Buildings: fill empty slots with the best unlocked option. A Great Work is
   // a national project — only one may be under construction at a time, so the
@@ -124,6 +123,32 @@ function manageEconomy(state: GameState, nationId: number): GameState {
     }
   }
   return s;
+}
+
+/** A province at/above this unrest is trending toward revolt (below the revolt line). */
+const NEAR_REVOLT_UNREST = 60;
+
+/**
+ * The tax rate a nation aims for. Higher when calm and poorer (economy/aggression
+ * push it up); eased when the realm's *average* unrest is high; and cut **hard**
+ * when its *worst* province is in or near revolt — a single crisis province is
+ * invisible to an average, yet losing it to secession is a free loss, so cutting
+ * tax to calm it is worth the income. Clamped to the legal band. Pure.
+ */
+export function desiredTaxRate(nation: Nation, owned: Region[]): number {
+  const p = nation.personality;
+  let target = 0.15 + (p?.economy ?? 0.5) * 0.1 + (p?.aggression ?? 0.4) * 0.1;
+  if (!owned.length) return clampTax(target);
+
+  const avgUnrest = owned.reduce((a, r) => a + r.unrest, 0) / owned.length;
+  if (avgUnrest > 45) target -= 0.1;
+
+  const maxUnrest = owned.reduce((m, r) => Math.max(m, r.unrest), 0);
+  if (maxUnrest >= UNREST_REVOLT) target -= 0.1; // a province is revolting — de-escalate
+  else if (maxUnrest >= NEAR_REVOLT_UNREST) target -= 0.05; // trending toward revolt
+
+  if (nation.stocks.gold > 300) target -= 0.05;
+  return clampTax(target);
 }
 
 /** The research branch a nation should favour, given the personality thresholds. */

@@ -6,6 +6,44 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — AI eases taxes to save a province from revolt
+
+Backlog **B** follow-on — the cheaper half of the AI's secession defence. The AI
+could already *garrison* a province tipping into revolt, but marching an army is
+expensive and slow; the obvious first move (the same one we tell the player to
+make) is to **cut taxes**. Its tax logic keyed only on *average* unrest, so one
+province at 90 hidden among calm neighbours never moved the dial — and quietly
+seceded.
+
+**Change** (`systems/ai.ts`): extracted the inline tax heuristic into a pure,
+tested `desiredTaxRate(nation, owned)` that now also reacts to the realm's
+**worst** province: a province in revolt (`unrest ≥ UNREST_REVOLT`) pulls tax down
+hard (−0.10), one merely trending toward it (`≥ 60`) a little (−0.05), on top of
+the existing average-unrest and treasury easing. So a single crisis province — the
+one about to break away — actually bends national policy toward calming it.
+
+**Verify:** typecheck ✓, **305 tests ✓** (+3: a lone revolting province cuts tax
+below the calm baseline despite a low average; a merely-nearing province cuts less
+than a revolting one; the rate stays in the legal band), build ✓ (0 `fetch`, deps
+`{}`; the full-tsc build caught an unused test-helper param that vitest's esbuild
+missed — ran build as the final gate). Browser smoke (15 turns): no console/page
+errors.
+
+**Balance (temp probe: 40 seeds × 3 difficulties × {2,3} rivals = 240 games,
+deleted):** no crashes; medians **70–104** turns and a diverse victory mix (all
+four kinds appear) — pacing and variety unchanged. **Secessions/game fell to
+~0.025**, down from ~0.05–0.07 with garrison-only defence (and ~0.10 before any
+defence): the AI now heads off roughly half the remaining own-goal break-aways by
+easing tax rather than spending an army. Smarter economic self-defence, same
+healthy balance.
+
+**Next ideas:** factor secession risk into how far the AI pushes conquest (stop
+expanding when it can't hold what it has); a small map countdown marker on a
+secession-imminent region; let the player see each rival's tax rate in the
+diplomacy panel.
+
+---
+
 ## 2026-07-14 — Secession warning in the region panel (legibility)
 
 Backlog **D** follow-on completing the secession arc (mechanic → AI response →
