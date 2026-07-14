@@ -1674,3 +1674,77 @@ body {
 .tut-next:hover {
   filter: brightness(1.08);
 }
+
+/* Confirmation dialog — modal prompt before irreversible / heavy actions. */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 8, 12, 0.6);
+}
+
+.confirm-panel {
+  width: min(380px, 92vw);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.55);
+}
+
+.confirm-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.confirm-body {
+  margin: 0 0 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--fg);
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.confirm-btn {
+  padding: 7px 14px;
+  font-weight: 700;
+  font-size: 13px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.confirm-btn.cancel {
+  background: none;
+  color: var(--muted);
+}
+
+.confirm-btn.cancel:hover {
+  color: var(--fg);
+  border-color: var(--fg);
+}
+
+.confirm-btn.primary {
+  color: #1a1408;
+  background: var(--accent);
+  border-color: transparent;
+}
+
+.confirm-btn.danger {
+  color: #fff;
+  background: var(--danger, #b5433a);
+  border-color: transparent;
+}
+
+.confirm-btn.primary:hover,
+.confirm-btn.danger:hover {
+  filter: brightness(1.08);
+}

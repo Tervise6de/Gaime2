@@ -18,6 +18,7 @@ import { TERRAIN, TERRAIN_IDS } from "@/data/terrain";
 import { regionProduction, nationalProduction, nationYieldMult, yieldFactors, singleModifierMult, unrestPenalty } from "@/systems/economy";
 import { garrisonCalm } from "@/systems/stability";
 import { runTutorial } from "@/ui/tutorial";
+import { confirmAction } from "@/ui/confirm";
 import { EDGE_COLOR, WAR_EDGE_COLOR, type MapLayout } from "@/systems/renderer";
 import { DEFAULT_MAP_OPTIONS, type MapGenOptions } from "@/systems/mapgen";
 import { regionCapacity } from "@/systems/population";
@@ -279,7 +280,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const newGameBtn = document.createElement("button");
   newGameBtn.className = "hud-newgame-btn primary";
   newGameBtn.textContent = "New game";
-  newGameBtn.addEventListener("click", () => {
+  function startNewGame(): void {
     const raw = seedInput.value.trim();
     saveNewGamePrefs({ difficulty: difficultySel.value, rivals: rivalsSel.value, mapSize: mapSizeSel.value });
     callbacks.onNewGame({
@@ -287,6 +288,23 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       difficulty: difficultySel.value as Difficulty,
       rivals: Number(rivalsSel.value),
       map: { ...DEFAULT_MAP_OPTIONS, regionCount: Number(mapSizeSel.value) },
+    });
+  }
+  newGameBtn.addEventListener("click", () => {
+    // Only guard when there's a live game to discard — a fresh session or a
+    // finished game starts immediately.
+    const inProgress = lastState !== null && lastState.turn > 1 && lastState.outcome === "playing";
+    if (!inProgress) {
+      startNewGame();
+      return;
+    }
+    void confirmAction({
+      title: "Start a new game?",
+      body: `Your current game is at turn ${lastState!.turn} and hasn't been won yet. Starting over replaces the autosave — save it to a slot first if you want to keep it.`,
+      confirmLabel: "New game",
+      danger: true,
+    }).then((ok) => {
+      if (ok) startNewGame();
     });
   });
   // Save/Load act on the chosen checkpoint slot (3 named slots + the autosave).
@@ -321,8 +339,25 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   clearBtn.textContent = "✕";
   clearBtn.title = "Clear the selected slot's checkpoint (the live game is untouched).";
   clearBtn.addEventListener("click", () => {
-    callbacks.onClearSlot(slotSel.value as SaveSlot);
-    refreshSlotLabels(); // the slot reads "empty" again immediately
+    const slot = slotSel.value as SaveSlot;
+    const info = slotInfo(slot);
+    if (!info) {
+      // Nothing to lose — let the intent report "already empty" without a prompt.
+      callbacks.onClearSlot(slot);
+      refreshSlotLabels();
+      return;
+    }
+    const i = MANUAL_SLOTS.indexOf(slot);
+    void confirmAction({
+      title: `Clear Slot ${i + 1}?`,
+      body: `This permanently deletes the checkpoint saved at turn ${info.turn}. The live game is untouched.`,
+      confirmLabel: "Clear slot",
+      danger: true,
+    }).then((ok) => {
+      if (!ok) return;
+      callbacks.onClearSlot(slot);
+      refreshSlotLabels(); // the slot reads "empty" again immediately
+    });
   });
   btnRow.append(newGameBtn, slotSel, saveBtn, loadBtn, clearBtn);
   controls.append(btnRow);
@@ -1461,7 +1496,18 @@ function renderDiplomacy(
     if (treaty === "war") {
       actions.append(btn("Sue for peace", "hud-diplo-btn", () => callbacks.onMakePeace(rival.id)));
     } else {
-      actions.append(btn("Declare war", "hud-diplo-btn war", () => callbacks.onDeclareWar(rival.id)));
+      actions.append(
+        btn("Declare war", "hud-diplo-btn war", () => {
+          void confirmAction({
+            title: `Declare war on ${rival.name}?`,
+            body: "War severs any trade route and treaty between you, and can't be called off this turn. Your rivals will take note.",
+            confirmLabel: "Declare war",
+            danger: true,
+          }).then((ok) => {
+            if (ok) callbacks.onDeclareWar(rival.id);
+          });
+        }),
+      );
       if (treaty === "peace") {
         actions.append(
           btn("NAP", "hud-diplo-btn", () => callbacks.onProposePact(rival.id, "nap")),

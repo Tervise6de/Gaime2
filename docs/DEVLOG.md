@@ -6,6 +6,37 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — ROADMAP A2: Confirmation dialogs for irreversible actions
+
+Second Phase-A item of `docs/roadmap-to-ready.md`: guard the handful of clicks a
+player can't take back. A reusable modal (`ui/confirm.ts`, `confirmAction()` →
+`Promise<boolean>`) now sits in front of three actions:
+
+- **Declare war** — a red "Declare war on {rival}?" prompt noting it severs trade
+  and treaties and can't be undone this turn.
+- **Clear save slot** — confirms only when the slot actually holds a checkpoint
+  (empty slots clear silently), naming the turn it will delete.
+- **New game** — confirms only when a game is genuinely in progress (turn > 1 and
+  still playing); a fresh session or a finished game starts immediately. Warns the
+  autosave is replaced and suggests saving to a slot first.
+
+The dialog is pure DOM over the HUD: centred panel over a dimmed backdrop, **Enter**
+confirms / **Esc** or backdrop cancels, focus lands on the confirm button, and one
+dialog shows at a time. Body text is set as text nodes (never innerHTML). Danger
+actions get a red confirm button; benign ones the accent colour.
+
+**Verify:** typecheck ✓, **338 tests ✓** (confirm.ts is pure DOM, browser-verified
+rather than unit-tested — the suite runs in the `node` env by design), build ✓
+(0 `fetch`, deps `{}`). Browser-driven (Playwright): declaring war opens the dialog
+with the right title, **Cancel** closes it without acting, **Confirm** declares the
+war (the panel flips to "Sue for peace"), danger styling present, no page errors.
+
+**Next (roadmap order):** A3 first-run UX sweep, then A4 UI fuzz/bug-bash close the
+Phase-A gate (**~75 testing-ready**); then Phase B opens with **procedural audio**
+(Web Audio, no assets/deps).
+
+---
+
 ## 2026-07-14 — ROADMAP A1: Interactive tutorial (the gate to testing-ready)
 
 First item of `docs/roadmap-to-ready.md` Phase A — the single highest-leverage
