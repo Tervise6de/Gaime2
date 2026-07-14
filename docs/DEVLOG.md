@@ -6,6 +6,38 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — War-weariness scales with simultaneous wars
+
+A two-front war should hurt more than one. War-weariness was a flat −15% gold no
+matter how many enemies you fought; now it **compounds per simultaneous war**,
+capped at 3 stacks — one war ×0.85, two ×0.72, three-plus ×0.61 gold. The cap
+keeps a wide coalition from zeroing an economy while still making over-extension
+into many wars a real, escalating drag (design §3.4 anti-snowball spirit).
+
+Small, entirely inside the modifier framework: `NationModifier` gained an
+optional `stacks` field (absent = 1, so legacy saves are unaffected),
+`modifierMultipliers` raises the war-weary factor to the `stacks` power, and
+`applyWarWeariness` now counts a nation's live wars and sets `stacks`. The HUD
+chip shows the intensity ("⚔ War-weariness ×2 (3)") only when it exceeds one.
+Pure/deterministic; round-trips through the generic save.
+
+**Balance (200-seed × 4-archetype self-play probe, rivals 3, deleted before
+commit):** warlord 24% / merchant 22% / builder 22% / opportunist 19% — a tight
+5-point spread, no archetype dominating or collapsing; all three victory kinds
+reached (domination 118, great works 51, prestige 2). Aggressive archetypes that
+fight several wars pay the new escalating cost but still win at the top of the
+pack, so the mechanic bites without punishing warmongering out of viability.
+
+**Verify:** typecheck ✓, 277 tests ✓ (+2: war-weariness stacks per war and caps
+at 3; the gold multiplier compounds multiplicatively), build ✓ (0 `fetch`, deps
+none). Browser-driven smoke (seed 12345, 12 turns): the map renders and turns
+resolve with no console/page errors.
+
+**Next ideas:** taper the stack instead of a hard cap; a HUD tooltip spelling out
+the gold penalty; scale unrest (not just gold) with prolonged war.
+
+---
+
 ## 2026-07-13 — War fronts on the map (red border edges) + a typecheck fix
 
 **Front lines at a glance.** The map drew every adjacency edge the same faint

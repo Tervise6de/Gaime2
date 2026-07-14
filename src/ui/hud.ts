@@ -586,7 +586,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     resourceEls.food.flow.classList.toggle("negative", player.famine || flow.food < 0);
     const activeMods = (player.modifiers ?? [])
       .filter((m) => m.turnsLeft > 0)
-      .map((m) => `${MODIFIER_LABEL[m.id]} (${m.turnsLeft})`)
+      .map((m) => {
+        const intensity = (m.stacks ?? 1) > 1 ? ` ×${m.stacks}` : "";
+        return `${MODIFIER_LABEL[m.id]}${intensity} (${m.turnsLeft})`;
+      })
       .join(" · ");
     turnBadge.textContent =
       (player.famine ? "⚠ FAMINE · " : "") +

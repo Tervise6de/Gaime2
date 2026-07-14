@@ -34,6 +34,7 @@ import { createRng, type Rng } from "@/systems/rng";
 import {
   BANKRUPTCY_UNREST,
   WAR_WEARY_TURNS,
+  WAR_WEARY_MAX_STACKS,
   BARBARIAN_ID,
   DEFAULT_TAX,
   DIFFICULTY,
@@ -207,17 +208,24 @@ export function createGame(options: NewGameOptions): GameState {
   return game;
 }
 
-/** Whether a nation is at war with any living, non-barbarian nation. */
-function isAtWarWithAnyone(state: GameState, id: number): boolean {
-  return state.nations.some((o) => !o.isBarbarian && o.alive && o.id !== id && atWar(state, id, o.id));
+/** How many living, non-barbarian nations a nation is currently at war with. */
+function warCount(state: GameState, id: number): number {
+  return state.nations.filter((o) => !o.isBarbarian && o.alive && o.id !== id && atWar(state, id, o.id)).length;
 }
 
-/** Refresh the war-weariness modifier on every nation currently at war. */
+/**
+ * Refresh the war-weariness modifier on every nation currently at war, scaling
+ * its bite by the number of simultaneous wars (a two-front war hurts more),
+ * capped at WAR_WEARY_MAX_STACKS.
+ */
 function applyWarWeariness(state: GameState): GameState {
   const nations = state.nations.map((n) => {
-    if (n.isBarbarian || !n.alive || !isAtWarWithAnyone(state, n.id)) return n;
+    if (n.isBarbarian || !n.alive) return n;
+    const wars = warCount(state, n.id);
+    if (wars === 0) return n;
+    const stacks = Math.min(wars, WAR_WEARY_MAX_STACKS);
     const others = (n.modifiers ?? []).filter((m) => m.id !== "war_weary");
-    return { ...n, modifiers: [...others, { id: "war_weary" as const, turnsLeft: WAR_WEARY_TURNS }] };
+    return { ...n, modifiers: [...others, { id: "war_weary" as const, turnsLeft: WAR_WEARY_TURNS, stacks }] };
   });
   return { ...state, nations };
 }

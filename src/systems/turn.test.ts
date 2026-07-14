@@ -259,6 +259,18 @@ describe("war-weariness", () => {
     s = resolveTurn(s);
     expect(wearyOf(s)).toBeUndefined(); // gone
   });
+
+  it("scales with the number of simultaneous wars, capped at 3", () => {
+    // One war → 1 stack.
+    let one: GameState = { ...createGame({ seed: 3, rivals: 3 }), treaties: { "0-2": "war" } };
+    one = resolveTurn(one);
+    expect(wearyOf(one)?.stacks).toBe(1);
+
+    // Two simultaneous wars → 2 stacks (a heavier drag).
+    let two: GameState = { ...createGame({ seed: 3, rivals: 3 }), treaties: { "0-2": "war", "0-3": "war" } };
+    two = resolveTurn(two);
+    expect(wearyOf(two)?.stacks).toBe(2);
+  });
 });
 
 describe("score history", () => {

@@ -239,6 +239,11 @@ export interface NationModifier {
   id: ModifierId;
   /** Turns of effect remaining; the modifier applies while > 0, then is dropped. */
   turnsLeft: number;
+  /**
+   * Intensity multiplier — how many times the base effect stacks (war-weariness
+   * scales with the number of simultaneous wars). Absent = 1 (legacy saves).
+   */
+  stacks?: number;
 }
 
 /** Player-facing labels for active modifiers (HUD chips). */
@@ -253,6 +258,8 @@ export const PROSPERITY_GOLD_MULT = 1.25;
 export const WAR_WEARY_GOLD_MULT = 0.85;
 /** Turns a bout of war-weariness lingers; refreshed each turn a war continues. */
 export const WAR_WEARY_TURNS = 3;
+/** War-weariness stacks with each simultaneous war, but no worse than this. */
+export const WAR_WEARY_MAX_STACKS = 3;
 
 /** Diplomatic standing between two nations. */
 export type TreatyStatus = "war" | "peace" | "nap" | "alliance";

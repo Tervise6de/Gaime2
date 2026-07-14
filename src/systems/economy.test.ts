@@ -91,6 +91,20 @@ describe("prosperity modifier", () => {
     ).toBeCloseTo(PROSPERITY_GOLD_MULT * WAR_WEARY_GOLD_MULT, 5);
   });
 
+  it("war-weariness compounds per simultaneous war (stacks)", () => {
+    // Absent stacks behaves as a single war.
+    expect(modifierMultipliers([{ id: "war_weary", turnsLeft: 2 }]).gold).toBe(WAR_WEARY_GOLD_MULT);
+    // Two-front war bites twice as hard (multiplicatively).
+    expect(modifierMultipliers([{ id: "war_weary", turnsLeft: 2, stacks: 2 }]).gold).toBeCloseTo(
+      WAR_WEARY_GOLD_MULT ** 2,
+      5,
+    );
+    expect(modifierMultipliers([{ id: "war_weary", turnsLeft: 2, stacks: 3 }]).gold).toBeCloseTo(
+      WAR_WEARY_GOLD_MULT ** 3,
+      5,
+    );
+  });
+
   it("raises a nation's gold output when active", () => {
     const base = {
       nations: [{ id: PLAYER_ID, taxRate: 0.2, research: { current: null, progress: 0, done: [] } }],

@@ -37,7 +37,8 @@ export function modifierMultipliers(modifiers: NationModifier[] = []): ResourceY
   for (const m of modifiers) {
     if (m.turnsLeft <= 0) continue;
     if (m.id === "prosperity") gold *= PROSPERITY_GOLD_MULT;
-    else if (m.id === "war_weary") gold *= WAR_WEARY_GOLD_MULT;
+    // War-weariness compounds per simultaneous war (stacks; absent = 1).
+    else if (m.id === "war_weary") gold *= WAR_WEARY_GOLD_MULT ** Math.max(1, m.stacks ?? 1);
   }
   return { food: 1, materials: 1, gold, knowledge: 1 };
 }
