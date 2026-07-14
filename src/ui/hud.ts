@@ -49,6 +49,7 @@ import {
   SECESSION_REVOLT_TURNS,
   armySize,
   emptyUnits,
+  nationInstability,
   playerNation,
   type Army,
   type GameState,
@@ -1413,6 +1414,24 @@ function renderDiplomacy(
       `${rival.name}'s strength is ${Math.round(ratio * 100)}% of yours ` +
       "(army + territory + treasury). Below 100% is a softer target; well above is a threat.";
     powerRow.append(powerChip);
+
+    // "Reeling" read: famine / bankruptcy / a province in open revolt leaves the
+    // rival distracted and poorly placed to defend — the same opportunist signal
+    // the AI acts on (it lowers its required power edge to strike a reeling foe).
+    const inst = nationInstability(state, rival.id);
+    if (inst.reeling) {
+      const crises = [
+        inst.revolt ? "a province in revolt" : null,
+        inst.famine ? "famine" : null,
+        inst.bankrupt ? "bankruptcy" : null,
+      ].filter(Boolean);
+      const reelChip = el("span", "hud-diplo-reeling");
+      reelChip.textContent = "⚠ Reeling";
+      reelChip.title =
+        `${rival.name} is reeling — ${crises.join(", ")}. Distracted and poorly ` +
+        "placed to defend: a tempting moment to strike (rivals read this on you too).";
+      powerRow.append(reelChip);
+    }
     card.append(powerRow);
 
     const actions = el("div", "hud-diplo-actions");

@@ -379,6 +379,39 @@ export function pairKey(a: number, b: number): string {
   return a < b ? `${a}-${b}` : `${b}-${a}`;
 }
 
+/**
+ * What, if anything, is destabilising a nation right now — the "reeling" read.
+ * A realm gripped by famine, bankruptcy, or an open provincial revolt is
+ * distracted and poorly placed to defend, so the AI's opportunism lowers its
+ * required power edge against such a target (see `ai.ts` `doDiplomacy`). This
+ * is the same signal, exposed as a pure helper so the player's HUD can show
+ * exactly the read the AI acts on.
+ */
+export interface Instability {
+  /** A national famine last turn (population starving). */
+  famine: boolean;
+  /** Treasury went negative last turn (troops disbanded, unrest spiked). */
+  bankrupt: boolean;
+  /** At least one owned region is in full revolt. */
+  revolt: boolean;
+  /** Any of the above — the nation is reeling and a tempting moment to strike. */
+  reeling: boolean;
+}
+
+/** Assess a nation's current instability (famine / bankruptcy / open revolt). */
+export function nationInstability(
+  state: GameState,
+  nationId: number,
+): Instability {
+  const nation = state.nations.find((n) => n.id === nationId);
+  const famine = nation?.famine ?? false;
+  const bankrupt = nation?.bankrupt ?? false;
+  const revolt = state.regions.some(
+    (r) => r.ownerId === nationId && r.unrest >= UNREST_REVOLT,
+  );
+  return { famine, bankrupt, revolt, reeling: famine || bankrupt || revolt };
+}
+
 /** Clamp a tax rate into the legal band. */
 export function clampTax(rate: number): number {
   return Math.min(TAX_MAX, Math.max(TAX_MIN, rate));

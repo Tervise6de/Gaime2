@@ -52,6 +52,7 @@ import {
   WONDER_GOAL,
   UNREST_REVOLT,
   SECESSION_REVOLT_TURNS,
+  nationInstability,
   armySize,
   clampTax,
   emptyUnits,
@@ -346,10 +347,7 @@ function doDiplomacy(state: GameState, nationId: number, rng: Rng): GameState {
     // famine or bankruptcy — is distracted and poorly placed to defend, so it's a
     // tempting moment: the required power edge drops. (The complement to the
     // `overstretched` restraint: strike weakness, don't compound your own.)
-    const targetUnstable =
-      o.famine ||
-      o.bankrupt ||
-      state.regions.some((r) => r.ownerId === o.id && r.unrest >= UNREST_REVOLT);
+    const targetUnstable = nationInstability(state, o.id).reeling;
     const warThreshold = 1.5 - aggression - (targetUnstable ? 0.3 : 0);
     if (border && rel < -25 && ratio > warThreshold && !earlyGraceForPlayer && !overstretched) {
       s = openWar(s, nationId, o);

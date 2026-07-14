@@ -6,6 +6,41 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — "Reeling" read: show the player the weakness the AI exploits
+
+Last cycle taught the AI to **strike a reeling rival** — one gripped by famine,
+bankruptcy, or an open provincial revolt — by lowering its required power edge
+against such a target. But that read was invisible to the human: the AI would
+pounce on your neighbour's crisis while you had no in-game signal that the moment
+was ripe. This closes the asymmetry. The diplomacy panel now shows a small amber
+**⚠ Reeling** badge on any rival that is famine-struck, bankrupt, or holding a
+province in full revolt, with a tooltip naming the crises — *"…a tempting moment
+to strike (rivals read this on you too)."* The player now shares exactly the
+opportunist signal the AI acts on, and it doubles as a warning that the same
+weakness on *your* borders invites aggression.
+
+**Change.** Extracted the AI's inline instability test into one pure, shared
+helper `nationInstability(state, nationId)` in `systems/state.ts` (returns
+`{famine, bankrupt, revolt, reeling}`); `ai.ts` `doDiplomacy` now calls it
+instead of re-deriving the same booleans (DRY — one source of truth for the
+signal). `ui/hud.ts` `renderDiplomacy` reads the helper and appends the badge to
+each rival card's strategic-read row next to the power chip; new CSS
+`.hud-diplo-reeling`. Pure read, no sim/behaviour change — the AI decides
+identically, the player just sees more.
+
+**Verify:** typecheck ✓, **321 tests ✓** (+8: a new `state.test.ts` covering
+`nationInstability` — stable vs. famine/bankrupt/revolt, the ≥`UNREST_REVOLT`
+threshold, ignoring other nations' revolts, and a missing-nation legacy guard),
+build ✓ (0 `fetch`, deps `{}`). Browser (Playwright, seed 16 → 3 rivals): drove
+to turn 15 where a rival (Sundered League) has a province in revolt — the amber
+**⚠ Reeling** badge appears on exactly that card with the right tooltip, the two
+stable rivals show none, no console/page errors. No balance probe (no sim logic
+changed).
+
+**Next ideas:** have an ally called to arms prefer joining the war against a
+reeling enemy; mirror the badge into the Standings overlay rows; a matching
+self-warning when *your own* realm is reeling (you're the tempting target now).
+
 ## 2026-07-14 — AI opportunism: strike a rival that's already reeling
 
 The offensive complement to last cycle's restraint — together they give the AI a

@@ -707,6 +707,20 @@ body {
   background: rgba(232, 119, 107, 0.16);
 }
 
+/* "Reeling" badge: a rival gripped by famine / bankruptcy / revolt — an opening. */
+.hud-diplo-reeling {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: #f0b34a;
+  background: rgba(240, 179, 74, 0.16);
+  border: 1px solid rgba(240, 179, 74, 0.35);
+}
+
 .hud-diplo-actions {
   display: flex;
   flex-wrap: wrap;
