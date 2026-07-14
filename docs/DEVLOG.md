@@ -6,6 +6,37 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — AI restraint: quell revolt before conquering more
+
+Backlog **B**. The AI would happily open a *new* war of conquest even while one of
+its own provinces was in open revolt and about to secede — grabbing more land it
+couldn't hold, straight into a death spiral. Now a nation that has any region in
+full revolt (`unrest ≥ UNREST_REVOLT`) **holds off from new opportunistic wars
+until it restores order.** Defensive wars, suing for peace, and coalitions against
+a runaway leader are all unaffected — only unprovoked aggression pauses.
+
+**Change** (`systems/ai.ts` `doDiplomacy`): a one-line `overstretched` guard on
+the opportunistic-war branch. Tiny, deterministic, pure.
+
+**Verify:** typecheck ✓, **310 tests ✓** (+2: a stable warlord opens the
+opportunistic war it should; the same warlord with a province in revolt holds off
+— isolated with no armies so only the diplomacy decision is under test), build ✓
+(0 `fetch`, deps `{}`). Browser smoke (15 turns): no console/page errors.
+
+**Balance (temp probe: 40 seeds × 3 difficulties × {2,3} rivals = 240 games,
+deleted):** no crashes; medians **69–97** turns, diverse victory mix (all four
+kinds), secessions/game steady at **~0.025** — unchanged, i.e. **no regression**.
+The AI still wars plenty (domination and elimination stay common); it just stops
+compounding instability by biting off more while a province is in revolt. A
+coherence win, same healthy balance.
+
+**Next ideas:** also pause aggression when badly overstretched (high *average*
+unrest, not only full revolt); factor a target's instability into how tempting it
+is to attack (revolting rivals are softer); show rival famine/bankruptcy flags in
+the diplomacy panel.
+
+---
+
 ## 2026-07-14 — Power balance on the diplomacy cards (strategic intel)
 
 Backlog **D**, a deliberate step out of the unrest/secession subsystem after

@@ -293,6 +293,13 @@ function doDiplomacy(state: GameState, nationId: number, rng: Rng): GameState {
   );
   const myPower = nationPower(state, nationId);
   const leaderId = runawayLeader(state);
+  // A realm already struggling to hold itself together (a province in open
+  // revolt) puts new wars of *conquest* on hold until it restores order — quell
+  // unrest before grabbing more land. Defensive wars, suing for peace, and
+  // coalitions against a runaway leader are unaffected.
+  const overstretched = state.regions.some(
+    (r) => r.ownerId === nationId && r.unrest >= UNREST_REVOLT,
+  );
 
   let s = state;
   let actions = 0;
@@ -336,7 +343,7 @@ function doDiplomacy(state: GameState, nationId: number, rng: Rng): GameState {
     // at worse odds; peaceful types need a big edge. The player gets an
     // early-game grace period so a new realm isn't snuffed out immediately.
     const warThreshold = 1.5 - aggression;
-    if (border && rel < -25 && ratio > warThreshold && !earlyGraceForPlayer) {
+    if (border && rel < -25 && ratio > warThreshold && !earlyGraceForPlayer && !overstretched) {
       s = openWar(s, nationId, o);
       actions++;
       continue;

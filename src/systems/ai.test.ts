@@ -683,6 +683,42 @@ describe("bestTarget capital strikes (archetype-weighted)", () => {
   });
 });
 
+describe("overstretched restraint (hold new wars while a province revolts)", () => {
+  const AGGR = 2, TARGET = 3;
+  const WARLORD: Personality = { archetype: "warlord", aggression: 0.9, expansion: 0.8, economy: 0.3, trustworthiness: 0.2 };
+  const nat = (id: number, over: Partial<Nation> = {}): Nation =>
+    ({
+      id, name: `N${id}`, color: "#fff", isPlayer: false, isBarbarian: false, alive: true,
+      stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, taxRate: 0.15,
+      research: emptyResearch(), wonders: 0, famine: false, bankrupt: false, ...over,
+    }) as Nation;
+
+  // AGGR (warlord) borders and is hostile to a same-strength TARGET, so it would
+  // open an opportunistic war. No armies + no gold, so only diplomacy can declare
+  // war (military can't attack or recruit) — isolating the restraint guard.
+  const baseState = (aggrUnrest: number): GameState =>
+    ({
+      turn: 40, difficulty: "normal",
+      relations: { [pairKey(AGGR, TARGET)]: -35 },
+      treaties: {}, offers: [], nextOfferId: 0, nextArmyId: 10, armies: [], log: [], outcome: "playing",
+      nations: [nat(AGGR, { personality: WARLORD }), nat(TARGET)],
+      regions: [
+        region({ id: 0, ownerId: AGGR, unrest: aggrUnrest, adjacency: [1] }),
+        region({ id: 1, ownerId: TARGET, adjacency: [0] }),
+      ],
+    }) as unknown as GameState;
+
+  it("declares an opportunistic war when its realm is stable", () => {
+    const after = runNationTurn(baseState(0), AGGR, createRng(1));
+    expect(atWar(after, AGGR, TARGET)).toBe(true);
+  });
+
+  it("holds off from new wars while one of its provinces is in revolt", () => {
+    const after = runNationTurn(baseState(90), AGGR, createRng(1));
+    expect(atWar(after, AGGR, TARGET)).toBe(false);
+  });
+});
+
 describe("gang up on a runaway leader", () => {
   const LEADER = 2, JOINER = 3, ALLY = 0;
 
