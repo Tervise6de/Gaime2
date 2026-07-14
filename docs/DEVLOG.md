@@ -6,6 +6,40 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — AI opportunism: strike a rival that's already reeling
+
+The offensive complement to last cycle's restraint — together they give the AI a
+coherent opportunist brain: *don't compound your own instability; do exploit the
+enemy's.* A rival that is internally weak — a province in open revolt, or gripped
+by famine or bankruptcy — is distracted and poorly placed to defend, so it's a
+tempting moment to pounce. The AI now **lowers its required power edge by 0.3
+against such a target**, so it will open a war it would otherwise judge too close
+when the enemy is reeling. Rivals therefore actively press *your* weak moments,
+which turns all the unrest/secession machinery into a threat the AI leans on.
+
+**Change** (`systems/ai.ts` `doDiplomacy`): a `targetUnstable` test
+(famine / bankrupt / any owned region in full revolt) shaves the opportunistic-war
+threshold. Small, deterministic, pure.
+
+**Verify:** typecheck ✓, **313 tests ✓** (+3: a cautious realm won't open an
+even-odds war against a *stable* rival, but strikes when that rival has a province
+in revolt, and likewise strikes a *bankrupt* rival — isolated with no armies so
+only the diplomacy decision is under test), build ✓ (0 `fetch`, deps `{}`).
+Browser smoke (15 turns): no console/page errors.
+
+**Balance (temp probe: 40 seeds × 3 difficulties × {2,3} rivals = 240 games,
+deleted):** no crashes; medians **77–94** turns, diverse victory mix, secessions
+/game steady at **~0.025** — unchanged, **no regression**. Target instability is
+uncommon at the moment a war is weighed, so the easing fires occasionally, not
+constantly; the AI is smarter without games ending faster.
+
+**Next ideas:** surface a rival's instability (famine/bankruptcy/revolt) in the
+diplomacy panel so the player gets the same opportunist read; have an ally the AI
+calls to arms prefer joining against a reeling enemy; a small "reeling" badge on
+the rival card.
+
+---
+
 ## 2026-07-14 — AI restraint: quell revolt before conquering more
 
 Backlog **B**. The AI would happily open a *new* war of conquest even while one of

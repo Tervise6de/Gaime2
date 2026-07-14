@@ -342,7 +342,15 @@ function doDiplomacy(state: GameState, nationId: number, rng: Rng): GameState {
     // Opportunistic war: hostile, bordering, and I'm stronger. Warlords pounce
     // at worse odds; peaceful types need a big edge. The player gets an
     // early-game grace period so a new realm isn't snuffed out immediately.
-    const warThreshold = 1.5 - aggression;
+    // A rival that is internally weak — a province in open revolt, or gripped by
+    // famine or bankruptcy — is distracted and poorly placed to defend, so it's a
+    // tempting moment: the required power edge drops. (The complement to the
+    // `overstretched` restraint: strike weakness, don't compound your own.)
+    const targetUnstable =
+      o.famine ||
+      o.bankrupt ||
+      state.regions.some((r) => r.ownerId === o.id && r.unrest >= UNREST_REVOLT);
+    const warThreshold = 1.5 - aggression - (targetUnstable ? 0.3 : 0);
     if (border && rel < -25 && ratio > warThreshold && !earlyGraceForPlayer && !overstretched) {
       s = openWar(s, nationId, o);
       actions++;

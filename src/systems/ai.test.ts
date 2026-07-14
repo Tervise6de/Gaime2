@@ -719,6 +719,45 @@ describe("overstretched restraint (hold new wars while a province revolts)", () 
   });
 });
 
+describe("opportunistic strike on a weak rival (target instability)", () => {
+  const AGGR = 2, TARGET = 3;
+  // A cautious realm (aggression 0.4 → base war threshold 1.1) that will NOT open
+  // an even-odds war normally, but WILL when the target is destabilised.
+  const CAUTIOUS: Personality = { archetype: "builder", aggression: 0.4, expansion: 0.3, economy: 0.3, trustworthiness: 0.5 };
+  const nat = (id: number, over: Partial<Nation> = {}): Nation =>
+    ({
+      id, name: `N${id}`, color: "#fff", isPlayer: false, isBarbarian: false, alive: true,
+      stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, taxRate: 0.15,
+      research: emptyResearch(), wonders: 0, famine: false, bankrupt: false, ...over,
+    }) as Nation;
+
+  // Equal power (1 region each, no armies) → ratio ≈ 1.0, below the 1.1 base
+  // threshold but above the 0.8 threshold once the target is unstable.
+  const stateWith = (targetUnrest: number, targetOver: Partial<Nation> = {}): GameState =>
+    ({
+      turn: 40, difficulty: "normal",
+      relations: { [pairKey(AGGR, TARGET)]: -35 },
+      treaties: {}, offers: [], nextOfferId: 0, nextArmyId: 10, armies: [], log: [], outcome: "playing",
+      nations: [nat(AGGR, { personality: CAUTIOUS }), nat(TARGET, targetOver)],
+      regions: [
+        region({ id: 0, ownerId: AGGR, adjacency: [1] }),
+        region({ id: 1, ownerId: TARGET, unrest: targetUnrest, adjacency: [0] }),
+      ],
+    }) as unknown as GameState;
+
+  it("does not open an even-odds war against a stable rival", () => {
+    expect(atWar(runNationTurn(stateWith(0), AGGR, createRng(1)), AGGR, TARGET)).toBe(false);
+  });
+
+  it("strikes when the rival has a province in open revolt", () => {
+    expect(atWar(runNationTurn(stateWith(90), AGGR, createRng(1)), AGGR, TARGET)).toBe(true);
+  });
+
+  it("strikes a bankrupt rival at the same odds", () => {
+    expect(atWar(runNationTurn(stateWith(0, { bankrupt: true }), AGGR, createRng(1)), AGGR, TARGET)).toBe(true);
+  });
+});
+
 describe("gang up on a runaway leader", () => {
   const LEADER = 2, JOINER = 3, ALLY = 0;
 
