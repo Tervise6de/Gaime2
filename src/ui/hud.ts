@@ -17,6 +17,7 @@ import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
 import { TERRAIN, TERRAIN_IDS } from "@/data/terrain";
 import { regionProduction, nationalProduction, nationYieldMult, yieldFactors, singleModifierMult, unrestPenalty } from "@/systems/economy";
 import { garrisonCalm } from "@/systems/stability";
+import { runTutorial } from "@/ui/tutorial";
 import { EDGE_COLOR, WAR_EDGE_COLOR, type MapLayout } from "@/systems/renderer";
 import { DEFAULT_MAP_OPTIONS, type MapGenOptions } from "@/systems/mapgen";
 import { regionCapacity } from "@/systems/population";
@@ -185,6 +186,9 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const helpToggle = btn("💡 Help", "hud-legend-toggle", () => showHints());
   helpToggle.title = "Reopen the getting-started tips. Shortcut: H";
   topBar.append(helpToggle);
+  const tutorialToggle = btn("🎓 Tutorial", "hud-legend-toggle", () => runTutorial());
+  tutorialToggle.title = "Replay the guided tour of the interface.";
+  topBar.append(tutorialToggle);
   const standingsToggle = btn("📊 Standings", "hud-legend-toggle", () => toggleStandings());
   standingsToggle.title = "See how you rank against every rival. Shortcut: S";
   topBar.append(standingsToggle);

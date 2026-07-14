@@ -6,6 +6,39 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — ROADMAP A1: Interactive tutorial (the gate to testing-ready)
+
+First item of `docs/roadmap-to-ready.md` Phase A — the single highest-leverage
+step toward *testing-ready (75)*: onboarding. A systems-heavy 4X with only a
+hints box is hard to hand to a newcomer; now there's a **coached first-game tour**.
+
+**What it does** (`ui/tutorial.ts`, pure DOM over the live HUD, no sim touch):
+a skippable 7-step walkthrough that spotlights each key area — resources bar, tax
+slider, the map, research menu, diplomacy panel, end-turn — with a one-line
+explanation and a highlight ring. **Next / → / Enter** advance, **Skip / Esc**
+end it; a step counter shows progress. It **auto-starts once** on a first-ever
+session (persisted `tutorialSeen` flag) and is **re-openable any time** via a new
+**🎓 Tutorial** top-bar button. On that first run it retires the legacy hints box
+(still on 💡 Help) so newcomers get *one* welcome flow, not two. Step text is set
+as text nodes (never innerHTML) so content can't inject markup.
+
+**Verify:** typecheck ✓, **338 tests ✓** (+2: the step list is well-formed and
+non-empty; it opens with a centred welcome and every targeted step names a real
+CSS selector), build ✓ (0 `fetch`, deps `{}`). Browser-driven (fresh session):
+the tour auto-starts ("Step 1 of 7 — Welcome, ruler 👑"), steps through all seven,
+marks seen, does **not** re-auto-start on reload, and the 🎓 button replays it;
+the legacy hints box no longer co-appears on the first run; screenshot confirms
+the dimmed spotlight + card; no console/page errors.
+
+**Roadmap position:** with onboarding in place, the remaining Phase-A gate items
+are small (A2 confirm dialogs, A3 first-run UX sweep, A4 UI fuzz/bug-bash). After
+those, the project should sit at a genuine **~75 (testing-ready)**.
+
+**Next (roadmap order):** A2 confirm dialogs for war / new-game / clear-slot; then
+A3–A4; then Phase B opens with **procedural audio** (Web Audio, no assets/deps).
+
+---
+
 ## 2026-07-14 — BIG DEV 2/2: Up to 5 rival powers (a fuller world)
 
 The world was always a 4-way contest at most (3 rivals). Now it scales to **6

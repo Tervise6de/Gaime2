@@ -1595,3 +1595,82 @@ body {
   color: var(--muted, #9aa4b2);
   font-style: italic;
 }
+
+/* --- Interactive tutorial (coached first-game walkthrough) ----------------- */
+.tut-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(6, 8, 12, 0.55);
+  pointer-events: auto;
+}
+
+.tut-highlight {
+  position: fixed;
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  box-shadow: 0 0 0 4px rgba(244, 210, 122, 0.22), 0 0 22px rgba(244, 210, 122, 0.4);
+  pointer-events: none;
+  transition: left 0.15s ease, top 0.15s ease, width 0.15s ease, height 0.15s ease;
+}
+
+.tut-card {
+  position: fixed;
+  width: min(340px, 92vw);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.tut-step {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.tut-title {
+  margin: 4px 0 6px;
+  font-size: 16px;
+}
+
+.tut-body {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--fg);
+}
+
+.tut-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tut-skip {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.tut-skip:hover {
+  color: var(--fg);
+}
+
+.tut-next {
+  padding: 7px 14px;
+  font-weight: 700;
+  color: #1a1408;
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.tut-next:hover {
+  filter: brightness(1.08);
+}

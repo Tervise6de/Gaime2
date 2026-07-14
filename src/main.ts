@@ -22,6 +22,7 @@ import { saveToLocal, loadFromLocal, hasLocalSave, clearLocalSave, serializeGame
 import { summarizeTurn, type TurnSummary } from "@/systems/summary";
 import { PLAYER_ID, type GameState } from "@/systems/state";
 import { createHud } from "@/ui/hud";
+import { runTutorial, hasSeenTutorial } from "@/ui/tutorial";
 import "@/ui/style.css";
 
 /**
@@ -44,6 +45,17 @@ function main(): void {
   let selectedRegion: number | null = null;
   let moveArmyId: number | null = null;
   let lastSummary: TurnSummary | null = null;
+
+  // First-ever session: the coached tour is the primary onboarding, so retire the
+  // legacy first-run hints box (still on 💡 Help) *before* the HUD reads the flag.
+  const firstEver = !hasSeenTutorial();
+  if (firstEver) {
+    try {
+      localStorage.setItem("gaime2:hintsSeen", "1");
+    } catch {
+      /* storage unavailable */
+    }
+  }
 
   const renderer = createRenderer(canvas);
   const hud = createHud(hudRoot, {
@@ -236,6 +248,9 @@ function main(): void {
 
   renderer.start();
   sync();
+
+  // Launch the coached tour once the HUD has laid out (first-ever session only).
+  if (firstEver) window.setTimeout(runTutorial, 500);
 
   // eslint-disable-next-line no-console
   console.info("Gaime2 — v1 ready. Build, research, conquer, and outlast your rivals.");
