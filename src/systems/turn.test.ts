@@ -239,6 +239,28 @@ describe("temporary modifiers", () => {
   });
 });
 
+describe("war-weariness", () => {
+  const wearyOf = (g: ReturnType<typeof createGame>) =>
+    playerNation(g).modifiers?.find((m) => m.id === "war_weary");
+
+  it("accrues while at war and lingers, then decays after peace", () => {
+    // Put the player at war with rival 2 from the start.
+    let s = { ...createGame({ seed: 1, rivals: 2 }), treaties: { "0-2": "war" as const } };
+    s = resolveTurn(s);
+    expect(wearyOf(s)?.turnsLeft).toBe(3); // refreshed while at war
+    s = resolveTurn(s);
+    expect(wearyOf(s)?.turnsLeft).toBe(3); // still refreshed
+
+    // Make peace: the modifier should now tick down and expire.
+    s = { ...s, treaties: {} };
+    s = resolveTurn(s);
+    expect(wearyOf(s)?.turnsLeft).toBe(2);
+    s = resolveTurn(s);
+    s = resolveTurn(s);
+    expect(wearyOf(s)).toBeUndefined(); // gone
+  });
+});
+
 describe("score history", () => {
   it("seeds a one-entry series per non-barbarian nation at game start", () => {
     const g = createGame({ seed: 7, rivals: 2 });

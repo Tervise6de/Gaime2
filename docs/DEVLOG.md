@@ -6,6 +6,38 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — War-weariness: a lingering cost of prolonged war
+
+Second use of the modifier framework, and the first *systemic* one (applied by
+the pipeline, not a choice). A nation at war now carries a **war-weariness**
+modifier — **−15% gold income** — refreshed to 3 turns each turn any war
+continues, so it bites throughout a conflict and lingers a couple of turns after
+peace. A real strategic cost that discourages endless war and rewards knowing
+when to sue for peace (design §3.4 anti-snowball spirit).
+
+Tiny, reusing everything already built: a new `war_weary` ModifierId + gold
+multiplier (state.ts/economy.ts) and one `applyWarWeariness` step in
+`resolveTurn` that refreshes the modifier on every nation `isAtWarWithAnyone`.
+The HUD chip ("⚔ War-weariness (N)") and save round-trip come for free from the
+modifier framework. Pure/deterministic.
+
+**Balance (200-seed × 4-archetype self-play probe, deleted before commit):**
+warlord 32 / opportunist 26 / builder 24 / merchant 24 — a 24–32% spread, still
+healthy (the peaceful economic archetypes dip a touch when dragged into war and
+lose their gold edge; aggressive ones, already warring, are unaffected relative to
+each other). All victory kinds reached.
+
+**Verify:** typecheck ✓, 275 tests ✓ (+2: war-weariness dents gold and stacks
+multiplicatively with prosperity; it accrues to 3 turns while at war, then decays
+and expires after peace), build ✓ (0 `fetch`, deps `{}`). Browser-driven (seed 2
+hard): once the player was dragged into war the badge showed "⚔ War-weariness
+(3)" at turn 15. No console/page errors.
+
+**Next ideas:** a research-surge modifier from a Scholarly event; scale
+war-weariness by number of simultaneous wars; a modifier that also nudges unrest.
+
+---
+
 ## 2026-07-13 — Lasting modifiers: temporary national effects (Prosperity)
 
 A new state dimension that unlocks a whole class of future content: **timed

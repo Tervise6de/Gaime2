@@ -25,7 +25,7 @@ import { advanceConstruction } from "@/systems/construction";
 import { nextPopulation } from "@/systems/population";
 import { nextUnrest } from "@/systems/stability";
 import { armyMoves, totalUpkeep } from "@/systems/military";
-import { driftRelations } from "@/systems/diplomacy";
+import { driftRelations, atWar } from "@/systems/diplomacy";
 import { runNationTurn } from "@/systems/ai";
 import { advanceResearch, techUnrestReduction, isBuildingUnlockedFor, selectTech } from "@/systems/tech";
 import { fireEvent } from "@/systems/events";
@@ -33,6 +33,7 @@ import { checkVictory, nationScore } from "@/systems/victory";
 import { createRng, type Rng } from "@/systems/rng";
 import {
   BANKRUPTCY_UNREST,
+  WAR_WEARY_TURNS,
   BARBARIAN_ID,
   DEFAULT_TAX,
   DIFFICULTY,
@@ -204,6 +205,21 @@ export function createGame(options: NewGameOptions): GameState {
   // Seed the score graph with the opening position (one sample per nation).
   game.scoreHistory = appendScores(game);
   return game;
+}
+
+/** Whether a nation is at war with any living, non-barbarian nation. */
+function isAtWarWithAnyone(state: GameState, id: number): boolean {
+  return state.nations.some((o) => !o.isBarbarian && o.alive && o.id !== id && atWar(state, id, o.id));
+}
+
+/** Refresh the war-weariness modifier on every nation currently at war. */
+function applyWarWeariness(state: GameState): GameState {
+  const nations = state.nations.map((n) => {
+    if (n.isBarbarian || !n.alive || !isAtWarWithAnyone(state, n.id)) return n;
+    const others = (n.modifiers ?? []).filter((m) => m.id !== "war_weary");
+    return { ...n, modifiers: [...others, { id: "war_weary" as const, turnsLeft: WAR_WEARY_TURNS }] };
+  });
+  return { ...state, nations };
 }
 
 /** Count a nation's temporary modifiers down one turn, dropping any that expire. */
@@ -398,6 +414,10 @@ export function resolveTurn(state: GameState): GameState {
 
   // 3. Relations drift.
   s = driftRelations(s);
+
+  // 3.5. War-weariness: a nation at war carries a lingering −gold modifier,
+  // refreshed each turn the war continues (the cost of a long conflict).
+  s = applyWarWeariness(s);
 
   // 4. Bounded random events (low probability, low variance).
   s = fireEvents(s, rng);

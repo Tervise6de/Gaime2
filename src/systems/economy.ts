@@ -19,6 +19,7 @@ import { BUILDINGS } from "@/data/buildings";
 import { TERRAIN, type ResourceYield } from "@/data/terrain";
 import {
   PROSPERITY_GOLD_MULT,
+  WAR_WEARY_GOLD_MULT,
   UNREST_PENALTY_START,
   UNREST_REVOLT,
   ZERO_FLOW,
@@ -30,11 +31,13 @@ import {
 } from "@/systems/state";
 import { techMultipliers } from "@/systems/tech";
 
-/** Yield multiplier from a nation's active temporary modifiers (e.g. prosperity). */
+/** Yield multiplier from a nation's active temporary modifiers (prosperity, war-weariness). */
 export function modifierMultipliers(modifiers: NationModifier[] = []): ResourceYield {
   let gold = 1;
   for (const m of modifiers) {
-    if (m.turnsLeft > 0 && m.id === "prosperity") gold *= PROSPERITY_GOLD_MULT;
+    if (m.turnsLeft <= 0) continue;
+    if (m.id === "prosperity") gold *= PROSPERITY_GOLD_MULT;
+    else if (m.id === "war_weary") gold *= WAR_WEARY_GOLD_MULT;
   }
   return { food: 1, materials: 1, gold, knowledge: 1 };
 }

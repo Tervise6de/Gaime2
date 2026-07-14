@@ -232,7 +232,7 @@ export interface Nation {
 }
 
 /** Kinds of temporary national effect (each with its own gameplay effect). */
-export type ModifierId = "prosperity";
+export type ModifierId = "prosperity" | "war_weary";
 
 /** A temporary national effect that ticks down and expires. Serialisable. */
 export interface NationModifier {
@@ -244,10 +244,15 @@ export interface NationModifier {
 /** Player-facing labels for active modifiers (HUD chips). */
 export const MODIFIER_LABEL: Record<ModifierId, string> = {
   prosperity: "✨ Prosperity",
+  war_weary: "⚔ War-weariness",
 };
 
 /** Gold-yield multiplier granted by a prosperity modifier. */
 export const PROSPERITY_GOLD_MULT = 1.25;
+/** Gold-yield multiplier while a nation is (recently) at war — the cost of war. */
+export const WAR_WEARY_GOLD_MULT = 0.85;
+/** Turns a bout of war-weariness lingers; refreshed each turn a war continues. */
+export const WAR_WEARY_TURNS = 3;
 
 /** Diplomatic standing between two nations. */
 export type TreatyStatus = "war" | "peace" | "nap" | "alliance";

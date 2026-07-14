@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { regionProduction, nationalProduction, modifierMultipliers } from "@/systems/economy";
 import { TERRAIN } from "@/data/terrain";
-import { PLAYER_ID, PROSPERITY_GOLD_MULT, type GameState, type Region } from "@/systems/state";
+import { PLAYER_ID, PROSPERITY_GOLD_MULT, WAR_WEARY_GOLD_MULT, type GameState, type Region } from "@/systems/state";
 
 function region(overrides: Partial<Region> = {}): Region {
   return {
@@ -79,6 +79,16 @@ describe("prosperity modifier", () => {
     expect(modifierMultipliers([{ id: "prosperity", turnsLeft: 0 }]).gold).toBe(1);
     expect(modifierMultipliers([]).gold).toBe(1);
     expect(modifierMultipliers(undefined).gold).toBe(1);
+  });
+
+  it("war-weariness dents gold; opposing modifiers stack multiplicatively", () => {
+    expect(modifierMultipliers([{ id: "war_weary", turnsLeft: 2 }]).gold).toBe(WAR_WEARY_GOLD_MULT);
+    expect(
+      modifierMultipliers([
+        { id: "prosperity", turnsLeft: 2 },
+        { id: "war_weary", turnsLeft: 2 },
+      ]).gold,
+    ).toBeCloseTo(PROSPERITY_GOLD_MULT * WAR_WEARY_GOLD_MULT, 5);
   });
 
   it("raises a nation's gold output when active", () => {
