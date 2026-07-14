@@ -41,7 +41,39 @@ band; a +1 fort here and there doesn't bend conquest pacing.
 AI value a target's fortification more when choosing what to besiege; show a
 region's fort level with a small shield marker on the map.
 
----
+## 2026-07-14 — Allies pile onto a reeling enemy (call to arms)
+
+Completes the "reeling" arc from both ends. The AI already strikes a reeling
+rival, and the player can now *see* who's reeling; this makes a called ally
+**answer at worse odds when the target is reeling**. A famine-struck, bankrupt,
+or revolt-gripped foe is distracted and easy to pile onto — exactly the moment
+you most want help finishing it off — so an ally that would normally judge itself
+too weak to join now does. Reactive, and symmetric with the AI's own opportunism.
+
+**Change** (`systems/diplomacy.ts` `wouldJoinWar`): the "won't suicide against a
+far-stronger foe" power floor drops from **0.4× → 0.25×** of the enemy's power
+when `nationInstability(state, enemy).reeling` (the same shared helper the AI's
+opportunist war and the diplomacy-panel badge use — one signal, three consumers).
+`wouldJoinWar` gates both the player's call to arms (the button's willingness
+tooltip updates for free) and the AI's own ally calls, so this deepens AI-vs-AI
+war dynamics too. Pure, deterministic.
+
+**Verify:** typecheck ✓, **322 tests ✓** (+1: an ally refuses a *stable* enemy at
+~0.33× power odds but joins the *same* enemy once it's reeling), build ✓ (0
+`fetch`, deps `{}`).
+
+**Balance (temp probe, deleted: 120 games = 30 seeds × {2,3} rivals ×
+{normal,hard}, symmetric self-play driving the player too):** before **and** after
+are **identical** — 0 crashes, 0 unfinished, median **86** turns (min 17, max
+150), victory mix domination 50 / great works 41 / prestige 13 / elimination 16,
+player win **16%** (healthy 15–30% band). The easing fires only in a rare
+confluence (an AI's normally-too-weak ally + an enemy reeling at that exact
+moment), so aggregate balance is untouched while the behaviour is richer when it
+does fire. **No regression.**
+
+**Next ideas:** mirror the reeling badge into the Standings overlay rows; let the
+AI *time* a call to arms for when a shared enemy tips into reeling; a brief
+"piling on" log flavour when an ally joins against a crumbling foe.
 
 ## 2026-07-14 — "Reeling" read: show the player the weakness the AI exploits
 

@@ -22,6 +22,7 @@ import {
   RELATION_MIN,
   RELATION_WAR_HIT,
   armySize,
+  nationInstability,
   pairKey,
   type GameState,
   type TreatyStatus,
@@ -325,8 +326,14 @@ export function wouldJoinWar(
   if (ally === enemy || atWar(state, ally, enemy)) return false;
   // Relations must be decent.
   if (getRelation(state, requester, ally) < 20) return false;
-  // The ally won't suicide against an overwhelmingly stronger foe.
-  if (nationPower(state, ally) < 0.4 * nationPower(state, enemy)) return false;
+  // The ally won't suicide against an overwhelmingly stronger foe — but a foe
+  // that is *reeling* (famine / bankruptcy / a province in open revolt) is
+  // distracted and easier to pile onto, so the ally will answer the call at
+  // worse odds against one. This mirrors the AI's own opportunist war logic
+  // (`ai.ts` `doDiplomacy`), which likewise lowers its bar against a reeling
+  // target — an ally is most useful exactly when finishing off a crumbling foe.
+  const powerFloor = nationInstability(state, enemy).reeling ? 0.25 : 0.4;
+  if (nationPower(state, ally) < powerFloor * nationPower(state, enemy)) return false;
   return true;
 }
 

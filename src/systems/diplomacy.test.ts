@@ -268,6 +268,25 @@ describe("call to arms", () => {
       g.nations[RIVAL_B]!.stocks.gold = 500000;
       expect(wouldJoinWar(g, RIVAL_A, 0, RIVAL_B)).toBe(false);
     });
+
+    it("joins a reeling enemy at odds it would refuse against a stable one", () => {
+      const base = ready();
+      // Treasuries dominate power (÷40): ally ≈ 1000, enemy ≈ 3000 → ratio ≈ 0.33,
+      // which sits below the stable 0.4 floor but above the reeling 0.25 floor.
+      base.nations[RIVAL_A]!.stocks.gold = 40000;
+      base.nations[RIVAL_B]!.stocks.gold = 120000;
+      // Stable enemy → the ally judges itself too weak and declines.
+      expect(wouldJoinWar(base, RIVAL_A, 0, RIVAL_B)).toBe(false);
+      // Same powers, but the enemy is now reeling (famine) → the eased floor lets
+      // the ally pile on.
+      const reeling: GameState = {
+        ...base,
+        nations: base.nations.map((n) =>
+          n.id === RIVAL_B ? { ...n, famine: true } : n,
+        ),
+      };
+      expect(wouldJoinWar(reeling, RIVAL_A, 0, RIVAL_B)).toBe(true);
+    });
   });
 
   describe("callToArms", () => {
