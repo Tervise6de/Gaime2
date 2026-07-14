@@ -239,7 +239,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   endTurnBtn.addEventListener("click", () => callbacks.onEndTurn());
   controls.append(endTurnBtn);
 
-  // New-game configuration: seed, difficulty, rivals.
+  // New-game configuration: seed, difficulty, rivals, map size. The last-used
+  // difficulty/rivals/size are remembered across sessions so a returning player
+  // keeps their preferred setup instead of re-picking every game.
+  const prefs = loadNewGamePrefs();
   const cfgRow = el("div", "hud-newgame");
   const seedInput = document.createElement("input");
   seedInput.type = "text";
@@ -249,18 +252,18 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     ["easy", "Easy"],
     ["normal", "Normal"],
     ["hard", "Hard"],
-  ], "normal");
+  ], prefs.difficulty ?? "normal");
   const rivalsSel = select("hud-select", [
     ["1", "1 rival"],
     ["2", "2 rivals"],
     ["3", "3 rivals"],
-  ], "2");
+  ], prefs.rivals ?? "2");
   // Map size — a smaller world plays tight and fast, a larger one expansive.
   const mapSizeSel = select("hud-select", [
     ["16", "Small map"],
     ["22", "Medium map"],
     ["30", "Large map"],
-  ], String(DEFAULT_MAP_OPTIONS.regionCount));
+  ], prefs.mapSize ?? String(DEFAULT_MAP_OPTIONS.regionCount));
   mapSizeSel.title = "World size: fewer regions play tight and quick; more regions give room to expand.";
   cfgRow.append(seedInput, difficultySel, rivalsSel, mapSizeSel);
   controls.append(cfgRow);
@@ -271,6 +274,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   newGameBtn.textContent = "New game";
   newGameBtn.addEventListener("click", () => {
     const raw = seedInput.value.trim();
+    saveNewGamePrefs({ difficulty: difficultySel.value, rivals: rivalsSel.value, mapSize: mapSizeSel.value });
     callbacks.onNewGame({
       seed: raw === "" ? (Date.now() >>> 0) : parseSeed(raw),
       difficulty: difficultySel.value as Difficulty,
@@ -1717,6 +1721,33 @@ function fmt(n: number): string {
 
 function round1(v: number): number {
   return Math.round(v * 10) / 10;
+}
+
+/** Remembered new-game selector choices (not the seed — that stays fresh each game). */
+interface NewGamePrefs {
+  difficulty?: string;
+  rivals?: string;
+  mapSize?: string;
+}
+
+const NEWGAME_PREFS_KEY = "gaime2:newgame-prefs";
+
+function loadNewGamePrefs(): NewGamePrefs {
+  try {
+    const raw = localStorage.getItem(NEWGAME_PREFS_KEY);
+    const p = raw ? (JSON.parse(raw) as unknown) : null;
+    return p && typeof p === "object" ? (p as NewGamePrefs) : {};
+  } catch {
+    return {}; // storage unavailable / malformed — fall back to defaults
+  }
+}
+
+function saveNewGamePrefs(prefs: NewGamePrefs): void {
+  try {
+    localStorage.setItem(NEWGAME_PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    /* storage unavailable — preferences simply won't persist */
+  }
 }
 
 function parseSeed(raw: string): number {

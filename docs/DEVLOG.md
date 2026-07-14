@@ -6,6 +6,38 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — Remember new-game settings + map-size balance check
+
+Two things in one small cycle: **verified** last cycle's map-size feature is
+balanced, and shipped a QoL follow-up it suggested.
+
+**Balance check (temp probe, 100 seeds × 4 archetypes, normal, rivals 3, deleted):**
+both new sizes are healthy — no degeneracy, and each shifts the *dominant
+strategy* in a nice, legible way:
+- **Small (16):** archetype wins 14–21% (all in band), median 87–100 turns;
+  victory mix led by **domination** (185) — a tight world makes conquest (60% of
+  16 ≈ 10 regions) the readiest path.
+- **Large (30):** wins 10–28%, median 95–111 turns; led by **Great Works** (187)
+  — 60% of 30 = 18 regions is a long march, so the builder/wonder path shines.
+Pacing stayed in the 60–150 window at both ends; the default (Medium/22) is
+unchanged. So map size is a real strategic dial, not a balance hole — nothing to
+tune.
+
+**QoL change** (`ui/hud.ts`): the new-game panel now **remembers your
+difficulty / rivals / map-size** across sessions (localStorage, `try/catch` so a
+blocked store just falls back to defaults; the seed stays fresh each game). A
+returning player — or anyone starting game after game — keeps their preferred
+setup instead of re-picking three selectors every time.
+
+**Verify:** typecheck ✓, 329 tests ✓ (unchanged — pure UI), build ✓ (0 `fetch`,
+deps `{}`). Browser-driven: set hard / 3 rivals / Small, started a game, reloaded
+the page → the selectors restored to hard/3/16; no console/page errors.
+
+**Next ideas:** persist the map layout (Nodes/Territory) toggle too; a "same
+settings, new seed" quick-restart button; scale rival-count options with map size.
+
+---
+
 ## 2026-07-14 — Map-size selector (replayability)
 
 Backlog **C/F**, a fresh surface (game setup) after several balance cycles. The
