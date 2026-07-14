@@ -6,6 +6,29 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-13 — Number-key shortcuts for choice decisions
+
+Small UX polish that finishes the choice-event feature. A pending decision's
+options are now numbered ("1 · Hire", "2 · Decline") and the matching key resolves
+one directly — no reach for the mouse mid-turn. While a decision is up the modal
+is truly modal to the keyboard: number keys pick an option and *nothing else*
+fires (L/H/S/Esc are suppressed until you decide), so a stray shortcut can't act
+behind the blocking prompt.
+
+Implementation: `renderChoice` prefixes each label with its index; a closure
+`currentChoice` (set whenever the modal shows) lets the keydown handler map a
+digit to an option id and call `onResolveChoice`. UI-only — no sim/state change.
+
+**Verify:** typecheck ✓, 268 tests ✓, build ✓ (0 `fetch`, deps `{}`). Browser-
+driven (seed 2, one End turn): the modal showed "1 · Settle families (−14 food)"
+and "2 · Store the surplus"; pressing **2** resolved the decision (modal closed)
+and End turn then advanced to turn 3. No console/page errors.
+
+**Next ideas:** a choice with a lasting per-nation modifier; a rare multi-turn
+quest event; keyboard hint chips on the option buttons.
+
+---
+
 ## 2026-07-13 — Player can demand tribute too (symmetric extortion)
 
 Last cycle gave the AI tribute demands; this gives the player the same lever. A

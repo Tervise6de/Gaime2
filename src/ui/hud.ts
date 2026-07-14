@@ -484,6 +484,8 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const choiceOverlay = el("div", "hud-techtree-overlay");
   choiceOverlay.style.display = "none";
   root.append(choiceOverlay);
+  // The pending decision's options, so a number key can resolve one directly.
+  let currentChoice: NonNullable<GameState["pendingChoice"]> | null = null;
   function renderChoice(pc: NonNullable<GameState["pendingChoice"]>): void {
     choiceOverlay.innerHTML = "";
     const panel = el("div", "hud-techtree-panel hud-choice-panel");
@@ -494,14 +496,15 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     prompt.textContent = pc.prompt;
     panel.append(prompt);
     const opts = el("div", "hud-choice-options");
-    for (const o of pc.options) {
+    pc.options.forEach((o, i) => {
       const wrap = el("div", "hud-choice-option");
-      wrap.append(btn(o.label, "hud-choice-btn", () => callbacks.onResolveChoice(o.id)));
+      // Numbered so the matching key (1, 2, …) is discoverable.
+      wrap.append(btn(`${i + 1} · ${o.label}`, "hud-choice-btn", () => callbacks.onResolveChoice(o.id)));
       const d = el("span", "hud-choice-detail");
       d.textContent = o.detail;
       wrap.append(d);
       opts.append(wrap);
-    }
+    });
     panel.append(opts);
     choiceOverlay.append(panel);
   }
@@ -513,6 +516,16 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   window.addEventListener("keydown", (ev) => {
     const target = ev.target as HTMLElement | null;
     if (target && (target.tagName === "INPUT" || target.tagName === "SELECT")) return;
+    // A pending decision is modal: number keys pick an option; nothing else fires.
+    if (currentChoice && choiceOverlay.style.display !== "none") {
+      const idx = Number(ev.key) - 1;
+      const opt = currentChoice.options[idx];
+      if (opt) {
+        ev.preventDefault();
+        callbacks.onResolveChoice(opt.id);
+      }
+      return;
+    }
     const key = ev.key.toLowerCase();
     if (key === "l") {
       ev.preventDefault();
@@ -552,9 +565,11 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     if (standingsOverlay.style.display !== "none") renderStandingsOverlay();
     // A pending decision blocks play until resolved — show its modal.
     if (state.pendingChoice) {
+      currentChoice = state.pendingChoice;
       renderChoice(state.pendingChoice);
       choiceOverlay.style.display = "flex";
     } else if (choiceOverlay.style.display !== "none") {
+      currentChoice = null;
       choiceOverlay.style.display = "none";
       choiceOverlay.innerHTML = "";
     }
