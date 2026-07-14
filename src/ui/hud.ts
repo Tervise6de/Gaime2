@@ -28,7 +28,7 @@ import {
   totalUpkeep,
   unitCost,
 } from "@/systems/military";
-import { getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, TRIBUTE_DEMAND } from "@/systems/diplomacy";
+import { getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, nationPower, TRIBUTE_DEMAND } from "@/systems/diplomacy";
 import { nationScore, victoryProgress, endGameSummary } from "@/systems/victory";
 import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
 import type { TurnSummary } from "@/systems/summary";
@@ -1401,6 +1401,20 @@ function renderDiplomacy(
     status.append(relSpan, treatySpan);
     card.append(status);
 
+    // Power balance: how this rival's strength (army + territory + treasury)
+    // compares to yours — the key read for whether it's a soft target or a threat.
+    const myPower = nationPower(state, PLAYER_ID);
+    const ratio = nationPower(state, rival.id) / (myPower || 1);
+    const assess = powerAssessment(ratio);
+    const powerRow = el("div", "hud-diplo-power");
+    const powerChip = el("span", "hud-diplo-power-chip " + assess.cls);
+    powerChip.textContent = `⚔ ${assess.label}`;
+    powerChip.title =
+      `${rival.name}'s strength is ${Math.round(ratio * 100)}% of yours ` +
+      "(army + territory + treasury). Below 100% is a softer target; well above is a threat.";
+    powerRow.append(powerChip);
+    card.append(powerRow);
+
     const actions = el("div", "hud-diplo-actions");
     if (treaty === "war") {
       actions.append(btn("Sue for peace", "hud-diplo-btn", () => callbacks.onMakePeace(rival.id)));
@@ -1572,6 +1586,15 @@ function relationColor(rel: number): string {
   if (rel >= 40) return "#6fb98a";
   if (rel <= -30) return "#e8776b";
   return "#c9cedb";
+}
+
+/** A rival's strength relative to the player (ratio = their power / yours) → a label + class. */
+function powerAssessment(ratio: number): { label: string; cls: string } {
+  if (ratio < 0.7) return { label: "Much weaker", cls: "weak" };
+  if (ratio < 0.9) return { label: "Weaker", cls: "weak" };
+  if (ratio <= 1.1) return { label: "Evenly matched", cls: "even" };
+  if (ratio <= 1.4) return { label: "Stronger", cls: "strong" };
+  return { label: "Much stronger", cls: "strong" };
 }
 
 function select(className: string, options: [string, string][], value: string): HTMLSelectElement {

@@ -678,6 +678,35 @@ body {
   color: #6fb98a;
 }
 
+/* Power-balance readout (rival strength vs. the player). */
+.hud-diplo-power {
+  margin: 0 0 6px;
+}
+
+.hud-diplo-power-chip {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.hud-diplo-power-chip.weak {
+  color: #6fb98a;
+  background: rgba(111, 185, 138, 0.16);
+}
+
+.hud-diplo-power-chip.even {
+  color: #c9cedb;
+}
+
+.hud-diplo-power-chip.strong {
+  color: #e8776b;
+  background: rgba(232, 119, 107, 0.16);
+}
+
 .hud-diplo-actions {
   display: flex;
   flex-wrap: wrap;

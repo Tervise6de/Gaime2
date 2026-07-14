@@ -6,6 +6,35 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — Power balance on the diplomacy cards (strategic intel)
+
+Backlog **D**, a deliberate step out of the unrest/secession subsystem after
+several cycles there. The diplomacy panel showed each rival's relation and treaty
+but never how *strong* they are — yet relative power is the single biggest read
+for whether a rival is a soft target or a threat you should appease. The AI has
+always scored this (`nationPower` = army + territory + treasury); now the player
+sees it too.
+
+**Change** (`ui/hud.ts` `renderDiplomacy` + CSS): each rival card gains a colour-
+coded **⚔ power chip** — "Much weaker / Weaker / Evenly matched / Stronger / Much
+stronger" — from the ratio of the rival's `nationPower` to the player's, green
+when they trail you (an opportunity), red when they lead (a threat). Its tooltip
+gives the exact percentage and names the inputs (army + territory + treasury). A
+small pure `powerAssessment(ratio)` maps the ratio to a label + class, alongside
+the existing `relationLabel`/`relationColor` presentation helpers.
+
+**Verify:** typecheck ✓, 308 tests ✓ (unchanged — presentation only, reusing the
+already-tested `nationPower`), build ✓ (0 `fetch`, deps `{}`). Browser-driven
+(default game, turn 1): both rival cards show "⚔ Evenly matched" (correct — all
+realms start equal) with the tooltip "…strength is 100% of yours (army +
+territory + treasury)…"; no console/page errors.
+
+**Next ideas:** show each rival's tax rate / famine / bankruptcy flags for deeper
+intel; a threat arrow on the map from a much-stronger neighbour; let the AI weigh
+garrison-for-calm vs. upkeep when its treasury is thin.
+
+---
+
 ## 2026-07-14 — Garrison-calm made legible in the region panel
 
 Follow-on to last cycle's garrison-calm mechanic — closing the legibility loop
