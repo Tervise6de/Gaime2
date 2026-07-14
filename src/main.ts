@@ -24,6 +24,7 @@ import { PLAYER_ID, type GameState } from "@/systems/state";
 import { createHud } from "@/ui/hud";
 import { runTutorial, hasSeenTutorial } from "@/ui/tutorial";
 import { play, outcomeCue, armAmbientOnGesture } from "@/ui/audio";
+import { applyDisplaySettings } from "@/ui/settings";
 import "@/ui/style.css";
 
 /**
@@ -49,6 +50,9 @@ function main(): void {
 
   // First-ever session: the coached tour is the primary onboarding, so retire the
   // legacy first-run hints box (still on 💡 Help) *before* the HUD reads the flag.
+  // Reflect persisted accessibility prefs onto the document root before first paint.
+  applyDisplaySettings();
+
   const firstEver = !hasSeenTutorial();
   if (firstEver) {
     try {

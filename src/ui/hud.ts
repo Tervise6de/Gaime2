@@ -19,7 +19,15 @@ import { regionProduction, nationalProduction, nationYieldMult, yieldFactors, si
 import { garrisonCalm } from "@/systems/stability";
 import { runTutorial } from "@/ui/tutorial";
 import { confirmAction } from "@/ui/confirm";
-import { isMuted, toggleMuted, play, isAmbientEnabled, toggleAmbient } from "@/ui/audio";
+import { isMuted, setMuted, play, isAmbientEnabled, setAmbientEnabled, getVolume, setVolume } from "@/ui/audio";
+import {
+  isColourblind,
+  setColourblind,
+  isReduceMotion,
+  setReduceMotion,
+  getDefaultMapLayout,
+  setDefaultMapLayout,
+} from "@/ui/settings";
 import { EDGE_COLOR, WAR_EDGE_COLOR, type MapLayout } from "@/systems/renderer";
 import { DEFAULT_MAP_OPTIONS, type MapGenOptions } from "@/systems/mapgen";
 import { regionCapacity } from "@/systems/population";
@@ -195,39 +203,26 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   standingsToggle.title = "See how you rank against every rival. Shortcut: S";
   topBar.append(standingsToggle);
 
-  // Map layout toggle: node+edge fallback ⇄ Voronoi polygon view.
-  let mapLayout: MapLayout = "node";
+  // Map layout toggle: node+edge fallback ⇄ Voronoi polygon view. Opens on the
+  // persisted default (set in Options) and applies it for this session immediately.
+  let mapLayout: MapLayout = getDefaultMapLayout();
   const mapLayoutLabel = (l: MapLayout): string => (l === "voronoi" ? "🗺 Map: Territory" : "🗺 Map: Nodes");
-  const mapToggle = btn(mapLayoutLabel(mapLayout), "hud-legend-toggle", () => {
-    mapLayout = mapLayout === "voronoi" ? "node" : "voronoi";
+  const applyMapLayout = (l: MapLayout): void => {
+    mapLayout = l;
     mapToggle.textContent = mapLayoutLabel(mapLayout);
     callbacks.onSetMapLayout(mapLayout);
+  };
+  const mapToggle = btn(mapLayoutLabel(mapLayout), "hud-legend-toggle", () => {
+    applyMapLayout(mapLayout === "voronoi" ? "node" : "voronoi");
   });
   mapToggle.title = "Switch between the node/edge map and the Voronoi territory map. Shortcut: M";
   topBar.append(mapToggle);
+  if (mapLayout !== "node") callbacks.onSetMapLayout(mapLayout); // honour a saved default at boot
 
-  // Master sound toggle — persisted, synthesised cues (no audio files).
-  const soundLabel = (): string => (isMuted() ? "🔇 Sound" : "🔊 Sound");
-  const soundToggle = btn(soundLabel(), "hud-legend-toggle", () => {
-    const nowMuted = toggleMuted();
-    soundToggle.textContent = soundLabel();
-    soundToggle.classList.toggle("muted", nowMuted);
-    if (!nowMuted) play("build"); // a quick blip confirms sound is back on
-  });
-  soundToggle.classList.toggle("muted", isMuted());
-  soundToggle.title = "Mute or unmute the game's sound cues.";
-  topBar.append(soundToggle);
-
-  // Ambient bed — off by default, its own toggle, silenced by the master mute.
-  const ambientLabel = (): string => (isAmbientEnabled() ? "🎵 Ambient" : "🎵 Ambient: off");
-  const ambientToggle = btn(ambientLabel(), "hud-legend-toggle", () => {
-    const on = toggleAmbient();
-    ambientToggle.textContent = ambientLabel();
-    ambientToggle.classList.toggle("muted", !on);
-  });
-  ambientToggle.classList.toggle("muted", !isAmbientEnabled());
-  ambientToggle.title = "Toggle a soft ambient music bed (off by default).";
-  topBar.append(ambientToggle);
+  // Options — sound, accessibility and view preferences in one persisted panel.
+  const optionsToggle = btn("⚙ Options", "hud-legend-toggle", () => openOptions());
+  optionsToggle.title = "Sound, accessibility and display options.";
+  topBar.append(optionsToggle);
   root.append(topBar);
 
   // Critical-events alert strip (just below the resource bar).
@@ -625,6 +620,116 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   function toggleStandings(): void {
     if (standingsOverlay.style.display === "none") openStandings();
     else closeStandings();
+  }
+
+  // --- Options overlay (sound, accessibility, display; all persisted) --------
+  const optionsOverlay = el("div", "hud-techtree-overlay");
+  optionsOverlay.style.display = "none";
+  optionsOverlay.addEventListener("click", (ev) => {
+    if (ev.target === optionsOverlay) closeOptions();
+  });
+  root.append(optionsOverlay);
+
+  /** A labelled checkbox row bound to a get/set pair; onChange fires after set. */
+  function checkboxRow(label: string, get: () => boolean, set: (v: boolean) => void, hint?: string): HTMLElement {
+    const row = el("label", "hud-opt-row");
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.className = "hud-opt-check";
+    box.checked = get();
+    box.addEventListener("change", () => set(box.checked));
+    const text = el("span", "hud-opt-label");
+    text.textContent = label;
+    row.append(box, text);
+    if (hint) row.title = hint;
+    return row;
+  }
+
+  function renderOptions(): void {
+    optionsOverlay.innerHTML = "";
+    const panel = el("div", "hud-techtree-panel hud-options-panel");
+    const head = el("div", "hud-techtree-head");
+    const title = el("h2", "hud-techtree-title");
+    title.textContent = "Options";
+    head.append(title, btn("✕", "hud-techtree-close", closeOptions));
+    panel.append(head);
+
+    // Sound ------------------------------------------------------------------
+    panel.append(sectionHeading("Sound"));
+    panel.append(
+      checkboxRow("Mute all sound", isMuted, (v) => {
+        setMuted(v);
+        if (!v) play("build"); // audible confirmation on unmute
+      }),
+    );
+    // Volume slider.
+    const volRow = el("label", "hud-opt-row");
+    const volLabel = el("span", "hud-opt-label");
+    const volText = (): string => `Volume — ${Math.round(getVolume() * 100)}%`;
+    volLabel.textContent = volText();
+    const vol = document.createElement("input");
+    vol.type = "range";
+    vol.min = "0";
+    vol.max = "100";
+    vol.step = "5";
+    vol.className = "hud-opt-range";
+    vol.value = String(Math.round(getVolume() * 100));
+    vol.addEventListener("input", () => {
+      setVolume(Number(vol.value) / 100);
+      volLabel.textContent = volText();
+    });
+    vol.addEventListener("change", () => play("build")); // preview at the new level
+    volRow.append(volLabel, vol);
+    panel.append(volRow);
+    panel.append(
+      checkboxRow("Ambient music bed", isAmbientEnabled, (v) => setAmbientEnabled(v), "A soft, sparse motif — off by default."),
+    );
+
+    // Accessibility ----------------------------------------------------------
+    panel.append(sectionHeading("Accessibility"));
+    panel.append(
+      checkboxRow("Colour-blind-safe palette", isColourblind, (v) => setColourblind(v), "A higher-contrast owner/relation palette."),
+    );
+    panel.append(
+      checkboxRow("Reduce motion", isReduceMotion, (v) => setReduceMotion(v), "Disable non-essential UI transitions and animation."),
+    );
+
+    // Display ----------------------------------------------------------------
+    panel.append(sectionHeading("Display"));
+    const mapRow = el("label", "hud-opt-row");
+    const mapLabel = el("span", "hud-opt-label");
+    mapLabel.textContent = "Default map view";
+    const mapSel = select(
+      "hud-select",
+      [
+        ["node", "Nodes"],
+        ["voronoi", "Territory"],
+      ],
+      getDefaultMapLayout(),
+    );
+    mapSel.addEventListener("change", () => {
+      const layout = mapSel.value as MapLayout;
+      setDefaultMapLayout(layout);
+      applyMapLayout(layout); // apply to the current session too
+    });
+    mapRow.append(mapLabel, mapSel);
+    panel.append(mapRow);
+
+    optionsOverlay.append(panel);
+  }
+
+  function sectionHeading(text: string): HTMLElement {
+    const h = el("div", "hud-opt-section");
+    h.textContent = text;
+    return h;
+  }
+
+  function openOptions(): void {
+    renderOptions();
+    optionsOverlay.style.display = "flex";
+  }
+  function closeOptions(): void {
+    optionsOverlay.style.display = "none";
   }
 
   // --- Pending-decision modal (raised by a choice event) --------------------

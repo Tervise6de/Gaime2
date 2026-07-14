@@ -6,6 +6,45 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — ROADMAP B3: Options panel — one home for sound/access/display
+
+Third Phase-B item of `docs/roadmap-to-ready.md`: a single **⚙ Options** panel that
+consolidates the scattered top-bar audio chips and adds the settings the next
+features need. All preferences persist to localStorage.
+
+**Panel contents:**
+- **Sound:** mute-all, a **master volume slider** (new — all cues now route through
+  one master `GainNode`, so the slider is a single live knob; persisted, clamped to
+  0–1), and the ambient-bed toggle.
+- **Accessibility:** a **colour-blind-safe palette** toggle and a **reduce-motion**
+  toggle. Both reflect onto the document root as data-attributes
+  (`:root[data-colourblind]` / `[data-reduce-motion]`). Reduce-motion is **honoured
+  now** — CSS strips non-essential UI transitions/animations. The colour-blind
+  palette flag is persisted and exposed for **B4** to consume (palette swap lands
+  there); the toggle sets the attribute today.
+- **Display:** a **default map view** select (Nodes / Territory) — persisted and
+  applied to the live session, and honoured at boot by the map chip.
+
+**Structure:** new `ui/settings.ts` owns the non-audio prefs (colourblind,
+reduce-motion, default map layout) with typed get/set + `applyDisplaySettings()`;
+volume/mute/ambient stay owned by `ui/audio.ts`. The two old top-bar audio chips are
+replaced by the single ⚙ Options chip, decluttering the bar. `main.ts` applies the
+display prefs before first paint.
+
+**Verify:** typecheck ✓, **343 tests ✓**, build ✓ (0 `fetch`, deps `{}`). Browser
+(Playwright): the single ⚙ chip replaces Sound/Ambient; the panel shows all six
+rows; the volume slider writes `gaime2:volume=0.4`; reduce-motion sets
+`data-reduce-motion=1` + persists and is **re-applied on boot after reload**;
+colour-blind sets `data-colourblind=1`; mute writes `gaime2:muted=1`; the default-map
+select writes `gaime2:mapLayout=voronoi` and flips the top chip to "Territory";
+backdrop and ✕ both close the panel; no page errors.
+
+**Next (roadmap order):** B4 accessibility — the colour-blind-safe owner/relation
+palette (behind the flag this panel now sets), keyboard nav of the HUD, ARIA labels,
+visible focus rings.
+
+---
+
 ## 2026-07-14 — ROADMAP B2: Procedural ambient bed (optional, off by default)
 
 Second Phase-B item of `docs/roadmap-to-ready.md`: atmosphere without asset files.

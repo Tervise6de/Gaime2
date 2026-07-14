@@ -1675,9 +1675,56 @@ body {
   filter: brightness(1.08);
 }
 
-/* Muted sound toggle reads dimmer than the other top-bar chips. */
-.hud-legend-toggle.muted {
-  opacity: 0.6;
+/* Options panel — sound / accessibility / display preferences. */
+.hud-options-panel {
+  width: min(420px, 94vw);
+  max-height: 84vh;
+  overflow-y: auto;
+}
+
+.hud-opt-section {
+  margin: 14px 0 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  border-bottom: 1px solid var(--panel-border);
+  padding-bottom: 4px;
+}
+
+.hud-opt-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 2px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.hud-opt-label {
+  flex: 1;
+}
+
+.hud-opt-range {
+  flex: 1;
+  max-width: 200px;
+  cursor: pointer;
+}
+
+.hud-opt-check {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+/* Reduce-motion: strip non-essential UI transitions/animations when opted in. */
+:root[data-reduce-motion="1"] .tut-highlight {
+  transition: none;
+}
+:root[data-reduce-motion="1"] * {
+  animation-duration: 0.001s !important;
+  transition-duration: 0.001s !important;
 }
 
 /* First-run orientation: jump to the player's capital from the empty region panel. */

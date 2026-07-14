@@ -77,8 +77,13 @@ const CUES: Record<Cue, CueSpec> = {
   alert: { wave: "square", gain: 0.16, notes: [[880, 0, 0.08], [880, 0.14, 0.08]] },
 };
 
+const VOLUME_KEY = "gaime2:volume";
+const DEFAULT_VOLUME = 0.7;
+
 let ctx: AudioContext | null = null;
+let masterGain: GainNode | null = null;
 let muted = readMuted();
+let volume = readVolume();
 
 function readMuted(): boolean {
   try {
@@ -86,6 +91,39 @@ function readMuted(): boolean {
   } catch {
     return false;
   }
+}
+
+function readVolume(): number {
+  try {
+    const raw = localStorage.getItem(VOLUME_KEY);
+    if (raw === null) return DEFAULT_VOLUME;
+    return clampVolume(Number(raw));
+  } catch {
+    return DEFAULT_VOLUME;
+  }
+}
+
+/** Keep volume a finite number in [0, 1]; fall back to the default on garbage. */
+function clampVolume(v: number): number {
+  if (!Number.isFinite(v)) return DEFAULT_VOLUME;
+  return Math.max(0, Math.min(1, v));
+}
+
+/** Current master volume, 0..1 (drives the options slider). */
+export function getVolume(): number {
+  return volume;
+}
+
+/** Set and persist the master volume (0..1); applies live to the mix. */
+export function setVolume(next: number): number {
+  volume = clampVolume(next);
+  try {
+    localStorage.setItem(VOLUME_KEY, String(volume));
+  } catch {
+    /* storage unavailable — volume simply won't persist */
+  }
+  if (masterGain) masterGain.gain.value = volume;
+  return volume;
 }
 
 /** Whether sound is currently muted (drives the toggle's icon/label). */
@@ -116,11 +154,20 @@ function audioContext(): AudioContext | null {
   if (!ctx) {
     try {
       ctx = new Ctor();
+      // All cues route through one master gain so the volume slider is a single knob.
+      masterGain = ctx.createGain();
+      masterGain.gain.value = volume;
+      masterGain.connect(ctx.destination);
     } catch {
       return null;
     }
   }
   return ctx;
+}
+
+/** The node cues connect to — the master gain if present, else the raw output. */
+function outputNode(ac: AudioContext): AudioNode {
+  return masterGain ?? ac.destination;
 }
 
 /** Play a cue. No-op when muted or when Web Audio is unavailable. */
@@ -144,7 +191,7 @@ export function play(cue: Cue): void {
     g.gain.setValueAtTime(0.0001, start);
     g.gain.exponentialRampToValueAtTime(spec.gain, start + 0.008);
     g.gain.exponentialRampToValueAtTime(0.0001, end);
-    osc.connect(g).connect(ac.destination);
+    osc.connect(g).connect(outputNode(ac));
     osc.start(start);
     osc.stop(end + 0.02);
   }
@@ -211,7 +258,7 @@ function playPad(notes: number[]): void {
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.exponentialRampToValueAtTime(0.05, t0 + 1.2); // gentle swell
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + len);
-    osc.connect(g).connect(ac.destination);
+    osc.connect(g).connect(outputNode(ac));
     osc.start(t0);
     osc.stop(t0 + len + 0.05);
   }
