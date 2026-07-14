@@ -16,6 +16,7 @@ import { BUILDINGS, BUILDING_IDS, type BuildingId } from "@/data/buildings";
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
 import { TERRAIN, TERRAIN_IDS } from "@/data/terrain";
 import { regionProduction, nationalProduction, nationYieldMult, yieldFactors, singleModifierMult, unrestPenalty } from "@/systems/economy";
+import { garrisonCalm } from "@/systems/stability";
 import { EDGE_COLOR, WAR_EDGE_COLOR, type MapLayout } from "@/systems/renderer";
 import { regionCapacity } from "@/systems/population";
 import { previewCombat } from "@/systems/combat";
@@ -800,6 +801,12 @@ function renderOwnedRegion(
   const player = playerNation(state);
   const flow = regionProduction(region, player.taxRate, nationYieldMult(player));
 
+  // A friendly garrison polices its region, lowering unrest (design §3.3). Surface
+  // its contribution so the drop in the number is legible, not mysterious.
+  const garrisonHere = armyAt(state, region.id, PLAYER_ID);
+  const garrisonUnits = garrisonHere ? armySize(garrisonHere.units) : 0;
+  const garrisonCalmAmt = garrisonCalm(garrisonUnits);
+
   // Unrest bar. The tooltip states this region's *current* output penalty so the
   // cost of unrest is concrete, not just the general rule.
   const uMult = unrestPenalty(region.unrest);
@@ -809,15 +816,26 @@ function renderOwnedRegion(
       : uMult <= 0
         ? "This region is in revolt — it produces nothing."
         : `Right now this region produces ${Math.round(uMult * 100)}% of its output (−${Math.round((1 - uMult) * 100)}%).`;
+  const garrisonNote =
+    garrisonCalmAmt > 0
+      ? `\n\nYour garrison of ${garrisonUnits} unit${garrisonUnits === 1 ? "" : "s"} polices this region, calming it by ${garrisonCalmAmt} unrest.`
+      : "";
   const unrestWrap = el("div", "hud-unrest");
   unrestWrap.title =
     `Unrest throttles a region's output. Calm below ${UNREST_PENALTY_START}; ` +
     `production suffers from ${UNREST_PENALTY_START}; at ${UNREST_REVOLT}+ the region revolts ` +
     "and produces nothing. High taxes, famine, over-expansion and fresh conquests all raise it — " +
-    `temples and civics tech calm it.\n\n${penaltyNote}`;
+    `temples, civics tech and a stationed garrison calm it.\n\n${penaltyNote}${garrisonNote}`;
   const unrestLabel = el("div", "hud-unrest-label");
   unrestLabel.textContent = `Unrest ${fmt(region.unrest)}`;
   unrestLabel.append(unrestTag(region));
+  // A subtle chip showing the garrison's calming effect (the reason the number is lower).
+  if (garrisonCalmAmt > 0) {
+    const calmChip = el("span", "hud-unrest-garrison");
+    calmChip.textContent = `⚑ −${garrisonCalmAmt}`;
+    calmChip.title = `A stationed garrison calms this region by ${garrisonCalmAmt} unrest.`;
+    unrestLabel.append(calmChip);
+  }
   const bar = el("div", "hud-unrest-bar");
   const fill = el("div", "hud-unrest-fill");
   fill.style.width = `${Math.min(100, region.unrest)}%`;
@@ -829,8 +847,7 @@ function renderOwnedRegion(
   // Secession warning: a revolting region breaks away to rebels unless held.
   // Surface the countdown and the two ways to stop it, so the mechanic is fair.
   if (region.unrest >= UNREST_REVOLT) {
-    const garrison = armyAt(state, region.id, PLAYER_ID);
-    const held = garrison !== undefined && armySize(garrison.units) > 0;
+    const held = garrisonUnits > 0;
     const warn = el("div", `hud-secession ${held ? "held" : "danger"}`);
     if (held) {
       warn.textContent = "⚑ Revolt held down by your garrison — it won't secede while troops remain.";

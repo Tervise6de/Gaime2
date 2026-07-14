@@ -6,6 +6,36 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — Garrison-calm made legible in the region panel
+
+Follow-on to last cycle's garrison-calm mechanic — closing the legibility loop
+(the same "mechanic → make it visible" pattern the secession work followed). A
+stationed army now lowers a region's unrest, but the panel gave no hint *why* the
+number was lower, which quietly breaks the "legible complexity" design pillar.
+
+**Change** (`ui/hud.ts` `renderOwnedRegion` + a little CSS): when a friendly
+garrison stands in the selected region, the unrest row shows a subtle cyan chip
+**"⚑ −N"** beside the unrest number (N = the garrison's calming contribution from
+the shared, unit-tested `garrisonCalm`), and the unrest tooltip gains a line —
+*"Your garrison of N units polices this region, calming it by N unrest."* — plus
+"a stationed garrison" is now named among the calming factors in the general
+tooltip text. Relaid the unrest label (number+chip grouped left, the state tag
+pinned right) so three items don't scatter. Pure presentation; reuses the hoisted
+garrison lookup the secession warning already needed (removed a duplicate
+`armyAt` call).
+
+**Verify:** typecheck ✓, 308 tests ✓ (unchanged — presentation only), build ✓
+(0 `fetch`, deps `{}`). Browser-driven (default game): selecting a garrisoned
+region shows the "⚑ −N" chip beside the unrest number and the tooltip names the
+garrison's calming effect; the label layout holds with the chip present; no
+console/page errors.
+
+**Next ideas:** let the AI weigh garrison-for-calm vs. army upkeep when its
+treasury is thin; factor secession risk into how far the AI pushes conquest; a
+small map marker for a garrison holding a restless province.
+
+---
+
 ## 2026-07-14 — Garrisons calm their region (design §3.3)
 
 Design §3.3 lists garrisons among the things that *lower unrest*, but they never

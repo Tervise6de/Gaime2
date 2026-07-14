@@ -322,18 +322,29 @@ body {
 
 .hud-unrest-label {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
+  gap: 6px;
   font-size: 12px;
   margin-bottom: 4px;
   font-variant-numeric: tabular-nums;
 }
 
+/* The unrest state tag ("REVOLT" etc.) stays pinned to the right edge. */
 .hud-unrest-state {
+  margin-left: auto;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--muted);
+}
+
+/* Garrison calming chip — sits right after the unrest number. */
+.hud-unrest-garrison {
+  font-size: 10px;
+  font-weight: 600;
+  color: #a9dbe4;
+  font-variant-numeric: tabular-nums;
 }
 
 .hud-unrest-state.warn {
