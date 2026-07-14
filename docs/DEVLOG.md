@@ -6,6 +6,44 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — BIG DEV 2/2: Up to 5 rival powers (a fuller world)
+
+The world was always a 4-way contest at most (3 rivals). Now it scales to **6
+realms — up to 5 rivals** — so the diplomacy / war / trade web (Dev 1) has far
+more players in it: more coalitions, more fronts, more trade partners, a genuinely
+crowded late game.
+
+**Change:** two new powers on the roster — **Emberhold** and **Korrath
+Hegemony**, each with a distinct colour (coral, teal) — bringing `RIVAL_NAMES` /
+`RIVAL_COLORS` to five. `createGame` now caps rivals by *both* the roster and the
+map: `Math.floor(regions / 3)` nations, so a **small map silently seats fewer
+rivals** (Small→up to 4) rather than cramming capitals on top of each other, while
+Medium/Large host the full five. The rivals selector offers 1–5 (its choice is
+already remembered across sessions).
+
+**Verify:** typecheck ✓, **336 tests ✓** (+1: 5 rivals seat on a large map, a
+small map caps below 5 but ≥1, and every seated realm is actually placed), build ✓
+(0 `fetch`, deps `{}`). Node robustness sweep (deleted): every {16,22,30} ×
+{4,5 rivals} combo places all nations, runs 5 turns crash-free, stays
+deterministic; Small(16) caps to 4, Medium/Large seat 5. Browser (Large + 5
+rivals): the diplomacy panel shows all five — Valdheim, Suzerain of Kael, Sundered
+League, Emberhold, Korrath Hegemony — no console/page errors.
+
+**Balance (temp probe, 100 seeds × 4 archetypes, 5 rivals, medium, deleted):** no
+crashes; a very **tight, fair spread** (warlord 11 / merchant 12 / builder 12 /
+opportunist 10 — six-way games naturally lower every win rate). Domination is rare
+(33) — 60% of the map is a long march with six realms — so games resolve mostly by
+prestige (144) or Great Works (152); pacing runs longer (medians 133–139, still
+inside the 150-turn window), a fitting "big crowded game" feel. Players wanting
+room can pair 5 rivals with a Large map (the selector + persistence make that a
+one-time choice).
+
+**Next ideas:** scale the *default* rival count / barbarian density with map size;
+a mini standings sparkline in the diplomacy header for six-way games; team/bloc
+victory when allied blocs dominate.
+
+---
+
 ## 2026-07-14 — BIG DEV 1/2: Trade routes (economic diplomacy)
 
 A whole new diplomatic layer: **trade routes**. Two nations at peace can open a

@@ -258,6 +258,8 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     ["1", "1 rival"],
     ["2", "2 rivals"],
     ["3", "3 rivals"],
+    ["4", "4 rivals"],
+    ["5", "5 rivals"],
   ], prefs.rivals ?? "2");
   // Map size — a smaller world plays tight and fast, a larger one expansive.
   const mapSizeSel = select("hud-select", [

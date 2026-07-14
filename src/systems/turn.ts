@@ -74,8 +74,8 @@ const BARBARIAN_NATION: Nation = {
   bankrupt: false,
 };
 
-const RIVAL_NAMES = ["Valdheim", "Suzerain of Kael", "Sundered League"];
-const RIVAL_COLORS = ["#5b8bd0", "#b06ec0", "#6cae7a"];
+const RIVAL_NAMES = ["Valdheim", "Suzerain of Kael", "Sundered League", "Emberhold", "Korrath Hegemony"];
+const RIVAL_COLORS = ["#5b8bd0", "#b06ec0", "#6cae7a", "#d0796e", "#4fb0a0"];
 
 const STARTING_STOCKS: ResourceStocks = { gold: 60, food: 20, materials: 15, knowledge: 0 };
 /** How many regions each nation begins with (capital + neighbours). */
@@ -95,7 +95,11 @@ export interface NewGameOptions {
 export function createGame(options: NewGameOptions): GameState {
   const { regions } = generateMap(options.seed, options.map);
   const rng = createRng((options.seed ^ 0x9e3779b9) >>> 0);
-  const rivalCount = Math.max(0, Math.min(options.rivals ?? RIVAL_COUNT, RIVAL_COLORS.length));
+  // Cap rivals by the roster and by the map: every realm needs room for a capital
+  // and neighbours (~3 regions each), so a small map silently seats fewer rivals
+  // rather than cramming capitals on top of one another.
+  const mapCap = Math.max(2, Math.floor(regions.length / 3));
+  const rivalCount = Math.max(0, Math.min(options.rivals ?? RIVAL_COUNT, RIVAL_COLORS.length, mapCap - 1));
 
   // Player is nation 0, barbarians nation 1, rivals 2..n. Index === id.
   const nations: Nation[] = [

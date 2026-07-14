@@ -64,6 +64,22 @@ describe("createGame", () => {
     expect(applyTradeIncome(createGame({ seed: 1, rivals: 2 }))).toEqual(createGame({ seed: 1, rivals: 2 }));
   });
 
+  it("seats up to 5 rivals on a large map and caps rivals on a small one", () => {
+    // Medium/large maps host the full 5-rival roster.
+    const big = createGame({ seed: 4, rivals: 5, map: { ...DEFAULT_MAP_OPTIONS, regionCount: 30 } });
+    expect(big.nations.filter((n) => !n.isBarbarian && !n.isPlayer).length).toBe(5);
+    // A small map seats fewer rivals rather than cramming capitals — but always ≥1.
+    const small = createGame({ seed: 4, rivals: 5, map: { ...DEFAULT_MAP_OPTIONS, regionCount: 16 } });
+    const smallRivals = small.nations.filter((n) => !n.isBarbarian && !n.isPlayer).length;
+    expect(smallRivals).toBeGreaterThanOrEqual(1);
+    expect(smallRivals).toBeLessThan(5);
+    // Whatever seats, every realm is actually placed on the map.
+    for (const g of [big, small]) {
+      const placed = new Set(g.regions.map((r) => r.ownerId).filter((o) => o !== null && o !== BARBARIAN_ID));
+      expect(placed.size).toBe(g.nations.filter((n) => !n.isBarbarian).length);
+    }
+  });
+
   it("respects a custom map size and still seats every nation", () => {
     const small = createGame({ seed: 3, rivals: 3, map: { ...DEFAULT_MAP_OPTIONS, regionCount: 16 } });
     const large = createGame({ seed: 3, rivals: 3, map: { ...DEFAULT_MAP_OPTIONS, regionCount: 30 } });
