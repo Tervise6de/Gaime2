@@ -6,6 +6,37 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — Map-size selector (replayability)
+
+Backlog **C/F**, a fresh surface (game setup) after several balance cycles. The
+engine has always supported a variable region count (`MapGenOptions.regionCount`,
+default 22, up to the 30 region names), but the new-game panel only let you pick
+seed / difficulty / rivals — every world was the same 22-region size. Now a
+**Small (16) / Medium (22) / Large (30)** selector sits beside the others: a small
+world plays tight and quick, a large one gives room to expand. Real replay
+variety for one selector.
+
+**Change:** `NewGameConfig` gains an optional `map`; the HUD's new-game panel adds
+a size `<select>` and passes `{ ...DEFAULT_MAP_OPTIONS, regionCount }` through —
+`main.ts` already forwards the whole config to `createGame`, which already reads
+`options.map`, so the plumbing was one field. Default stays Medium/22, so the
+out-of-the-box game (and its balance) is unchanged.
+
+**Verify:** typecheck ✓, **329 tests ✓** (+1: `createGame` respects a custom map
+size — 16 and 30 regions — and still seats all four realms on the smaller map;
+the full-tsc build also caught my test's partial `MapGenOptions`, fixed to spread
+the default — build-as-final-gate again), build ✓ (0 `fetch`, deps `{}`). Node
+robustness sweep (deleted): every {16,22,30} × {1,2,3 rivals} combo places all
+nations, runs 5 turns without crashing, and stays deterministic. Browser: the
+selector shows Small/Medium/Large and starting both a 16- and a 30-region game
+raises no console/page errors. Default unchanged → no balance probe.
+
+**Next ideas:** re-probe balance per map size (a big map may lengthen games / favour
+builders); scale starting `RIVAL_COUNT` options or barbarian density with map
+size; remember the last-used size across sessions.
+
+---
+
 ## 2026-07-14 — Balance: ease conquest unrest so aggression pays (archetype fairness)
 
 Backlog **A**, finishing the archetype-fairness thread the `WONDER_GOAL` change

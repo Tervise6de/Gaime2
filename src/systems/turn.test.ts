@@ -10,6 +10,7 @@ import {
 } from "@/systems/turn";
 import { nationalProduction } from "@/systems/economy";
 import { totalUpkeep } from "@/systems/military";
+import { DEFAULT_MAP_OPTIONS } from "@/systems/mapgen";
 import { BUILDINGS } from "@/data/buildings";
 import {
   PLAYER_ID,
@@ -45,6 +46,20 @@ describe("createGame", () => {
     expect(g.armies.some((a) => a.ownerId === PLAYER_ID)).toBe(true);
     // Rival nations exist.
     expect(g.nations.some((n) => !n.isPlayer && !n.isBarbarian)).toBe(true);
+  });
+
+  it("respects a custom map size and still seats every nation", () => {
+    const small = createGame({ seed: 3, rivals: 3, map: { ...DEFAULT_MAP_OPTIONS, regionCount: 16 } });
+    const large = createGame({ seed: 3, rivals: 3, map: { ...DEFAULT_MAP_OPTIONS, regionCount: 30 } });
+    expect(small.regions.length).toBe(16);
+    expect(large.regions.length).toBe(30);
+    // All four realms (player + 3 rivals) get placed on the smaller map too.
+    for (const g of [small, large]) {
+      const owners = new Set(
+        g.regions.map((r) => r.ownerId).filter((o) => o !== null && o !== BARBARIAN_ID),
+      );
+      expect(owners.size).toBe(4);
+    }
   });
 
   it("records each nation's capital: an owned, lightly fortified region", () => {

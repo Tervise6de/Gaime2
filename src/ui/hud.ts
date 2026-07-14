@@ -18,6 +18,7 @@ import { TERRAIN, TERRAIN_IDS } from "@/data/terrain";
 import { regionProduction, nationalProduction, nationYieldMult, yieldFactors, singleModifierMult, unrestPenalty } from "@/systems/economy";
 import { garrisonCalm } from "@/systems/stability";
 import { EDGE_COLOR, WAR_EDGE_COLOR, type MapLayout } from "@/systems/renderer";
+import { DEFAULT_MAP_OPTIONS, type MapGenOptions } from "@/systems/mapgen";
 import { regionCapacity } from "@/systems/population";
 import { previewCombat } from "@/systems/combat";
 import {
@@ -62,6 +63,8 @@ export interface NewGameConfig {
   seed: number;
   difficulty: Difficulty;
   rivals: number;
+  /** Map generation options (region count etc.); omitted = engine default. */
+  map?: MapGenOptions;
 }
 
 export interface HudCallbacks {
@@ -252,7 +255,14 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     ["2", "2 rivals"],
     ["3", "3 rivals"],
   ], "2");
-  cfgRow.append(seedInput, difficultySel, rivalsSel);
+  // Map size — a smaller world plays tight and fast, a larger one expansive.
+  const mapSizeSel = select("hud-select", [
+    ["16", "Small map"],
+    ["22", "Medium map"],
+    ["30", "Large map"],
+  ], String(DEFAULT_MAP_OPTIONS.regionCount));
+  mapSizeSel.title = "World size: fewer regions play tight and quick; more regions give room to expand.";
+  cfgRow.append(seedInput, difficultySel, rivalsSel, mapSizeSel);
   controls.append(cfgRow);
 
   const btnRow = el("div", "hud-newgame");
@@ -265,6 +275,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       seed: raw === "" ? (Date.now() >>> 0) : parseSeed(raw),
       difficulty: difficultySel.value as Difficulty,
       rivals: Number(rivalsSel.value),
+      map: { ...DEFAULT_MAP_OPTIONS, regionCount: Number(mapSizeSel.value) },
     });
   });
   // Save/Load act on the chosen checkpoint slot (3 named slots + the autosave).
