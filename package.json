@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "description": "Kingdom Management / 4X-lite strategy game (browser-based).",
   "type": "module",
+  "author": "GAIME",
   "license": "MIT",
   "scripts": {
     "dev": "vite",

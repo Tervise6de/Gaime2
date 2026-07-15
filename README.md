@@ -88,6 +88,10 @@ Gaime2/
 
 See [`docs/design.md`](docs/design.md) for the design vision and roadmap.
 
+## Credits
+
+Developed by **GAIME**.
+
 ## License
 
 MIT

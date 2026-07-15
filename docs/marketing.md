@@ -1,8 +1,13 @@
 # Marketing & positioning
 
 Working messaging for launch. The game is a browser-based **Kingdom Management /
-4X-lite** strategy game (working title *Gaime2* — a placeholder; see §7). This
-doc is the source of truth for how we talk about it.
+4X-lite** strategy game (working title *Gaime2* — a placeholder; see §7),
+developed by **GAIME**. This doc is the source of truth for how we talk about it.
+
+> **Developer / studio:** GAIME. Credit the studio in the store listing, the
+> title/credits screen, and the Show HN post. Note the studio name (GAIME) is
+> distinct from the game's still-unchosen title (§7) — don't conflate them in
+> copy.
 
 > **The one-line pitch:** *A whole 4X in a browser tab — no install, no account,
 > no network. The empire, the rivals, and the AI all run on your machine.*
