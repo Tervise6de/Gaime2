@@ -29,11 +29,13 @@ import {
   setDefaultMapLayout,
 } from "@/ui/settings";
 import { cbSafe } from "@/data/palette";
-import { crestSvg, eventVignette, MOMENT_ART, TERRAIN_ART } from "@/data/art";
+import { badgeArt, BRANCH_ART, crestSvg, eventVignette, MOMENT_ART, TERRAIN_ART, TREATY_ART } from "@/data/art";
 import {
   glyphEl,
   glyphHtml,
   iconBtn,
+  iconEl,
+  iconHtml,
   resourceIconEl,
   resourceIconHtml,
   setIconBtnLabel,
@@ -931,7 +933,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       const got = unlocked.has(a.id);
       const cell = el("div", "hud-achv" + (got ? " got" : " locked"));
       const badge = el("div", "hud-achv-badge");
-      badge.append(got ? glyphEl("medal", "🏅") : glyphEl("lock", "🔒"));
+      badge.append(got ? iconEl(badgeArt(a.id), "🏅") : glyphEl("lock", "🔒"));
       const body = el("div", "hud-achv-body");
       const name = el("div", "hud-achv-name");
       name.textContent = a.name;
@@ -1358,7 +1360,7 @@ function renderArmySection(
   section.append(heading("Army"));
 
   if (army && armySize(army.units) > 0) {
-    section.append(line(`${armySize(army.units)} units — ${composition(army)}`, "hud-army-comp"));
+    section.append(compositionLine(army));
     section.append(line(`Moves left: ${army.movesLeft}`, "hud-hint"));
     const moving = moveArmyId === army.id;
     const moveBtn = document.createElement("button");
@@ -1855,7 +1857,10 @@ function renderDiplomacy(
     relSpan.textContent = `${rel > 0 ? "+" : ""}${rel} ${relationLabel(rel)}`;
     relSpan.style.color = relationColor(rel);
     const treatySpan = el("span", "hud-diplo-treaty " + treaty);
-    treatySpan.textContent = treaty === "nap" ? "NAP" : treaty[0]!.toUpperCase() + treaty.slice(1);
+    treatySpan.append(
+      iconEl(TREATY_ART[treaty], ""),
+      document.createTextNode(treaty === "nap" ? "NAP" : treaty[0]!.toUpperCase() + treaty.slice(1)),
+    );
     status.append(relSpan, treatySpan);
     card.append(status);
 
@@ -2001,7 +2006,7 @@ function renderResearch(
     b.innerHTML =
       `<span class="hud-tech-name">${def.name}</span>` +
       `<span class="hud-tech-blurb">${def.blurb}</span>` +
-      `<span class="hud-tech-cost">${def.cost}${resourceIconHtml("knowledge", "📖")} · ${def.branch}</span>`;
+      `<span class="hud-tech-cost">${def.cost}${resourceIconHtml("knowledge", "📖")} · ${iconHtml(BRANCH_ART[def.branch], "")} ${def.branch}</span>`;
     b.addEventListener("click", () => callbacks.onChooseResearch(id));
     menu.append(b);
   }
@@ -2060,7 +2065,7 @@ function renderTechTree(
       node.title = def.blurb + (missing.length ? ` (needs ${missing.join(", ")})` : "");
       node.innerHTML =
         `<span class="hud-tt-name">${isDone ? "✓ " : ""}${def.name}</span>` +
-        `<span class="hud-tt-meta">T${def.tier} · ${def.cost}${resourceIconHtml("knowledge", "📖")}</span>`;
+        `<span class="hud-tt-meta">T${def.tier} · ${def.cost}${resourceIconHtml("knowledge", "📖")} · ${iconHtml(BRANCH_ART[def.branch], "")}</span>`;
       if (available) {
         node.addEventListener("click", () => {
           callbacks.onChooseResearch(id);
@@ -2134,6 +2139,23 @@ function composition(army: Army): string {
   const parts: string[] = [];
   for (const t of UNIT_TYPES) if (army.units[t] > 0) parts.push(`${army.units[t]} ${UNITS[t].short}`);
   return parts.join(", ") || "—";
+}
+
+/** The army line with unit icons: "3 units — [⚒]2 [🗡]1". Text fallback intact. */
+function compositionLine(army: Army): HTMLElement {
+  const p = el("p", "hud-army-comp");
+  p.append(document.createTextNode(`${armySize(army.units)} units — `));
+  let any = false;
+  for (const t of UNIT_TYPES) {
+    if (army.units[t] <= 0) continue;
+    any = true;
+    const chip = el("span", "hud-comp-chip");
+    chip.title = UNITS[t].name;
+    chip.innerHTML = `${unitIconHtml(t, UNITS[t].short + " ")}${army.units[t]}`;
+    p.append(chip);
+  }
+  if (!any) p.append(document.createTextNode("—"));
+  return p;
 }
 
 /**

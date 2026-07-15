@@ -425,6 +425,61 @@ export function eventVignette(eventId: string): string | null {
   return theme ? (EVENT_VIGNETTE[theme] ?? null) : null;
 }
 
+// ---------------------------------------------------------------------------
+// Achievement badges — a shared soft-hexagon frame with one motif per
+// achievement id (data/achievements.ts). Locked achievements keep the lock
+// glyph; an unknown id falls back to the generic medal.
+// ---------------------------------------------------------------------------
+
+/** Soft-hex badge frame around a motif. */
+function badge(inner: string): string {
+  return ico(
+    `<path d="M12 2.6l7.6 4.4v10L12 21.4 4.4 17V7z"/>${inner}`,
+    { sw: 1.4 },
+  );
+}
+
+export const BADGE_ART: Record<string, string | null> = {
+  first_crown: badge('<path d="M8.4 14.6v-4.4l2.3 1.7 1.3-2.6 1.3 2.6 2.3-1.7v4.4z" fill="currentColor" stroke="none"/>'),
+  conqueror: badge('<path d="M8.6 8.6l6.8 6.8M15.4 8.6l-6.8 6.8"/><path d="M13.6 16l1.8-1.8M8.6 14.2l1.8 1.8"/>'),
+  wonder_of_the_age: badge('<path d="M11.2 13.9L12 7.9l.8 6z"/><path d="M9.8 16h4.4"/><path d="M7.6 9.2c-.3 2.4.3 4.5 1.6 6.2M16.4 9.2c.3 2.4-.3 4.5-1.6 6.2"/>'),
+  enlightened: badge('<path d="M12 8.6c-1-.8-2.5-1.1-4-1v7c1.5-.1 3 .2 4 1 1-.8 2.5-1.1 4-1v-7c-1.5-.1-3 .2-4 1z"/><path d="M12 8.6v7"/>'),
+  polymath: badge('<path d="M12 6.8v2.4M12 14.8v2.4M8.4 12h-2.4M18 12h-2.4M9.2 9.2L7.8 7.8M16.2 16.2l-1.4-1.4M14.8 9.2l1.4-1.4M7.8 16.2l1.4-1.4"/><circle cx="12" cy="12" r="1.9"/>'),
+  veteran: badge('<path d="M9.2 17V7.2"/><path d="M9.2 7.8c2.2-1 4.4 1 6.6 0v5c-2.2 1-4.4-1-6.6 0"/>'),
+  warlord: badge('<path d="M12 6.4v7.2M9.8 9.9h4.4M12 13.6v2.8M11 17.6h2"/>'),
+  blitz: badge('<path d="M13 6.5l-4.4 6h3l-1.4 5 4.6-6.2h-3z"/>'),
+  the_long_game: badge('<path d="M9 7h6M9 17h6M9.8 7v1.7c0 1.5 1 2.4 2.2 3.3 1.2-.9 2.2-1.8 2.2-3.3V7M9.8 17v-1.7c0-1.5 1-2.4 2.2-3.3 1.2.9 2.2 1.8 2.2 3.3V17"/>'),
+  iron_blood: badge('<path d="M7.2 8.6h6.4c1.2 0 2.1-.4 2.9-1.1-.2 1.9-1.5 3.1-3.4 3.3v1.9c1 .2 1.7.7 2 1.6H8.9c.3-.9 1-1.4 2-1.6v-1.9c-1.7-.2-3.1-1-3.7-2.2z" fill="currentColor" stroke="none"/>'),
+};
+
+/** Badge for an achievement id — unknown ids get the generic medal. */
+export function badgeArt(achievementId: string): string | null {
+  return BADGE_ART[achievementId] ?? MEDAL;
+}
+
+// ---------------------------------------------------------------------------
+// Small classification glyphs: tech branches and diplomacy treaties.
+// ---------------------------------------------------------------------------
+
+/** Tech-branch glyphs, shown beside the branch name in research UI. */
+export const BRANCH_ART: Record<"economy" | "military" | "civics" | "wonders", string | null> = {
+  economy: ico('<circle cx="12" cy="12" r="6.6"/><path d="M12 8.6v6.8M10 10.4c0-.9.9-1.4 2-1.4s2 .5 2 1.3c0 2-4 1.4-4 3.4 0 .8.9 1.3 2 1.3s2-.5 2-1.4"/>', { sw: 1.6 }),
+  military: ico('<path d="M6.4 6.4l11.2 11.2M17.6 6.4L6.4 17.6"/><path d="M14.9 16.9l2-2M7.1 14.9l2 2"/>', { sw: 1.6 }),
+  civics: ico('<path d="M5.4 9.4L12 5.6l6.6 3.8z"/><path d="M7 9.4v6.4M12 9.4v6.4M17 9.4v6.4M5.6 15.8h12.8M4.6 18.4h14.8"/>', { sw: 1.6 }),
+  wonders: ico('<path d="M12 4.8l1.9 3.9 4.3.6-3.1 3 .7 4.3-3.8-2-3.8 2 .7-4.3-3.1-3 4.3-.6z"/>', { sw: 1.6 }),
+};
+
+/** Treaty-state glyphs for the diplomacy chips. */
+export const TREATY_ART: Record<"war" | "peace" | "nap" | "alliance", string | null> = {
+  war: ico('<path d="M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"/><path d="M15.2 17.4l2.2-2.2M6.6 15.2l2.2 2.2"/>', { sw: 2 }),
+  // Olive sprig.
+  peace: ico('<path d="M12 19.5c0-5.5 1.6-9.5 4.8-12.5"/><path d="M12.8 13.2c-2.3.4-4.2-.4-5.3-2.3 2.3-.4 4.2.4 5.3 2.3zM14 9.4c-.4-2.3.4-4.2 2.3-5.3.4 2.3-.4 4.2-2.3 5.3z"/>', { sw: 2 }),
+  // Paused shields: two shields side by side (standing apart, not clashing).
+  nap: ico('<path d="M8.4 5.6l4 1.4v3.2c0 2.6-1.6 4.5-4 5.3-2.4-.8-4-2.7-4-5.3V7z"/><path d="M15.6 8.5l4 1.4v3.2c0 2.6-1.6 4.5-4 5.3-2.4-.8-4-2.7-4-5.3v-3.2z"/>', { sw: 2 }),
+  // Interlocked rings.
+  alliance: ico('<circle cx="9.4" cy="12" r="4.6"/><circle cx="14.6" cy="12" r="4.6"/>', { sw: 2 }),
+};
+
 /**
  * Title-screen key art: the player crest struck as a large medallion. The
  * wordmark itself is styled DOM text (the game's name is still a placeholder —

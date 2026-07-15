@@ -2198,3 +2198,29 @@ a:focus-visible,
 .hud-choice-vignette {
   color: #e6c874;
 }
+
+/* Army composition chips: unit icon + count. */
+.hud-comp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 8px;
+}
+
+/* Achievement badges render larger than inline glyphs. */
+.hud-achv-badge .ico-svg svg {
+  width: 26px;
+  height: 26px;
+}
+
+/* Treaty chip glyph hugs its label. */
+.hud-diplo-treaty {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hud-diplo-treaty .ico-svg svg {
+  width: 12px;
+  height: 12px;
+}
