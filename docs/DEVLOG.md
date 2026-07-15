@@ -6,6 +6,36 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — ROADMAP C2: Content — five new events (incl. a diplomacy lever)
+
+Second Phase-C item of `docs/roadmap-to-ready.md`: deepen the mid-game with more
+event texture. All additive to the `systems/events.ts` table — the same bounded,
+low-variance, deterministic shape as the existing ~28 — so no cross-system wiring.
+
+**New events:**
+- **drought** (setback) — a dry year; −12 food (floored at 0) + a little unrest. The
+  counterweight the food windfall lacked.
+- **caravan_raided** (setback) — bandits cost 12 gold (floored at 0). Balances the
+  market boom.
+- **border_raid** (setback, frontier-gated) — a raid on your most-exposed border
+  region: −1 population (never below the minimum) + unrest. War-front flavour.
+- **traveling_fair** (windfall) — a small dual boon: +10 gold and a touch of calm.
+- **envoy_exchange** (DECISION, **new diplomacy lever**) — spend 20 gold to warm
+  relations +15 with your lowest-standing living rival; the first event to touch
+  diplomacy (a de-escalation option). AI funds it when flush and the rival is still
+  cool.
+
+**Verify:** typecheck ✓, **359 tests ✓** (+5: envoy send/abstain relation + gold
+effects, and the three setbacks respecting their floors with no ownership change),
+build ✓ (0 `fetch`, deps `{}`). A temporary 40-game self-play probe (AI-driven,
+3 rivals) confirmed the additions keep games stable: **0 timeouts**, turn length
+min 24 / median 98 / max 150 — squarely in the healthy band — then deleted.
+
+**Next (roadmap order):** C3 scenarios — a few hand-set start configurations (map
+size, rivals, a themed twist) selectable at new-game, for replay variety.
+
+---
+
 ## 2026-07-14 — ROADMAP C1: Meta-progression — profile stats & achievements
 
 First item of **Phase C** (`docs/roadmap-to-ready.md`) — the reasons to come back.

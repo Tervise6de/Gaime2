@@ -2,7 +2,10 @@ import { describe, it, expect } from "vitest";
 import { fireEvent, resolveChoice } from "@/systems/events";
 import { createGame } from "@/systems/turn";
 import { createRng } from "@/systems/rng";
-import { PLAYER_ID, BARBARIAN_ID, RESEARCH_SURGE_TURNS, type GameState } from "@/systems/state";
+import { getRelation } from "@/systems/diplomacy";
+import { PLAYER_ID, BARBARIAN_ID, RESEARCH_SURGE_TURNS, pairKey, type GameState } from "@/systems/state";
+
+const relationBetween = (s: GameState, a: number, b: number): number => getRelation(s, a, b);
 
 /** Fire seeds until a specific choice event pends for the player; throws if it never does. */
 function pendingChoiceState(eventId: string): GameState {
@@ -463,5 +466,73 @@ describe("choice events", () => {
     for (let i = 1; i <= 300; i++) {
       expect(fireEvent(noForts, PLAYER_ID, createRng(i)).pendingChoice?.eventId).not.toBe("sap_the_walls");
     }
+  });
+
+  it("envoy exchange: sending warms relations with the lowest-standing rival for 20 gold", () => {
+    const base = pendingChoiceState("envoy_exchange");
+    // Make one rival clearly the frostiest so the target is unambiguous.
+    const rivals = base.nations.filter((n) => !n.isPlayer && !n.isBarbarian).map((n) => n.id);
+    const targetId = rivals[0]!;
+    const s: GameState = { ...base, relations: { ...base.relations, [pairKey(PLAYER_ID, targetId)]: -30 } };
+    const rel0 = -30;
+    const gold0 = s.nations[PLAYER_ID]!.stocks.gold;
+    expect(gold0).toBeGreaterThanOrEqual(20);
+    const sent = resolveChoice(s, "send");
+    expect(sent.pendingChoice).toBeUndefined();
+    expect(sent.nations[PLAYER_ID]!.stocks.gold).toBe(gold0 - 20);
+    expect(relationBetween(sent, PLAYER_ID, targetId)).toBe(rel0 + 15);
+  });
+
+  it("envoy exchange: abstaining costs nothing and changes no relations", () => {
+    const s = pendingChoiceState("envoy_exchange");
+    const gold0 = s.nations[PLAYER_ID]!.stocks.gold;
+    const rel0 = JSON.stringify(s.relations);
+    const abstained = resolveChoice(s, "abstain");
+    expect(abstained.pendingChoice).toBeUndefined();
+    expect(abstained.nations[PLAYER_ID]!.stocks.gold).toBe(gold0);
+    expect(JSON.stringify(abstained.relations)).toBe(rel0);
+  });
+});
+
+describe("balancing setback events", () => {
+  it("drought costs food and never drives it below zero", () => {
+    const base = createGame({ seed: 12345, rivals: 2 });
+    // Player food low so the −12 would underflow without the floor.
+    const g = { ...base, nations: base.nations.map((n) => (n.id === PLAYER_ID ? { ...n, stocks: { ...n.stocks, food: 4 } } : n)) };
+    for (let i = 1; i <= 300; i++) {
+      const next = fireEvent(g, PLAYER_ID, createRng(i));
+      if (next.log.some((l) => l.includes("dry year"))) {
+        expect(next.nations[PLAYER_ID]!.stocks.food).toBe(0); // floored, not negative
+        return;
+      }
+    }
+    throw new Error("drought never fired across 300 seeds");
+  });
+
+  it("a raided caravan costs gold but never below zero", () => {
+    const base = createGame({ seed: 12345, rivals: 2 });
+    const g = { ...base, nations: base.nations.map((n) => (n.id === PLAYER_ID ? { ...n, stocks: { ...n.stocks, gold: 5 } } : n)) };
+    for (let i = 1; i <= 300; i++) {
+      const next = fireEvent(g, PLAYER_ID, createRng(i));
+      if (next.log.some((l) => l.includes("Bandits waylay"))) {
+        expect(next.nations[PLAYER_ID]!.stocks.gold).toBe(0);
+        return;
+      }
+    }
+    throw new Error("caravan_raided never fired across 300 seeds");
+  });
+
+  it("a border raid costs population but never below the minimum, and adds no owner change", () => {
+    const g = createGame({ seed: 12345, rivals: 2 });
+    const before = g.regions.filter((r) => r.ownerId === PLAYER_ID).length;
+    for (let i = 1; i <= 400; i++) {
+      const next = fireEvent(g, PLAYER_ID, createRng(i));
+      if (next.log.some((l) => l.includes("Raiders strike"))) {
+        expect(next.regions.every((r) => r.population >= 1)).toBe(true);
+        expect(next.regions.filter((r) => r.ownerId === PLAYER_ID).length).toBe(before);
+        return;
+      }
+    }
+    throw new Error("border_raid never fired across 400 seeds");
   });
 });

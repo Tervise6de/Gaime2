@@ -22,7 +22,7 @@ import {
   type ModifierId,
   type Region,
 } from "@/systems/state";
-import { atWar } from "@/systems/diplomacy";
+import { atWar, adjustRelation, getRelation } from "@/systems/diplomacy";
 import { round1 } from "@/systems/economy";
 import type { TraitId } from "@/data/traits";
 
@@ -157,6 +157,26 @@ function hostileFortNeighbour(state: GameState, nationId: number): Region | null
   return best;
 }
 
+/**
+ * A living non-barbarian rival with the lowest standing toward `nationId` — the
+ * natural target for a relations-warming envoy. Ties by id. Null if the nation has
+ * no living rival. Deterministic.
+ */
+function lowestRelationRival(state: GameState, nationId: number): number | null {
+  const rivals = state.nations.filter((n) => !n.isBarbarian && n.alive && n.id !== nationId);
+  if (!rivals.length) return null;
+  let best = rivals[0]!;
+  let bestRel = getRelation(state, nationId, best.id);
+  for (const r of rivals.slice(1)) {
+    const rel = getRelation(state, nationId, r.id);
+    if (rel < bestRel || (rel === bestRel && r.id < best.id)) {
+      best = r;
+      bestRel = rel;
+    }
+  }
+  return best.id;
+}
+
 const EVENTS: EventDef[] = [
   {
     id: "good_harvest",
@@ -285,6 +305,76 @@ const EVENTS: EventDef[] = [
     },
   },
   {
+    // Setback: a dry year — the counterweight to good_harvest. Costs food and
+    // unsettles one region, never below the floors.
+    id: "drought",
+    weight: 2,
+    apply: (state, nationId, rng) => {
+      const owned = state.regions.filter((r) => r.ownerId === nationId);
+      if (!owned.length) return null;
+      const drained = addStock(state, nationId, "food", -12);
+      const withFloor = {
+        ...drained,
+        nations: drained.nations.map((n) =>
+          n.id === nationId ? { ...n, stocks: { ...n.stocks, food: Math.max(0, n.stocks.food) } } : n,
+        ),
+      };
+      const target = owned[rng.int(0, owned.length - 1)]!;
+      const regions = withFloor.regions.map((r) =>
+        r.id === target.id ? { ...r, unrest: Math.min(UNREST_MAX, round1(r.unrest + 5)) } : r,
+      );
+      return { state: { ...withFloor, regions }, message: "A dry year — granaries thin and tempers fray." };
+    },
+  },
+  {
+    // Setback: bandits waylay a caravan — the counterweight to market_boom. Never
+    // drives the treasury below zero.
+    id: "caravan_raided",
+    weight: 2,
+    apply: (state, nationId) => {
+      const drained = addStock(state, nationId, "gold", -12);
+      const nations = drained.nations.map((n) =>
+        n.id === nationId ? { ...n, stocks: { ...n.stocks, gold: Math.max(0, n.stocks.gold) } } : n,
+      );
+      return { state: { ...drained, nations }, message: "Bandits waylay a caravan — the coffers lighten." };
+    },
+  },
+  {
+    // Setback (frontier only): a raid across an exposed border costs a little
+    // population and stirs unrest there. Fires only for a realm with a frontier.
+    id: "border_raid",
+    weight: 2,
+    eligible: (state, nationId) => frontierRegion(state, nationId) !== null,
+    apply: (state, nationId) => {
+      const target = frontierRegion(state, nationId);
+      if (!target) return null;
+      const regions = state.regions.map((r) =>
+        r.id === target.id
+          ? {
+              ...r,
+              population: round1(Math.max(MIN_POPULATION, r.population - 1)),
+              unrest: Math.min(UNREST_MAX, round1(r.unrest + 8)),
+            }
+          : r,
+      );
+      return { state: { ...state, regions }, message: `Raiders strike across the border at ${target.name}.` };
+    },
+  },
+  {
+    // Windfall: a travelling fair — a small dual boon (a little coin, a little calm).
+    id: "traveling_fair",
+    weight: 1,
+    apply: (state, nationId) => {
+      const owned = state.regions.filter((r) => r.ownerId === nationId);
+      if (!owned.length) return null;
+      const paid = addStock(state, nationId, "gold", 10);
+      const regions = paid.regions.map((r) =>
+        r.ownerId === nationId ? { ...r, unrest: Math.max(0, round1(r.unrest - 4)) } : r,
+      );
+      return { state: { ...paid, regions }, message: "A travelling fair passes through — coin and cheer in its wake." };
+    },
+  },
+  {
     // DECISION: pay upfront to kick off a run of prosperity (a lasting +gold modifier).
     id: "golden_jubilee",
     weight: 2,
@@ -387,6 +477,47 @@ const EVENTS: EventDef[] = [
         const n = state.nations.find((x) => x.id === nationId);
         const econ = n?.personality?.economy ?? 0.5;
         return n && n.stocks.gold >= 50 && econ >= 0.5 ? "fund" : "ignore";
+      },
+    },
+  },
+  {
+    // DECISION (diplomacy): spend gold on an envoy to warm relations with your
+    // frostiest neighbour — a de-escalation lever, the first event to touch
+    // diplomacy. Fires only when a living rival exists.
+    id: "envoy_exchange",
+    weight: 2,
+    eligible: (state, nationId) => lowestRelationRival(state, nationId) !== null,
+    choice: {
+      prompt: "Your chancellor proposes an envoy to a neighbouring court — fund the mission for 20 gold?",
+      options: [
+        {
+          id: "send",
+          label: "Send the envoy (−20g)",
+          detail: "Spend 20 gold; +15 relations with your lowest-standing rival.",
+          apply: (state, nationId) => {
+            const n = state.nations.find((x) => x.id === nationId);
+            if (!n || n.stocks.gold < 20) return { state, message: "Too little gold to fund an envoy." };
+            const target = lowestRelationRival(state, nationId);
+            if (target === null) return { state, message: "No neighbouring court to treat with." };
+            const paid = addStock(state, nationId, "gold", -20);
+            const warmed = adjustRelation(paid, nationId, target, 15);
+            const targetName = state.nations.find((x) => x.id === target)?.name ?? "a rival";
+            return { state: warmed, message: `Your envoy is well received — relations with ${targetName} warm.` };
+          },
+        },
+        {
+          id: "abstain",
+          label: "Not now",
+          detail: "Keep the gold; leave the courts be.",
+          apply: (state) => ({ state, message: "You keep your envoys at home." }),
+        },
+      ],
+      // A funded nation warms ties with a rival it isn't yet friendly with.
+      aiPick: (state, nationId) => {
+        const n = state.nations.find((x) => x.id === nationId);
+        const target = lowestRelationRival(state, nationId);
+        if (!n || target === null || n.stocks.gold < 40) return "abstain";
+        return getRelation(state, nationId, target) < 20 ? "send" : "abstain";
       },
     },
   },
