@@ -114,7 +114,7 @@ function main(): void {
         commit(); // adopt the imported game as the live autosave
         hud.toast(`Imported game — turn ${state.turn}.`);
       } else {
-        hud.toast("Import failed — not a valid Gaime2 save.");
+        hud.toast("Import failed — not a valid Petty Kingdoms save.");
       }
     },
     onQueueBuilding(regionId, building) {
@@ -335,7 +335,7 @@ function main(): void {
   });
 
   // eslint-disable-next-line no-console
-  console.info("Gaime2 — v1 ready. Build, research, conquer, and outlast your rivals.");
+  console.info("Petty Kingdoms — v1 ready. Build, research, conquer, and outlast your rivals.");
 }
 
 /** A wall-clock stamp for saves. Kept out of the sim (which forbids Date). */

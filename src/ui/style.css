@@ -2131,7 +2131,10 @@ a:focus-visible,
   font-size: clamp(30px, 6vmin, 46px);
   font-weight: 700;
   letter-spacing: 0.32em;
-  text-indent: 0.32em; /* recentre the tracked text */
+  /* Centre every line (the name wraps to two on narrow screens); padding-left
+     offsets the trailing letter-spacing so tracked text reads optically centred. */
+  text-align: center;
+  padding-left: 0.32em;
   text-transform: uppercase;
   background: linear-gradient(180deg, #efd694, #d8a24a 70%, #b0812f);
   -webkit-background-clip: text;
@@ -2142,7 +2145,8 @@ a:focus-visible,
 .title-tagline {
   font-size: 13px;
   letter-spacing: 0.42em;
-  text-indent: 0.42em;
+  text-align: center;
+  padding-left: 0.42em;
   text-transform: uppercase;
   color: var(--muted);
 }

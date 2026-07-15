@@ -1,13 +1,12 @@
 # Marketing & positioning
 
-Working messaging for launch. The game is a browser-based **Kingdom Management /
-4X-lite** strategy game (working title *Gaime2* — a placeholder; see §7),
-developed by **GAIME**. This doc is the source of truth for how we talk about it.
+Working messaging for launch. **Petty Kingdoms** is a browser-based **Kingdom
+Management / 4X-lite** strategy game, developed by **GAIME**. This doc is the
+source of truth for how we talk about it.
 
-> **Developer / studio:** GAIME. Credit the studio in the store listing, the
-> title/credits screen, and the Show HN post. Note the studio name (GAIME) is
-> distinct from the game's still-unchosen title (§7) — don't conflate them in
-> copy.
+> **Title:** Petty Kingdoms. **Developer / studio:** GAIME. Credit the studio in
+> the store listing, the title/credits screen, and the Show HN post — and keep
+> the two distinct in copy ("Petty Kingdoms, by GAIME"), since the names rhyme.
 
 > **The one-line pitch:** *A whole 4X in a browser tab — no install, no account,
 > no network. The empire, the rivals, and the AI all run on your machine.*
@@ -41,10 +40,10 @@ Supporting proof points:
 ## 2. Positioning statement
 
 For strategy players who want real 4X depth without the install, the account,
-or the all-nighter, *[Game]* is a browser 4X you can start in one click and
+or the all-nighter, *Petty Kingdoms* is a browser 4X you can start in one click and
 finish in an evening — with a rival AI that runs entirely on your own machine,
 so it works offline and shares nothing. Unlike big-box 4X titles (heavy
-installs, online launchers) or most web games (thin, ad-supported), *[Game]* is
+installs, online launchers) or most web games (thin, ad-supported), *Petty Kingdoms* is
 deep, private, deterministic, and free.
 
 ## 3. Taglines (to A/B test)
@@ -77,7 +76,7 @@ straight to a playable build, mention the offline/privacy guarantee up front.
 
 ## 5. Launch checklist (marketing side)
 
-- [ ] Final name + wordmark locked (blocks everything — see §7).
+- [x] Name + wordmark locked: **Petty Kingdoms** (wired into the title screen, `<title>`, README).
 - [ ] One-click playable build on a stable URL (itch.io embed + direct link).
 - [ ] 3–5 screenshots: title screen, territory (Voronoi) map, region panel,
       diplomacy, end-game standings. All in dark theme; one colour-blind variant.
@@ -88,7 +87,7 @@ straight to a playable build, mention the offline/privacy guarantee up front.
 
 ## 6. Store blurb (draft, ~100 words)
 
-> Rule a kingdom in a browser tab. *[Game]* is a compact 4X strategy game —
+> Rule a kingdom in a browser tab. *Petty Kingdoms* is a compact 4X strategy game —
 > explore a procedurally generated realm, grow your economy, keep your people
 > from revolting, raise armies through a rock-paper-scissors counter-loop, and
 > outmanoeuvre rival powers by war, wonders, or sheer prestige. Every world is
@@ -97,12 +96,16 @@ straight to a playable build, mention the offline/privacy guarantee up front.
 > offline. No install, no ads, no tracking. One click to start, one evening to
 > win. Free.
 
-## 7. The blocker: the name
+## 7. The name — decided
 
-*"Gaime2"* is a placeholder and no marketing survives it — a real name +
-wordmark is the single gating decision before any launch push. It should evoke
-rule/realm/strategy, be short, and be a clean domain/handle. Directions to
-explore (not final): **Realmspan, Suzerain, Crownfall, Thronework, Kelmoor,
-Marchlands, Regnum, Overreach, Petty Kingdoms, Tessera** (nods to the Voronoi
-map). Once chosen, it's a one-line copy edit in the title screen (the wordmark
-renders as DOM text by design) — no art rework needed.
+**Petty Kingdoms.** Self-aware, memorable, and true to the fantasy: small realms
+with big grudges, squabbling over a fractured map. It pairs cleanly with the
+studio (GAIME) and gives a strong two-word wordmark. Now live in the title
+screen, `<title>`, README and this doc; the wordmark renders as DOM text, so any
+future tweak stays a copy edit, not an art change.
+
+**Still to verify before a public push:** domain availability, and a search on
+Steam / itch / trademark registries (an unrelated title of the same name would
+force a qualifier like *"Petty Kingdoms: <subtitle>"*). Shortlist kept for
+reference in case a conflict forces a change: Suzerain, Marchlands, Tessera,
+Crownfall, Realmspan.

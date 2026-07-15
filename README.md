@@ -1,6 +1,7 @@
-# Gaime2
+# Petty Kingdoms
 
-A browser-based **Kingdom Management / 4X-lite** strategy game. Depth comes
+A browser-based **Kingdom Management / 4X-lite** strategy game by **GAIME**.
+Depth comes
 from interacting systems — economy, population, military, diplomacy — rather
 than from art. Low-art, high-decision-density, runs anywhere a browser does.
 

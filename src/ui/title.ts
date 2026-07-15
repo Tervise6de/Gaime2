@@ -4,9 +4,9 @@
  * Key art (TITLE_ART crest medallion) + wordmark over the usual game-shell
  * entries: Continue (or Begin), New game (expands the shared setup form from
  * ui/newgame.ts — identical to the HUD's), Options and Records (the HUD's own
- * overlays, raised above the menu while it is open). The game name is still
- * the "Gaime2" placeholder — it renders as DOM text so the eventual rename is
- * a copy edit, never an art change.
+ * overlays, raised above the menu while it is open). The wordmark
+ * ("Petty Kingdoms") renders as DOM text, so a rename stays a copy edit rather
+ * than an art change.
  *
  * Pure presentation: no sim access. The end-turn hotkey is blocked by main.ts's
  * `modalOpen()` `.title-overlay` check (load-bearing — main.ts's listener is a
@@ -48,11 +48,11 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
 
     const wordmark = document.createElement("h1");
     wordmark.className = "title-wordmark";
-    wordmark.textContent = "Gaime2";
+    wordmark.textContent = "Petty Kingdoms";
 
     const tagline = document.createElement("p");
     tagline.className = "title-tagline";
-    tagline.textContent = "Kingdom Management";
+    tagline.textContent = "Small realms, grand ambitions";
 
     const menu = document.createElement("div");
     menu.className = "title-menu";
