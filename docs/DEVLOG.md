@@ -6,6 +6,24 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-15 (third pass) — D1 polish: badges, branch/treaty glyphs, army chips
+
+- **Achievement badges**: all 10 achievements got a unique motif in a shared
+  soft-hexagon frame (`BADGE_ART` + `badgeArt()`); locked entries keep the
+  padlock, unknown ids fall back to the generic medal.
+- **Tech-branch glyphs** (`BRANCH_ART`): coin / crossed swords / columned hall
+  / star beside the branch name in the research picker and the tech tree.
+- **Treaty glyphs** (`TREATY_ART`): the diplomacy status chip now leads with
+  crossed swords (war), an olive sprig (peace), two standing shields (NAP) or
+  interlocked rings (alliance) — treaty state reads before the word does.
+- **Army composition chips**: "2 Mil, 1 Inf" is now unit-icon chips with
+  counts (tooltip carries the full name); the text path remains the fallback.
+
+Verify: 375 tests green, typecheck/build clean, `fetch(` count 0, Playwright
+pass over the region panel and Records overlay — no console errors.
+
+---
+
 ## 2026-07-15 (later) — D1 continued: title screen, moment art, map texture
 
 Second art cycle of the day, finishing the brief's remaining deliverables
