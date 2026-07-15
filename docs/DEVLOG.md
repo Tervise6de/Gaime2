@@ -6,6 +6,44 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — ROADMAP D4: Performance profiling — measured fast, guard added
+
+First Phase-D item the loop can complete alone (D1–D3 are `[RESOURCE]`; D4 is not).
+Profiled the whole pipeline at the largest configuration (30 regions × 6 nations ×
+150 turns, AI self-play) with a temporary harness.
+
+**Measured baseline (this box):**
+- Full turn loop (AI + events + resolve): **~0.62 ms/turn**.
+- `resolveTurn` alone, mid-game: **~0.35 ms**.
+- `computeVoronoiCells` (30 regions): **~0.115 ms** — and already cached by the
+  renderer (recomputed only when map geometry changes, never per frame).
+
+Everything is far under the 16.6 ms/frame budget, so — per the roadmap's "optimise
+only if measured slow" — **no hot path warrants optimisation**; forcing a
+micro-optimisation on already-fast code would add risk for no gain.
+
+**Durable deliverable:** a committed max-config integration + regression guard
+(`systems/perf.test.ts`). It plays five full 30r/6n games to completion and asserts
+the game always terminates, region ownership is conserved, and every stock stays
+finite and non-negative — the first end-to-end test at the largest config — plus a
+deliberately generous wall-clock ceiling (8 s vs ~0.33 s measured; ~24× headroom) so
+it never flakes but would still trip on an accidental O(n²)→O(n³) blow-up. The temp
+harness was deleted.
+
+**Verify:** typecheck ✓, **368 tests ✓** (+1; the new test runs in ~0.33 s), build ✓
+(0 `fetch`, deps `{}`, bundle byte-identical — test-only change). No browser/probe
+needed (no runtime, UI, or sim change).
+
+**Roadmap position:** with A–C complete and D4 done, the loop-tractable code work is
+essentially finished. **Remaining is `[RESOURCE]`-gated** — D1 art (needs an artist),
+D2 human playtesting (needs people), D3 store/packaging (needs a target + accounts),
+D5 localisation (only if targeting non-English). Next cycles will do the *code-side
+scaffolding* for these (e.g. D5 UI-string extraction) and surface to the human what
+external input each needs; the project sits at a genuine **~90+**, testing-ready and
+feature-complete, with market-readiness now gated on non-code inputs.
+
+---
+
 ## 2026-07-14 — ROADMAP C4: Diplomacy depth II — peace offers with reparations
 
 Fourth Phase-C item of `docs/roadmap-to-ready.md`, and the last before ~95: give AI
