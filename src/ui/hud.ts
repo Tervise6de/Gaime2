@@ -29,7 +29,7 @@ import {
   setDefaultMapLayout,
 } from "@/ui/settings";
 import { cbSafe } from "@/data/palette";
-import { crestSvg } from "@/data/art";
+import { crestSvg, TERRAIN_ART } from "@/data/art";
 import {
   glyphEl,
   glyphHtml,
@@ -1156,7 +1156,7 @@ function renderRegion(
   const title = el("p", "hud-region-title");
   title.textContent = region.name;
   const swatch = el("span", "hud-region-swatch");
-  swatch.style.background = terrain.color;
+  swatch.style.background = terrainCss(region.terrain);
   title.prepend(swatch);
 
   const meta = el("p", "hud-region-meta");
@@ -1528,7 +1528,7 @@ function buildLegend(): HTMLElement {
     `<span class="hud-legend-line" style="border-top-color:${color}"></span>`;
 
   section("Terrain (node fill)");
-  for (const t of TERRAIN_IDS) row(disc(TERRAIN[t].color), TERRAIN[t].name);
+  for (const t of TERRAIN_IDS) row(disc(terrainCss(t)), TERRAIN[t].name);
 
   section("Region markers");
   row(ring("#d8a24a"), "Owner colour (ring) · dark = neutral/barbarian");
@@ -2136,6 +2136,14 @@ function nationMark(n: Nation): HTMLElement {
   const sw = el("span", "hud-region-swatch");
   sw.style.background = color;
   return sw;
+}
+
+/** CSS background matching the map's shaded terrain fill (flat colour fallback). */
+function terrainCss(t: (typeof TERRAIN_IDS)[number]): string {
+  const shade = TERRAIN_ART[t];
+  const base = TERRAIN[t].color;
+  if (!shade) return base;
+  return `radial-gradient(circle at 35% 32%, ${shade.hi}, ${base} 55%, ${shade.lo})`;
 }
 
 function unrestTag(region: Region): HTMLElement {

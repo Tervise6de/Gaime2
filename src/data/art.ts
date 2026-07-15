@@ -246,15 +246,18 @@ export interface TerrainShade {
 }
 
 export const TERRAIN_ART: Record<TerrainId, TerrainShade | null> = {
-  plains: null,
-  forest: null,
-  hills: null,
-  mountains: null,
-  coast: null,
+  plains: { hi: "#a8c476", lo: "#6f8c45" },
+  forest: { hi: "#549465", lo: "#2c5c3a" },
+  hills: { hi: "#c2a468", lo: "#866c3d" },
+  mountains: { hi: "#979aa5", lo: "#5e616b" },
+  coast: { hi: "#62a2cf", lo: "#35688f" },
 };
 
 /** World background vignette (`null` = flat renderer BACKGROUND). */
-export const WORLD_BG: { inner: string; outer: string } | null = null;
+export const WORLD_BG: { inner: string; outer: string } | null = {
+  inner: "#171d29",
+  outer: "#0b0e14",
+};
 
 // `ico` is exported for the phases that fill these tables in (and for tests);
 // keeping the builder beside the data keeps every icon on the shared grid.
