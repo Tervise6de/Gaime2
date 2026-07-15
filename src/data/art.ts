@@ -159,28 +159,87 @@ export const GLYPH_ART: Record<GlyphId, string | null> = {
 };
 
 export const UNIT_ART: Record<UnitType, string | null> = {
-  militia: null,
-  infantry: null,
-  ranged: null,
-  cavalry: null,
-  siege: null,
+  // Pitchfork — the farm levy.
+  militia: ico(
+    '<path d="M12 21.2v-7.9"/><path d="M8.2 4.2v4.6a3.8 3.8 0 007.6 0V4.2"/><path d="M12 4.2v9.1"/>',
+  ),
+  // Upright sword — the professional line.
+  infantry: ico(
+    '<path d="M12 3.2v10.6M8.6 8.4h6.8M12 13.8v4.4M10.4 20.4h3.2"/><path d="M12 3.2l-1.2 2h2.4z" fill="currentColor" stroke="none"/>',
+  ),
+  // Drawn bow with a nocked arrow.
+  ranged: ico(
+    '<path d="M8.2 3.9c5.3 3.2 5.3 13 0 16.2"/><path d="M8.2 3.9v16.2"/><path d="M8.2 12h10.7M18.9 12l-2.8-1.7M18.9 12l-2.8 1.7"/>',
+  ),
+  // Horse head + couched lance.
+  cavalry:
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">' +
+    '<path d="M6.2 20.5c0-4.4 1.4-7.5 4-9.2L8.9 6.8l1.9 1.2.6-2 1.7 3c3.1 1.5 5.2 4.4 5.2 7.7v3.8h-3.5c0-2.1-1-3.3-3-3.8-1.3.9-2 2.1-2 3.8z" fill="currentColor"/>' +
+    '<g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M15 9l5-5M20 4h-2.7M20 4v2.7"/></g>' +
+    "</svg>",
+  // Catapult: frame, wheels, throwing arm.
+  siege: ico(
+    '<circle cx="7.8" cy="17.6" r="2.1"/><circle cx="15.4" cy="17.6" r="2.1"/><path d="M4.6 15.4h14.2"/><path d="M7.4 14.6l9-9M16.4 5.6l3.5-.6-.8 3.4z"/>',
+  ),
 };
 
 export const BUILDING_ART: Record<BuildingId, string | null> = {
-  farm: null,
-  workshop: null,
-  market: null,
-  harbor: null,
-  mine: null,
-  library: null,
-  temple: null,
-  aqueduct: null,
-  university: null,
-  bank: null,
-  guildhall: null,
-  forum: null,
-  fortress: null,
-  wonder: null,
+  // Barn with a door.
+  farm: ico(
+    '<path d="M4.5 19.5v-8.5L12 5.3l7.5 5.7v8.5z"/><path d="M9.8 19.5v-5.3h4.4v5.3"/><path d="M3.4 19.5h17.2"/>',
+  ),
+  // Roofed shed with a hammer at work.
+  workshop: ico(
+    '<path d="M4 10.6L12 4.6l8 6"/><path d="M5.6 10.6v8.9M18.4 10.6v8.9M3.4 19.5h17.2"/><path d="M9.4 16.8l3.2-3.2M12 12l2.3 2.3 1.5-1.5L13.5 10.5z"/>',
+  ),
+  // Scalloped market awning over a stall.
+  market: ico(
+    '<path d="M4.1 4.5h15.8l1.3 3.3a2.65 2.65 0 01-5.3.2 2.65 2.65 0 01-5.3 0 2.65 2.65 0 01-5.3-.2z"/><path d="M5.6 10.8v8.7h12.8v-8.7"/><path d="M10 19.5v-4.8h4v4.8"/>',
+  ),
+  // Anchor.
+  harbor: ico(
+    '<circle cx="12" cy="5.2" r="1.9"/><path d="M12 7.1v12.4"/><path d="M12 19.5c-4.3 0-7.2-2.4-7.8-5.7l2.6 1.1M12 19.5c4.3 0 7.2-2.4 7.8-5.7l-2.6 1.1"/><path d="M8.9 10h6.2"/>',
+  ),
+  // Mine tunnel.
+  mine: ico(
+    '<path d="M4.2 19.5v-6.1a7.8 7.8 0 0115.6 0v6.1"/><path d="M9.3 19.5v-4a2.7 2.7 0 015.4 0v4"/><path d="M3 19.5h18"/>',
+  ),
+  // Bookshelf.
+  library: ico(
+    '<rect x="5" y="4" width="14" height="15.5" rx="1.2"/><path d="M5 9.7h14M5 14.6h14"/><path d="M8.4 4.6v4M11.4 5.4v3.2M15.6 10.4v3.6M9.2 15.3v3.5"/>',
+  ),
+  // Pediment on columns.
+  temple: ico(
+    '<path d="M3.9 8.6L12 3.9l8.1 4.7z"/><path d="M5.8 8.6v7.6M12 8.6v7.6M18.2 8.6v7.6"/><path d="M4.4 16.2h15.2M3.2 19.5h17.6"/>',
+  ),
+  // Arched water bridge.
+  aqueduct: ico(
+    '<path d="M3.4 5.4h17.2M4.6 5.4v2.4M19.4 5.4v2.4M3.4 7.8h17.2"/><path d="M5.2 19.5v-8.1a3.2 3.2 0 016.4 0v8.1M12.4 19.5v-8.1a3.2 3.2 0 016.4 0v8.1"/><path d="M3 19.5h18"/>',
+  ),
+  // Domed hall.
+  university: ico(
+    '<path d="M6.4 9.6a5.6 5.6 0 0111.2 0z"/><path d="M12 2.8v1.4M4.9 9.6h14.2"/><path d="M6.6 12.4v7.1M12 12.4v7.1M17.4 12.4v7.1M4.6 12.4h14.8M3.4 19.5h17.2"/>',
+  ),
+  // Vault chest.
+  bank: ico(
+    '<rect x="4.5" y="7" width="15" height="12.5" rx="1.6"/><path d="M4.5 11.2h15"/><circle cx="12" cy="15.2" r="1.8"/><path d="M12 13.4v-2.2"/>',
+  ),
+  // Hall flying the guild shield.
+  guildhall: ico(
+    '<path d="M4.9 19.5V9.2L12 4.6l7.1 4.6v10.3z"/><path d="M12 10.3l2.7 1v2c0 1.8-1.1 3.1-2.7 3.6-1.6-.5-2.7-1.8-2.7-3.6v-2z"/><path d="M3.4 19.5h17.2"/>',
+  ),
+  // Tiered amphitheatre.
+  forum: ico(
+    '<path d="M4 18.5a8 8 0 0116 0"/><path d="M6.7 18.5a5.3 5.3 0 0110.6 0M9.4 18.5a2.6 2.6 0 015.2 0"/><path d="M3 18.5h18"/>',
+  ),
+  // Crenellated keep.
+  fortress: ico(
+    '<path d="M6.4 19.5V8h2.1V6.1h2.2V8h2.6V6.1h2.2V8h2.1v11.5z"/><path d="M10.4 19.5v-3.7h3.2v3.7"/><path d="M4.6 19.5h14.8"/>',
+  ),
+  // Great Work: laurelled monument, always in the brand gold.
+  wonder: ico(
+    '<path d="M10.8 14.3L12 4.6l1.2 9.7z"/><path d="M9.2 16.9h5.6M8 19.5h8"/><path d="M5.3 7.8c-.6 3.6.3 6.7 2.4 9.3M18.7 7.8c.6 3.6-.3 6.7-2.4 9.3"/><path d="M5.3 7.8l1.9.5M18.7 7.8l-1.9.5"/>',
+  ).replaceAll("currentColor", "#e6c874"),
 };
 
 // ---------------------------------------------------------------------------

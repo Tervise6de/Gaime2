@@ -2090,3 +2090,10 @@ a:focus-visible,
   width: 18px;
   height: 20px;
 }
+
+/* Unit / building menu icons sit tight against their labels. */
+.hud-unit-name .ico,
+.hud-build-name .ico {
+  margin-right: 5px;
+  vertical-align: -0.22em;
+}
