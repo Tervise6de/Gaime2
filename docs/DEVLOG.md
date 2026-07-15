@@ -43,11 +43,12 @@ suite) and sweep every SVG table. 377 tests green; typecheck/build clean; bundle
 `fetch(` 0; 7-scenario Playwright matrix + the XSS and discard-confirm probes all
 pass with no console errors.
 
-Left as noted-not-fixed (low/latent): the `ensureCells` signature only hashes
-region-0's position (pre-existing, needs a same-count regen pinning site 0 — not
-reachable with random mapgen); the trade-vignette pan transform is ~sub-pixel at
-display size; TREATY/BRANCH empty-string fallbacks are dead while those tables are
-fully populated.
+Follow-up: the three low/latent items were then fixed too — `ensureCells` now
+rolls up every region's coordinates (a same-count regen can't reuse stale cells);
+the trade vignette's pans attach directly to the beam (dropped the transform that
+detached them); and `iconEl`/`iconHtml` emit nothing (not a zero-size span) when a
+registry entry is null with no fallback, honouring the all-null-registry contract.
+377 tests green, build clean, Voronoi + regen verified with no console errors.
 
 ---
 
