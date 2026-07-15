@@ -6,6 +6,44 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — ROADMAP C4: Diplomacy depth II — peace offers with reparations
+
+Fourth Phase-C item of `docs/roadmap-to-ready.md`, and the last before ~95: give AI
+peace bids real terms. A losing AI now **sweetens its peace offer to the player with
+gold reparations** — a concrete reason to grant peace, and a richer negotiation than
+a bare white-peace.
+
+**Sim:**
+- `peaceReparations(state, from, to)` (pure, exported) — only the clearly-weaker
+  party (power ratio < 0.75) offers, spending a bounded slice of its treasury
+  (≤40, ≥10 or nothing).
+- `acceptOffer` "peace" case now transfers `offer.gold` from the suing nation to the
+  player (capped at what it still holds — it may have spent since offering) before
+  the war ends. Existing gold-less peace offers are unaffected.
+- `ai.ts` `suePeace` attaches reparations when suing to the player; AI-to-AI peace is
+  unchanged (resolves immediately, no offer).
+
+**UI:** the offer reads "*X sues for peace, offering Ng in reparations*" when gold is
+attached (plain peace otherwise).
+
+**Verify:** typecheck ✓, **367 tests ✓** (+4: reparations only from the weaker party
+and bounded; accept transfers the gold and ends the war; the transfer caps at the
+payer's balance; a plain peace moves no gold). Build ✓ (0 `fetch`, deps `{}`). A
+temporary 40-game self-play probe exercised the path (177 reparations offers) with
+**0 timeouts**, turn length min 24 / median 100 / max 150 — stable — then deleted.
+Browser (Playwright, crafted autosave): the offer renders "…offering 30g in
+reparations", accepting moves the player's gold 60→90 and clears the offer; no page
+errors.
+
+**Phase C nearly done:** C1–C4 shipped (meta-progression, content events, scenarios,
+diplomacy depth). **Next:** the remaining polish toward market-ready lives in Phase D
+(`[RESOURCE]`-tagged: real art, human playtesting, store, perf, localisation) — the
+code-only headroom in A–C is largely spent, so upcoming cycles will pick the most
+code-tractable D items (e.g. a perf pass, or a localisation scaffold) and flag the
+rest as needing a human/budget.
+
+---
+
 ## 2026-07-14 — ROADMAP C3: Start scenarios — hand-set openings at new-game
 
 Third Phase-C item of `docs/roadmap-to-ready.md`: replay variety through preset

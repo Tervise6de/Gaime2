@@ -1707,7 +1707,9 @@ function renderDiplomacy(
     const text =
       offer.type === "tribute"
         ? `${from} demands ${offer.gold ?? 0}g tribute.`
-        : `${from} offers ${offer.type === "nap" ? "a non-aggression pact" : offer.type}.`;
+        : offer.type === "peace" && offer.gold
+          ? `${from} sues for peace, offering ${offer.gold}g in reparations.`
+          : `${from} offers ${offer.type === "nap" ? "a non-aggression pact" : offer.type}.`;
     box.append(line(text, "hud-offer-text"));
     const row = el("div", "hud-offer-actions");
     row.append(

@@ -27,6 +27,7 @@ import {
   severTrade,
   tradeIncome,
   tradePartners,
+  peaceReparations,
 } from "@/systems/diplomacy";
 import { createGame } from "@/systems/turn";
 import {
@@ -164,6 +165,55 @@ describe("offers", () => {
     let g = addOffer(game(), RIVAL_A, 0, "peace");
     g = addOffer(g, RIVAL_A, 0, "peace");
     expect(g.offers).toHaveLength(1);
+  });
+});
+
+describe("peace reparations", () => {
+  // Strip a rival of land and army (regions → barbarian, armies removed) but leave
+  // it a treasury, so it reads as far weaker than the player.
+  const weaken = (g: GameState, rivalId: number, gold: number): GameState => ({
+    ...g,
+    nations: g.nations.map((n) => (n.id === rivalId ? { ...n, stocks: { ...n.stocks, gold } } : n)),
+    regions: g.regions.map((r) => (r.ownerId === rivalId ? { ...r, ownerId: 1 } : r)),
+    armies: g.armies.filter((a) => a.ownerId !== rivalId),
+  });
+
+  it("only the clearly-weaker party offers reparations, bounded by treasury", () => {
+    const weak = weaken(game(), RIVAL_A, 100);
+    expect(peaceReparations(weak, RIVAL_A, PLAYER_ID)).toBe(25); // min(40, floor(100*0.25))
+    // A full-strength rival on even footing offers nothing.
+    expect(peaceReparations(game(), RIVAL_A, PLAYER_ID)).toBe(0);
+    // Too small a treasury isn't worth offering.
+    expect(peaceReparations(weaken(game(), RIVAL_A, 30), RIVAL_A, PLAYER_ID)).toBe(0);
+  });
+
+  it("accepting a peace offer with reparations transfers the gold and ends the war", () => {
+    let g = declareWar(weaken(game(), RIVAL_A, 100), RIVAL_A, PLAYER_ID);
+    g = addOffer(g, RIVAL_A, PLAYER_ID, "peace", 25);
+    const rival0 = g.nations.find((n) => n.id === RIVAL_A)!.stocks.gold;
+    const player0 = g.nations[PLAYER_ID]!.stocks.gold;
+    const accepted = acceptOffer(g, g.offers[0]!.id);
+    expect(atWar(accepted, RIVAL_A, PLAYER_ID)).toBe(false);
+    expect(accepted.nations.find((n) => n.id === RIVAL_A)!.stocks.gold).toBe(rival0 - 25);
+    expect(accepted.nations[PLAYER_ID]!.stocks.gold).toBe(player0 + 25);
+  });
+
+  it("caps the reparations transfer at what the payer still holds", () => {
+    let g = weaken(game(), RIVAL_A, 10); // promises more than it now has
+    g = addOffer(g, RIVAL_A, PLAYER_ID, "peace", 25);
+    const player0 = g.nations[PLAYER_ID]!.stocks.gold;
+    const accepted = acceptOffer(g, g.offers[0]!.id);
+    expect(accepted.nations.find((n) => n.id === RIVAL_A)!.stocks.gold).toBe(0);
+    expect(accepted.nations[PLAYER_ID]!.stocks.gold).toBe(player0 + 10);
+  });
+
+  it("a plain peace offer (no reparations) moves no gold", () => {
+    let g = declareWar(game(), RIVAL_A, PLAYER_ID);
+    g = addOffer(g, RIVAL_A, PLAYER_ID, "peace");
+    const player0 = g.nations[PLAYER_ID]!.stocks.gold;
+    const accepted = acceptOffer(g, g.offers[0]!.id);
+    expect(atWar(accepted, RIVAL_A, PLAYER_ID)).toBe(false);
+    expect(accepted.nations[PLAYER_ID]!.stocks.gold).toBe(player0);
   });
 });
 

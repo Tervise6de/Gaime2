@@ -38,6 +38,7 @@ import {
   hasTrade,
   makePeace,
   nationPower,
+  peaceReparations,
   setPact,
   sharedBorders,
   wouldAccept,
@@ -445,7 +446,12 @@ function openWar(state: GameState, from: number, target: Nation): GameState {
 }
 
 function suePeace(state: GameState, from: number, target: Nation): GameState {
-  if (target.isPlayer) return addOffer(state, from, target.id, "peace");
+  if (target.isPlayer) {
+    // Sweeten the bid with reparations when clearly the weaker party — a losing AI
+    // buys its way out, giving the player a concrete reason to grant peace.
+    const reparations = peaceReparations(state, from, target.id);
+    return addOffer(state, from, target.id, "peace", reparations > 0 ? reparations : undefined);
+  }
   // AI-to-AI peace resolves immediately.
   return makePeace(state, from, target.id);
 }

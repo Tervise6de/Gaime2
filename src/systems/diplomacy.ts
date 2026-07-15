@@ -226,6 +226,20 @@ export function wouldAccept(
   }
 }
 
+/**
+ * Reparations a suing nation `from` offers `to` to sweeten a peace bid — only the
+ * clearly-weaker party buys its way out, spending a slice of its treasury (bounded).
+ * Pure and deterministic; returns 0 when it isn't worth offering.
+ */
+export function peaceReparations(state: GameState, from: number, to: number): number {
+  const me = state.nations.find((n) => n.id === from);
+  if (!me) return 0;
+  const ratio = nationPower(state, from) / (nationPower(state, to) || 1);
+  if (ratio >= 0.75) return 0; // even footing: no need to pay for peace
+  const amount = Math.min(40, Math.floor(me.stocks.gold * 0.25));
+  return amount >= 10 ? amount : 0; // too small to bother offering
+}
+
 /** Total gold upkeep-scaled strength lost/needed — helper for AI (re-exported). */
 export function armyStrengthOf(units: Record<UnitType, number>): number {
   let s = 0;
@@ -255,6 +269,24 @@ export function acceptOffer(state: GameState, offerId: number): GameState {
   let next = removeOffer(state, offerId);
   switch (offer.type) {
     case "peace":
+      // Reparations: a suing nation may sweeten peace with gold. It pays what it
+      // still has (it may have spent since offering), then the war ends.
+      if (offer.gold && offer.gold > 0) {
+        const payer = next.nations.find((n) => n.id === offer.from);
+        const pay = Math.min(offer.gold, payer?.stocks.gold ?? 0);
+        if (pay > 0) {
+          next = {
+            ...next,
+            nations: next.nations.map((n) =>
+              n.id === offer.from
+                ? { ...n, stocks: { ...n.stocks, gold: round1(n.stocks.gold - pay) } }
+                : n.id === offer.to
+                  ? { ...n, stocks: { ...n.stocks, gold: round1(n.stocks.gold + pay) } }
+                  : n,
+            ),
+          };
+        }
+      }
       next = makePeace(next, offer.from, offer.to);
       break;
     case "nap":
