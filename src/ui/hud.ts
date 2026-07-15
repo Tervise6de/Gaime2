@@ -192,6 +192,58 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     topBar.append(cell);
     resourceEls[key] = { stock, flow };
   }
+
+  // Resource-count tweening: the displayed stock eases toward the live value so the
+  // numbers count up/down instead of snapping. Skipped (snaps) under reduce-motion.
+  // The RAF idles itself once every value has settled, so a static HUD costs nothing.
+  const displayedStock: Record<ResourceKey, number> = {} as never;
+  const targetStock: Record<ResourceKey, number> = {} as never;
+  let stockInitialized = false;
+  let stockRaf: number | null = null;
+  function writeStock(key: ResourceKey, value: number, exact: boolean): void {
+    resourceEls[key].stock.textContent = exact ? fmt(value) : String(Math.round(value));
+  }
+  function snapStocks(): void {
+    for (const key of RESOURCE_KEYS) {
+      displayedStock[key] = targetStock[key];
+      writeStock(key, targetStock[key], true);
+    }
+    if (stockRaf !== null) {
+      cancelAnimationFrame(stockRaf);
+      stockRaf = null;
+    }
+  }
+  function stepStock(): void {
+    if (isReduceMotion()) {
+      snapStocks();
+      return;
+    }
+    let moving = false;
+    for (const key of RESOURCE_KEYS) {
+      const target = targetStock[key];
+      const cur = displayedStock[key] ?? target;
+      const diff = target - cur;
+      if (Math.abs(diff) < 0.5) {
+        displayedStock[key] = target;
+        writeStock(key, target, true); // exact (may be fractional) once settled
+      } else {
+        const next = cur + diff * 0.2; // ease ~20%/frame → ~0.3s to settle
+        displayedStock[key] = next;
+        writeStock(key, next, false); // rounded while counting
+        moving = true;
+      }
+    }
+    stockRaf = moving ? requestAnimationFrame(stepStock) : null;
+  }
+  function syncStockDisplay(): void {
+    if (!stockInitialized || isReduceMotion()) {
+      snapStocks();
+      stockInitialized = true;
+      return;
+    }
+    if (stockRaf === null) stockRaf = requestAnimationFrame(stepStock);
+  }
+
   const turnBadge = el("div", "hud-turn");
   topBar.append(turnBadge);
   const victoryEl = el("div", "hud-victory");
@@ -982,11 +1034,12 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     const flow = nationalProduction(state, PLAYER_ID);
     const upkeep = totalUpkeep(state, PLAYER_ID);
     for (const key of RESOURCE_KEYS) {
-      resourceEls[key].stock.textContent = fmt(player.stocks[key]);
+      targetStock[key] = player.stocks[key];
       const f = key === "gold" ? round1(flow.gold - upkeep) : flow[key];
       resourceEls[key].flow.textContent = `${f >= 0 ? "+" : ""}${fmt(f)}/turn`;
       resourceEls[key].flow.classList.toggle("negative", f < 0);
     }
+    syncStockDisplay(); // ease the displayed stock toward the new target (or snap)
     resourceEls.food.flow.classList.toggle("negative", player.famine || flow.food < 0);
     const activeMods = (player.modifiers ?? [])
       .filter((m) => m.turnsLeft > 0)

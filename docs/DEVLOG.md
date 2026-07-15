@@ -6,6 +6,32 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — B5 follow-up: resource-count tweening (deferred juice, now done)
+
+Closed the visual-juice follow-up flagged when B5 shipped: the top-bar resource
+numbers now **count up/down** to their new value instead of snapping. Pure HUD, no
+sim touch, and gated by the same reduce-motion flag as the other B5 motion.
+
+**How:** the resource cells are stable DOM refs, so `update()` now sets a *target*
+per resource and a small self-idling RAF eases the displayed value toward it
+(~20%/frame → ~0.3 s), rounding while counting and showing the exact (possibly
+fractional) value once settled. The loop stops itself when every value has settled,
+so a static HUD costs nothing. Under reduce-motion — or on the very first paint — it
+snaps immediately. A mid-tween reduce-motion toggle snaps on the next frame.
+
+**Verify:** typecheck ✓, **368 tests ✓**, build ✓ (0 `fetch`, deps `{}`). Browser
+(Playwright): with motion on, ending a turn walks gold 60→66→67→69→71→72→**72.7**
+(six distinct intermediate frames, rounded while counting, exact when settled); with
+reduce-motion on it jumps straight to 72.7 (one frame); no page errors. UI-only, so
+no probe.
+
+**Roadmap position unchanged:** A–C + D4 complete; remaining Phase-D items are
+`[RESOURCE]`-gated. This tidied the last deferred code-side polish; next cycles turn
+to the code-side *scaffolding* for the resource-gated items (D5 UI-string extraction)
+and surfacing what external input each needs.
+
+---
+
 ## 2026-07-14 — ROADMAP D4: Performance profiling — measured fast, guard added
 
 First Phase-D item the loop can complete alone (D1–D3 are `[RESOURCE]`; D4 is not).
