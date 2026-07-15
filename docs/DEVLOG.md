@@ -8,8 +8,10 @@ what changed and why, the test count after, and ideas for next time. See
 
 ## 2026-07-15 — D1: visual identity — the emoji/flat-colour era ends
 
-Executed the art brief (`docs/art-agent-brief.md`; plan + style decision in
-`docs/art-plan.md`). Committed style: **flat-vector, stroke-first line icons**
+Executed the art brief (`docs/art-agent-brief.md`; plan in `docs/art-plan.md`,
+style bible in `docs/art-style.md` — palette tokens, 24×24 grid, stroke and
+legibility rules all future assets conform to). Committed style:
+**flat-vector, stroke-first line icons**
 on a shared 24×24 grid, `currentColor`, one gold/brass accent inherited from
 the crown favicon. Everything hand-authored inline SVG — no deps, no network,
 `dependencies` still `{}`.

@@ -6,6 +6,9 @@ and the order the work lands in.
 
 ## Style decision (committed)
 
+> Codified in **`docs/art-style.md`** — the style bible (palette tokens, grid,
+> stroke and legibility rules) every future asset must conform to.
+
 **Flat-vector, stroke-first line icons** on a shared 24×24 grid:
 
 - Single consistent stroke weight (2px at 24px), rounded joins, minimal fills.
