@@ -15,6 +15,7 @@ import {
   UNIT_ART,
   badgeArt,
   crestSvg,
+  safeColor,
   eventVignette,
   ico,
 } from "@/data/art";
@@ -98,6 +99,25 @@ describe("art registry", () => {
       expect(svg).toContain("#123456");
       expect(svg).not.toContain("__C__");
     }
+  });
+
+  it("crestSvg sanitises a hostile colour (no markup break-out — DOM-XSS guard)", () => {
+    const hostile = '"><img src=x onerror=alert(1)>';
+    for (let id = 0; id <= 6; id++) {
+      const svg = crestSvg(id, hostile);
+      if (svg === null) continue;
+      expect(svg).not.toContain("<img");
+      expect(svg).not.toContain("onerror");
+    }
+  });
+
+  it("safeColor passes valid colours and rejects markup", () => {
+    expect(safeColor("#d8a24a")).toBe("#d8a24a");
+    expect(safeColor("#fff")).toBe("#fff");
+    expect(safeColor("rgb(10, 20, 30)")).toBe("rgb(10, 20, 30)");
+    expect(safeColor('"><script>alert(1)</script>')).toBe("#8a8f99");
+    expect(safeColor("red; background:url(x)")).toBe("#8a8f99");
+    expect(safeColor("javascript:alert(1)")).toBe("#8a8f99");
   });
 
   it("ico builder emits the shared 24×24 stroke shell", () => {

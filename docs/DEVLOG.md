@@ -6,6 +6,37 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-15 (seventh pass) — security review
+
+Full-codebase security pass (threat model + review recorded in
+`docs/security.md`). The game is offline and backend-less, so the surface is
+essentially "untrusted save files → DOM."
+
+**Found and fixed one real DOM XSS.** `nation.color` from an imported/shared
+save was substituted unsanitised into the crest SVG (`fill="__C__"`) and set via
+`innerHTML` in the standings/diplomacy panels — a colour like `"><img onerror=…>`
+executed script. (The fifth-pass hunt fixed the *name*/seed/difficulty sinks but
+missed *colour*.) Reproduced it headless — the page title flipped to "CRESTPWN"
+— then fixed it two ways:
+- **`safeColor()`** validates a colour is hex or `rgb()/rgba()`, else falls back
+  to neutral grey; `crestSvg` and every save-derived colour sink now route
+  through it.
+- A strict **production CSP** (`vite.config.ts`, build-time `<meta>`, skipped in
+  dev): `script-src 'self'` blocks inline handlers (a hard second layer),
+  `connect-src 'none'` enforces the no-network guarantee, `img-src 'self' data:`
+  keeps the canvas SVG rasters working. Confirmed the app runs with zero CSP
+  violations and the XSS no longer fires.
+
+Also swept: no `eval`/`Function`/`document.write`/`insertAdjacentHTML`; the only
+network-shaped call is `new Image()` on a `data:` SVG (non-scripting context);
+runtime `dependencies: {}` so nothing third-party ships. `npm audit` flags a
+dev-only esbuild/Vite advisory (dev server only, not the shipped bundle;
+remediation is a breaking Vite 8 upgrade) — documented and accepted, not fixed
+in this pass. 379 tests green (added `safeColor` + hostile-crest guards); build
+clean; bundle `fetch(` 0.
+
+---
+
 ## 2026-07-15 (sixth pass) — behaviour-driven UI bug hunt
 
 Drove the real app through its major flows (Playwright) rather than only reading

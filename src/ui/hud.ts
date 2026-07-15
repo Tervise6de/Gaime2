@@ -29,7 +29,7 @@ import {
   setDefaultMapLayout,
 } from "@/ui/settings";
 import { cbSafe } from "@/data/palette";
-import { badgeArt, BRANCH_ART, crestSvg, eventVignette, MOMENT_ART, TERRAIN_ART, TREATY_ART } from "@/data/art";
+import { badgeArt, BRANCH_ART, crestSvg, eventVignette, MOMENT_ART, safeColor, TERRAIN_ART, TREATY_ART } from "@/data/art";
 import {
   escapeHtml,
   glyphEl,
@@ -512,7 +512,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
     const title = el("h2", "hud-end-title " + (win ? "win" : "lose"));
     title.textContent = win ? "Victory!" : "Defeat";
-    if (winner) title.style.color = cbSafe(winner.color, isColourblind());
+    if (winner) title.style.color = safeColor(cbSafe(winner.color, isColourblind()));
     const sub = el("p", "hud-end-sub");
     const who = win ? "Your realm" : winner && !winner.isPlayer ? winner.name : "A rival";
     sub.textContent =
@@ -1663,7 +1663,7 @@ function buildSparkline(
     const poly = document.createElementNS(SVG_NS, "polyline");
     poly.setAttribute("points", toPoints(s.values));
     poly.setAttribute("fill", "none");
-    poly.setAttribute("stroke", cbSafe(s.nation.color, isColourblind()));
+    poly.setAttribute("stroke", safeColor(cbSafe(s.nation.color, isColourblind())));
     poly.setAttribute("stroke-width", String(round1(s.nation.isPlayer ? playerW : rivalW)));
     poly.setAttribute("stroke-opacity", s.nation.isPlayer ? "1" : "0.65");
     poly.setAttribute("stroke-linejoin", "round");
@@ -1675,7 +1675,7 @@ function buildSparkline(
       dot.setAttribute("cx", last[0]!);
       dot.setAttribute("cy", last[1]!);
       dot.setAttribute("r", String(round1(dotR)));
-      dot.setAttribute("fill", cbSafe(s.nation.color, isColourblind()));
+      dot.setAttribute("fill", safeColor(cbSafe(s.nation.color, isColourblind())));
       svg.append(dot);
     }
   }
@@ -2103,7 +2103,7 @@ function nationMark(n: Nation): HTMLElement {
     return span;
   }
   const sw = el("span", "hud-region-swatch");
-  sw.style.background = color;
+  sw.style.background = safeColor(color);
   return sw;
 }
 

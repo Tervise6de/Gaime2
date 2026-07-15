@@ -289,10 +289,22 @@ export const CREST_ART: Record<number, string | null> = {
   ),
 };
 
+/**
+ * A CSS colour safe to substitute into SVG/HTML markup. Nation colours can come
+ * from an imported save, and the crest is injected via `innerHTML`, so an
+ * unchecked value like `"><img onerror=…>` would be a DOM-XSS. Accept only hex
+ * or rgb()/rgba() tokens; anything else falls back to a neutral grey.
+ */
+export function safeColor(color: string): string {
+  return /^#[0-9a-fA-F]{3,8}$/.test(color) || /^rgba?\([\d.,%\s/]+\)$/.test(color)
+    ? color
+    : "#8a8f99";
+}
+
 /** Resolve a nation's crest SVG in its display colour, or null (fallback: colour swatch). */
 export function crestSvg(nationId: number, color: string): string | null {
   const tpl = CREST_ART[nationId];
-  return tpl ? tpl.replaceAll("__C__", color) : null;
+  return tpl ? tpl.replaceAll("__C__", safeColor(color)) : null;
 }
 
 // ---------------------------------------------------------------------------

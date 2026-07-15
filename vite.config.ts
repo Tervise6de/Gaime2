@@ -1,7 +1,39 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import { fileURLToPath, URL } from "node:url";
 
+/**
+ * Content-Security-Policy for the production build (injected as a <meta> so it
+ * ships with the static bundle; skipped in dev so Vite's HMR websocket keeps
+ * working). The game is a self-contained offline app, so the policy is tight:
+ *
+ *  - `script-src 'self'` (no 'unsafe-inline') → inline event handlers like a
+ *    smuggled `onerror=` never execute — a hard second layer under the
+ *    innerHTML escaping, should any sink ever be missed.
+ *  - `connect-src 'none'` → enforces the "makes zero network calls" guarantee
+ *    at the browser level (fetch/XHR/websocket/beacon all blocked).
+ *  - `img-src 'self' data:` → the canvas rasterises registry SVGs from data:
+ *    URIs; `style-src` allows the inline style attributes the HUD sets.
+ */
+const CSP =
+  "default-src 'self'; base-uri 'none'; object-src 'none'; " +
+  "script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; " +
+  "font-src 'self'; connect-src 'none'; form-action 'none'";
+
+function cspMeta(): Plugin {
+  return {
+    name: "csp-meta",
+    apply: "build",
+    transformIndexHtml(html) {
+      return html.replace(
+        "</title>",
+        `</title>\n    <meta http-equiv="Content-Security-Policy" content="${CSP}" />`,
+      );
+    },
+  };
+}
+
 export default defineConfig({
+  plugins: [cspMeta()],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
