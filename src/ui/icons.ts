@@ -11,19 +11,27 @@ import { GLYPH_ART, RESOURCE_ART, UNIT_ART, BUILDING_ART, type GlyphId, type Res
 import type { UnitType } from "@/data/units";
 import type { BuildingId } from "@/data/buildings";
 
-/** An inline-SVG icon element, or a text (emoji) span when no asset exists. */
+/**
+ * An inline-SVG icon element, or a text (emoji) span when no asset exists. With
+ * neither an asset nor fallback text (a null registry entry used purely
+ * decoratively), returns an empty non-rendering span so nothing collapses to a
+ * zero-size artifact — honouring the "renders fine with an all-null registry"
+ * contract.
+ */
 export function iconEl(svg: string | null | undefined, fallbackText: string, className = "ico"): HTMLElement {
   const span = document.createElement("span");
   span.className = svg ? `${className} ico-svg` : className;
   span.setAttribute("aria-hidden", "true");
   if (svg) span.innerHTML = svg;
-  else span.textContent = fallbackText;
+  else if (fallbackText) span.textContent = fallbackText;
+  else span.hidden = true;
   return span;
 }
 
 /** Same as `iconEl` but as an HTML string, for innerHTML template sites. */
 export function iconHtml(svg: string | null | undefined, fallbackText: string, className = "ico"): string {
   if (svg) return `<span class="${className} ico-svg" aria-hidden="true">${svg}</span>`;
+  if (!fallbackText) return ""; // no asset, no fallback → emit nothing rather than an empty span
   return `<span class="${className}" aria-hidden="true">${escapeHtml(fallbackText)}</span>`;
 }
 

@@ -390,7 +390,7 @@ export const EVENT_VIGNETTE: Record<string, string | null> = {
   ),
   // Balance scales — trade, markets, coin.
   trade: medallion(
-    '<path d="M12 5.8v11.4M9.4 17.2h5.2"/><path d="M6.6 8h10.8"/><path d="M6.6 8l-1.8 4.2a2.4 2.4 0 004.8 0zM17.4 8l-1.8 4.2a2.4 2.4 0 004.8 0z" transform="scale(0.92) translate(1 0.6)"/>',
+    '<path d="M12 5.8v11.4M9.4 17.2h5.2"/><path d="M6.6 8h10.8"/><path d="M6.6 8l-1.6 3.7a2.1 2.1 0 004.2 0zM17.4 8l-1.6 3.7a2.1 2.1 0 004.2 0z"/>',
   ),
   // Open book + quill — scholars, envoys, expeditions.
   scholars: medallion(

@@ -124,8 +124,13 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   }
 
   function ensureCells(s: GameState): void {
-    const first = s.regions[0];
-    const sig = `${s.regions.length}:${first?.x.toFixed(5)}:${first?.y.toFixed(5)}`;
+    // Signature must change whenever any site moves, else a regenerated map with
+    // the same region count could reuse stale cells. A cheap coordinate rollup
+    // over every region (there are only ~16–30) catches any change; iterating
+    // per frame is negligible next to the cell computation it guards.
+    let acc = s.regions.length;
+    for (const r of s.regions) acc = (acc * 31 + r.x * 8191 + r.y * 131071) % 1e12;
+    const sig = String(acc);
     if (sig !== cellSig) {
       cellSig = sig;
       cells = computeVoronoiCells(s.regions.map((r) => ({ x: r.x, y: r.y })));
