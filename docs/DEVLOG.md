@@ -6,6 +6,30 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-15 (sixth pass) — behaviour-driven UI bug hunt
+
+Drove the real app through its major flows (Playwright) rather than only reading
+code: every overlay open/close, end-turn guarding, diplomacy + confirm dialog,
+save/load, a junk-slot load, recruit/build/move, tax dragging, a full game to the
+end screen, tutorial navigation, and phone-width layout — watching for console
+errors, broken interactions and layout overflow.
+
+Almost everything held up cleanly (zero console errors throughout; overlays are
+mutually exclusive via their backdrops and all closable; end-turn is correctly
+blocked behind overlays; junk saves load to a toast, not a crash; the region
+panel follows ownership changes; the tax slider only autosaves on distinct value
+changes, not once per input tick; no horizontal overflow and overlays fit on a
+390×780 phone).
+
+**One real bug, fixed:** `runTutorial` added a `window` "resize" listener that
+`finish()` never removed (it removed only the keydown listener). Because the tour
+is re-openable from the toolbar, every run leaked a listener that kept calling
+`render()` against detached DOM on every resize. Named it `onResize` and remove it
+in `finish()`; verified net listener count stays flat across the Start-playing,
+Esc and Skip close paths. 377 tests green, build clean.
+
+---
+
 ## 2026-07-15 (fifth pass) — bug hunt over the session's changes
 
 Ran a structured four-track bug hunt (renderer, DOM-injection, menu/boot wiring,
