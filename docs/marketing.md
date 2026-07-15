@@ -88,6 +88,8 @@ straight to a playable build, mention the offline/privacy guarantee up front.
       resource counters ticking, an event card).
 - [x] Installable PWA: manifest + offline service worker wired (192/512/SVG icons, theme colour); offline reload verified. Extra store-icon platform sizes still optional.
 - [ ] Short store blurb (see §6) + the Show HN post drafted.
+- [x] Steam store-page package ready: copy + asset checklist + 7 screenshots +
+      starter capsules in `docs/press/` (see `docs/press/steam-store.md`).
 
 ## 6. Store blurb (draft, ~100 words)
 
