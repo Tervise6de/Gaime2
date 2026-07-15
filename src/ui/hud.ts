@@ -31,6 +31,7 @@ import {
 import { cbSafe } from "@/data/palette";
 import { badgeArt, BRANCH_ART, crestSvg, eventVignette, MOMENT_ART, TERRAIN_ART, TREATY_ART } from "@/data/art";
 import {
+  escapeHtml,
   glyphEl,
   glyphHtml,
   iconBtn,
@@ -1005,14 +1006,15 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
         return `${MODIFIER_LABEL[m.id]}${intensity} (${m.turnsLeft})`;
       })
       .join(" · ");
-    // Trait/modifier labels are fixed data-table strings — safe as HTML.
+    // Trait/modifier labels are fixed data-table strings, but difficulty and
+    // seed come from the (possibly imported) save — escape them.
     turnBadge.innerHTML =
       (player.famine ? `${glyphHtml("warning", "⚠")} FAMINE · ` : "") +
       (player.bankrupt ? `${glyphHtml("warning", "⚠")} BANKRUPT · ` : "") +
-      `Turn ${state.turn} · ${state.difficulty}` +
+      `Turn ${state.turn} · ${escapeHtml(String(state.difficulty))}` +
       (player.trait ? ` · ${TRAITS[player.trait].label}` : "") +
       (activeMods ? ` · ${activeMods}` : "") +
-      ` · seed ${state.seed}`;
+      ` · seed ${escapeHtml(String(state.seed))}`;
     turnBadge.title = player.trait ? TRAITS[player.trait].blurb : "";
     turnBadge.classList.toggle("famine", player.famine || player.bankrupt);
 
@@ -1104,14 +1106,15 @@ function renderRegion(
   title.prepend(swatch);
 
   const meta = el("p", "hud-region-meta");
-  // Region/nation names come from the fixed procedural rosters — safe as HTML.
-  const bits = [terrain.name, ownerName, `pop ${fmt(region.population)}/${fmt(regionCapacity(region))}`];
+  // Nation names can come from an imported save — escape every name that lands
+  // in this innerHTML (terrain names are data-table constants but escaping is harmless).
+  const bits = [escapeHtml(terrain.name), escapeHtml(ownerName), `pop ${fmt(region.population)}/${fmt(regionCapacity(region))}`];
   // The held capital of its owner (crown falls with the seat, as on the map).
   const capitalOf = state.nations.find(
     (n) => !n.isBarbarian && n.capitalRegionId === region.id && region.ownerId === n.id,
   );
   if (capitalOf) {
-    bits.splice(1, 0, `${glyphHtml("crown", "👑")} capital of ${capitalOf.isPlayer ? "your realm" : capitalOf.name}`);
+    bits.splice(1, 0, `${glyphHtml("crown", "👑")} capital of ${capitalOf.isPlayer ? "your realm" : escapeHtml(capitalOf.name)}`);
   }
   if (region.fortification > 0) bits.push(`fort ${region.fortification}`);
   if (region.resource) {
@@ -1519,9 +1522,9 @@ function renderVictoryProgress(elm: HTMLElement, state: GameState): void {
   const share = Math.round((Math.max(0, leaderRegions) / total) * 100);
   const leaderName = leader ? (leader.isPlayer ? "You" : leader.name) : "—";
   const player = playerNation(state);
-  // Nation names come from the fixed roster in systems/turn.ts — safe as HTML.
+  // Nation names can come from an imported save — escape before HTML interpolation.
   elm.innerHTML =
-    `${glyphHtml("victory", "🏆")} ${leaderName} ${share}%  ·  ` +
+    `${glyphHtml("victory", "🏆")} ${escapeHtml(leaderName)} ${share}%  ·  ` +
     `${glyphHtml("star", "⭐")} ${player.wonders}/${WONDER_GOAL}  ·  ` +
     `${glyphHtml("hourglass", "⏳")} ${state.turn}/${TURN_LIMIT}`;
   const rivalNearing = !!leader && !leader.isPlayer && share >= DOMINATION_FRACTION * 100 - 12;
@@ -1710,17 +1713,19 @@ function renderSummary(box: HTMLElement, summary: TurnSummary | null): void {
   const items: Array<[string, string]> = [];
   const g = summary.goldDelta;
   items.push([g >= 0 ? "good" : "bad", `${g >= 0 ? "+" : ""}${fmt(g)}g treasury`]);
-  if (summary.regionsGained.length) items.push(["good", `Gained ${summary.regionsGained.join(", ")}`]);
-  if (summary.regionsLost.length) items.push(["bad", `Lost ${summary.regionsLost.join(", ")}`]);
-  if (summary.warsDeclared.length) items.push(["bad", `War with ${summary.warsDeclared.join(", ")}`]);
-  if (summary.peaceMade.length) items.push(["good", `Peace with ${summary.peaceMade.join(", ")}`]);
-  if (summary.eliminated.length) items.push(["good", `Eliminated ${summary.eliminated.join(", ")}`]);
+  // Region/nation names can come from an imported save — escape each before HTML.
+  const names = (xs: string[]): string => xs.map(escapeHtml).join(", ");
+  if (summary.regionsGained.length) items.push(["good", `Gained ${names(summary.regionsGained)}`]);
+  if (summary.regionsLost.length) items.push(["bad", `Lost ${names(summary.regionsLost)}`]);
+  if (summary.warsDeclared.length) items.push(["bad", `War with ${names(summary.warsDeclared)}`]);
+  if (summary.peaceMade.length) items.push(["good", `Peace with ${names(summary.peaceMade)}`]);
+  if (summary.eliminated.length) items.push(["good", `Eliminated ${names(summary.eliminated)}`]);
   if (summary.techsCompleted.length) items.push(["good", `Researched ${summary.techsCompleted.map((t) => TECHS[t].name).join(", ")}`]);
   if (summary.famine) items.push(["bad", `${glyphHtml("warning", "⚠")} Famine`]);
   if (summary.bankrupt) items.push(["bad", `${glyphHtml("warning", "⚠")} Bankruptcy`]);
   if (summary.quiet) items.push(["muted", "A quiet turn."]);
 
-  // Item texts are built from fixed labels and roster names — safe as HTML.
+  // Item texts mix fixed glyph HTML with pre-escaped names (see `names`).
   for (const [tone, text] of items) {
     const row = el("div", "hud-summary-row " + tone);
     row.innerHTML = text;

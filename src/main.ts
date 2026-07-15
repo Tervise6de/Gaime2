@@ -325,6 +325,8 @@ function main(): void {
   // so the two never stack.
   void showMainMenu({
     hasSave: hasLocalSave("auto"),
+    // A loaded, still-playable game past turn 1 is worth a discard confirm.
+    liveGameTurn: state.turn > 1 && state.outcome === "playing" ? state.turn : null,
     onNewGame: startNewGame,
     onOpenOptions: () => hud.openOptions(),
     onOpenRecords: () => hud.openRecords(),

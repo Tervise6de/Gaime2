@@ -2303,10 +2303,20 @@ a:focus-visible,
   margin-top: 2px;
 }
 
-/* While the menu is up, the HUD's shared overlays (Options / Records opened
-   from the menu) must render above it — same #hud stacking context. */
-#hud:has(.title-overlay) .hud-techtree-overlay {
+/* While the menu is up, only the Options/Records overlays it opens should rise
+   above it (same #hud stacking context). Other overlays that may be live from
+   a loaded save — the event-choice modal, the end-game recap — stay below the
+   menu, so the menu keeps the screen until the player enters the game. */
+#hud:has(.title-overlay) .hud-techtree-overlay:has(.hud-options-panel),
+#hud:has(.title-overlay) .hud-techtree-overlay:has(.hud-records-panel) {
   z-index: 250;
+}
+
+/* Armed discard-confirm state on the menu's Start button. */
+.title-menu-btn.armed {
+  background: linear-gradient(180deg, #e8907a, #c8593f);
+  border-color: #efb59c;
+  color: #12060a;
 }
 
 @media (max-height: 700px) {

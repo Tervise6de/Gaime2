@@ -54,7 +54,10 @@ function ico(inner: string, opts: { fill?: boolean; sw?: number } = {}): string 
   const paint = opts.fill
     ? `fill="currentColor" stroke="none"`
     : `fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" ${paint} aria-hidden="true">${inner}</svg>`;
+  // Explicit width/height (not just viewBox): some engines rasterise an
+  // intrinsically-unsized SVG to a *blank* canvas, and drawImage would then
+  // cache that blank as "ready" and suppress the emoji fallback.
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" ${paint} aria-hidden="true">${inner}</svg>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -173,7 +176,7 @@ export const UNIT_ART: Record<UnitType, string | null> = {
   ),
   // Horse head + couched lance.
   cavalry:
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">' +
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">' +
     '<path d="M6.2 20.5c0-4.4 1.4-7.5 4-9.2L8.9 6.8l1.9 1.2.6-2 1.7 3c3.1 1.5 5.2 4.4 5.2 7.7v3.8h-3.5c0-2.1-1-3.3-3-3.8-1.3.9-2 2.1-2 3.8z" fill="currentColor"/>' +
     '<g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M15 9l5-5M20 4h-2.7M20 4v2.7"/></g>' +
     "</svg>",
@@ -254,7 +257,7 @@ export const BUILDING_ART: Record<BuildingId, string | null> = {
 /** Shared shield template; the sigil group is drawn in off-white over `__C__`. */
 function crest(sigil: string): string {
   return (
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">' +
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">' +
     '<path d="M12 2.6l8 2.8v6.1c0 4.9-3.2 8.6-8 9.9-4.8-1.3-8-5-8-9.9V5.4z" fill="__C__" stroke="rgba(10,12,16,0.6)" stroke-width="1.2" stroke-linejoin="round"/>' +
     `<g fill="none" stroke="#f7f4ea" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${sigil}</g>` +
     "</svg>"
@@ -393,6 +396,10 @@ export const EVENT_VIGNETTE: Record<string, string | null> = {
   scholars: medallion(
     '<path d="M12 8.4c-1.5-1.2-3.7-1.6-5.9-1.4v9.8c2.2-.2 4.4.2 5.9 1.4 1.5-1.2 3.7-1.6 5.9-1.4V7c-2.2-.2-4.4.2-5.9 1.4z"/><path d="M12 8.4v9.8"/><path d="M14.4 12.6l4.2-6.1 1 .7-4.2 6z"/>',
   ),
+  // Mason's trowel + block — public works and civic construction.
+  works: medallion(
+    '<path d="M6.6 8.2l4.3 4.3-2.4 2.4-4.3-4.3a1.7 1.7 0 012.4-2.4z"/><path d="M10.4 12.9l3-3M12.4 15.4h7.2v3.2h-7.2z"/>',
+  ),
 };
 
 /** Event id → vignette theme (see systems/events.ts for the roster). */
@@ -417,6 +424,13 @@ const EVENT_THEME: Record<string, keyof typeof EVENT_VIGNETTE> = {
   wandering_scholars: "scholars",
   expedition: "scholars",
   envoy_exchange: "scholars",
+  // Trait-decision events (events.ts trait-choice block).
+  call_the_banners: "war",
+  forbidden_lore: "scholars",
+  grand_academy: "scholars",
+  monopoly_charter: "trade",
+  settling_season: "harvest",
+  public_works: "works",
 };
 
 /** Vignette for a concrete event id, or null (caller renders no art). */
@@ -486,7 +500,7 @@ export const TREATY_ART: Record<"war" | "peace" | "nap" | "alliance", string | n
  * renaming must not require redrawing art).
  */
 export const TITLE_ART: string | null =
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" aria-hidden="true">' +
+  '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" aria-hidden="true">' +
   '<circle cx="24" cy="24" r="22.6" fill="none" stroke="#e6c874" stroke-width="1.4"/>' +
   '<circle cx="24" cy="24" r="19.8" fill="none" stroke="rgba(230,200,116,0.35)" stroke-width="0.8"/>' +
   '<path d="M24 7.5l13.4 4.6v10.3c0 8.2-5.4 14.4-13.4 16.6-8-2.2-13.4-8.4-13.4-16.6V12.1z" fill="#d8a24a" stroke="#e6c874" stroke-width="1.4" stroke-linejoin="round"/>' +

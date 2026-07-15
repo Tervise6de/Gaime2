@@ -141,11 +141,16 @@ export function buildNewGameForm(): NewGameForm {
     readConfig(): NewGameConfig {
       const raw = seedInput.value.trim();
       saveNewGamePrefs({ difficulty: difficultySel.value, rivals: rivalsSel.value, mapSize: mapSizeSel.value });
+      // Clamp against a blank select (a stale/foreign persisted pref can leave
+      // selectedIndex -1 → value "" → Number("") === 0), so a bad pref can never
+      // start a 0-rival / 0-region game.
+      const rivals = Number(rivalsSel.value) || 2;
+      const regionCount = Number(mapSizeSel.value) || DEFAULT_MAP_OPTIONS.regionCount;
       return {
         seed: raw === "" ? (Date.now() >>> 0) : parseSeed(raw),
-        difficulty: difficultySel.value as Difficulty,
-        rivals: Number(rivalsSel.value),
-        map: { ...DEFAULT_MAP_OPTIONS, regionCount: Number(mapSizeSel.value) },
+        difficulty: (difficultySel.value || "normal") as Difficulty,
+        rivals,
+        map: { ...DEFAULT_MAP_OPTIONS, regionCount },
         playerTrait: scenarioTrait,
       };
     },

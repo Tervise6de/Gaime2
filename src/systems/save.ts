@@ -48,6 +48,15 @@ export function deserializeGame(json: string): GameState | null {
     if (!Array.isArray(s.nations) || !Array.isArray(s.regions) || typeof s.turn !== "number") {
       return null;
     }
+    // Defence in depth: fields that flow into UI templates or arithmetic are
+    // JSON-typed only, so a hand-edited/shared save could smuggle a non-number
+    // seed or an unknown difficulty. Coerce/whitelist them here so a bad save
+    // degrades gracefully instead of poisoning the HUD or the RNG. (String
+    // names are additionally escaped at every render sink.)
+    s.seed = Number(s.seed) >>> 0;
+    if (s.difficulty !== "easy" && s.difficulty !== "normal" && s.difficulty !== "hard") {
+      s.difficulty = "normal";
+    }
     return s;
   } catch {
     return null;

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  BADGE_ART,
+  BRANCH_ART,
   BUILDING_ART,
   CREST_ART,
   EVENT_VIGNETTE,
@@ -9,7 +11,9 @@ import {
   TERRAIN_ART,
   TERRAIN_MOTIF,
   TITLE_ART,
+  TREATY_ART,
   UNIT_ART,
+  badgeArt,
   crestSvg,
   eventVignette,
   ico,
@@ -17,6 +21,8 @@ import {
 import { TERRAIN_IDS } from "@/data/terrain";
 import { UNITS } from "@/data/units";
 import { BUILDINGS } from "@/data/buildings";
+import { ACHIEVEMENTS } from "@/data/achievements";
+import { CHOICE_EVENT_IDS } from "@/systems/events";
 
 /** Every registry value is either null (fallback) or a self-contained inline SVG. */
 function expectSvgOrNull(value: string | null): void {
@@ -43,6 +49,19 @@ describe("art registry", () => {
     for (const v of Object.values(TERRAIN_MOTIF)) expectSvgOrNull(v);
     for (const v of Object.values(MOMENT_ART)) expectSvgOrNull(v);
     for (const v of Object.values(EVENT_VIGNETTE)) expectSvgOrNull(v);
+    for (const v of Object.values(BADGE_ART)) expectSvgOrNull(v);
+    for (const v of Object.values(BRANCH_ART)) expectSvgOrNull(v);
+    for (const v of Object.values(TREATY_ART)) expectSvgOrNull(v);
+  });
+
+  it("crest templates render self-contained SVG in a concrete colour", () => {
+    for (const id of Object.keys(CREST_ART)) {
+      const svg = crestSvg(Number(id), "#123456");
+      if (svg === null) continue;
+      expect(svg.startsWith("<svg")).toBe(true);
+      expect(svg.endsWith("</svg>")).toBe(true);
+      expect(svg).not.toMatch(/href=|<script/i);
+    }
   });
 
   it("title art is self-contained (48-grid key art)", () => {
@@ -52,12 +71,20 @@ describe("art registry", () => {
     }
   });
 
-  it("maps every choice-bearing event id to a vignette", () => {
-    // The decision modal is the vignette's home; these events raise it today.
-    for (const id of ["golden_jubilee", "mercenary_offer", "expedition", "envoy_exchange", "grain_aid", "reinforce_walls", "sap_the_walls"]) {
-      expect(eventVignette(id), id).not.toBeNull();
+  it("gives every choice-bearing event a vignette (derived from events.ts)", () => {
+    // Derive the id set from the source of truth so a new decision event that
+    // forgets its vignette fails here instead of shipping an art-less modal.
+    expect(CHOICE_EVENT_IDS.length).toBeGreaterThan(0);
+    for (const id of CHOICE_EVENT_IDS) {
+      expect(eventVignette(id), `event "${id}" has no vignette theme`).not.toBeNull();
     }
     expect(eventVignette("unknown_event")).toBeNull();
+  });
+
+  it("gives every achievement a badge (derived from achievements.ts)", () => {
+    for (const a of ACHIEVEMENTS) {
+      expect(badgeArt(a.id), `achievement "${a.id}" has no badge`).not.toBeNull();
+    }
   });
 
   it("has a crest slot for the full fixed nation roster (ids 0..6)", () => {

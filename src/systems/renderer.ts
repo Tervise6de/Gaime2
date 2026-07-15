@@ -94,6 +94,35 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   let cells: VoronoiCell[] = [];
   let cellSig = "";
 
+  // Projected-geometry cache: the pixel polygons, region sites, per-cell reach
+  // and terrain gradients depend only on the map and the canvas size, never on
+  // per-frame state — so they are rebuilt only when either changes, not 60×/s.
+  interface Projection {
+    px: Point[][];
+    sites: Point[];
+    fills: (string | CanvasGradient)[];
+  }
+  let projection: Projection | null = null;
+  let projSig = "";
+
+  function ensureProjection(s: GameState): Projection {
+    ensureCells(s);
+    const sig = `${cellSig}|${canvas.clientWidth}x${canvas.clientHeight}`;
+    if (projection && sig === projSig) return projection;
+    projSig = sig;
+    const px = cells.map((c) => c.poly.map((v) => projectXY(v.x, v.y)));
+    const sites = s.regions.map((r) => project(r));
+    const fills = s.regions.map((r, i) => {
+      const site = sites[i]!;
+      const poly = px[i] ?? [];
+      let reach = 0;
+      for (const v of poly) reach = Math.max(reach, Math.hypot(v.x - site.x, v.y - site.y));
+      return terrainFill(r.terrain, site.x, site.y, reach || 1);
+    });
+    projection = { px, sites, fills };
+    return projection;
+  }
+
   function ensureCells(s: GameState): void {
     const first = s.regions[0];
     const sig = `${s.regions.length}:${first?.x.toFixed(5)}:${first?.y.toFixed(5)}`;
@@ -169,6 +198,10 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     return g;
   }
 
+  // Background vignette gradient, cached by canvas size (rebuilt only on resize).
+  let bgGradient: CanvasGradient | null = null;
+  let bgSize = "";
+
   /** World background: flat until the registry provides a vignette pair. */
   function paintBackground(w: number, h: number): void {
     if (!WORLD_BG) {
@@ -176,10 +209,14 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       context.fillRect(0, 0, w, h);
       return;
     }
-    const g = context.createRadialGradient(w / 2, h * 0.42, Math.min(w, h) * 0.1, w / 2, h / 2, Math.max(w, h) * 0.72);
-    g.addColorStop(0, WORLD_BG.inner);
-    g.addColorStop(1, WORLD_BG.outer);
-    context.fillStyle = g;
+    const sizeKey = `${w}x${h}`;
+    if (!bgGradient || sizeKey !== bgSize) {
+      bgSize = sizeKey;
+      bgGradient = context.createRadialGradient(w / 2, h * 0.42, Math.min(w, h) * 0.1, w / 2, h / 2, Math.max(w, h) * 0.72);
+      bgGradient.addColorStop(0, WORLD_BG.inner);
+      bgGradient.addColorStop(1, WORLD_BG.outer);
+    }
+    context.fillStyle = bgGradient;
     context.fillRect(0, 0, w, h);
   }
 
@@ -337,19 +374,15 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
   /** Fill + border the Voronoi cells, then draw the shared markers on top. */
   function drawVoronoi(s: GameState): void {
-    ensureCells(s);
+    const { px: pxCells, sites, fills } = ensureProjection(s);
     const capitals = capitalSet(s);
-    const pxCells = cells.map((c) => c.poly.map((v) => projectXY(v.x, v.y)));
 
     // Fills: terrain colour, then an owner tint (dark wash for neutral/barbarian).
     s.regions.forEach((region, i) => {
       const poly = pxCells[i];
       if (!poly || poly.length < 3) return;
       tracePoly(poly);
-      const site = projectXY(region.x, region.y);
-      let reach = 0;
-      for (const v of poly) reach = Math.max(reach, Math.hypot(v.x - site.x, v.y - site.y));
-      context.fillStyle = terrainFill(region.terrain, site.x, site.y, reach || 1);
+      context.fillStyle = fills[i]!;
       context.fill();
       tracePoly(poly);
       context.globalAlpha = OWNER_TINT_ALPHA;
@@ -364,7 +397,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       if (!poly || poly.length < 3) return;
       const motif = TERRAIN_MOTIF[region.terrain];
       if (!motif) return;
-      const site = projectXY(region.x, region.y);
+      const site = sites[i]!;
       context.globalAlpha = 0.3;
       drawIcon(`motif:${region.terrain}`, motif, "#0d0f14", site.x, site.y - 21, 17);
       context.globalAlpha = 1;
@@ -468,6 +501,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       if (art) iconChip(rx, ry, 9);
       if (!drawIcon(`res:${region.resource}`, art, MAP_ICON_COLOR, rx, ry, 13)) {
         context.font = "13px system-ui, sans-serif";
+        context.fillStyle = MAP_ICON_COLOR; // else the monochrome ⚒ inherits the pop-count ink
         context.fillText(RESOURCE_ICON[region.resource] ?? "?", rx, ry);
       }
     }
@@ -517,6 +551,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         context.fillText(String(region.fortification), p.x + 5, fy);
       } else {
         context.font = "600 10px system-ui, sans-serif";
+        context.fillStyle = MAP_ICON_COLOR; // the fort digit must not inherit a stale marker colour
+        context.textAlign = "center";
+        context.textBaseline = "middle";
         context.fillText(`🛡${region.fortification}`, p.x, fy);
       }
     }

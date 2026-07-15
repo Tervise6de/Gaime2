@@ -944,6 +944,9 @@ const EVENTS: EventDef[] = [
   },
 ];
 
+/** Ids of events that raise a player decision modal (they carry a `choice`). */
+export const CHOICE_EVENT_IDS: readonly string[] = EVENTS.filter((e) => e.choice).map((e) => e.id);
+
 /** Fire a single random event for a nation. Returns state unchanged if it fizzles. */
 export function fireEvent(state: GameState, nationId: number, rng: Rng): GameState {
   // Only events this nation is eligible for (trait gates, etc.).

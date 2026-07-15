@@ -8,9 +8,11 @@
  * the "Gaime2" placeholder — it renders as DOM text so the eventual rename is
  * a copy edit, never an art change.
  *
- * Pure presentation: no sim access. Blocks the end-turn hotkey while up
- * (main.ts checks `.title-overlay`) and shields HUD shortcuts by stopping key
- * propagation; Escape chooses Continue.
+ * Pure presentation: no sim access. The end-turn hotkey is blocked by main.ts's
+ * `modalOpen()` `.title-overlay` check (load-bearing — main.ts's listener is a
+ * capture listener registered before this one, so our `stopPropagation` cannot
+ * stop it); we additionally stop propagation to shield the HUD's bubble-phase
+ * shortcuts and trap Tab focus inside the overlay. Escape chooses Continue.
  */
 
 import { TITLE_ART } from "@/data/art";
@@ -20,6 +22,8 @@ import { buildNewGameForm, type NewGameConfig } from "@/ui/newgame";
 export interface MainMenuHooks {
   /** An autosave exists — label the primary entry "Continue". */
   hasSave: boolean;
+  /** A live, unfinished game is loaded — starting fresh needs confirmation. */
+  liveGameTurn: number | null;
   /** Start a fresh game with the chosen setup (menu closes afterwards). */
   onNewGame(config: NewGameConfig): void;
   /** Open the HUD's Options overlay (renders above the menu). */
@@ -63,7 +67,17 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
     setup.style.display = "none";
     const form = buildNewGameForm();
     const startBtn = menuBtn("Start", "primary title-start");
+    // Guard against discarding a live game with a mis-click: the first Start
+    // arms an inline confirm (no separate dialog — that would sit under this
+    // opaque overlay), the second starts. Fresh boots start immediately.
+    let armed = false;
     startBtn.addEventListener("click", () => {
+      if (hooks.liveGameTurn !== null && !armed) {
+        armed = true;
+        startBtn.textContent = `Discard your turn ${hooks.liveGameTurn} game — start over?`;
+        startBtn.classList.add("armed");
+        return;
+      }
       hooks.onNewGame(form.readConfig());
       dismiss();
     });
@@ -110,27 +124,56 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
     // activation. Escape = Continue, but never while a HUD overlay (Options /
     // Records) is open above us — Esc belongs to that overlay then.
     function onKey(ev: KeyboardEvent): void {
-      if (hudOverlayOpen()) return; // an overlay above the menu owns the keys (its Esc closes it)
+      if (hudOverlayOpen()) return; // Options/Records above the menu owns the keys (its Esc closes it)
       const target = ev.target as HTMLElement | null;
       const typing = target && (target.tagName === "INPUT" || target.tagName === "SELECT");
       if (ev.key === "Escape" && !typing) {
         ev.preventDefault();
         dismiss();
+      } else if (ev.key === "Tab") {
+        // Focus trap: keep Tab inside the overlay so it can never reach (and
+        // Enter-activate) the live HUD controls hidden behind this opaque menu.
+        trapFocus(overlay, ev);
       }
       // Shield HUD shortcuts while the menu is topmost. Native input typing and
-      // button activation are unaffected (no preventDefault beyond Escape).
+      // button activation are unaffected (no preventDefault beyond Escape/Tab).
       ev.stopPropagation();
     }
     window.addEventListener("keydown", onKey, true);
   });
 }
 
-/** True while one of the HUD's shared overlays (Options/Records) is open. */
+/**
+ * True while the HUD's Options or Records overlay is open — the only overlays
+ * the menu itself raises above the splash. A stale choice/end-game overlay from
+ * the loaded save is deliberately *not* counted: it sits behind the menu, so
+ * the menu keeps ownership of Escape until the player enters the game.
+ */
 function hudOverlayOpen(): boolean {
   for (const o of document.querySelectorAll<HTMLElement>(".hud-techtree-overlay")) {
-    if (o.style.display !== "none") return true;
+    if (o.style.display === "none") continue;
+    if (o.querySelector(".hud-options-panel, .hud-records-panel")) return true;
   }
   return false;
+}
+
+/** Cycle Tab focus within `container`'s focusable elements (wraps at the ends). */
+function trapFocus(container: HTMLElement, ev: KeyboardEvent): void {
+  const focusable = container.querySelectorAll<HTMLElement>(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+  );
+  const items = Array.from(focusable).filter((el) => el.offsetParent !== null);
+  if (items.length === 0) return;
+  const first = items[0]!;
+  const last = items[items.length - 1]!;
+  const active = document.activeElement as HTMLElement | null;
+  if (ev.shiftKey && (active === first || !container.contains(active))) {
+    ev.preventDefault();
+    last.focus();
+  } else if (!ev.shiftKey && (active === last || !container.contains(active))) {
+    ev.preventDefault();
+    first.focus();
+  }
 }
 
 function menuBtn(label: string, extra = ""): HTMLButtonElement {

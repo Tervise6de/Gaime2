@@ -88,6 +88,7 @@ function labelSpan(label: string): HTMLElement {
   return s;
 }
 
-function escapeHtml(s: string): string {
+/** Escape a string for safe interpolation into an innerHTML template. */
+export function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
