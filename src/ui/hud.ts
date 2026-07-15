@@ -29,7 +29,7 @@ import {
   setDefaultMapLayout,
 } from "@/ui/settings";
 import { cbSafe } from "@/data/palette";
-import { crestSvg, TERRAIN_ART } from "@/data/art";
+import { crestSvg, eventVignette, MOMENT_ART, TERRAIN_ART } from "@/data/art";
 import {
   glyphEl,
   glyphHtml,
@@ -575,6 +575,15 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
     const panel = el("div", "hud-techtree-panel hud-end-panel");
 
+    // End-card medallion (registry art; the banner still reads without it).
+    const cardArt = MOMENT_ART[win ? "victory" : "defeat"];
+    if (cardArt) {
+      const medal = el("div", "hud-end-art " + (win ? "win" : "lose"));
+      medal.setAttribute("aria-hidden", "true");
+      medal.innerHTML = cardArt;
+      panel.append(medal);
+    }
+
     const title = el("h2", "hud-end-title " + (win ? "win" : "lose"));
     title.textContent = win ? "Victory!" : "Defeat";
     if (winner) title.style.color = cbSafe(winner.color, isColourblind());
@@ -955,6 +964,14 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   function renderChoice(pc: NonNullable<GameState["pendingChoice"]>): void {
     choiceOverlay.innerHTML = "";
     const panel = el("div", "hud-techtree-panel hud-choice-panel");
+    // Themed vignette medallion for the event (falls back to no art).
+    const vig = eventVignette(pc.eventId);
+    if (vig) {
+      const medal = el("div", "hud-choice-vignette");
+      medal.setAttribute("aria-hidden", "true");
+      medal.innerHTML = vig;
+      panel.append(medal);
+    }
     const title = el("h2", "hud-techtree-title");
     title.textContent = "A decision";
     panel.append(title);

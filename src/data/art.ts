@@ -318,6 +318,104 @@ export const WORLD_BG: { inner: string; outer: string } | null = {
   outer: "#0b0e14",
 };
 
+// ---------------------------------------------------------------------------
+// Moment art — larger "key art" medallions (docs/art-style.md family rules
+// apply; drawn on the same 24 grid, displayed at 56–140px). A medallion is a
+// ring + motif so every moment reads as a struck seal/coin.
+// ---------------------------------------------------------------------------
+
+/** Ring medallion shell around a motif (stroke-first, currentColor). */
+function medallion(inner: string): string {
+  return ico(`<circle cx="12" cy="12" r="10.2"/>${inner}`, { sw: 1.2 });
+}
+
+/** End-of-game cards. Victory is laurelled gold; defeat a toppled crown. */
+export const MOMENT_ART: Record<"victory" | "defeat", string | null> = {
+  victory: medallion(
+    '<path d="M8.9 6.8h6.2v3.4a3.1 3.1 0 01-6.2 0z"/><path d="M8.9 7.6H7a2.2 2.2 0 002.3 2.3M15.1 7.6H17a2.2 2.2 0 01-2.3 2.3"/><path d="M12 13.3v2M10 17.4h4M10.9 15.3h2.2"/>' +
+      '<path d="M5.2 8.6c-.5 3 .2 5.6 2 7.8M18.8 8.6c.5 3-.2 5.6-2 7.8"/><path d="M5.2 8.6l1.5.4M18.8 8.6l-1.5.4"/>',
+  ),
+  defeat: medallion(
+    '<path d="M7.4 14.9l.9-5.3 2.4 1.5 1.5-3 1.9 2.6 2.5-1.1-1.5 5.3z" transform="rotate(14 12 12)"/><path d="M8.1 17.3l7.6-1.4" transform="rotate(14 12 12)"/>',
+  ),
+};
+
+/**
+ * Reusable event vignettes, keyed by theme. `eventVignette` maps a concrete
+ * event id (systems/events.ts) to its theme so new events inherit art by
+ * category — adding an event means one line in the map, not new art.
+ */
+export const EVENT_VIGNETTE: Record<string, string | null> = {
+  // Sheaf of wheat — harvests, grain, the land.
+  harvest: medallion(
+    '<path d="M12 18.5V8.3"/><path d="M12 11.9c-1.7 0-3.1-1.2-3.1-3.3 1.7 0 3.1 1.2 3.1 3.3z"/><path d="M12 11.9c1.7 0 3.1-1.2 3.1-3.3-1.7 0-3.1 1.2-3.1 3.3z"/><path d="M12 15.5c-1.7 0-3.1-1.2-3.1-3.3 1.7 0 3.1 1.2 3.1 3.3z"/><path d="M12 15.5c1.7 0 3.1-1.2 3.1-3.3-1.7 0-3.1 1.2-3.1 3.3z"/><path d="M12 8.3c-.7-.7-.7-1.9 0-2.6.7.7.7 1.9 0 2.6z"/><path d="M8.6 18.5h6.8"/>',
+  ),
+  // Skull — plague and pestilence.
+  plague: medallion(
+    '<path d="M12 5.6a4.9 4.9 0 014.9 4.9c0 1.7-.8 2.9-1.9 3.7v2h-6v-2c-1.1-.8-1.9-2-1.9-3.7A4.9 4.9 0 0112 5.6z"/><circle cx="10.1" cy="10.6" r="1"/><circle cx="13.9" cy="10.6" r="1"/><path d="M10.6 16.2v1.6M13.4 16.2v1.6"/>',
+  ),
+  // Bunting pennants — festivals and jubilees.
+  festival: medallion(
+    '<path d="M5.6 8.2c4.2 2.6 8.6 2.6 12.8 0"/><path d="M7.4 9.4l1 2.4 1.5-1.9M11 10.6l.9 2.3 1.4-2.1M15.2 9.9l1 2 1.3-2.3"/><path d="M5.6 8.2v-2M18.4 8.2v-2"/><circle cx="12" cy="16.6" r=".5" fill="currentColor" stroke="none"/><circle cx="9" cy="15.4" r=".5" fill="currentColor" stroke="none"/><circle cx="15" cy="15.4" r=".5" fill="currentColor" stroke="none"/>',
+  ),
+  // Crossed swords — raids, sieges, mercenaries.
+  war: medallion(
+    '<path d="M7 7l8.6 8.6M17 7L8.4 15.6"/><path d="M14.2 16.9l2.7-2.7M7.1 14.2l2.7 2.7"/><path d="M7.4 18l1.4-1.4M16.6 18l-1.4-1.4"/>',
+  ),
+  // Balance scales — trade, markets, coin.
+  trade: medallion(
+    '<path d="M12 5.8v11.4M9.4 17.2h5.2"/><path d="M6.6 8h10.8"/><path d="M6.6 8l-1.8 4.2a2.4 2.4 0 004.8 0zM17.4 8l-1.8 4.2a2.4 2.4 0 004.8 0z" transform="scale(0.92) translate(1 0.6)"/>',
+  ),
+  // Open book + quill — scholars, envoys, expeditions.
+  scholars: medallion(
+    '<path d="M12 8.4c-1.5-1.2-3.7-1.6-5.9-1.4v9.8c2.2-.2 4.4.2 5.9 1.4 1.5-1.2 3.7-1.6 5.9-1.4V7c-2.2-.2-4.4.2-5.9 1.4z"/><path d="M12 8.4v9.8"/><path d="M14.4 12.6l4.2-6.1 1 .7-4.2 6z"/>',
+  ),
+};
+
+/** Event id → vignette theme (see systems/events.ts for the roster). */
+const EVENT_THEME: Record<string, keyof typeof EVENT_VIGNETTE> = {
+  good_harvest: "harvest",
+  drought: "harvest",
+  grain_aid: "harvest",
+  migration_wave: "harvest",
+  plague: "plague",
+  festival: "festival",
+  golden_jubilee: "festival",
+  traveling_fair: "festival",
+  local_uprising: "war",
+  mercenaries: "war",
+  mercenary_offer: "war",
+  border_raid: "war",
+  reinforce_walls: "war",
+  sap_the_walls: "war",
+  market_boom: "trade",
+  caravan_raided: "trade",
+  ore_discovery: "trade",
+  wandering_scholars: "scholars",
+  expedition: "scholars",
+  envoy_exchange: "scholars",
+};
+
+/** Vignette for a concrete event id, or null (caller renders no art). */
+export function eventVignette(eventId: string): string | null {
+  const theme = EVENT_THEME[eventId];
+  return theme ? (EVENT_VIGNETTE[theme] ?? null) : null;
+}
+
+/**
+ * Title-screen key art: the player crest struck as a large medallion. The
+ * wordmark itself is styled DOM text (the game's name is still a placeholder —
+ * renaming must not require redrawing art).
+ */
+export const TITLE_ART: string | null =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" aria-hidden="true">' +
+  '<circle cx="24" cy="24" r="22.6" fill="none" stroke="#e6c874" stroke-width="1.4"/>' +
+  '<circle cx="24" cy="24" r="19.8" fill="none" stroke="rgba(230,200,116,0.35)" stroke-width="0.8"/>' +
+  '<path d="M24 7.5l13.4 4.6v10.3c0 8.2-5.4 14.4-13.4 16.6-8-2.2-13.4-8.4-13.4-16.6V12.1z" fill="#d8a24a" stroke="#e6c874" stroke-width="1.4" stroke-linejoin="round"/>' +
+  '<path d="M16.6 27.9v-7.6l4.1 3.1 3.3-5.8 3.3 5.8 4.1-3.1v7.6z" fill="#f7f4ea"/>' +
+  '<rect x="16.6" y="30.4" width="14.8" height="2.4" rx="1.2" fill="#f7f4ea"/>' +
+  "</svg>";
+
 // `ico` is exported for the phases that fill these tables in (and for tests);
 // keeping the builder beside the data keeps every icon on the shared grid.
 export { ico };
