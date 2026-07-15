@@ -15,7 +15,8 @@
  * recomputed only when the map changes, never per animation frame.
  */
 
-import { TERRAIN } from "@/data/terrain";
+import { TERRAIN, type TerrainId } from "@/data/terrain";
+import { GLYPH_ART, RESOURCE_ART, TERRAIN_ART, WORLD_BG } from "@/data/art";
 import { cbSafe } from "@/data/palette";
 import { armySize, BARBARIAN_ID } from "@/systems/state";
 import {
@@ -43,6 +44,9 @@ const NEUTRAL_OWNER = "rgba(0,0,0,0.35)";
 const OWNER_TINT_ALPHA = 0.5;
 
 const RESOURCE_ICON: Record<string, string> = { iron: "⚒", horses: "🐎" };
+/** Light ink used when rasterising registry icons for the dark map. */
+const MAP_ICON_COLOR = "#e8e2cf";
+const CAPITAL_ICON_COLOR = "#f4d27a";
 
 export type MapLayout = "node" | "voronoi";
 
@@ -99,6 +103,86 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     }
   }
 
+  // --- Registry icon cache ---------------------------------------------------
+  // SVG source → tinted data: URI Image → per-size offscreen raster, so the
+  // render loop never re-decodes an asset (same discipline as the Voronoi cache).
+  // While an image is still decoding, drawIcon reports false and the caller
+  // paints its legacy emoji/colour fallback — the map renders with zero assets.
+  interface IconEntry {
+    img: HTMLImageElement;
+    ready: boolean;
+    scaled: Map<number, HTMLCanvasElement>;
+  }
+  const iconCache = new Map<string, IconEntry>();
+
+  function iconEntry(key: string, svg: string, color: string): IconEntry {
+    let entry = iconCache.get(key);
+    if (!entry) {
+      const img = new Image();
+      const e: IconEntry = { img, ready: false, scaled: new Map() };
+      img.onload = () => {
+        e.ready = true;
+      };
+      img.src = "data:image/svg+xml," + encodeURIComponent(svg.replaceAll("currentColor", color));
+      iconCache.set(key, e);
+      entry = e;
+    }
+    return entry;
+  }
+
+  /** Draw a registry icon centred at (x, y); false = not ready/absent → use fallback. */
+  function drawIcon(name: string, svg: string | null, color: string, x: number, y: number, size: number): boolean {
+    if (!svg) return false;
+    const entry = iconEntry(`${name}|${color}`, svg, color);
+    if (!entry.ready) return false;
+    const dpr = window.devicePixelRatio || 1;
+    const px = Math.max(1, Math.round(size * dpr));
+    let raster = entry.scaled.get(px);
+    if (!raster) {
+      raster = document.createElement("canvas");
+      raster.width = px;
+      raster.height = px;
+      raster.getContext("2d")?.drawImage(entry.img, 0, 0, px, px);
+      entry.scaled.set(px, raster);
+    }
+    context.drawImage(raster, x - size / 2, y - size / 2, size, size);
+    return true;
+  }
+
+  /** A soft dark chip behind a map icon so it reads over any terrain fill. */
+  function iconChip(x: number, y: number, r: number): void {
+    context.beginPath();
+    context.arc(x, y, r, 0, Math.PI * 2);
+    context.fillStyle = "rgba(13, 15, 20, 0.55)";
+    context.fill();
+  }
+
+  /** Terrain fill: flat colour until the registry provides a hi/lo shade pair. */
+  function terrainFill(t: TerrainId, cx: number, cy: number, r: number): string | CanvasGradient {
+    const shade = TERRAIN_ART[t];
+    const base = TERRAIN[t].color;
+    if (!shade) return base;
+    const g = context.createRadialGradient(cx - r * 0.35, cy - r * 0.45, r * 0.15, cx, cy, r * 1.05);
+    g.addColorStop(0, shade.hi);
+    g.addColorStop(0.55, base);
+    g.addColorStop(1, shade.lo);
+    return g;
+  }
+
+  /** World background: flat until the registry provides a vignette pair. */
+  function paintBackground(w: number, h: number): void {
+    if (!WORLD_BG) {
+      context.fillStyle = BACKGROUND;
+      context.fillRect(0, 0, w, h);
+      return;
+    }
+    const g = context.createRadialGradient(w / 2, h * 0.42, Math.min(w, h) * 0.1, w / 2, h / 2, Math.max(w, h) * 0.72);
+    g.addColorStop(0, WORLD_BG.inner);
+    g.addColorStop(1, WORLD_BG.outer);
+    context.fillStyle = g;
+    context.fillRect(0, 0, w, h);
+  }
+
   function ownerColor(ownerId: number | null): string {
     if (ownerId === null || !state) return NEUTRAL_OWNER;
     const base = state.nations.find((n) => n.id === ownerId)?.color ?? NEUTRAL_OWNER;
@@ -126,8 +210,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   function render(): void {
     if (!running) return;
     const { clientWidth, clientHeight } = canvas;
-    context.fillStyle = BACKGROUND;
-    context.fillRect(0, 0, clientWidth, clientHeight);
+    paintBackground(clientWidth, clientHeight);
     if (state) {
       if (layout === "voronoi") {
         drawVoronoi(state);
@@ -233,7 +316,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
       context.beginPath();
       context.arc(p.x, p.y, NODE_RADIUS, 0, Math.PI * 2);
-      context.fillStyle = terrain.color;
+      context.fillStyle = terrainFill(terrain.id, p.x, p.y, NODE_RADIUS);
       context.fill();
       context.lineWidth = isSelected ? 4 : 3;
       context.strokeStyle = isSelected ? SELECT_COLOR : ownerColor(region.ownerId);
@@ -263,7 +346,10 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       const poly = pxCells[i];
       if (!poly || poly.length < 3) return;
       tracePoly(poly);
-      context.fillStyle = TERRAIN[region.terrain].color;
+      const site = projectXY(region.x, region.y);
+      let reach = 0;
+      for (const v of poly) reach = Math.max(reach, Math.hypot(v.x - site.x, v.y - site.y));
+      context.fillStyle = terrainFill(region.terrain, site.x, site.y, reach || 1);
       context.fill();
       tracePoly(poly);
       context.globalAlpha = OWNER_TINT_ALPHA;
@@ -349,14 +435,25 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
     // Strategic resource marker (top-left).
     if (region.resource) {
-      context.font = "13px system-ui, sans-serif";
-      context.fillText(RESOURCE_ICON[region.resource] ?? "?", p.x - NODE_RADIUS + 4, p.y - NODE_RADIUS + 2);
+      const rx = p.x - NODE_RADIUS + 4;
+      const ry = p.y - NODE_RADIUS + 2;
+      const art = RESOURCE_ART[region.resource];
+      if (art) iconChip(rx, ry, 9);
+      if (!drawIcon(`res:${region.resource}`, art, MAP_ICON_COLOR, rx, ry, 13)) {
+        context.font = "13px system-ui, sans-serif";
+        context.fillText(RESOURCE_ICON[region.resource] ?? "?", rx, ry);
+      }
     }
 
     // Capital marker (crown, bottom-left corner).
     if (capitals.has(region.id)) {
-      context.font = "13px system-ui, sans-serif";
-      context.fillText("👑", p.x - NODE_RADIUS + 5, p.y + NODE_RADIUS - 7);
+      const cx = p.x - NODE_RADIUS + 5;
+      const cy = p.y + NODE_RADIUS - 7;
+      if (GLYPH_ART.crown) iconChip(cx, cy, 9);
+      if (!drawIcon("glyph:crown", GLYPH_ART.crown, CAPITAL_ICON_COLOR, cx, cy, 13)) {
+        context.font = "13px system-ui, sans-serif";
+        context.fillText("👑", cx, cy);
+      }
     }
 
     // Unrest marker (top-right dot) and construction (hammer, top).
@@ -368,15 +465,28 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       context.fill();
     }
     if (region.construction) {
-      context.font = "12px system-ui, sans-serif";
-      context.fillText("🔨", p.x, p.y - NODE_RADIUS - 8);
+      const hy = p.y - NODE_RADIUS - 8;
+      if (GLYPH_ART.hammer) iconChip(p.x, hy, 8);
+      if (!drawIcon("glyph:hammer", GLYPH_ART.hammer, MAP_ICON_COLOR, p.x, hy, 12)) {
+        context.font = "12px system-ui, sans-serif";
+        context.fillText("🔨", p.x, hy);
+      }
     }
 
     // Fortification marker (bottom-centre) — a defended region is harder to take.
     // Bottom-centre is free: the crown sits bottom-left, the army badge bottom-right.
     if (region.fortification > 0) {
-      context.font = "600 10px system-ui, sans-serif";
-      context.fillText(`🛡${region.fortification}`, p.x, p.y + NODE_RADIUS - 7);
+      const fy = p.y + NODE_RADIUS - 7;
+      if (drawIcon("glyph:shield", GLYPH_ART.shield, MAP_ICON_COLOR, p.x - 4, fy, 11)) {
+        context.font = "600 10px system-ui, sans-serif";
+        context.fillStyle = MAP_ICON_COLOR;
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.fillText(String(region.fortification), p.x + 5, fy);
+      } else {
+        context.font = "600 10px system-ui, sans-serif";
+        context.fillText(`🛡${region.fortification}`, p.x, fy);
+      }
     }
 
     // Region name below.

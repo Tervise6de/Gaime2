@@ -2052,3 +2052,41 @@ a:focus-visible,
     padding: 10px;
   }
 }
+
+/* --- Registry icons (data/art.ts via ui/icons.ts) -------------------------- */
+/* An .ico span holds either an inline SVG (.ico-svg) or the emoji fallback.
+   SVGs size from the local font-size so icons track their label everywhere. */
+.ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: -0.18em;
+}
+
+.ico-svg svg {
+  width: 1.15em;
+  height: 1.15em;
+  display: block;
+}
+
+/* Icon+label buttons: breathing room between the glyph and its text. */
+.ico + .ico-label {
+  margin-left: 5px;
+}
+
+/* Larger anchors for the top resource bar and legend key. */
+.hud-resource-icon.ico-svg svg {
+  width: 20px;
+  height: 20px;
+}
+
+.hud-legend-ico.ico-svg svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Nation crest mark (standings, diplomacy) — same footprint as the swatch. */
+.hud-crest svg {
+  width: 18px;
+  height: 20px;
+}

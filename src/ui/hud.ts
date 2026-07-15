@@ -29,6 +29,17 @@ import {
   setDefaultMapLayout,
 } from "@/ui/settings";
 import { cbSafe } from "@/data/palette";
+import { crestSvg } from "@/data/art";
+import {
+  glyphEl,
+  glyphHtml,
+  iconBtn,
+  resourceIconEl,
+  resourceIconHtml,
+  setIconBtnLabel,
+  unitIconHtml,
+  buildingIconHtml,
+} from "@/ui/icons";
 import { loadProfile, type ProfileStats } from "@/ui/profile";
 import { ACHIEVEMENTS } from "@/data/achievements";
 import { EDGE_COLOR, WAR_EDGE_COLOR, type MapLayout } from "@/systems/renderer";
@@ -180,8 +191,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     const meta = RESOURCE_META[key];
     const cell = el("div", "hud-resource");
     cell.title = meta.tip;
-    const icon = el("span", "hud-resource-icon");
-    icon.textContent = meta.icon;
+    const icon = resourceIconEl(key, meta.icon, "hud-resource-icon");
     const body = el("div", "hud-resource-body");
     const label = el("span", "hud-resource-label");
     label.textContent = meta.label;
@@ -250,31 +260,31 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   victoryEl.title = "Progress toward each victory: leading realm's territory share (domination at "
     + `${Math.round(DOMINATION_FRACTION * 100)}%), Great Works, and the turn ${TURN_LIMIT} prestige deadline.`;
   topBar.append(victoryEl);
-  const legendToggle = btn("❔ Legend", "hud-legend-toggle", () => {
+  const legendToggle = iconBtn("legend", "❔", "Legend", "hud-legend-toggle", () => {
     legendPanel.style.display = legendPanel.style.display === "none" ? "block" : "none";
   });
   legendToggle.title = "Decode the map markers. Shortcut: L";
   topBar.append(legendToggle);
-  const helpToggle = btn("💡 Help", "hud-legend-toggle", () => showHints());
+  const helpToggle = iconBtn("help", "💡", "Help", "hud-legend-toggle", () => showHints());
   helpToggle.title = "Reopen the getting-started tips. Shortcut: H";
   topBar.append(helpToggle);
-  const tutorialToggle = btn("🎓 Tutorial", "hud-legend-toggle", () => runTutorial());
+  const tutorialToggle = iconBtn("tutorial", "🎓", "Tutorial", "hud-legend-toggle", () => runTutorial());
   tutorialToggle.title = "Replay the guided tour of the interface.";
   topBar.append(tutorialToggle);
-  const standingsToggle = btn("📊 Standings", "hud-legend-toggle", () => toggleStandings());
+  const standingsToggle = iconBtn("standings", "📊", "Standings", "hud-legend-toggle", () => toggleStandings());
   standingsToggle.title = "See how you rank against every rival. Shortcut: S";
   topBar.append(standingsToggle);
 
   // Map layout toggle: node+edge fallback ⇄ Voronoi polygon view. Opens on the
   // persisted default (set in Options) and applies it for this session immediately.
   let mapLayout: MapLayout = getDefaultMapLayout();
-  const mapLayoutLabel = (l: MapLayout): string => (l === "voronoi" ? "🗺 Map: Territory" : "🗺 Map: Nodes");
+  const mapLayoutLabel = (l: MapLayout): string => (l === "voronoi" ? "Map: Territory" : "Map: Nodes");
   const applyMapLayout = (l: MapLayout): void => {
     mapLayout = l;
-    mapToggle.textContent = mapLayoutLabel(mapLayout);
+    setIconBtnLabel(mapToggle, mapLayoutLabel(mapLayout));
     callbacks.onSetMapLayout(mapLayout);
   };
-  const mapToggle = btn(mapLayoutLabel(mapLayout), "hud-legend-toggle", () => {
+  const mapToggle = iconBtn("map", "🗺", mapLayoutLabel(mapLayout), "hud-legend-toggle", () => {
     applyMapLayout(mapLayout === "voronoi" ? "node" : "voronoi");
   });
   mapToggle.title = "Switch between the node/edge map and the Voronoi territory map. Shortcut: M";
@@ -282,12 +292,12 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   if (mapLayout !== "node") callbacks.onSetMapLayout(mapLayout); // honour a saved default at boot
 
   // Records — cumulative profile stats and achievements.
-  const recordsToggle = btn("🏅 Records", "hud-legend-toggle", () => openRecords());
+  const recordsToggle = iconBtn("records", "🏅", "Records", "hud-legend-toggle", () => openRecords());
   recordsToggle.title = "Your career stats and achievements.";
   topBar.append(recordsToggle);
 
   // Options — sound, accessibility and view preferences in one persisted panel.
-  const optionsToggle = btn("⚙ Options", "hud-legend-toggle", () => openOptions());
+  const optionsToggle = iconBtn("options", "⚙", "Options", "hud-legend-toggle", () => openOptions());
   optionsToggle.title = "Sound, accessibility and display options.";
   topBar.append(optionsToggle);
   root.append(topBar);
@@ -584,7 +594,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     const pr = sum.rows.find((r) => r.id === PLAYER_ID);
     if (pr) {
       const sup = el("p", "hud-end-super");
-      sup.textContent = `Your peak prestige: ${pr.peakScore} (turn ${pr.peakTurn}). Final: ${pr.score} · ${pr.regions}⬢ · ${pr.wonders}★ · ${pr.techs}📖.`;
+      sup.innerHTML =
+        `Your peak prestige: ${pr.peakScore} (turn ${pr.peakTurn}). Final: ${pr.score} · ` +
+        `${pr.regions}${glyphHtml("region", "⬢")} · ${pr.wonders}${glyphHtml("star", "★")} · ` +
+        `${pr.techs}${glyphHtml("book", "📖")}.`;
       panel.append(sup);
     }
 
@@ -606,14 +619,14 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const hints = el("div", "hud-hints");
   hints.style.display = "none";
   const hintsTitle = el("div", "hud-hints-title");
-  hintsTitle.textContent = "Welcome, ruler 👑";
+  hintsTitle.append(document.createTextNode("Welcome, ruler "), glyphEl("crown", "👑"));
   const hintsBody = el("ul", "hud-hints-list");
   for (const tip of [
     "Set your tax rate on the left — more gold, but higher unrest.",
     "Click a region to develop it: queue buildings and raise armies.",
     "Move / Attack an army onto a neighbour to expand or conquer.",
-    "End turn to advance; watch the 🏆 victory progress up top.",
-    "Tap ❔ Legend (L) to decode markers; 💡 Help (H) reopens these tips.",
+    "End turn to advance; watch the victory progress up top.",
+    "Tap Legend (L) to decode markers; Help (H) reopens these tips.",
   ]) {
     const li = document.createElement("li");
     li.textContent = tip;
@@ -909,7 +922,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       const got = unlocked.has(a.id);
       const cell = el("div", "hud-achv" + (got ? " got" : " locked"));
       const badge = el("div", "hud-achv-badge");
-      badge.textContent = got ? "🏅" : "🔒";
+      badge.append(got ? glyphEl("medal", "🏅") : glyphEl("lock", "🔒"));
       const body = el("div", "hud-achv-body");
       const name = el("div", "hud-achv-name");
       name.textContent = a.name;
@@ -1048,9 +1061,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
         return `${MODIFIER_LABEL[m.id]}${intensity} (${m.turnsLeft})`;
       })
       .join(" · ");
-    turnBadge.textContent =
-      (player.famine ? "⚠ FAMINE · " : "") +
-      (player.bankrupt ? "⚠ BANKRUPT · " : "") +
+    // Trait/modifier labels are fixed data-table strings — safe as HTML.
+    turnBadge.innerHTML =
+      (player.famine ? `${glyphHtml("warning", "⚠")} FAMINE · ` : "") +
+      (player.bankrupt ? `${glyphHtml("warning", "⚠")} BANKRUPT · ` : "") +
       `Turn ${state.turn} · ${state.difficulty}` +
       (player.trait ? ` · ${TRAITS[player.trait].label}` : "") +
       (activeMods ? ` · ${activeMods}` : "") +
@@ -1127,7 +1141,7 @@ function renderRegion(
     const player = state.nations.find((n) => n.isPlayer);
     const cap = player?.capitalRegionId;
     if (cap !== undefined && state.regions[cap]?.ownerId === PLAYER_ID) {
-      const jump = btn("👑 Show your capital", "hud-region-jump", () => callbacks.onSelectRegion(cap));
+      const jump = iconBtn("crown", "👑", "Show your capital", "hud-region-jump", () => callbacks.onSelectRegion(cap));
       jump.title = "Select and highlight your seat of power on the map.";
       container.append(jump);
     }
@@ -1146,15 +1160,24 @@ function renderRegion(
   title.prepend(swatch);
 
   const meta = el("p", "hud-region-meta");
+  // Region/nation names come from the fixed procedural rosters — safe as HTML.
   const bits = [terrain.name, ownerName, `pop ${fmt(region.population)}/${fmt(regionCapacity(region))}`];
   // The held capital of its owner (crown falls with the seat, as on the map).
   const capitalOf = state.nations.find(
     (n) => !n.isBarbarian && n.capitalRegionId === region.id && region.ownerId === n.id,
   );
-  if (capitalOf) bits.splice(1, 0, `👑 capital of ${capitalOf.isPlayer ? "your realm" : capitalOf.name}`);
+  if (capitalOf) {
+    bits.splice(1, 0, `${glyphHtml("crown", "👑")} capital of ${capitalOf.isPlayer ? "your realm" : capitalOf.name}`);
+  }
   if (region.fortification > 0) bits.push(`fort ${region.fortification}`);
-  if (region.resource) bits.push(region.resource === "iron" ? "⚒ iron" : "🐎 horses");
-  meta.textContent = bits.join(" · ");
+  if (region.resource) {
+    bits.push(
+      region.resource === "iron"
+        ? `${resourceIconHtml("iron", "⚒")} iron`
+        : `${resourceIconHtml("horses", "🐎")} horses`,
+    );
+  }
+  meta.innerHTML = bits.join(" · ");
   container.append(title, meta);
 
   if (owned) {
@@ -1228,7 +1251,7 @@ function renderOwnedRegion(
   // A subtle chip showing the garrison's calming effect (the reason the number is lower).
   if (garrisonCalmAmt > 0) {
     const calmChip = el("span", "hud-unrest-garrison");
-    calmChip.textContent = `⚑ −${garrisonCalmAmt}`;
+    calmChip.append(glyphEl("flag", "⚑"), document.createTextNode(` −${garrisonCalmAmt}`));
     calmChip.title = `A stationed garrison calms this region by ${garrisonCalmAmt} unrest.`;
     unrestLabel.append(calmChip);
   }
@@ -1246,10 +1269,18 @@ function renderOwnedRegion(
     const held = garrisonUnits > 0;
     const warn = el("div", `hud-secession ${held ? "held" : "danger"}`);
     if (held) {
-      warn.textContent = "⚑ Revolt held down by your garrison — it won't secede while troops remain.";
+      warn.append(
+        glyphEl("flag", "⚑"),
+        document.createTextNode(" Revolt held down by your garrison — it won't secede while troops remain."),
+      );
     } else {
       const left = Math.max(1, SECESSION_REVOLT_TURNS - (region.revoltTurns ?? 0));
-      warn.textContent = `⚠ Secedes to rebels in ${left} turn${left === 1 ? "" : "s"} — station an army here or cut taxes to calm it.`;
+      warn.append(
+        glyphEl("warning", "⚠"),
+        document.createTextNode(
+          ` Secedes to rebels in ${left} turn${left === 1 ? "" : "s"} — station an army here or cut taxes to calm it.`,
+        ),
+      );
     }
     container.append(warn);
   }
@@ -1338,12 +1369,12 @@ function renderArmySection(
     btn.className = "hud-unit-btn";
     btn.disabled = !check.ok;
     btn.title = check.ok
-      ? `${def.attack}⚔ / ${def.defense}🛡 · ${def.upkeep}g upkeep${def.requires ? ` · needs ${def.requires}` : ""}`
+      ? `${def.attack} atk / ${def.defense} def · ${def.upkeep}g upkeep${def.requires ? ` · needs ${def.requires}` : ""}`
       : check.reason ?? "";
     const cost = unitCost(playerNation(state), t);
     btn.innerHTML =
-      `<span class="hud-unit-name">${def.short}</span>` +
-      `<span class="hud-unit-cost">${cost.gold}g ${cost.materials}⛏</span>`;
+      `<span class="hud-unit-name">${unitIconHtml(t, "")}${def.short}</span>` +
+      `<span class="hud-unit-cost">${cost.gold}g ${cost.materials}${resourceIconHtml("materials", "⛏")}</span>`;
     if (check.ok) btn.addEventListener("click", () => callbacks.onRaiseUnit(region.id, t));
     menu.append(btn);
   }
@@ -1382,7 +1413,9 @@ function renderCombatOdds(state: GameState, army: Army): HTMLElement {
       row.append(chip);
     } else {
       const detail = el("span", "hud-odds-detail");
-      detail.textContent = `⚔${Math.round(preview.attack)} · 🛡${Math.round(preview.defense)}`;
+      detail.innerHTML =
+        `${glyphHtml("attack", "⚔")}${Math.round(preview.attack)} · ` +
+        `${glyphHtml("shield", "🛡")}${Math.round(preview.defense)}`;
       const pct = Math.round(preview.winChance * 100);
       const chip = el("span", "hud-odds-chip " + oddsClass(preview.winChance));
       chip.textContent = `${pct}%`;
@@ -1446,9 +1479,13 @@ function renderBuildSection(region: Region, done: TechId[], callbacks: HudCallba
     btn.className = "hud-build-btn";
     btn.disabled = already || !unlocked;
     btn.title = unlocked ? def.blurb : `Locked — research ${def.requiresTech?.replace(/_/g, " ")}.`;
-    const costLabel = already ? "built" : !unlocked ? "🔒" : def.cost + "⛏";
+    const costLabel = already
+      ? "built"
+      : !unlocked
+        ? glyphHtml("lock", "🔒")
+        : def.cost + resourceIconHtml("materials", "⛏");
     btn.innerHTML =
-      `<span class="hud-build-name">${def.name}</span>` +
+      `<span class="hud-build-name">${buildingIconHtml(id, "")}${def.name}</span>` +
       `<span class="hud-build-cost">${costLabel}</span>`;
     if (!already && unlocked) btn.addEventListener("click", () => callbacks.onQueueBuilding(region.id, id));
     menu.append(btn);
@@ -1498,11 +1535,11 @@ function buildLegend(): HTMLElement {
   row('<span class="hud-legend-num">6</span>', "Population (number in node)");
   row(dot("#e0b74a"), "Unrest — unhappy (amber dot)");
   row(dot("#e8776b"), "Unrest — revolt risk (red dot)");
-  row('<span class="hud-legend-ico">⚒</span>', "Iron deposit");
-  row('<span class="hud-legend-ico">🐎</span>', "Horses");
-  row('<span class="hud-legend-ico">🔨</span>', "Building under construction");
-  row('<span class="hud-legend-ico">🛡</span>', "Fortification level (harder to capture; siege strips it)");
-  row('<span class="hud-legend-ico">👑</span>', "Capital — crown + double ring (a nation's seat of power)");
+  row(resourceIconHtml("iron", "⚒", "hud-legend-ico"), "Iron deposit");
+  row(resourceIconHtml("horses", "🐎", "hud-legend-ico"), "Horses");
+  row(glyphHtml("hammer", "🔨", "hud-legend-ico"), "Building under construction");
+  row(glyphHtml("shield", "🛡", "hud-legend-ico"), "Fortification level (harder to capture; siege strips it)");
+  row(glyphHtml("crown", "👑", "hud-legend-ico"), "Capital — crown + double ring (a nation's seat of power)");
   row('<span class="hud-legend-badge">3</span>', "Army (owner colour, unit count)");
 
   section("Borders (edges)");
@@ -1538,8 +1575,11 @@ function renderVictoryProgress(elm: HTMLElement, state: GameState): void {
   const share = Math.round((Math.max(0, leaderRegions) / total) * 100);
   const leaderName = leader ? (leader.isPlayer ? "You" : leader.name) : "—";
   const player = playerNation(state);
-  elm.textContent =
-    `🏆 ${leaderName} ${share}%  ·  ⭐ ${player.wonders}/${WONDER_GOAL}  ·  ⏳ ${state.turn}/${TURN_LIMIT}`;
+  // Nation names come from the fixed roster in systems/turn.ts — safe as HTML.
+  elm.innerHTML =
+    `${glyphHtml("victory", "🏆")} ${leaderName} ${share}%  ·  ` +
+    `${glyphHtml("star", "⭐")} ${player.wonders}/${WONDER_GOAL}  ·  ` +
+    `${glyphHtml("hourglass", "⏳")} ${state.turn}/${TURN_LIMIT}`;
   const rivalNearing = !!leader && !leader.isPlayer && share >= DOMINATION_FRACTION * 100 - 12;
   elm.classList.toggle("threat", rivalNearing);
 }
@@ -1585,13 +1625,15 @@ function renderStandings(
     );
     const rank = el("span", "hud-standings-rank");
     rank.textContent = String(i + 1);
-    const sw = el("span", "hud-region-swatch");
-    sw.style.background = cbSafe(row.n.color, isColourblind());
+    const sw = nationMark(row.n);
     const name = el("span", "hud-standings-name");
-    name.textContent =
-      (row.n.isPlayer ? "You" : row.n.name) + (row.holdsCapital ? " 👑" : "") + (row.n.alive ? "" : " ✗");
+    name.textContent = (row.n.isPlayer ? "You" : row.n.name) + (row.n.alive ? "" : " ✗");
+    if (row.holdsCapital) name.append(document.createTextNode(" "), glyphEl("crown", "👑"));
     const detail = el("span", "hud-standings-detail");
-    detail.textContent = `${row.regions}⬢ · ${row.n.wonders}★ · ${row.n.research.done.length}📖`;
+    detail.innerHTML =
+      `${row.regions}${glyphHtml("region", "⬢")} · ` +
+      `${row.n.wonders}${glyphHtml("star", "★")} · ` +
+      `${row.n.research.done.length}${glyphHtml("book", "📖")}`;
     const score = el("span", "hud-standings-score");
     score.textContent = String(row.score);
     tr.append(rank, sw, name, detail, score);
@@ -1730,13 +1772,14 @@ function renderSummary(box: HTMLElement, summary: TurnSummary | null): void {
   if (summary.peaceMade.length) items.push(["good", `Peace with ${summary.peaceMade.join(", ")}`]);
   if (summary.eliminated.length) items.push(["good", `Eliminated ${summary.eliminated.join(", ")}`]);
   if (summary.techsCompleted.length) items.push(["good", `Researched ${summary.techsCompleted.map((t) => TECHS[t].name).join(", ")}`]);
-  if (summary.famine) items.push(["bad", "⚠ Famine"]);
-  if (summary.bankrupt) items.push(["bad", "⚠ Bankruptcy"]);
+  if (summary.famine) items.push(["bad", `${glyphHtml("warning", "⚠")} Famine`]);
+  if (summary.bankrupt) items.push(["bad", `${glyphHtml("warning", "⚠")} Bankruptcy`]);
   if (summary.quiet) items.push(["muted", "A quiet turn."]);
 
+  // Item texts are built from fixed labels and roster names — safe as HTML.
   for (const [tone, text] of items) {
     const row = el("div", "hud-summary-row " + tone);
-    row.textContent = text;
+    row.innerHTML = text;
     box.append(row);
   }
 }
@@ -1779,8 +1822,7 @@ function renderDiplomacy(
     const card = el("div", "hud-diplo-card");
 
     const head = el("div", "hud-diplo-head");
-    const sw = el("span", "hud-region-swatch");
-    sw.style.background = cbSafe(rival.color, isColourblind());
+    const sw = nationMark(rival);
     const nm = el("span", "hud-diplo-name");
     nm.textContent = rival.name;
     const arch = el("span", "hud-diplo-arch");
@@ -1807,7 +1849,7 @@ function renderDiplomacy(
     const assess = powerAssessment(ratio);
     const powerRow = el("div", "hud-diplo-power");
     const powerChip = el("span", "hud-diplo-power-chip " + assess.cls);
-    powerChip.textContent = `⚔ ${assess.label}`;
+    powerChip.append(glyphEl("attack", "⚔"), document.createTextNode(` ${assess.label}`));
     powerChip.title =
       `${rival.name}'s strength is ${Math.round(ratio * 100)}% of yours ` +
       "(army + territory + treasury). Below 100% is a softer target; well above is a threat.";
@@ -1824,7 +1866,7 @@ function renderDiplomacy(
         inst.bankrupt ? "bankruptcy" : null,
       ].filter(Boolean);
       const reelChip = el("span", "hud-diplo-reeling");
-      reelChip.textContent = "⚠ Reeling";
+      reelChip.append(glyphEl("warning", "⚠"), document.createTextNode(" Reeling"));
       reelChip.title =
         `${rival.name} is reeling — ${crises.join(", ")}. Distracted and poorly ` +
         "placed to defend: a tempting moment to strike (rivals read this on you too).";
@@ -1942,7 +1984,7 @@ function renderResearch(
     b.innerHTML =
       `<span class="hud-tech-name">${def.name}</span>` +
       `<span class="hud-tech-blurb">${def.blurb}</span>` +
-      `<span class="hud-tech-cost">${def.cost}📖 · ${def.branch}</span>`;
+      `<span class="hud-tech-cost">${def.cost}${resourceIconHtml("knowledge", "📖")} · ${def.branch}</span>`;
     b.addEventListener("click", () => callbacks.onChooseResearch(id));
     menu.append(b);
   }
@@ -2001,7 +2043,7 @@ function renderTechTree(
       node.title = def.blurb + (missing.length ? ` (needs ${missing.join(", ")})` : "");
       node.innerHTML =
         `<span class="hud-tt-name">${isDone ? "✓ " : ""}${def.name}</span>` +
-        `<span class="hud-tt-meta">T${def.tier} · ${def.cost}📖</span>`;
+        `<span class="hud-tt-meta">T${def.tier} · ${def.cost}${resourceIconHtml("knowledge", "📖")}</span>`;
       if (available) {
         node.addEventListener("click", () => {
           callbacks.onChooseResearch(id);
@@ -2075,6 +2117,25 @@ function composition(army: Army): string {
   const parts: string[] = [];
   for (const t of UNIT_TYPES) if (army.units[t] > 0) parts.push(`${army.units[t]} ${UNITS[t].short}`);
   return parts.join(", ") || "—";
+}
+
+/**
+ * A nation's identity mark: its crest (in its resolved display colour) when
+ * the registry has one, else the legacy colour swatch. Used by standings and
+ * diplomacy so factions read as factions, not coloured dots.
+ */
+function nationMark(n: Nation): HTMLElement {
+  const color = cbSafe(n.color, isColourblind());
+  const crest = crestSvg(n.id, color);
+  if (crest) {
+    const span = el("span", "hud-crest ico-svg");
+    span.setAttribute("aria-hidden", "true");
+    span.innerHTML = crest;
+    return span;
+  }
+  const sw = el("span", "hud-region-swatch");
+  sw.style.background = color;
+  return sw;
 }
 
 function unrestTag(region: Region): HTMLElement {
