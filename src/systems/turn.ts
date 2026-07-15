@@ -451,8 +451,8 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
     const notes: string[] = [];
     for (const c of built.completed) notes.push(`${BUILDINGS[c.building].name} built in ${c.regionName}`);
     if (step.completed) notes.push(`researched ${TECHS[step.completed].name}`);
-    if (famine) notes.push("⚠ famine — population starving");
-    if (bankrupt) notes.push("⚠ bankruptcy — troops disbanded, unrest spikes");
+    if (famine) notes.push("Famine — population starving");
+    if (bankrupt) notes.push("Bankruptcy — troops disbanded, unrest spikes");
     const entry =
       `Turn ${state.turn} — +${flow.gold}g (−${upkeep} upkeep) +${flow.materials}m ` +
       `+${flow.knowledge}k, food ${fmtSigned(flow.food)}. Treasury ${stocks.gold}g.` +

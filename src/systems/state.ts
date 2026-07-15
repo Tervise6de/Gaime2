@@ -283,7 +283,7 @@ export interface NationModifier {
 /** Player-facing labels for active modifiers (HUD chips). */
 export const MODIFIER_LABEL: Record<ModifierId, string> = {
   prosperity: "✨ Prosperity",
-  war_weary: "⚔ War-weariness",
+  war_weary: "War-weariness",
   research_surge: "📚 Research surge",
 };
 

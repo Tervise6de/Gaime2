@@ -285,7 +285,7 @@ function main(): void {
         const names = newlyUnlocked
           .map((id) => ACHIEVEMENTS.find((a) => a.id === id)?.name ?? id)
           .join(", ");
-        hud.toast(`🏅 Achievement${newlyUnlocked.length > 1 ? "s" : ""} unlocked: ${names}`);
+        hud.toast(`Achievement${newlyUnlocked.length > 1 ? "s" : ""} unlocked: ${names}`);
       }
     }
   }

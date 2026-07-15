@@ -18,13 +18,13 @@ export interface TutorialStep {
 export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     target: null,
-    title: "Welcome, ruler 👑",
+    title: "Welcome, ruler",
     body: "You lead one realm among rivals. Grow your economy, keep your people content, and win by conquest, Great Works, or prestige. This quick tour points out the essentials — you can skip it any time.",
   },
   {
     target: ".hud-topbar",
     title: "Your treasury & production",
-    body: "Gold, food, materials and knowledge — with each resource's per-turn flow. Watch food (famine bites) and gold (bankruptcy disbands troops). The 🏆 bar tracks who's nearest a victory.",
+    body: "Gold, food, materials and knowledge — with each resource's per-turn flow. Watch food (famine bites) and gold (bankruptcy disbands troops). The victory bar up top tracks who's nearest a victory.",
   },
   {
     target: ".hud-tax-slider",
@@ -44,7 +44,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     target: ".hud-right",
     title: "Diplomacy",
-    body: "Make war or peace, sign pacts, gift gold, demand tribute — or open a trade route (gold each turn while at peace). The ⚔ chip shows each rival's strength; ⚠ marks a rival that's reeling.",
+    body: "Make war or peace, sign pacts, gift gold, demand tribute — or open a trade route (gold each turn while at peace). The strength chip shows how each rival compares to you; a Reeling badge marks a rival in crisis.",
   },
   {
     target: ".hud-endturn",
