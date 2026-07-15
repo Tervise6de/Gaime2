@@ -192,14 +192,39 @@ export const BUILDING_ART: Record<BuildingId, string | null> = {
 // factions even under palette remaps.
 // ---------------------------------------------------------------------------
 
+/** Shared shield template; the sigil group is drawn in off-white over `__C__`. */
+function crest(sigil: string): string {
+  return (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">' +
+    '<path d="M12 2.6l8 2.8v6.1c0 4.9-3.2 8.6-8 9.9-4.8-1.3-8-5-8-9.9V5.4z" fill="__C__" stroke="rgba(10,12,16,0.6)" stroke-width="1.2" stroke-linejoin="round"/>' +
+    `<g fill="none" stroke="#f7f4ea" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${sigil}</g>` +
+    "</svg>"
+  );
+}
+
 export const CREST_ART: Record<number, string | null> = {
-  0: null, // Your Realm — crown
-  1: null, // Free Peoples (barbarians) — crossed axes
-  2: null, // Valdheim — mountain peaks
-  3: null, // Suzerain of Kael — crescent moon
-  4: null, // Sundered League — broken ring
-  5: null, // Emberhold — flame
-  6: null, // Korrath Hegemony — tower
+  // Your Realm — crown (the brand mark).
+  0: crest('<path d="M7.6 14.2v-4.4l2.4 1.8 2-3.4 2 3.4 2.4-1.8v4.4z" fill="#f7f4ea" stroke="none"/>'),
+  // Free Peoples (barbarians) — crossed axes.
+  1: crest(
+    '<path d="M9 8.2l6.4 7M15 8.2l-6.4 7"/><path d="M9.8 7.4c-1.2.3-2 .8-2.6 1.7M14.2 7.4c1.2.3 2 .8 2.6 1.7"/>',
+  ),
+  // Valdheim — mountain peaks.
+  2: crest('<path d="M6.8 14.6l3.1-5.4 2 3.2 1.9-3.7 3.4 5.9z"/>'),
+  // Suzerain of Kael — crescent moon.
+  3: crest('<path d="M14.8 7.6a4.9 4.9 0 100 7.6 5.7 5.7 0 010-7.6z"/>'),
+  // Sundered League — a ring broken in two.
+  4: crest(
+    '<path d="M14.9 8.3a4.4 4.4 0 011.5 3.3 4.4 4.4 0 01-1.5 3.3M9.1 14.9a4.4 4.4 0 01-1.5-3.3 4.4 4.4 0 011.5-3.3"/>',
+  ),
+  // Emberhold — flame.
+  5: crest(
+    '<path d="M12 6.6c1.9 1.9 3.4 3.7 3.4 5.7a3.4 3.4 0 11-6.8 0c0-2 1.5-3.8 3.4-5.7z"/><path d="M12 11.2c.7.8 1.1 1.5 1.1 2.2a1.1 1.1 0 11-2.2 0c0-.7.4-1.4 1.1-2.2z"/>',
+  ),
+  // Korrath Hegemony — battlemented tower.
+  6: crest(
+    '<path d="M9.3 15.4v-4.6h-.9V7.6h1.6v1.1h1.2V7.6h1.6v1.1H14V7.6h1.6v3.2h-.9v4.6z"/>',
+  ),
 };
 
 /** Resolve a nation's crest SVG in its display colour, or null (fallback: colour swatch). */

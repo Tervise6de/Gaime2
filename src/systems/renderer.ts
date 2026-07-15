@@ -16,7 +16,7 @@
  */
 
 import { TERRAIN, type TerrainId } from "@/data/terrain";
-import { GLYPH_ART, RESOURCE_ART, TERRAIN_ART, WORLD_BG } from "@/data/art";
+import { GLYPH_ART, RESOURCE_ART, TERRAIN_ART, WORLD_BG, crestSvg } from "@/data/art";
 import { cbSafe } from "@/data/palette";
 import { armySize, BARBARIAN_ID } from "@/systems/state";
 import {
@@ -445,12 +445,17 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       }
     }
 
-    // Capital marker (crown, bottom-left corner).
+    // Capital marker (bottom-left corner): the owner's crest, else the crown.
     if (capitals.has(region.id)) {
       const cx = p.x - NODE_RADIUS + 5;
       const cy = p.y + NODE_RADIUS - 7;
-      if (GLYPH_ART.crown) iconChip(cx, cy, 9);
-      if (!drawIcon("glyph:crown", GLYPH_ART.crown, CAPITAL_ICON_COLOR, cx, cy, 13)) {
+      const owner = region.ownerId;
+      const crestArt = owner === null ? null : crestSvg(owner, ownerColor(owner));
+      if (crestArt || GLYPH_ART.crown) iconChip(cx, cy, 9.5);
+      if (
+        !(crestArt && drawIcon(`crest:${owner}`, crestArt, ownerColor(owner), cx, cy, 15)) &&
+        !drawIcon("glyph:crown", GLYPH_ART.crown, CAPITAL_ICON_COLOR, cx, cy, 13)
+      ) {
         context.font = "13px system-ui, sans-serif";
         context.fillText("👑", cx, cy);
       }
