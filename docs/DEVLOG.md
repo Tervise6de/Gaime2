@@ -6,6 +6,49 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-15 — D1: visual identity — the emoji/flat-colour era ends
+
+Executed the art brief (`docs/art-agent-brief.md`; plan + style decision in
+`docs/art-plan.md`). Committed style: **flat-vector, stroke-first line icons**
+on a shared 24×24 grid, `currentColor`, one gold/brass accent inherited from
+the crown favicon. Everything hand-authored inline SVG — no deps, no network,
+`dependencies` still `{}`.
+
+- **Scaffolding first** (per the brief): `src/data/art.ts` is the single asset
+  registry (resources / glyphs / units / buildings / crests / terrain shades);
+  `src/ui/icons.ts` builds DOM icons; the renderer got an SVG→canvas image
+  cache keyed by (id, colour, size). Every consumer falls back to the old
+  emoji/flat colour when a registry entry is null — the game renders with
+  zero assets.
+- **Resource icons (6) + UI glyphs (22)**: coin-stack, wheat, pickaxe, book,
+  anvil, horse head; toolbar/legend/victory/marker glyphs. Emoji fully gone
+  from HUD, tutorial, toasts and sim-side labels.
+- **Nation crests (7)**: one shield template, per-faction white sigil (crown /
+  crossed axes / peaks / crescent / broken ring / flame / tower), filled with
+  the nation's `cbSafe`-resolved colour — crests follow the colour-blind
+  palette; shape still separates factions. Shown in standings, diplomacy and
+  the map's capital marker.
+- **Terrain + background**: each terrain got a hi/lo shade pair (radial
+  shading in both node and Voronoi views, mirrored in HUD legend/panel via
+  CSS); flat `#11151c` replaced with a quiet vignette.
+- **Units (5) + buildings (14)**: distinct silhouettes (pitchfork / sword /
+  bow / horse+lance / catapult); buildings legible at ~14px; the Great Work is
+  a laurelled monument in fixed gold.
+- **App mark**: favicon upgraded to the player crest; 192/512 PNG app icons +
+  master SVG in `assets/icons/` (manifest wiring left for D3's platform call).
+
+Verified per the brief every cycle: typecheck + 373 tests green + build with
+`fetch(` count 0, plus Playwright screenshots at 1280×860 and 390×780, node +
+Voronoi layouts, colour-blind and reduce-motion toggles — no console errors.
+All assets original (no `THIRD_PARTY_ASSETS.md` needed yet).
+
+**Left for a human (per the brief):** final game name + logo direction
+("Gaime2" wordmark untouched), commissioned-art budget/licensing, store-icon
+platform targets (D3). **Next art ideas:** victory/defeat end-cards, event
+vignettes, subtle terrain motifs in Voronoi cells.
+
+---
+
 ## 2026-07-14 — B5 follow-up: resource-count tweening (deferred juice, now done)
 
 Closed the visual-juice follow-up flagged when B5 shipped: the top-bar resource
