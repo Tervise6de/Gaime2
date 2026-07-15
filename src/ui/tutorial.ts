@@ -96,7 +96,15 @@ export function runTutorial(): void {
   function finish(): void {
     markTutorialSeen();
     document.removeEventListener("keydown", onKey);
+    window.removeEventListener("resize", onResize);
     overlay.remove();
+  }
+
+  // Reposition the spotlight/card when the viewport changes. Named so `finish`
+  // can remove it — an anonymous listener would leak on every tour (the tour is
+  // re-openable), each firing `render()` against detached DOM forever after.
+  function onResize(): void {
+    render();
   }
 
   function render(): void {
@@ -172,6 +180,6 @@ export function runTutorial(): void {
   }
 
   document.addEventListener("keydown", onKey);
-  window.addEventListener("resize", () => render(), { once: false });
+  window.addEventListener("resize", onResize);
   render();
 }
