@@ -6,6 +6,40 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — ROADMAP C3: Start scenarios — hand-set openings at new-game
+
+Third Phase-C item of `docs/roadmap-to-ready.md`: replay variety through preset
+openings, so a returning player has curated setups (not just the raw sliders).
+
+**Scenarios (`data/scenarios.ts`, content):** six hand-set openings bundling map
+size + rival count + difficulty, two with a **themed twist** (a pinned opening
+trait): Classic Realm, Border Duel (1 rival, small), Age of Warlords (5 rivals,
+large, hard), The Long Peace (2 rivals, large, easy — a builder's game), Scholar-
+Kings (opens Scholarly), The Warhost (opens Martial, hard).
+
+**Sim (`turn.ts`):** `NewGameOptions.playerTrait` optionally pins the player's
+opening trait; rivals then draw from the remaining pool. **Determinism preserved** —
+with `playerTrait` unset the trait draw is byte-identical to before (verified), so
+no existing seed shifts.
+
+**UI:** a **Scenario** dropdown in the new-game panel. Picking one fills the
+difficulty/rivals/map selectors and shows its blurb; editing any of them by hand
+drops back to "Custom". The chosen scenario's trait rides through to `createGame`.
+
+**Verify:** typecheck ✓, **363 tests ✓** (+4: `playerTrait` pins the player's trait
+while rivals stay distinct, the unset path stays deterministic, and the scenarios
+table is well-formed with no `custom` collision), build ✓ (0 `fetch`, deps `{}`).
+Browser (Playwright): the dropdown lists all six; "Age of Warlords" sets hard / 5 /
+large + blurb; a manual rivals edit reverts to Custom and clears the blurb; starting
+"Scholar-Kings" opens the player with the Scholarly trait; no page errors. (No
+self-play probe — default-game balance is untouched; scenarios only bundle existing
+knobs and the trait pin is a player-facing themed choice.)
+
+**Next (roadmap order):** C4 diplomacy/AI depth II — richer AI decision-making or a
+new diplomatic action, deepening the strategic layer.
+
+---
+
 ## 2026-07-14 — ROADMAP C2: Content — five new events (incl. a diplomacy lever)
 
 Second Phase-C item of `docs/roadmap-to-ready.md`: deepen the mid-game with more

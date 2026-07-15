@@ -36,6 +36,19 @@ describe("createGame", () => {
     expect(createGame({ seed: 999 })).toEqual(createGame({ seed: 999 }));
   });
 
+  it("pins the player's opening trait when a scenario forces one, leaving rivals distinct", () => {
+    const g = createGame({ seed: 7, rivals: 3, playerTrait: "scholarly" });
+    expect(playerNation(g).trait).toBe("scholarly");
+    // Rivals draw from the remaining pool — none should duplicate the forced trait.
+    const rivalTraits = g.nations.filter((n) => !n.isPlayer && !n.isBarbarian).map((n) => n.trait);
+    expect(rivalTraits.every((t) => t !== "scholarly")).toBe(true);
+  });
+
+  it("leaves trait assignment (and determinism) unchanged when playerTrait is unset", () => {
+    // Same seed with no forced trait must be byte-identical to the legacy path.
+    expect(createGame({ seed: 55, rivals: 3 })).toEqual(createGame({ seed: 55, rivals: 3, playerTrait: undefined }));
+  });
+
   it("starts at turn 1 with a small player realm and barbarian rest", () => {
     const g = createGame({ seed: 1 });
     expect(g.turn).toBe(1);

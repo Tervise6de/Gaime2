@@ -50,7 +50,8 @@ import type { TurnSummary } from "@/systems/summary";
 import { deriveAlerts } from "@/ui/alerts";
 import { researchFrontier, isBuildingUnlockedFor } from "@/systems/tech";
 import { ARCHETYPE_LABEL } from "@/data/personalities";
-import { TRAITS } from "@/data/traits";
+import { TRAITS, type TraitId } from "@/data/traits";
+import { SCENARIOS } from "@/data/scenarios";
 import { TECHS, TECH_IDS, type TechId, type TechBranch } from "@/data/techs";
 import { WONDER_GOAL, DOMINATION_FRACTION, TURN_LIMIT, MODIFIER_LABEL, type Difficulty } from "@/systems/state";
 import {
@@ -79,6 +80,8 @@ export interface NewGameConfig {
   rivals: number;
   /** Map generation options (region count etc.); omitted = engine default. */
   map?: MapGenOptions;
+  /** Scenario twist: force the player's opening trait. */
+  playerTrait?: TraitId;
 }
 
 export interface HudCallbacks {
@@ -305,7 +308,45 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   ], prefs.mapSize ?? String(DEFAULT_MAP_OPTIONS.regionCount));
   mapSizeSel.title = "World size: fewer regions play tight and quick; more regions give room to expand.";
   cfgRow.append(seedInput, difficultySel, rivalsSel, mapSizeSel);
-  controls.append(cfgRow);
+
+  // Scenarios: hand-set openings. Picking one fills the config below (and may pin
+  // an opening trait); editing the config by hand drops back to "Custom".
+  let scenarioTrait: TraitId | undefined;
+  const scenarioRow = el("div", "hud-newgame");
+  const scenarioSel = select(
+    "hud-select hud-scenario",
+    [["custom", "Custom setup"], ...SCENARIOS.map((s) => [s.id, s.name] as [string, string])],
+    "custom",
+  );
+  scenarioSel.title = "Pick a hand-set opening, or build your own with the options below.";
+  const scenarioBlurb = el("p", "hud-hint hud-scenario-blurb");
+  scenarioRow.append(scenarioSel);
+  scenarioSel.addEventListener("change", () => {
+    const sc = SCENARIOS.find((s) => s.id === scenarioSel.value);
+    if (!sc) {
+      scenarioTrait = undefined;
+      scenarioBlurb.textContent = "";
+      return;
+    }
+    difficultySel.value = sc.difficulty;
+    rivalsSel.value = String(sc.rivals);
+    mapSizeSel.value = String(sc.regionCount);
+    scenarioTrait = sc.playerTrait;
+    scenarioBlurb.textContent = sc.blurb;
+  });
+  // Any manual edit means it's no longer the chosen scenario.
+  const dropToCustom = (): void => {
+    if (scenarioSel.value !== "custom") {
+      scenarioSel.value = "custom";
+      scenarioTrait = undefined;
+      scenarioBlurb.textContent = "";
+    }
+  };
+  difficultySel.addEventListener("change", dropToCustom);
+  rivalsSel.addEventListener("change", dropToCustom);
+  mapSizeSel.addEventListener("change", dropToCustom);
+
+  controls.append(scenarioRow, scenarioBlurb, cfgRow);
 
   const btnRow = el("div", "hud-newgame");
   const newGameBtn = document.createElement("button");
@@ -319,6 +360,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       difficulty: difficultySel.value as Difficulty,
       rivals: Number(rivalsSel.value),
       map: { ...DEFAULT_MAP_OPTIONS, regionCount: Number(mapSizeSel.value) },
+      playerTrait: scenarioTrait,
     });
   }
   newGameBtn.addEventListener("click", () => {

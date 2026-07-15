@@ -17,7 +17,7 @@
 import { BUILDINGS, type BuildingId } from "@/data/buildings";
 import { UNITS, type UnitType } from "@/data/units";
 import { ARCHETYPES } from "@/data/personalities";
-import { TRAIT_IDS } from "@/data/traits";
+import { TRAIT_IDS, type TraitId } from "@/data/traits";
 import { TECHS, type TechId } from "@/data/techs";
 import { generateMap, type MapGenOptions } from "@/systems/mapgen";
 import { nationalProduction, round1 } from "@/systems/economy";
@@ -89,6 +89,8 @@ export interface NewGameOptions {
   taxRate?: number;
   rivals?: number;
   difficulty?: Difficulty;
+  /** Scenario twist: force the player's opening trait (else drawn from the pool). */
+  playerTrait?: TraitId;
 }
 
 /** Build a fresh game from a seed. Pure: same seed → identical starting state. */
@@ -181,11 +183,17 @@ export function createGame(options: NewGameOptions): GameState {
 
   // Draw a distinct national trait for each non-barbarian nation (player +
   // rivals), for opening variety. Done last so existing seeded map/capital
-  // layouts are unaffected by the added RNG draws.
-  const traitPool = shuffled(TRAIT_IDS, rng);
+  // layouts are unaffected by the added RNG draws. A scenario may pin the
+  // player's trait; rivals then draw from the remaining pool.
+  const forced = options.playerTrait;
+  const traitPool = shuffled(forced ? TRAIT_IDS.filter((t) => t !== forced) : TRAIT_IDS, rng);
   let traitIdx = 0;
   for (const n of nations) {
     if (n.isBarbarian) continue;
+    if (n.isPlayer && forced) {
+      n.trait = forced;
+      continue;
+    }
     n.trait = traitPool[traitIdx % traitPool.length];
     traitIdx += 1;
   }
