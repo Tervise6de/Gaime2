@@ -21,9 +21,12 @@ Three stories, and every one of them is literally true (not aspirational):
    second. No download, no launcher, no sign-up. Runs on a locked-down
    school/work laptop, a Chromebook, or a phone — anywhere with a browser.
 2. **Genuinely offline & private.** The rival AI, the economy, the entire
-   simulation run *locally in the tab*. The built bundle makes **zero network
-   calls** (we assert it in CI: `grep -c 'fetch(' dist/…` must be 0). No
-   telemetry, no ads, no accounts, nothing phones home. Play on a plane.
+   simulation run *locally in the tab*. The **app bundle makes zero network
+   calls** (asserted in CI: `grep -c 'fetch(' dist/assets/*.js` must be 0) — no
+   telemetry, no ads, no accounts, nothing phones home. It **installs as a PWA
+   and plays fully offline** after the first visit (a service worker caches its
+   own same-origin assets; a strict CSP `connect-src 'self'` blocks any
+   cross-origin call). Play on a plane.
 3. **Systems over spectacle.** Deterministic, seeded worlds you can *share*;
    interacting economy, population, unrest, a military counter-loop, diplomacy
    and a branching tech tree; three balanced victory paths; an anti-snowball
@@ -31,7 +34,8 @@ Three stories, and every one of them is literally true (not aspirational):
 
 Supporting proof points:
 - **Tiny & dependency-free:** ~54 KB of gzipped JS, `dependencies: {}`. Loads
-  instantly, installs as a PWA, works offline after first visit.
+  instantly, installs as a PWA (manifest + service worker), plays fully offline
+  after the first visit — verified by reloading with the network cut.
 - **Short, replayable sessions:** a game runs ~60–150 turns (median ~100),
   ~1–2 hours — a satisfying arc in one sitting, not a 12-hour campaign.
 - **Shareable seeds:** same seed → identical world and AI. Screenshot a brutal
@@ -82,7 +86,7 @@ straight to a playable build, mention the offline/privacy guarantee up front.
       diplomacy, end-game standings. All in dark theme; one colour-blind variant.
 - [ ] A 20–30s silent screen-capture GIF/clip of a turn resolving (map ripples,
       resource counters ticking, an event card).
-- [ ] Store/PWA icons at required sizes (192/512 exist; add platform sizes).
+- [x] Installable PWA: manifest + offline service worker wired (192/512/SVG icons, theme colour); offline reload verified. Extra store-icon platform sizes still optional.
 - [ ] Short store blurb (see §6) + the Show HN post drafted.
 
 ## 6. Store blurb (draft, ~100 words)

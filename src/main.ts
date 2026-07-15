@@ -363,3 +363,14 @@ function downloadText(filename: string, text: string): void {
 }
 
 main();
+
+// Register the offline service worker in the production build (skipped in dev so
+// it never caches a stale HMR bundle). Failure is non-fatal — the game runs the
+// same online; the worker only adds installability and offline replay.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register("/sw.js").catch(() => {
+      /* offline support simply won't be available */
+    });
+  });
+}

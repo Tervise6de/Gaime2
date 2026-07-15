@@ -25,13 +25,19 @@ HMR works):
 ```
 default-src 'self'; base-uri 'none'; object-src 'none';
 script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;
-font-src 'self'; connect-src 'none'; form-action 'none'
+font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self';
+form-action 'none'
 ```
 
 - `script-src 'self'` (no `'unsafe-inline'`) — inline handlers like a smuggled
   `onerror=` never execute. The built HTML has no inline `<script>`, so this
   costs nothing.
-- `connect-src 'none'` — enforces the no-network guarantee in the browser.
+- `connect-src 'self'` — same-origin only, so the offline service worker can
+  re-fetch the app's own assets but nothing can call an external server. The
+  "zero network calls" guarantee is really "no cross-origin / no phone-home,"
+  and this enforces it in the browser.
+- `worker-src`/`manifest-src 'self'` — the offline service worker and the web
+  app manifest.
 - `img-src 'self' data:` — the canvas rasterises registry SVGs from `data:`
   URIs. `style-src 'unsafe-inline'` covers the inline style attributes the HUD
   sets (e.g. legend swatches); no inline scripts rely on it.

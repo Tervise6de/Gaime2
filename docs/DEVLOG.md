@@ -6,6 +6,33 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-15 (eighth pass) — real PWA: installable + offline
+
+The marketing claim "installs as a PWA, works offline" was aspirational — there
+was no manifest and no service worker. Made it true:
+
+- **`public/manifest.webmanifest`** — name/short_name "Petty Kingdoms",
+  standalone display, theme/background `#11151c`, the 192/512 PNG + SVG
+  (maskable) icons. Linked from `index.html` with `theme-color` and an
+  apple-touch-icon.
+- **`public/sw.js`** — a tiny hand-rolled service worker (no workbox, no dep):
+  stale-while-revalidate over same-origin GETs, navigation fallback to the
+  cached shell, old-cache cleanup on activate. Registered from `main.ts` in
+  production only (dev keeps HMR).
+- **CSP updated** for the new surfaces: `connect-src` `'none'` → `'self'` (the
+  SW re-fetches the app's own assets; cross-origin is still blocked), plus
+  `worker-src`/`manifest-src 'self'`.
+
+Verified in a headless browser: SW registers and controls the page, the
+manifest parses, and — the real test — **reloading with the network cut still
+loads and runs the game**, with zero CSP violations and zero console errors.
+The app bundle's `fetch(` count stays 0 (the SW's own `fetch` lives in
+`dist/sw.js`, intentional same-origin caching); marketing copy clarified to
+"the app bundle makes zero network calls" so the guarantee stays airtight.
+379 tests green; build clean.
+
+---
+
 ## 2026-07-15 (seventh pass) — security review
 
 Full-codebase security pass (threat model + review recorded in

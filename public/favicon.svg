@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- The player crest (data/art.ts) as the app mark: gold shield + crown. -->
+  <rect width="32" height="32" rx="7" fill="#11151c"/>
+  <path d="M16 3.5l10.4 3.6v8c0 6.4-4.2 11.2-10.4 12.9C9.8 26.3 5.6 21.5 5.6 15.1v-8z"
+        fill="#d8a24a" stroke="#e6c874" stroke-width="1.2" stroke-linejoin="round"/>
+  <path d="M10.3 19.3v-5.9l3.2 2.4 2.5-4.5 2.5 4.5 3.2-2.4v5.9z" fill="#f7f4ea"/>
+</svg>

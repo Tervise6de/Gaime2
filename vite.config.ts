@@ -9,15 +9,17 @@ import { fileURLToPath, URL } from "node:url";
  *  - `script-src 'self'` (no 'unsafe-inline') → inline event handlers like a
  *    smuggled `onerror=` never execute — a hard second layer under the
  *    innerHTML escaping, should any sink ever be missed.
- *  - `connect-src 'none'` → enforces the "makes zero network calls" guarantee
- *    at the browser level (fetch/XHR/websocket/beacon all blocked).
+ *  - `connect-src 'self'` → same-origin only (the service worker re-fetches the
+ *    app's own assets to cache them); no cross-origin call can phone home.
+ *  - `worker-src 'self'` → the offline service worker; `manifest-src 'self'` →
+ *    the web app manifest.
  *  - `img-src 'self' data:` → the canvas rasterises registry SVGs from data:
  *    URIs; `style-src` allows the inline style attributes the HUD sets.
  */
 const CSP =
   "default-src 'self'; base-uri 'none'; object-src 'none'; " +
   "script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; " +
-  "font-src 'self'; connect-src 'none'; form-action 'none'";
+  "font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; form-action 'none'";
 
 function cspMeta(): Plugin {
   return {
