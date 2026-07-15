@@ -6,6 +6,42 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-14 — ROADMAP C1: Meta-progression — profile stats & achievements
+
+First item of **Phase C** (`docs/roadmap-to-ready.md`) — the reasons to come back.
+A per-browser player profile now accumulates across games and unlocks achievements,
+persisted to localStorage. Purely observational: it reads a finished `GameState` and
+changes no gameplay (guardrail-clean).
+
+**Store (`ui/profile.ts`):** `ProfileStats` tracks games played/won, wins by victory
+kind (domination / conquest / great works / prestige score) and by difficulty,
+fastest win, and longest game. `recordGameEnd(state)` folds a finished game in and
+returns any newly-unlocked achievements; `deriveAchievements` is pure. Fired once
+from `main.ts` on the terminal transition (advanceTurn only runs while playing, so
+reaching a verdict there is fresh), and a toast celebrates fresh unlocks.
+
+**Achievements (`data/achievements.ts`, content):** 10 milestones as pure predicates
+over the stats — First Crown, Conqueror, Wonder of the Age, Enlightened, **Polymath**
+(win all three paths), Veteran, Warlord, Blitz (≤45-turn win), The Long Game, Iron
+Blood (win on Hard). The type-only `ProfileStats` import keeps it cycle-free.
+
+**Records screen:** a new **🏅 Records** top-bar chip opens a modal — career stats,
+wins by path, and an achievements grid (unlocked gold, locked greyed with the
+unlock hint).
+
+**Verify:** typecheck ✓, **354 tests ✓** (+6: achievement derivation incl. the
+three-path Polymath gate, and `recordGameEnd` win/loss/fastest/longest folding with
+persistence, on an in-memory localStorage). Build ✓ (0 `fetch`, deps `{}`). Browser
+(Playwright): a fresh profile shows 0/0 and all 10 achievements locked; playing a
+game to its end writes `gaime2:profile` (played 1, longest 30) — verified on a real
+~29-turn game; a seeded full profile renders every stat and 10/10 unlocked; no page
+errors.
+
+**Next (roadmap order):** C2 content — more events, buildings, techs or a wonder or
+two, to deepen the mid-game (data-table additions, unit-tested).
+
+---
+
 ## 2026-07-14 — ROADMAP B6: Responsive & touch layout (Phase B closes → ~85)
 
 Sixth and final Phase-B item of `docs/roadmap-to-ready.md`. The desktop HUD is a

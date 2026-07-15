@@ -25,6 +25,8 @@ import { createHud } from "@/ui/hud";
 import { runTutorial, hasSeenTutorial } from "@/ui/tutorial";
 import { play, outcomeCue, armAmbientOnGesture } from "@/ui/audio";
 import { applyDisplaySettings, isColourblind, isReduceMotion } from "@/ui/settings";
+import { recordGameEnd } from "@/ui/profile";
+import { ACHIEVEMENTS } from "@/data/achievements";
 import "@/ui/style.css";
 
 /**
@@ -274,6 +276,17 @@ function main(): void {
     else {
       const cue = outcomeCue(lastSummary);
       if (cue) play(cue);
+    }
+    // Meta-progression: fold this game into the profile on the terminal transition
+    // (advanceTurn only runs while playing, so reaching a verdict here is fresh).
+    if (state.outcome !== "playing") {
+      const { newlyUnlocked } = recordGameEnd(state);
+      if (newlyUnlocked.length > 0) {
+        const names = newlyUnlocked
+          .map((id) => ACHIEVEMENTS.find((a) => a.id === id)?.name ?? id)
+          .join(", ");
+        hud.toast(`🏅 Achievement${newlyUnlocked.length > 1 ? "s" : ""} unlocked: ${names}`);
+      }
     }
   }
 

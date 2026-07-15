@@ -1716,6 +1716,70 @@ a:focus-visible,
   border-radius: 4px;
 }
 
+/* Records panel — career stats + achievements. */
+.hud-records-panel {
+  width: min(460px, 94vw);
+  max-height: 84vh;
+  overflow-y: auto;
+}
+
+.hud-stat-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 2px;
+  font-size: 13px;
+}
+
+.hud-stat-label {
+  color: var(--muted);
+}
+
+.hud-stat-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-achv-grid {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.hud-achv {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+}
+
+.hud-achv.got {
+  border-color: rgba(244, 210, 122, 0.5);
+  background: rgba(244, 210, 122, 0.08);
+}
+
+.hud-achv.locked {
+  opacity: 0.55;
+}
+
+.hud-achv-badge {
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.hud-achv-name {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.hud-achv-desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
 /* Options panel — sound / accessibility / display preferences. */
 .hud-options-panel {
   width: min(420px, 94vw);

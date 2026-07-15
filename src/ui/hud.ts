@@ -29,6 +29,8 @@ import {
   setDefaultMapLayout,
 } from "@/ui/settings";
 import { cbSafe } from "@/data/palette";
+import { loadProfile, type ProfileStats } from "@/ui/profile";
+import { ACHIEVEMENTS } from "@/data/achievements";
 import { EDGE_COLOR, WAR_EDGE_COLOR, type MapLayout } from "@/systems/renderer";
 import { DEFAULT_MAP_OPTIONS, type MapGenOptions } from "@/systems/mapgen";
 import { regionCapacity } from "@/systems/population";
@@ -223,6 +225,11 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   mapToggle.title = "Switch between the node/edge map and the Voronoi territory map. Shortcut: M";
   topBar.append(mapToggle);
   if (mapLayout !== "node") callbacks.onSetMapLayout(mapLayout); // honour a saved default at boot
+
+  // Records — cumulative profile stats and achievements.
+  const recordsToggle = btn("🏅 Records", "hud-legend-toggle", () => openRecords());
+  recordsToggle.title = "Your career stats and achievements.";
+  topBar.append(recordsToggle);
 
   // Options — sound, accessibility and view preferences in one persisted panel.
   const optionsToggle = btn("⚙ Options", "hud-legend-toggle", () => openOptions());
@@ -752,6 +759,83 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   }
   function closeOptions(): void {
     optionsOverlay.style.display = "none";
+  }
+
+  // --- Records overlay (career stats + achievements) ------------------------
+  const recordsOverlay = el("div", "hud-techtree-overlay");
+  recordsOverlay.style.display = "none";
+  recordsOverlay.addEventListener("click", (ev) => {
+    if (ev.target === recordsOverlay) closeRecords();
+  });
+  root.append(recordsOverlay);
+
+  function statRow(label: string, value: string): HTMLElement {
+    const row = el("div", "hud-stat-row");
+    const l = el("span", "hud-stat-label");
+    l.textContent = label;
+    const v = el("span", "hud-stat-value");
+    v.textContent = value;
+    row.append(l, v);
+    return row;
+  }
+
+  function renderRecords(): void {
+    recordsOverlay.innerHTML = "";
+    const p: ProfileStats = loadProfile();
+    const panel = el("div", "hud-techtree-panel hud-records-panel");
+    const head = el("div", "hud-techtree-head");
+    const title = el("h2", "hud-techtree-title");
+    title.textContent = "Records";
+    head.append(title, closeButton(closeRecords));
+    panel.append(head);
+
+    // Career stats.
+    panel.append(sectionHeading("Career"));
+    const winRate = p.gamesPlayed > 0 ? Math.round((p.gamesWon / p.gamesPlayed) * 100) : 0;
+    panel.append(statRow("Games played", String(p.gamesPlayed)));
+    panel.append(statRow("Games won", `${p.gamesWon} (${winRate}%)`));
+    panel.append(statRow("Fastest win", p.fastestWinTurns === null ? "—" : `${p.fastestWinTurns} turns`));
+    panel.append(statRow("Longest game", p.longestGameTurns > 0 ? `${p.longestGameTurns} turns` : "—"));
+
+    // Wins by victory path.
+    panel.append(sectionHeading("Wins by path"));
+    const paths: [string, string][] = [
+      ["domination", "Domination"],
+      ["conquest", "Conquest"],
+      ["great works", "Great Works"],
+      ["prestige score", "Prestige"],
+    ];
+    for (const [key, label] of paths) panel.append(statRow(label, String(p.winsByKind[key] ?? 0)));
+
+    // Achievements grid.
+    panel.append(sectionHeading(`Achievements — ${p.achievements.length}/${ACHIEVEMENTS.length}`));
+    const grid = el("div", "hud-achv-grid");
+    const unlocked = new Set(p.achievements);
+    for (const a of ACHIEVEMENTS) {
+      const got = unlocked.has(a.id);
+      const cell = el("div", "hud-achv" + (got ? " got" : " locked"));
+      const badge = el("div", "hud-achv-badge");
+      badge.textContent = got ? "🏅" : "🔒";
+      const body = el("div", "hud-achv-body");
+      const name = el("div", "hud-achv-name");
+      name.textContent = a.name;
+      const desc = el("div", "hud-achv-desc");
+      desc.textContent = a.desc;
+      body.append(name, desc);
+      cell.append(badge, body);
+      grid.append(cell);
+    }
+    panel.append(grid);
+
+    recordsOverlay.append(panel);
+  }
+
+  function openRecords(): void {
+    renderRecords();
+    recordsOverlay.style.display = "flex";
+  }
+  function closeRecords(): void {
+    recordsOverlay.style.display = "none";
   }
 
   // --- Pending-decision modal (raised by a choice event) --------------------
