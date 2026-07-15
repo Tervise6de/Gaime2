@@ -2103,6 +2103,7 @@ a:focus-visible,
   position: fixed;
   inset: 0;
   z-index: 200;
+  pointer-events: auto; /* #hud (our mount point) is pointer-events: none */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2223,4 +2224,103 @@ a:focus-visible,
 .hud-diplo-treaty .ico-svg svg {
   width: 12px;
   height: 12px;
+}
+
+/* --- Main-menu entries (title screen) --------------------------------------- */
+.title-menu {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  width: min(340px, 84vw);
+}
+
+.title-menu-btn {
+  padding: 10px 18px;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--fg);
+  background: rgba(23, 28, 38, 0.85);
+  border: 1px solid rgba(230, 200, 116, 0.28);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.title-menu-btn:hover,
+.title-menu-btn:focus-visible {
+  border-color: #e6c874;
+  background: rgba(30, 36, 49, 0.95);
+}
+
+.title-menu-btn.primary {
+  color: #0d0f14;
+  background: linear-gradient(180deg, #e6c874, #c9a24b);
+  border-color: #efd694;
+}
+
+.title-menu-btn.primary:hover,
+.title-menu-btn.primary:focus-visible {
+  filter: brightness(1.08);
+}
+
+.title-menu-btn.open {
+  border-color: #e6c874;
+}
+
+/* Inline new-game setup (the shared form, restyled for the menu column). */
+.title-setup {
+  padding: 12px;
+  background: rgba(17, 21, 28, 0.9);
+  border: 1px solid rgba(230, 200, 116, 0.2);
+  border-radius: 8px;
+}
+
+.title-setup .hud-newgame {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.title-setup .hud-select,
+.title-setup .hud-seed {
+  flex: 1 1 45%;
+  min-width: 0;
+}
+
+.title-setup .hud-scenario {
+  flex-basis: 100%;
+}
+
+.title-setup .hud-scenario-blurb {
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+
+.title-setup .title-start {
+  width: 100%;
+  margin-top: 2px;
+}
+
+/* While the menu is up, the HUD's shared overlays (Options / Records opened
+   from the menu) must render above it — same #hud stacking context. */
+#hud:has(.title-overlay) .hud-techtree-overlay {
+  z-index: 250;
+}
+
+@media (max-height: 700px) {
+  .title-art svg {
+    width: 84px;
+  }
+
+  .title-wordmark {
+    margin-top: 6px;
+    font-size: 26px;
+  }
+
+  .title-menu {
+    margin-top: 12px;
+    gap: 7px;
+  }
 }

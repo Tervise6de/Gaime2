@@ -22,7 +22,7 @@ import { saveToLocal, loadFromLocal, hasLocalSave, clearLocalSave, serializeGame
 import { summarizeTurn, type TurnSummary } from "@/systems/summary";
 import { PLAYER_ID, type GameState } from "@/systems/state";
 import { createHud } from "@/ui/hud";
-import { showTitleScreen } from "@/ui/title";
+import { showMainMenu } from "@/ui/title";
 import { runTutorial, hasSeenTutorial } from "@/ui/tutorial";
 import { play, outcomeCue, armAmbientOnGesture } from "@/ui/audio";
 import { applyDisplaySettings, isColourblind, isReduceMotion } from "@/ui/settings";
@@ -77,11 +77,7 @@ function main(): void {
       advanceTurn();
     },
     onNewGame(config) {
-      state = createGame(config);
-      selectedRegion = null;
-      moveArmyId = null;
-      lastSummary = null;
-      commit();
+      startNewGame(config);
     },
     onSave(slot) {
       const ok = saveToLocal(state, nowStamp(), slot);
@@ -242,6 +238,15 @@ function main(): void {
     true,
   );
 
+  /** Replace the live game with a fresh one (HUD panel and main menu both land here). */
+  function startNewGame(config: Parameters<typeof createGame>[0]): void {
+    state = createGame(config);
+    selectedRegion = null;
+    moveArmyId = null;
+    lastSummary = null;
+    commit();
+  }
+
   /** True while any blocking overlay is on screen (guards the end-turn hotkey). */
   function modalOpen(): boolean {
     // Title splash, confirm dialog and tutorial exist in the DOM only while open.
@@ -316,9 +321,14 @@ function main(): void {
   // If the ambient bed was left on last session, start it on the first gesture.
   armAmbientOnGesture();
 
-  // Title splash first; the coached tour (first-ever session only) follows it
+  // Main menu first; the coached tour (first-ever session only) follows it
   // so the two never stack.
-  void showTitleScreen(hasLocalSave("auto")).then(() => {
+  void showMainMenu({
+    hasSave: hasLocalSave("auto"),
+    onNewGame: startNewGame,
+    onOpenOptions: () => hud.openOptions(),
+    onOpenRecords: () => hud.openRecords(),
+  }).then(() => {
     if (firstEver) window.setTimeout(runTutorial, 400);
   });
 

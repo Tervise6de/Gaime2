@@ -45,7 +45,6 @@ import {
 import { loadProfile, type ProfileStats } from "@/ui/profile";
 import { ACHIEVEMENTS } from "@/data/achievements";
 import { EDGE_COLOR, WAR_EDGE_COLOR, type MapLayout } from "@/systems/renderer";
-import { DEFAULT_MAP_OPTIONS, type MapGenOptions } from "@/systems/mapgen";
 import { regionCapacity } from "@/systems/population";
 import { previewCombat } from "@/systems/combat";
 import {
@@ -63,10 +62,9 @@ import type { TurnSummary } from "@/systems/summary";
 import { deriveAlerts } from "@/ui/alerts";
 import { researchFrontier, isBuildingUnlockedFor } from "@/systems/tech";
 import { ARCHETYPE_LABEL } from "@/data/personalities";
-import { TRAITS, type TraitId } from "@/data/traits";
-import { SCENARIOS } from "@/data/scenarios";
+import { TRAITS } from "@/data/traits";
 import { TECHS, TECH_IDS, type TechId, type TechBranch } from "@/data/techs";
-import { WONDER_GOAL, DOMINATION_FRACTION, TURN_LIMIT, MODIFIER_LABEL, type Difficulty } from "@/systems/state";
+import { WONDER_GOAL, DOMINATION_FRACTION, TURN_LIMIT, MODIFIER_LABEL } from "@/systems/state";
 import {
   PLAYER_ID,
   RESOURCE_KEYS,
@@ -87,15 +85,8 @@ import {
   type ResourceKey,
 } from "@/systems/state";
 
-export interface NewGameConfig {
-  seed: number;
-  difficulty: Difficulty;
-  rivals: number;
-  /** Map generation options (region count etc.); omitted = engine default. */
-  map?: MapGenOptions;
-  /** Scenario twist: force the player's opening trait. */
-  playerTrait?: TraitId;
-}
+export type { NewGameConfig } from "@/ui/newgame";
+import { buildNewGameForm, type NewGameConfig } from "@/ui/newgame";
 
 export interface HudCallbacks {
   onTaxChange(rate: number): void;
@@ -157,6 +148,10 @@ export interface Hud {
   ): void;
   /** Flash a transient message (e.g. save/load feedback). */
   toast(message: string): void;
+  /** Open the Options overlay (also reachable from the main menu). */
+  openOptions(): void;
+  /** Open the Records overlay (also reachable from the main menu). */
+  openRecords(): void;
 }
 
 const RESOURCE_META: Record<ResourceKey, { label: string; icon: string; tip: string }> = {
@@ -343,89 +338,17 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   endTurnBtn.addEventListener("click", () => callbacks.onEndTurn());
   controls.append(endTurnBtn);
 
-  // New-game configuration: seed, difficulty, rivals, map size. The last-used
-  // difficulty/rivals/size are remembered across sessions so a returning player
-  // keeps their preferred setup instead of re-picking every game.
-  const prefs = loadNewGamePrefs();
-  const cfgRow = el("div", "hud-newgame");
-  const seedInput = document.createElement("input");
-  seedInput.type = "text";
-  seedInput.className = "hud-seed";
-  seedInput.placeholder = "seed";
-  const difficultySel = select("hud-select", [
-    ["easy", "Easy"],
-    ["normal", "Normal"],
-    ["hard", "Hard"],
-  ], prefs.difficulty ?? "normal");
-  const rivalsSel = select("hud-select", [
-    ["1", "1 rival"],
-    ["2", "2 rivals"],
-    ["3", "3 rivals"],
-    ["4", "4 rivals"],
-    ["5", "5 rivals"],
-  ], prefs.rivals ?? "2");
-  // Map size — a smaller world plays tight and fast, a larger one expansive.
-  const mapSizeSel = select("hud-select", [
-    ["16", "Small map"],
-    ["22", "Medium map"],
-    ["30", "Large map"],
-  ], prefs.mapSize ?? String(DEFAULT_MAP_OPTIONS.regionCount));
-  mapSizeSel.title = "World size: fewer regions play tight and quick; more regions give room to expand.";
-  cfgRow.append(seedInput, difficultySel, rivalsSel, mapSizeSel);
-
-  // Scenarios: hand-set openings. Picking one fills the config below (and may pin
-  // an opening trait); editing the config by hand drops back to "Custom".
-  let scenarioTrait: TraitId | undefined;
-  const scenarioRow = el("div", "hud-newgame");
-  const scenarioSel = select(
-    "hud-select hud-scenario",
-    [["custom", "Custom setup"], ...SCENARIOS.map((s) => [s.id, s.name] as [string, string])],
-    "custom",
-  );
-  scenarioSel.title = "Pick a hand-set opening, or build your own with the options below.";
-  const scenarioBlurb = el("p", "hud-hint hud-scenario-blurb");
-  scenarioRow.append(scenarioSel);
-  scenarioSel.addEventListener("change", () => {
-    const sc = SCENARIOS.find((s) => s.id === scenarioSel.value);
-    if (!sc) {
-      scenarioTrait = undefined;
-      scenarioBlurb.textContent = "";
-      return;
-    }
-    difficultySel.value = sc.difficulty;
-    rivalsSel.value = String(sc.rivals);
-    mapSizeSel.value = String(sc.regionCount);
-    scenarioTrait = sc.playerTrait;
-    scenarioBlurb.textContent = sc.blurb;
-  });
-  // Any manual edit means it's no longer the chosen scenario.
-  const dropToCustom = (): void => {
-    if (scenarioSel.value !== "custom") {
-      scenarioSel.value = "custom";
-      scenarioTrait = undefined;
-      scenarioBlurb.textContent = "";
-    }
-  };
-  difficultySel.addEventListener("change", dropToCustom);
-  rivalsSel.addEventListener("change", dropToCustom);
-  mapSizeSel.addEventListener("change", dropToCustom);
-
-  controls.append(scenarioRow, scenarioBlurb, cfgRow);
+  // New-game configuration — the shared form (also used by the main menu), so
+  // both surfaces offer identical setup and remember the same preferences.
+  const newGameForm = buildNewGameForm();
+  controls.append(...newGameForm.rows);
 
   const btnRow = el("div", "hud-newgame");
   const newGameBtn = document.createElement("button");
   newGameBtn.className = "hud-newgame-btn primary";
   newGameBtn.textContent = "New game";
   function startNewGame(): void {
-    const raw = seedInput.value.trim();
-    saveNewGamePrefs({ difficulty: difficultySel.value, rivals: rivalsSel.value, mapSize: mapSizeSel.value });
-    callbacks.onNewGame({
-      seed: raw === "" ? (Date.now() >>> 0) : parseSeed(raw),
-      difficulty: difficultySel.value as Difficulty,
-      rivals: Number(rivalsSel.value),
-      map: { ...DEFAULT_MAP_OPTIONS, regionCount: Number(mapSizeSel.value) },
-      playerTrait: scenarioTrait,
-    });
+    callbacks.onNewGame(newGameForm.readConfig());
   }
   newGameBtn.addEventListener("click", () => {
     // Only guard when there's a live game to discard — a fresh session or a
@@ -1028,6 +951,8 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     } else if (ev.key === "Escape") {
       closeTechTree();
       closeStandings();
+      closeOptions();
+      closeRecords();
       legendPanel.style.display = "none";
       if (hints.style.display !== "none") dismissHints();
     }
@@ -1141,7 +1066,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     }
   }
 
-  return { update, toast: flashToast };
+  return { update, toast: flashToast, openOptions, openRecords };
 }
 
 function renderRegion(
@@ -2248,40 +2173,3 @@ function round1(v: number): number {
   return Math.round(v * 10) / 10;
 }
 
-/** Remembered new-game selector choices (not the seed — that stays fresh each game). */
-interface NewGamePrefs {
-  difficulty?: string;
-  rivals?: string;
-  mapSize?: string;
-}
-
-const NEWGAME_PREFS_KEY = "gaime2:newgame-prefs";
-
-function loadNewGamePrefs(): NewGamePrefs {
-  try {
-    const raw = localStorage.getItem(NEWGAME_PREFS_KEY);
-    const p = raw ? (JSON.parse(raw) as unknown) : null;
-    return p && typeof p === "object" ? (p as NewGamePrefs) : {};
-  } catch {
-    return {}; // storage unavailable / malformed — fall back to defaults
-  }
-}
-
-function saveNewGamePrefs(prefs: NewGamePrefs): void {
-  try {
-    localStorage.setItem(NEWGAME_PREFS_KEY, JSON.stringify(prefs));
-  } catch {
-    /* storage unavailable — preferences simply won't persist */
-  }
-}
-
-function parseSeed(raw: string): number {
-  const n = Number(raw);
-  if (Number.isFinite(n)) return Math.abs(Math.trunc(n)) >>> 0;
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < raw.length; i++) {
-    h ^= raw.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
