@@ -6,6 +6,36 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-15 (later) — D1 continued: title screen, moment art, map texture
+
+Second art cycle of the day, finishing the brief's remaining deliverables
+(style rules per `docs/art-style.md`):
+
+- **Title screen** (`src/ui/title.ts`): crest-medallion key art + a gold
+  wordmark and "Begin/Continue your reign" entry. The name renders as DOM
+  text — "Gaime2" is still the placeholder, so the eventual rename is a copy
+  edit, not an art change. Blocks hotkeys while up, skips its fade under
+  reduce-motion, and the first-run tutorial now waits for it.
+- **Victory/defeat end-cards**: struck-seal medallions (laurelled trophy in
+  gold / toppled crown in slate) above the end-game banner.
+- **Event vignettes**: six reusable themes (harvest, plague, festival, war,
+  trade, scholars); `eventVignette()` maps every event id to a theme, so the
+  decision modal now opens with matching art and a new event inherits a
+  vignette with one map line.
+- **Map texture**: each Voronoi cell is stamped with a faint terrain emblem
+  (grain / pine / mounds / peaks / waves) and coast cells get a dashed
+  shoreline — terrain reads by shape at the map level, matching the
+  no-hue-only rule.
+
+Verify: 375 tests green (registry tests now cover the new tables), typecheck +
+build clean, bundle `fetch(` count 0, Playwright checks of the title screen,
+post-title boot and Voronoi motifs at both breakpoints with colour-blind on
+and off — no console errors. Remaining art ideas: per-achievement badge art,
+animated capture flourishes (reduce-motion-gated), store-icon platform set
+once the D3 platform call is made.
+
+---
+
 ## 2026-07-15 — D1: visual identity — the emoji/flat-colour era ends
 
 Executed the art brief (`docs/art-agent-brief.md`; plan in `docs/art-plan.md`,
