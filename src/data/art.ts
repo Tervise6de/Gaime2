@@ -312,6 +312,29 @@ export const TERRAIN_ART: Record<TerrainId, TerrainShade | null> = {
   coast: { hi: "#62a2cf", lo: "#35688f" },
 };
 
+/**
+ * Terrain motifs — tiny emblems the Voronoi view stamps faintly inside each
+ * cell so terrain reads by shape as well as colour (colour-blind safety at the
+ * map level). `null` = no stamp. Node view skips them (discs carry the
+ * population count).
+ */
+export const TERRAIN_MOTIF: Record<TerrainId, string | null> = {
+  plains: ico(
+    '<path d="M12 18.5V8.5"/><path d="M12 12.5c-2 0-3.6-1.4-3.6-3.6 2 0 3.6 1.4 3.6 3.6z"/><path d="M12 12.5c2 0 3.6-1.4 3.6-3.6-2 0-3.6 1.4-3.6 3.6z"/>',
+    { sw: 2 },
+  ),
+  forest: ico(
+    '<path d="M12 4.8l4.4 6.4h-2.4l3 5.3H7l3-5.3H7.6z"/><path d="M12 16.5v3"/>',
+    { sw: 2 },
+  ),
+  hills: ico('<path d="M3.8 16.5a5.6 5.6 0 0111.2 0"/><path d="M11 16.5a4.6 4.6 0 019.2 0"/>', { sw: 2 }),
+  mountains: ico('<path d="M4 17l4.6-8.2 3 5.1 2.4-4.4L20 17z"/>', { sw: 2 }),
+  coast: ico(
+    '<path d="M4 11.5c2.6-2 5.4-2 8 0s5.4 2 8 0M4 16c2.6-2 5.4-2 8 0s5.4 2 8 0"/>',
+    { sw: 2 },
+  ),
+};
+
 /** World background vignette (`null` = flat renderer BACKGROUND). */
 export const WORLD_BG: { inner: string; outer: string } | null = {
   inner: "#171d29",

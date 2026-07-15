@@ -2,11 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
   BUILDING_ART,
   CREST_ART,
+  EVENT_VIGNETTE,
   GLYPH_ART,
+  MOMENT_ART,
   RESOURCE_ART,
   TERRAIN_ART,
+  TERRAIN_MOTIF,
+  TITLE_ART,
   UNIT_ART,
   crestSvg,
+  eventVignette,
   ico,
 } from "@/data/art";
 import { TERRAIN_IDS } from "@/data/terrain";
@@ -35,6 +40,24 @@ describe("art registry", () => {
     for (const v of Object.values(GLYPH_ART)) expectSvgOrNull(v);
     for (const v of Object.values(UNIT_ART)) expectSvgOrNull(v);
     for (const v of Object.values(BUILDING_ART)) expectSvgOrNull(v);
+    for (const v of Object.values(TERRAIN_MOTIF)) expectSvgOrNull(v);
+    for (const v of Object.values(MOMENT_ART)) expectSvgOrNull(v);
+    for (const v of Object.values(EVENT_VIGNETTE)) expectSvgOrNull(v);
+  });
+
+  it("title art is self-contained (48-grid key art)", () => {
+    if (TITLE_ART !== null) {
+      expect(TITLE_ART.startsWith("<svg")).toBe(true);
+      expect(TITLE_ART).not.toMatch(/href=|url\(|<script/i);
+    }
+  });
+
+  it("maps every choice-bearing event id to a vignette", () => {
+    // The decision modal is the vignette's home; these events raise it today.
+    for (const id of ["golden_jubilee", "mercenary_offer", "expedition", "envoy_exchange", "grain_aid", "reinforce_walls", "sap_the_walls"]) {
+      expect(eventVignette(id), id).not.toBeNull();
+    }
+    expect(eventVignette("unknown_event")).toBeNull();
   });
 
   it("has a crest slot for the full fixed nation roster (ids 0..6)", () => {

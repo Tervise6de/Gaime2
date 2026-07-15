@@ -16,7 +16,7 @@
  */
 
 import { TERRAIN, type TerrainId } from "@/data/terrain";
-import { GLYPH_ART, RESOURCE_ART, TERRAIN_ART, WORLD_BG, crestSvg } from "@/data/art";
+import { GLYPH_ART, RESOURCE_ART, TERRAIN_ART, TERRAIN_MOTIF, WORLD_BG, crestSvg } from "@/data/art";
 import { cbSafe } from "@/data/palette";
 import { armySize, BARBARIAN_ID } from "@/systems/state";
 import {
@@ -358,6 +358,18 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       context.globalAlpha = 1;
     });
 
+    // Faint terrain motif stamped in each cell — terrain reads by shape too.
+    s.regions.forEach((region, i) => {
+      const poly = pxCells[i];
+      if (!poly || poly.length < 3) return;
+      const motif = TERRAIN_MOTIF[region.terrain];
+      if (!motif) return;
+      const site = projectXY(region.x, region.y);
+      context.globalAlpha = 0.3;
+      drawIcon(`motif:${region.terrain}`, motif, "#0d0f14", site.x, site.y - 21, 17);
+      context.globalAlpha = 1;
+    });
+
     // Normal cell borders.
     context.lineWidth = 1.5;
     context.strokeStyle = CELL_EDGE_COLOR;
@@ -366,6 +378,21 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       tracePoly(poly);
       context.stroke();
     }
+
+    // Shoreline treatment: coast cells get a light dashed water-edge inside
+    // their border, so the map's one "wet" terrain reads even under palette
+    // remaps (shape/texture, not hue alone).
+    context.strokeStyle = "rgba(126, 188, 226, 0.4)";
+    context.lineWidth = 1.2;
+    context.setLineDash([4, 5]);
+    s.regions.forEach((region, i) => {
+      if (region.terrain !== "coast") return;
+      const poly = pxCells[i];
+      if (!poly || poly.length < 3) return;
+      tracePoly(poly);
+      context.stroke();
+    });
+    context.setLineDash([]);
 
     // War fronts: shared edges between two warring, non-barbarian owners.
     context.strokeStyle = WAR_EDGE_COLOR;
