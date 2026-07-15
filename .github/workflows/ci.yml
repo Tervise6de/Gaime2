@@ -1,0 +1,49 @@
+name: CI
+
+# Gates every push and PR: types, tests, a clean production build, and the
+# "the app bundle makes no network calls" invariant. Vercel builds on push too,
+# but only runs `npm run build` (types + bundle) — this adds the test suite and
+# the fetch() assertion. To block a bad commit from shipping, enable Vercel's
+# "wait for CI" (or a required status check on `main`).
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+
+# A newer push to the same ref cancels the older, still-running job.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install (clean, from lockfile)
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+
+      - name: Assert app bundle makes no network calls
+        run: |
+          if grep -q 'fetch(' dist/assets/*.js; then
+            echo "::error::app bundle contains fetch() — the game must stay network-free"
+            grep -n 'fetch(' dist/assets/*.js || true
+            exit 1
+          fi
+          echo "OK: no fetch() in dist/assets/*.js"
