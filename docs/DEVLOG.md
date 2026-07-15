@@ -6,6 +6,29 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-15 (fourth pass) — main menu: the title screen grows up
+
+The splash became a conventional main menu: **Continue** (or *Begin your
+reign*), **New game**, **Options** and **Records**, with Esc continuing into
+the game. New game expands the full setup inline — scenario presets, seed,
+difficulty, rivals, map size — via a new shared module (`ui/newgame.ts`) that
+the HUD's left panel now uses too, so both surfaces stay identical and share
+the remembered preferences. Options/Records reuse the HUD's overlays, raised
+above the menu (the menu mounts inside `#hud`, since `position: fixed` traps
+child z-indexes in its stacking context).
+
+Fixed along the way: the HUD's Escape handler never closed the Options and
+Records overlays (only tech tree/standings/legend/hints) — Esc now closes
+every dismissable overlay.
+
+Verify: 375 tests green, typecheck/build clean, `fetch(` count 0; Playwright
+flows — menu → new game on Hard actually starts on Hard, Options opens above
+the menu and Esc unwinds overlay → menu → game, plus the 8-scenario matrix
+(menu, both layouts, colour-blind, reduce-motion, phone) with zero console
+errors.
+
+---
+
 ## 2026-07-15 (third pass) — D1 polish: badges, branch/treaty glyphs, army chips
 
 - **Achievement badges**: all 10 achievements got a unique motif in a shared
