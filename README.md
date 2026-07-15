@@ -89,6 +89,22 @@ Gaime2/
 
 See [`docs/design.md`](docs/design.md) for the design vision and roadmap.
 
+## Deploying (Vercel)
+
+The repo is Vercel-ready — it's a static Vite build with no backend.
+
+1. Import the repo at [vercel.com/new](https://vercel.com/new). Vercel
+   auto-detects Vite; `vercel.json` pins the build command (`npm run build`),
+   output directory (`dist`), security headers, and correct caching for the
+   service worker and web manifest.
+2. No environment variables and no server are needed — the game runs entirely
+   client-side.
+3. Every push to `main` deploys to production; pull requests get preview URLs.
+
+Any static host works the same way (Netlify, GitHub Pages, Cloudflare Pages):
+run `npm run build` and serve `dist/`. The app installs as an offline PWA on
+first visit.
+
 ## Credits
 
 Developed by **GAIME**.

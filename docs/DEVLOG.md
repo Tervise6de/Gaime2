@@ -6,6 +6,28 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-15 (ninth pass) — Vercel-ready
+
+Prepared `main` for one-click Vercel deployment (static build, no backend):
+
+- **`vercel.json`** — pins `buildCommand` (`npm run build`), `outputDirectory`
+  (`dist`), the Vite framework preset, and response headers: `nosniff`,
+  `Referrer-Policy: no-referrer`, HSTS, a locked-down `Permissions-Policy`,
+  `Cache-Control: must-revalidate` on `/sw.js` (so the service worker updates),
+  the correct `application/manifest+json` type on the manifest, and immutable
+  long-cache on hashed `/assets/*`. Deliberately **no** `X-Frame-Options` — the
+  game should stay embeddable (itch.io iframe, blog embeds), and it's a
+  single-player local app with no clickjacking-worthy actions.
+- **`package.json`** — `engines.node >= 18` (Vite 5).
+- **README** — a "Deploying (Vercel)" section (import repo → auto-detected → push
+  `main` = production; PRs get previews). Any static host works identically.
+
+Verified a clean `rm -rf dist && npm run build`: `dist/` ships `index.html`,
+`sw.js`, `manifest.webmanifest`, the icons and hashed `assets/` — exactly what
+Vercel serves. 379 tests green.
+
+---
+
 ## 2026-07-15 (eighth pass) — real PWA: installable + offline
 
 The marketing claim "installs as a PWA, works offline" was aspirational — there
