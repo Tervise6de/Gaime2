@@ -6,6 +6,51 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-15 (fifth pass) — bug hunt over the session's changes
+
+Ran a structured four-track bug hunt (renderer, DOM-injection, menu/boot wiring,
+art registry), verified each finding in code, and fixed the real ones.
+
+**Security — stored XSS via imported save (high).** `deserializeGame` only shape-
+checks, so nation/region names, `seed` and `difficulty` from a shared/edited save
+are attacker-controlled — and this session's icon work had turned four sinks from
+`textContent` to `innerHTML` (victory bar, region meta, turn summary, turn badge).
+A save with `nation.name = "<img onerror=…>"` executed on load. Fixed: escape
+every save-derived string at those sinks (exported `escapeHtml`), and, defence in
+depth, coerce `seed`→number and whitelist `difficulty` in `deserializeGame`.
+Verified with a tampered-autosave probe: the name now renders as inert text, no
+script runs, seed/difficulty degrade cleanly.
+
+**Menu (high).** The menu's New game → Start overwrote a live autosave with no
+confirmation (the HUD form guards it) — added a two-step "Discard your turn N
+game?" arm. Added a Tab focus trap so keyboard focus can't escape the opaque menu
+to the live HUD buttons behind it (one path reached an invisible destructive
+confirm dialog). Narrowed the overlay z-raise + `hudOverlayOpen` to Options/Records
+only, so a choice/end overlay from a loaded save stays *behind* the menu. Clamped
+new-game prefs so a stale value can't start a 0-rival / 0-region game.
+
+**Renderer.** `ico()` (and the hand-built SVGs) now carry explicit width/height —
+some engines rasterise an unsized SVG to a blank canvas and cache it as "ready",
+silently defeating the emoji fallback. Cached the Voronoi projection (pixel
+polygons, sites, reach, terrain gradients) and the background gradient by
+size+signature instead of rebuilding them 60×/second. Fixed fortification/resource
+fallback text inheriting a stale `fillStyle`.
+
+**Art + tests.** Six choice events had drifted out of `EVENT_THEME` and showed no
+vignette — added them (plus a `works` theme). Tests now derive ids from
+`EVENTS`/`ACHIEVEMENTS` (a new event/achievement that forgets its art fails the
+suite) and sweep every SVG table. 377 tests green; typecheck/build clean; bundle
+`fetch(` 0; 7-scenario Playwright matrix + the XSS and discard-confirm probes all
+pass with no console errors.
+
+Left as noted-not-fixed (low/latent): the `ensureCells` signature only hashes
+region-0's position (pre-existing, needs a same-count regen pinning site 0 — not
+reachable with random mapgen); the trade-vignette pan transform is ~sub-pixel at
+display size; TREATY/BRANCH empty-string fallbacks are dead while those tables are
+fully populated.
+
+---
+
 ## 2026-07-15 (fourth pass) — main menu: the title screen grows up
 
 The splash became a conventional main menu: **Continue** (or *Begin your
