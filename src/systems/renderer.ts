@@ -28,7 +28,14 @@
 import { TERRAIN, type TerrainId } from "@/data/terrain";
 import { GLYPH_ART, RESOURCE_ART, TERRAIN_ART, TERRAIN_MOTIF, WORLD_BG, crestSvg } from "@/data/art";
 import { cbSafe } from "@/data/palette";
-import { ISLAND_FRAME, OCEAN, POLITICAL, type IslandArchetype } from "@/data/mapstyle";
+import {
+  ISLAND_FRAME,
+  OCEAN,
+  POLITICAL,
+  TERRAIN_TEXTURE_ALPHA,
+  TERRAIN_TEXTURE_DENSITY,
+  type IslandArchetype,
+} from "@/data/mapstyle";
 import { armySize, BARBARIAN_ID } from "@/systems/state";
 import {
   UNREST_PENALTY_START,
@@ -40,6 +47,7 @@ import {
 import { atWar } from "@/systems/diplomacy";
 import { computeVoronoiCells, pointInPolygon, type Point, type VoronoiCell } from "@/systems/voronoi";
 import {
+  hashFloat,
   islandArchetype,
   islandShape,
   organicCells,
@@ -356,6 +364,11 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       g.globalAlpha = 1;
     });
 
+    // Procedural terrain texture — deterministic scatter baked into the layer,
+    // so trees/ridges/grass cost nothing per frame. Shape carries terrain
+    // identity alongside hue (colour-blind safety).
+    s.regions.forEach((region, i) => drawTerrainTexture(g, s.seed, region, i));
+
     // Interior seams: faint hairlines — political ink is layered on top later.
     g.lineWidth = 1;
     g.strokeStyle = CELL_EDGE_COLOR;
@@ -527,6 +540,116 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
     g.restore();
     return cv;
+  }
+
+  /**
+   * Scatter this cell's terrain stamps: candidate points are hashed in
+   * normalised space (resolution-independent and reproducible per seed),
+   * rejected outside the cell or near the site's marker cluster, then drawn
+   * as tiny vector shapes. Runs only when the terrain layer rebuilds.
+   */
+  function drawTerrainTexture(g: CanvasRenderingContext2D, seed: number, region: Region, i: number): void {
+    const cell = organic[i];
+    if (!cell || cell.poly.length < 3) return;
+    const density = TERRAIN_TEXTURE_DENSITY[region.terrain];
+    if (!density) return;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let area2 = 0;
+    for (let k = 0; k < cell.poly.length; k++) {
+      const a = cell.poly[k]!;
+      const b = cell.poly[(k + 1) % cell.poly.length]!;
+      area2 += a.x * b.y - b.x * a.y;
+      minX = Math.min(minX, a.x);
+      minY = Math.min(minY, a.y);
+      maxX = Math.max(maxX, a.x);
+      maxY = Math.max(maxY, a.y);
+    }
+    const count = Math.min(26, Math.round(Math.abs(area2 / 2) * density));
+    const base = (seed ^ Math.imul(region.id + 1, 7919)) >>> 0;
+    g.globalAlpha = TERRAIN_TEXTURE_ALPHA;
+    let placed = 0;
+    for (let t = 0; t < count * 6 && placed < count; t++) {
+      const x = minX + hashFloat(base, t, 3, 1) * (maxX - minX);
+      const y = minY + hashFloat(base, t, 3, 2) * (maxY - minY);
+      if (!pointInPolygon(cell.poly, x, y)) continue;
+      if (Math.hypot(x - region.x, y - region.y) < 0.048) continue; // marker zone stays clear
+      const p = projectXY(x, y);
+      stampTerrain(g, region.terrain, p.x, p.y, hashFloat(base, t, 3, 3));
+      placed++;
+    }
+    g.globalAlpha = 1;
+  }
+
+  /** One tiny hand-drawn stamp per terrain; `k` in [0,1) varies size/lean. */
+  function stampTerrain(g: CanvasRenderingContext2D, t: TerrainId, x: number, y: number, k: number): void {
+    switch (t) {
+      case "forest": {
+        const s = 5 + k * 3.5;
+        g.fillStyle = "rgba(12, 36, 20, 0.55)";
+        g.beginPath();
+        g.moveTo(x, y - s);
+        g.lineTo(x - s * 0.62, y + s * 0.55);
+        g.lineTo(x + s * 0.62, y + s * 0.55);
+        g.closePath();
+        g.fill();
+        break;
+      }
+      case "mountains": {
+        const s = 5 + k * 4;
+        g.strokeStyle = "rgba(22, 24, 32, 0.55)";
+        g.lineWidth = 1.7;
+        g.lineJoin = "round";
+        g.beginPath();
+        g.moveTo(x - s, y + s * 0.6);
+        g.lineTo(x - s * 0.15, y - s * 0.7);
+        g.lineTo(x + s * 0.55, y + s * 0.25);
+        g.stroke();
+        // Snow tick on the peak.
+        g.strokeStyle = "rgba(235, 240, 248, 0.4)";
+        g.lineWidth = 1.3;
+        g.beginPath();
+        g.moveTo(x - s * 0.38, y - s * 0.28);
+        g.lineTo(x - s * 0.15, y - s * 0.7);
+        g.lineTo(x + s * 0.08, y - s * 0.32);
+        g.stroke();
+        break;
+      }
+      case "hills": {
+        const s = 4 + k * 3;
+        g.strokeStyle = "rgba(66, 50, 22, 0.45)";
+        g.lineWidth = 1.5;
+        g.beginPath();
+        g.arc(x, y, s, Math.PI, Math.PI * 2);
+        g.stroke();
+        break;
+      }
+      case "plains": {
+        const s = 2.6 + k * 2;
+        g.strokeStyle = "rgba(58, 84, 30, 0.5)";
+        g.lineWidth = 1.1;
+        g.beginPath();
+        g.moveTo(x - s * 0.6, y + s * 0.5);
+        g.lineTo(x - s * 0.2, y - s * 0.6);
+        g.moveTo(x + s * 0.25, y + s * 0.5);
+        g.lineTo(x + s * 0.55, y - s * 0.4);
+        g.stroke();
+        break;
+      }
+      case "coast": {
+        const s = 3.2 + k * 2.4;
+        g.strokeStyle = "rgba(222, 238, 248, 0.3)";
+        g.lineWidth = 1.2;
+        g.beginPath();
+        g.moveTo(x - s, y);
+        g.quadraticCurveTo(x - s * 0.5, y - s * 0.55, x, y);
+        g.quadraticCurveTo(x + s * 0.5, y + s * 0.55, x + s, y);
+        g.stroke();
+        break;
+      }
+    }
   }
 
   /** Offset a pixel-space polygon outward by `dist` along vertex normals. */

@@ -62,6 +62,15 @@ function rand3(seed: number, a: number, b: number, c: number): number {
   return hash3(seed, a, b, c) / 4294967296;
 }
 
+/**
+ * Public deterministic hash → [0, 1) for presentation randomness (texture
+ * scatter, per-stamp variants). Same inputs, same output, forever — the
+ * renderer must never touch Math.random.
+ */
+export function hashFloat(seed: number, a: number, b: number, c: number): number {
+  return rand3(seed, a, b, c);
+}
+
 /** Quantise a normalised coordinate for position-stable hashing. */
 const qz = (v: number): number => Math.round(v * 8192);
 

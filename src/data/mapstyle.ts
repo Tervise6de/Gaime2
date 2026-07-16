@@ -57,6 +57,22 @@ export const EDGE_DETAIL = 2;
 export const EDGE_MAX_DISP = 0.012;
 
 /**
+ * Procedural terrain texture: how many stamps (trees, ridges, bumps, grass,
+ * wave ticks) to scatter per unit of normalised map area. Baked into the
+ * cached terrain layer, so density costs nothing per frame. 0 disables.
+ */
+export const TERRAIN_TEXTURE_DENSITY = {
+  plains: 110,
+  forest: 380,
+  hills: 190,
+  mountains: 150,
+  coast: 60,
+} as const;
+
+/** Ink alpha for the texture stamps (kept faint — texture, not noise). */
+export const TERRAIN_TEXTURE_ALPHA = 0.75;
+
+/**
  * Political ink — terrain reads first, ownership second. Realm interiors get
  * only a light wash; the realm identity is carried by an inner colour band
  * along the *outer* national border plus a crisp two-tone edge, so same-owner
