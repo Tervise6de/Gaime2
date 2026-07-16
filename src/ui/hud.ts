@@ -29,6 +29,7 @@ import {
   setDefaultMapLayout,
 } from "@/ui/settings";
 import { cbSafe } from "@/data/palette";
+import { OCEAN } from "@/data/mapstyle";
 import { badgeArt, BRANCH_ART, crestSvg, eventVignette, MOMENT_ART, safeColor, TERRAIN_ART, TREATY_ART } from "@/data/art";
 import {
   escapeHtml,
@@ -1682,9 +1683,11 @@ function buildLegend(): HTMLElement {
   row(glyphHtml("crown", "👑", "hud-legend-ico"), "Capital — crown + double ring (a nation's seat of power)");
   row('<span class="hud-legend-badge">3</span>', "Army (owner colour, unit count)");
 
-  section("Borders (edges)");
-  row(line(EDGE_COLOR), "Adjacency — regions connected (armies may march)");
+  section("Borders");
+  row(line("#5b8bd0"), "Realm border — each nation inks its own side (two-tone)");
   row(line(WAR_EDGE_COLOR), "War front — a border between two nations at war");
+  row(line(OCEAN.lane), "Sea lane — regions connected across water (armies may cross)");
+  row(line(EDGE_COLOR), "Adjacency edge (Nodes view) — regions connected");
 
   section("Selection");
   row(ring("#f4d27a"), "Selected region");

@@ -248,6 +248,39 @@ mountains as barriers/borders, resource nodes scattered with constraints) →
 place nations far apart with fair-ish starts. Everything derives from a single
 seed for reproducible testing and shareable maps.
 
+### 4.1 Island-world presentation (visual layer, decided in the M6 overhaul)
+
+The territory view presents the region graph as an **organic landmass floating
+in ocean**, not an edge-to-edge Voronoi mosaic. All of it is presentation over
+the untouched graph, and all of it derives from the seed (no `Math.random`
+anywhere in rendering):
+
+- **Silhouette** (`systems/island.ts`): a radial support outline around the
+  sites — smoothed so flats swell outward while extreme sites keep a
+  guaranteed pad (every site provably stays on land) — plus hashed harmonic
+  swell and fractal midpoint displacement for the coast. Decorative islets
+  scatter in the remaining water.
+- **Archetypes**: small / medium / large follow region count; qualifying maps
+  (≥20 regions) roll archipelago on 1-in-4 seeds, clustering sites into 2–3
+  landmasses. Cross-water adjacencies draw as dashed sea lanes. Framing
+  margins per archetype make world size *feel* different at a glance.
+- **Organic borders**: every shared Voronoi edge becomes a canonical
+  midpoint-displaced polyline reused by both neighbouring cells (gap-free by
+  construction); hit-testing uses the same polygons the player sees.
+- **Political ink**: terrain reads first (fills + baked texture stamps);
+  ownership reads at the borders — a light wash, a wide inner band along each
+  realm's outer border/coast, a crisp owner-coloured edge per side (two-tone
+  frontiers), a dark centreline, and loud red war fronts.
+- **Caching discipline**: ocean, terrain and political ink are pre-rendered
+  offscreen layers, rebuilt only when map/canvas size/ownership/wars/palette
+  change; the steady-state frame is three blits + selection + markers.
+- **Tuning**: every knob (framing margins, coast pads/roughness, texture
+  densities, political widths/alphas, ocean palette) lives in
+  `data/mapstyle.ts` — balancing the look is editing that table, not code.
+
+The node+edge fallback stays intact behind the map toggle, sharing markers
+and projection with the island view.
+
 ---
 
 ## 5. AI Opponents
