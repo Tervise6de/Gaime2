@@ -39,7 +39,15 @@ import {
 } from "@/systems/state";
 import { atWar } from "@/systems/diplomacy";
 import { computeVoronoiCells, pointInPolygon, type Point, type VoronoiCell } from "@/systems/voronoi";
-import { islandArchetype, islandShape, pointInIsland, ISLAND_BOUNDS, type IslandShape } from "@/systems/island";
+import {
+  islandArchetype,
+  islandShape,
+  organicCells,
+  pointInIsland,
+  ISLAND_BOUNDS,
+  type IslandShape,
+  type OrganicCell,
+} from "@/systems/island";
 
 const BACKGROUND = "#11151c";
 /** Adjacency edge (a normal border). Exported so the map legend matches exactly. */
@@ -104,9 +112,10 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   // on every setState so the projection frame is always in step with the state.
   let archetype: IslandArchetype = "medium";
 
-  // Voronoi cells + island silhouette (normalised space), cached until the map
-  // geometry changes.
+  // Voronoi cells (+ their organic-border variants) and the island silhouette
+  // (normalised space), cached until the map geometry changes.
   let cells: VoronoiCell[] = [];
+  let organic: OrganicCell[] = [];
   let shape: IslandShape | null = null;
   let cellSig = "";
 
@@ -116,6 +125,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   interface Projection {
     px: Point[][];
     paths: Path2D[];
+    /** Per cell, per original edge: the projected organic border polyline. */
+    edgesPx: Point[][][];
     sites: Point[];
     /** Furthest vertex distance per cell — radius for the terrain gradient. */
     reach: number[];
@@ -142,7 +153,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     const sig = `${cellSig}|${canvas.clientWidth}x${canvas.clientHeight}`;
     if (projection && sig === projSig) return projection;
     projSig = sig;
-    const px = cells.map((c) => c.poly.map((v) => projectXY(v.x, v.y)));
+    const px = organic.map((c) => c.poly.map((v) => projectXY(v.x, v.y)));
+    const edgesPx = organic.map((c) => c.edges.map((e) => e.map((v) => projectXY(v.x, v.y))));
     const paths = px.map((poly) => {
       const p = new Path2D();
       if (poly.length >= 3) {
@@ -186,9 +198,10 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       }
     }
 
-    projection = { px, paths, sites, reach, land, blobsPx, isletsPx, lanes };
+    projection = { px, paths, edgesPx, sites, reach, land, blobsPx, isletsPx, lanes };
     oceanSig = ""; // dependent layers must rebuild against the new geometry
     terrainSig = "";
+    politicalSig = "";
     return projection;
   }
 
@@ -204,6 +217,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       cellSig = sig;
       const sites = s.regions.map((r) => ({ x: r.x, y: r.y }));
       cells = computeVoronoiCells(sites, ISLAND_BOUNDS);
+      organic = organicCells(cells, s.seed);
       archetype = islandArchetype(s.regions.length, s.seed);
       shape = islandShape(sites, s.seed, archetype);
       projSig = ""; // projection derives from the cells — force a rebuild
@@ -412,29 +426,28 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     politicalLayer = cv;
     politicalSig = sig;
 
-    /** Shared border polylines around one nation (edges facing another owner). */
-    const borderSegments = (nid: number): [Point, Point][] => {
-      const segs: [Point, Point][] = [];
+    /** Organic border polylines around one nation (edges facing another owner). */
+    const borderPolylines = (nid: number): Point[][] => {
+      const lines: Point[][] = [];
       s.regions.forEach((region, i) => {
         if (region.ownerId !== nid) return;
-        const cell = cells[i]!;
-        const poly = proj.px[i]!;
-        if (poly.length < 3) return;
+        const cell = organic[i]!;
         for (let k = 0; k < cell.neighbor.length; k++) {
           const j = cell.neighbor[k]!;
           if (j < 0) continue; // outer bounds — the coastline stroke covers it
           if ((s.regions[j]?.ownerId ?? null) === nid) continue;
-          segs.push([poly[k]!, poly[(k + 1) % poly.length]!]);
+          lines.push(proj.edgesPx[i]![k]!);
         }
       });
-      return segs;
+      return lines;
     };
 
-    const strokeSegments = (segs: [Point, Point][]): void => {
+    const strokePolylines = (lines: Point[][]): void => {
       g.beginPath();
-      for (const [a, b] of segs) {
-        g.moveTo(a.x, a.y);
-        g.lineTo(b.x, b.y);
+      for (const pl of lines) {
+        if (pl.length < 2) continue;
+        g.moveTo(pl[0]!.x, pl[0]!.y);
+        for (let i = 1; i < pl.length; i++) g.lineTo(pl[i]!.x, pl[i]!.y);
       }
       g.stroke();
     };
@@ -460,7 +473,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       if (owned.length === 0) continue;
       const nationPath = new Path2D();
       for (const r of owned) nationPath.addPath(proj.paths[r.id]!);
-      const segs = borderSegments(nation.id);
+      const lines = borderPolylines(nation.id);
       const color = ownerColor(nation.id);
       const barb = nation.isBarbarian;
 
@@ -470,61 +483,46 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       // Wide inner band along borders and along the realm's own coastline.
       g.globalAlpha = barb ? POLITICAL.barbarianBandAlpha : POLITICAL.bandAlpha;
       g.lineWidth = POLITICAL.bandWidth;
-      strokeSegments(segs);
+      strokePolylines(lines);
       g.stroke(proj.land);
       // Crisp owner-coloured edge (this half of the two-tone frontier).
       g.globalAlpha = barb ? POLITICAL.barbarianEdgeAlpha : POLITICAL.edgeAlpha;
       g.lineWidth = POLITICAL.edgeWidth;
-      strokeSegments(segs);
+      strokePolylines(lines);
       g.globalAlpha = 1;
       g.restore();
     }
 
     // 3) Dark centreline over every border between two different owners.
-    g.strokeStyle = POLITICAL.core;
-    g.lineWidth = POLITICAL.coreWidth;
+    const centrelines: Point[][] = [];
+    // 4) …and the loud treatment where the two owners are at war.
+    const fronts: Point[][] = [];
     s.regions.forEach((region, i) => {
-      const cell = cells[i]!;
-      const poly = proj.px[i]!;
-      if (poly.length < 3) return;
-      for (let k = 0; k < cell.neighbor.length; k++) {
-        const j = cell.neighbor[k]!;
-        if (j < 0 || j < i) continue; // each shared edge once
-        const other = s.regions[j]?.ownerId ?? null;
-        if (other === region.ownerId) continue;
-        g.beginPath();
-        g.moveTo(poly[k]!.x, poly[k]!.y);
-        const b = poly[(k + 1) % poly.length]!;
-        g.lineTo(b.x, b.y);
-        g.stroke();
-      }
-    });
-
-    // 4) War fronts: shared edges between two warring, non-barbarian owners.
-    const fronts: [Point, Point][] = [];
-    s.regions.forEach((region, i) => {
-      const cell = cells[i]!;
-      const poly = proj.px[i]!;
-      if (poly.length < 3) return;
+      const cell = organic[i]!;
       const oa = region.ownerId;
       for (let k = 0; k < cell.neighbor.length; k++) {
         const j = cell.neighbor[k]!;
-        if (j < 0 || j < i) continue;
+        if (j < 0 || j < i) continue; // each shared edge once
         const ob = s.regions[j]?.ownerId ?? null;
+        if (ob === oa) continue;
+        centrelines.push(proj.edgesPx[i]![k]!);
         const isFront =
-          oa !== null && ob !== null && oa !== ob &&
+          oa !== null && ob !== null &&
           oa !== BARBARIAN_ID && ob !== BARBARIAN_ID &&
           atWar(s, oa, ob);
-        if (isFront) fronts.push([poly[k]!, poly[(k + 1) % poly.length]!]);
+        if (isFront) fronts.push(proj.edgesPx[i]![k]!);
       }
     });
+    g.strokeStyle = POLITICAL.core;
+    g.lineWidth = POLITICAL.coreWidth;
+    strokePolylines(centrelines);
     if (fronts.length > 0) {
       g.strokeStyle = POLITICAL.warGlow;
       g.lineWidth = POLITICAL.warGlowWidth;
-      strokeSegments(fronts);
+      strokePolylines(fronts);
       g.strokeStyle = WAR_EDGE_COLOR;
       g.lineWidth = POLITICAL.warCoreWidth;
-      strokeSegments(fronts);
+      strokePolylines(fronts);
     }
 
     g.restore();
@@ -994,8 +992,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       // Ocean clicks select nothing — the sea deselects.
       const n = unprojectXY(px, py);
       if (!shape || !pointInIsland(shape, n.x, n.y)) return null;
-      for (let i = 0; i < cells.length; i++) {
-        const poly = cells[i]!.poly.map((v) => projectXY(v.x, v.y));
+      // Hit-test against the *organic* polygons — exactly what is drawn.
+      for (let i = 0; i < organic.length; i++) {
+        const poly = organic[i]!.poly.map((v) => projectXY(v.x, v.y));
         if (pointInPolygon(poly, px, py)) return state.regions[i]?.id ?? i;
       }
       return null;

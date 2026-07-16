@@ -47,6 +47,16 @@ export const COAST_DETAIL = 3;
 export const COAST_MAX_SEGMENT = 0.055;
 
 /**
+ * Interior region borders: subtle shared-edge distortion so province lines
+ * stop reading as ruler-drawn bisectors. Kept small — the absolute cap
+ * (normalised units) stays well under half the minimum site spacing, so every
+ * site remains inside its own distorted cell and hit-testing stays sane.
+ */
+export const EDGE_ROUGHNESS = 0.18;
+export const EDGE_DETAIL = 2;
+export const EDGE_MAX_DISP = 0.012;
+
+/**
  * Political ink — terrain reads first, ownership second. Realm interiors get
  * only a light wash; the realm identity is carried by an inner colour band
  * along the *outer* national border plus a crisp two-tone edge, so same-owner

@@ -18,10 +18,13 @@ import {
   COAST_DETAIL,
   COAST_MAX_SEGMENT,
   COAST_ROUGHNESS,
+  EDGE_DETAIL,
+  EDGE_MAX_DISP,
+  EDGE_ROUGHNESS,
   ISLAND_FRAME,
   type IslandArchetype,
 } from "@/data/mapstyle";
-import { pointInPolygon, type Bounds, type Point } from "@/systems/voronoi";
+import { pointInPolygon, type Bounds, type Point, type VoronoiCell } from "@/systems/voronoi";
 
 export interface IslandShape {
   /** Landmass outlines (normalised space), each a closed polygon. */
@@ -312,4 +315,80 @@ export function islandShape(sites: Point[], seed: number, archetype: IslandArche
 /** Is a normalised point on land (inside any landmass blob)? */
 export function pointInIsland(shape: IslandShape, x: number, y: number): boolean {
   return shape.blobs.some((b) => pointInPolygon(b, x, y));
+}
+
+// --- Organic region borders ---------------------------------------------------
+
+export interface OrganicCell {
+  /** The full distorted cell polygon (edge polylines concatenated). */
+  poly: Point[];
+  /** One polyline per original cell edge: edges[k] runs vertex k → k+1. */
+  edges: Point[][];
+  /** Same edge labels as the source VoronoiCell (−1 = clipping bounds). */
+  neighbor: number[];
+}
+
+/**
+ * De-mathify the interior region borders: every *shared* Voronoi edge gets a
+ * subtle midpoint-displacement polyline. The polyline is computed once per
+ * unordered endpoint pair, in a canonical orientation, and reused (reversed)
+ * by the other cell — the two neighbours share the exact same points, so no
+ * gaps or overlaps can open. Displacement is hashed from midpoint positions
+ * (plus the seed), so it is deterministic and traversal-order independent.
+ * Edges on the clipping bounds (neighbor −1) lie far under the ocean and stay
+ * straight. The absolute displacement cap keeps every site inside its cell.
+ */
+export function organicCells(cells: VoronoiCell[], seed: number): OrganicCell[] {
+  const cache = new Map<string, Point[]>();
+
+  const displaceEdge = (a: Point, b: Point): Point[] => {
+    let pts = [a, b];
+    for (let r = 0; r < EDGE_DETAIL; r++) {
+      const next: Point[] = [pts[0]!];
+      for (let s = 0; s < pts.length - 1; s++) {
+        const p = pts[s]!;
+        const q = pts[s + 1]!;
+        const len = Math.hypot(q.x - p.x, q.y - p.y);
+        if (len > 1e-5) {
+          const mx = (p.x + q.x) / 2;
+          const my = (p.y + q.y) / 2;
+          const nx = (q.y - p.y) / len;
+          const ny = -(q.x - p.x) / len;
+          let d = (rand3(seed, qz(mx) * 2 + 1, qz(my) * 2 + 1, 100 + r) - 0.5) * 2 * EDGE_ROUGHNESS * len;
+          const cap = Math.min(EDGE_MAX_DISP, len * 0.3);
+          if (d > cap) d = cap;
+          if (d < -cap) d = -cap;
+          next.push({ x: mx + nx * d, y: my + ny * d });
+        }
+        next.push(q);
+      }
+      pts = next;
+    }
+    return pts;
+  };
+
+  return cells.map((cell) => {
+    const n = cell.poly.length;
+    const edges: Point[][] = [];
+    for (let k = 0; k < n; k++) {
+      const a = cell.poly[k]!;
+      const b = cell.poly[(k + 1) % n]!;
+      if ((cell.neighbor[k] ?? -1) < 0) {
+        edges.push([a, b]); // bounds edge — invisible under the ocean
+        continue;
+      }
+      const ka = `${qz(a.x)},${qz(a.y)}`;
+      const kb = `${qz(b.x)},${qz(b.y)}`;
+      const flip = ka > kb;
+      const key = flip ? `${kb}|${ka}` : `${ka}|${kb}`;
+      let pl = cache.get(key);
+      if (!pl) {
+        pl = flip ? displaceEdge(b, a) : displaceEdge(a, b);
+        cache.set(key, pl);
+      }
+      edges.push(flip ? [...pl].reverse() : pl);
+    }
+    const poly = edges.flatMap((e) => e.slice(0, -1));
+    return { poly, edges, neighbor: [...cell.neighbor] };
+  });
 }

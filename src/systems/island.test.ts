@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { clusterSites, islandArchetype, islandShape, pointInIsland, ISLAND_BOUNDS } from "@/systems/island";
-import { ARCHIPELAGO_MIN_REGIONS, ISLAND_FRAME } from "@/data/mapstyle";
-import { pointInPolygon, type Point } from "@/systems/voronoi";
+import {
+  clusterSites,
+  islandArchetype,
+  islandShape,
+  organicCells,
+  pointInIsland,
+  ISLAND_BOUNDS,
+} from "@/systems/island";
+import { ARCHIPELAGO_MIN_REGIONS, EDGE_MAX_DISP, ISLAND_FRAME } from "@/data/mapstyle";
+import { computeVoronoiCells, pointInPolygon, type Point } from "@/systems/voronoi";
 import { createRng } from "@/systems/rng";
 
 /** Scatter deterministic pseudo-sites like mapgen does (clamped to [0.03, 0.97]). */
@@ -98,6 +105,70 @@ describe("islandShape", () => {
         }
       }
     }
+  });
+});
+
+describe("organicCells", () => {
+  const sites = makeSites(22, 4242);
+  const cells = computeVoronoiCells(sites, ISLAND_BOUNDS);
+
+  it("is deterministic per seed and varies across seeds", () => {
+    const a = organicCells(cells, 7);
+    expect(organicCells(cells, 7)).toEqual(a);
+    expect(organicCells(cells, 8)).not.toEqual(a);
+  });
+
+  it("preserves every original edge's endpoints (within float epsilon)", () => {
+    // The canonical shared polyline carries the endpoint bits of whichever
+    // neighbour computed it first, so the other cell may differ by ~1 ulp —
+    // shared geometry (gap-free borders) deliberately wins over per-cell bits.
+    const org = organicCells(cells, 7);
+    org.forEach((cell, i) => {
+      const src = cells[i]!;
+      cell.edges.forEach((pl, k) => {
+        const a = src.poly[k]!;
+        const b = src.poly[(k + 1) % src.poly.length]!;
+        expect(pl[0]!.x).toBeCloseTo(a.x, 9);
+        expect(pl[0]!.y).toBeCloseTo(a.y, 9);
+        expect(pl[pl.length - 1]!.x).toBeCloseTo(b.x, 9);
+        expect(pl[pl.length - 1]!.y).toBeCloseTo(b.y, 9);
+      });
+    });
+  });
+
+  it("gives both neighbours the exact same shared polyline (no gaps)", () => {
+    const org = organicCells(cells, 7);
+    let checked = 0;
+    org.forEach((cell, i) => {
+      cell.neighbor.forEach((j, k) => {
+        if (j < 0 || j < i) return;
+        // Find the reciprocal edge in cell j that points back at i.
+        const back = org[j]!.neighbor.findIndex((n) => n === i);
+        if (back < 0) return; // clipped asymmetry — nothing shared to compare
+        const mine = cell.edges[k]!;
+        const theirs = [...org[j]!.edges[back]!].reverse();
+        expect(theirs).toEqual(mine);
+        checked++;
+      });
+    });
+    expect(checked).toBeGreaterThan(10); // the map genuinely has shared borders
+  });
+
+  it("keeps displacement under the configured cap", () => {
+    const org = organicCells(cells, 7);
+    org.forEach((cell, i) => {
+      const src = cells[i]!;
+      cell.edges.forEach((pl, k) => {
+        const a = src.poly[k]!;
+        const b = src.poly[(k + 1) % src.poly.length]!;
+        const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        for (const p of pl) {
+          // Perpendicular distance from the straight segment.
+          const d = Math.abs(((b.x - a.x) * (a.y - p.y) - (a.x - p.x) * (b.y - a.y)) / len);
+          expect(d).toBeLessThanOrEqual(EDGE_MAX_DISP * 2 + 1e-9); // ≤ cap per round, 2 rounds
+        }
+      });
+    });
   });
 });
 
