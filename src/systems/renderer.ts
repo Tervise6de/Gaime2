@@ -6,18 +6,29 @@
  *
  *  - **node** (default fallback): each region a terrain-coloured node ringed by
  *    its owner's colour, adjacency drawn as edges.
- *  - **voronoi**: each region a filled Voronoi polygon (terrain fill, owner
- *    tint), borders as polygon edges, war fronts as red shared edges.
+ *  - **voronoi**: the island-world territory view — an organic landmass
+ *    silhouette floating in ocean, region cells clipped to the coastline,
+ *    terrain fills + owner tints, borders and war fronts on shared edges.
  *
  * Both share every marker (population, resources, unrest, capital, construction,
  * army badges) and both are read-only over state — the renderer never mutates
- * the sim. The polygon geometry is pure and cached (systems/voronoi.ts): it is
- * recomputed only when the map changes, never per animation frame.
+ * the sim. Rendering is deterministic: all shapes derive from the map seed
+ * (systems/island.ts), never from Math.random or the clock.
+ *
+ * Performance discipline: everything expensive is cached and rebuilt only when
+ * its inputs change —
+ *  - Voronoi cells + island silhouette: recomputed when the map changes.
+ *  - Projected geometry (pixel polygons, Path2Ds, land path): map ⊕ canvas size.
+ *  - Ocean underlay + terrain base: pre-rendered offscreen once per map ⊕ size
+ *    (terrain never changes mid-game), then blitted each frame.
+ * Steady-state per-frame work is two drawImage blits plus the dynamic political
+ * tint, selection and markers.
  */
 
 import { TERRAIN, type TerrainId } from "@/data/terrain";
 import { GLYPH_ART, RESOURCE_ART, TERRAIN_ART, TERRAIN_MOTIF, WORLD_BG, crestSvg } from "@/data/art";
 import { cbSafe } from "@/data/palette";
+import { ISLAND_FRAME, OCEAN, type IslandArchetype } from "@/data/mapstyle";
 import { armySize, BARBARIAN_ID } from "@/systems/state";
 import {
   UNREST_PENALTY_START,
@@ -28,14 +39,15 @@ import {
 } from "@/systems/state";
 import { atWar } from "@/systems/diplomacy";
 import { computeVoronoiCells, pointInPolygon, type Point, type VoronoiCell } from "@/systems/voronoi";
+import { islandArchetype, islandShape, pointInIsland, ISLAND_BOUNDS, type IslandShape } from "@/systems/island";
 
 const BACKGROUND = "#11151c";
 /** Adjacency edge (a normal border). Exported so the map legend matches exactly. */
 export const EDGE_COLOR = "rgba(230, 233, 239, 0.14)";
 /** A border between two nations at war — the map's front line. */
 export const WAR_EDGE_COLOR = "rgba(232, 119, 107, 0.6)";
-/** Solid border between two regions in the polygon view. */
-const CELL_EDGE_COLOR = "rgba(13, 15, 20, 0.75)";
+/** Seam between two regions inside the landmass (kept faint; owners add ink). */
+const CELL_EDGE_COLOR = "rgba(13, 15, 20, 0.38)";
 const NODE_RADIUS = 26;
 const SELECT_COLOR = "#f4d27a";
 const HIGHLIGHT_COLOR = "#63c7d6";
@@ -90,20 +102,39 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   let tick = 0;
   let ripples: { regionId: number; color: string; born: number }[] = [];
 
-  // Voronoi cells (normalised space) cached until the map geometry changes.
+  // Island archetype: pure function of the map (region count + seed), refreshed
+  // on every setState so the projection frame is always in step with the state.
+  let archetype: IslandArchetype = "medium";
+
+  // Voronoi cells + island silhouette (normalised space), cached until the map
+  // geometry changes.
   let cells: VoronoiCell[] = [];
+  let shape: IslandShape | null = null;
   let cellSig = "";
 
-  // Projected-geometry cache: the pixel polygons, region sites, per-cell reach
-  // and terrain gradients depend only on the map and the canvas size, never on
-  // per-frame state — so they are rebuilt only when either changes, not 60×/s.
+  // Projected-geometry cache: pixel polygons, Path2Ds, the land path, islets and
+  // sea lanes depend only on the map and the canvas size, never on per-frame
+  // state — rebuilt only when either changes, not 60×/s.
   interface Projection {
     px: Point[][];
+    paths: Path2D[];
     sites: Point[];
-    fills: (string | CanvasGradient)[];
+    /** Furthest vertex distance per cell — radius for the terrain gradient. */
+    reach: number[];
+    land: Path2D;
+    blobsPx: Point[][];
+    isletsPx: Point[][];
+    /** Cross-water adjacency lanes (both endpoints at region sites). */
+    lanes: [Point, Point][];
   }
   let projection: Projection | null = null;
   let projSig = "";
+
+  // Pre-rendered static layers (device-pixel offscreens, blitted per frame).
+  let oceanLayer: HTMLCanvasElement | null = null;
+  let oceanSig = "";
+  let terrainLayer: HTMLCanvasElement | null = null;
+  let terrainSig = "";
 
   function ensureProjection(s: GameState): Projection {
     ensureCells(s);
@@ -111,15 +142,52 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     if (projection && sig === projSig) return projection;
     projSig = sig;
     const px = cells.map((c) => c.poly.map((v) => projectXY(v.x, v.y)));
-    const sites = s.regions.map((r) => project(r));
-    const fills = s.regions.map((r, i) => {
-      const site = sites[i]!;
-      const poly = px[i] ?? [];
-      let reach = 0;
-      for (const v of poly) reach = Math.max(reach, Math.hypot(v.x - site.x, v.y - site.y));
-      return terrainFill(r.terrain, site.x, site.y, reach || 1);
+    const paths = px.map((poly) => {
+      const p = new Path2D();
+      if (poly.length >= 3) {
+        p.moveTo(poly[0]!.x, poly[0]!.y);
+        for (let i = 1; i < poly.length; i++) p.lineTo(poly[i]!.x, poly[i]!.y);
+        p.closePath();
+      }
+      return p;
     });
-    projection = { px, sites, fills };
+    const sites = s.regions.map((r) => project(r));
+    const reach = px.map((poly, i) => {
+      const site = sites[i]!;
+      let r = 0;
+      for (const v of poly) r = Math.max(r, Math.hypot(v.x - site.x, v.y - site.y));
+      return r || 1;
+    });
+
+    const blobsPx = (shape?.blobs ?? []).map((b) => b.map((v) => projectXY(v.x, v.y)));
+    const land = new Path2D();
+    for (const blob of blobsPx) {
+      if (blob.length < 3) continue;
+      land.moveTo(blob[0]!.x, blob[0]!.y);
+      for (let i = 1; i < blob.length; i++) land.lineTo(blob[i]!.x, blob[i]!.y);
+      land.closePath();
+    }
+    const isletsPx = (shape?.islets ?? []).map((b) => b.map((v) => projectXY(v.x, v.y)));
+
+    // Sea lanes: game-adjacent pairs whose midpoint lies in open water — the
+    // visual reminder that armies may still cross (archipelago straits).
+    const lanes: [Point, Point][] = [];
+    if (shape) {
+      for (const region of s.regions) {
+        for (const nid of region.adjacency) {
+          if (region.id >= nid) continue;
+          const other = s.regions[nid];
+          if (!other) continue;
+          const mx = (region.x + other.x) / 2;
+          const my = (region.y + other.y) / 2;
+          if (!pointInIsland(shape, mx, my)) lanes.push([sites[region.id]!, sites[other.id]!]);
+        }
+      }
+    }
+
+    projection = { px, paths, sites, reach, land, blobsPx, isletsPx, lanes };
+    oceanSig = ""; // dependent layers must rebuild against the new geometry
+    terrainSig = "";
     return projection;
   }
 
@@ -128,13 +196,202 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     // the same region count could reuse stale cells. A cheap coordinate rollup
     // over every region (there are only ~16–30) catches any change; iterating
     // per frame is negligible next to the cell computation it guards.
-    let acc = s.regions.length;
+    let acc = s.regions.length + s.seed;
     for (const r of s.regions) acc = (acc * 31 + r.x * 8191 + r.y * 131071) % 1e12;
     const sig = String(acc);
     if (sig !== cellSig) {
       cellSig = sig;
-      cells = computeVoronoiCells(s.regions.map((r) => ({ x: r.x, y: r.y })));
+      const sites = s.regions.map((r) => ({ x: r.x, y: r.y }));
+      cells = computeVoronoiCells(sites, ISLAND_BOUNDS);
+      archetype = islandArchetype(s.regions.length, s.seed);
+      shape = islandShape(sites, s.seed, archetype);
+      projSig = ""; // projection derives from the cells — force a rebuild
     }
+  }
+
+  // --- Static layers ----------------------------------------------------------
+
+  /** (Re)build an offscreen layer canvas matching the main canvas resolution. */
+  function makeLayer(prev: HTMLCanvasElement | null): { cv: HTMLCanvasElement; g: CanvasRenderingContext2D } {
+    const cv = prev ?? document.createElement("canvas");
+    if (cv.width !== canvas.width || cv.height !== canvas.height) {
+      cv.width = canvas.width;
+      cv.height = canvas.height;
+    }
+    const g = cv.getContext("2d");
+    if (!g) throw new Error("Unable to acquire layer context");
+    const dpr = window.devicePixelRatio || 1;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+    return { cv, g };
+  }
+
+  /**
+   * Ocean underlay: vignette water, offshore wave rings, the landmass drop
+   * shadow + base, shallow-water glow, islets and sea lanes. Static per
+   * map ⊕ canvas size.
+   */
+  function ensureOcean(proj: Projection): HTMLCanvasElement {
+    if (oceanLayer && oceanSig === projSig) return oceanLayer;
+    const { cv, g } = makeLayer(oceanLayer);
+    oceanLayer = cv;
+    oceanSig = projSig;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+
+    const grad = g.createRadialGradient(w / 2, h * 0.42, Math.min(w, h) * 0.1, w / 2, h / 2, Math.max(w, h) * 0.72);
+    grad.addColorStop(0, OCEAN.inner);
+    grad.addColorStop(1, OCEAN.outer);
+    g.fillStyle = grad;
+    g.fillRect(0, 0, w, h);
+
+    // Offshore wave rings: dashed outlines drifting outward from the coast.
+    g.setLineDash([3, 13]);
+    g.lineWidth = 1.2;
+    g.strokeStyle = OCEAN.wave;
+    for (const blob of proj.blobsPx) {
+      for (const dist of [12, 26]) {
+        const ring = offsetPoly(blob, dist);
+        tracePolyOn(g, ring);
+        g.stroke();
+      }
+    }
+    g.setLineDash([]);
+
+    // Sea lanes under the land so their on-land ends tuck beneath the terrain.
+    g.setLineDash([2, 7]);
+    g.lineWidth = 1.6;
+    g.strokeStyle = OCEAN.lane;
+    for (const [a, b] of proj.lanes) {
+      const mx = (a.x + b.x) / 2;
+      const my = (a.y + b.y) / 2;
+      const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      const bow = Math.min(26, len * 0.16);
+      g.beginPath();
+      g.moveTo(a.x, a.y);
+      g.quadraticCurveTo(mx + ((b.y - a.y) / len) * bow, my - ((b.x - a.x) / len) * bow, b.x, b.y);
+      g.stroke();
+    }
+    g.setLineDash([]);
+
+    // Landmass shadow + base: the island reads as a body sitting on the water.
+    g.save();
+    g.shadowColor = OCEAN.shadow;
+    g.shadowBlur = 26;
+    g.shadowOffsetY = 10;
+    g.fillStyle = OCEAN.landBase;
+    g.fill(proj.land);
+    g.restore();
+
+    // Shallow-water glow hugging the coast (outer half of centred strokes).
+    g.lineJoin = "round";
+    g.strokeStyle = OCEAN.shallowWide;
+    g.lineWidth = 26;
+    g.stroke(proj.land);
+    g.strokeStyle = OCEAN.shallow;
+    g.lineWidth = 12;
+    g.stroke(proj.land);
+
+    // Islets: inert offshore rocks — texture for the margin waters.
+    for (const rock of proj.isletsPx) {
+      if (rock.length < 3) continue;
+      tracePolyOn(g, rock);
+      g.save();
+      g.shadowColor = "rgba(0, 0, 0, 0.4)";
+      g.shadowBlur = 8;
+      g.shadowOffsetY = 3;
+      g.fillStyle = OCEAN.islet;
+      g.fill();
+      g.restore();
+      tracePolyOn(g, rock);
+      g.lineWidth = 1;
+      g.strokeStyle = OCEAN.isletEdge;
+      g.stroke();
+    }
+    return cv;
+  }
+
+  /**
+   * Terrain base: cell fills, motifs, seams, the coast terrain's dashed edge —
+   * all clipped to the landmass — then the coastline ink. Terrain never changes
+   * mid-game, so this rebuilds only with the map or canvas size; while motif
+   * icons are still decoding it re-renders next frame until complete.
+   */
+  function ensureTerrain(s: GameState, proj: Projection): HTMLCanvasElement {
+    if (terrainLayer && terrainSig === projSig) return terrainLayer;
+    const { cv, g } = makeLayer(terrainLayer);
+    terrainLayer = cv;
+    let complete = true;
+
+    g.save();
+    g.clip(proj.land);
+    s.regions.forEach((region, i) => {
+      const site = proj.sites[i]!;
+      g.fillStyle = terrainFill(g, region.terrain, site.x, site.y, proj.reach[i]!);
+      g.fill(proj.paths[i]!);
+    });
+
+    // Faint terrain motif stamped in each cell — terrain reads by shape too.
+    s.regions.forEach((region, i) => {
+      const motif = TERRAIN_MOTIF[region.terrain];
+      if (!motif) return;
+      const site = proj.sites[i]!;
+      g.globalAlpha = 0.3;
+      if (!drawIcon(g, `motif:${region.terrain}`, motif, "#0d0f14", site.x, site.y - 21, 17)) complete = false;
+      g.globalAlpha = 1;
+    });
+
+    // Interior seams: faint hairlines — political ink is layered on top later.
+    g.lineWidth = 1;
+    g.strokeStyle = CELL_EDGE_COLOR;
+    for (const path of proj.paths) g.stroke(path);
+
+    // Shoreline treatment: coast cells get a light dashed water-edge inside
+    // their border, so the map's one "wet" terrain reads even under palette
+    // remaps (shape/texture, not hue alone).
+    g.strokeStyle = "rgba(126, 188, 226, 0.35)";
+    g.lineWidth = 1.2;
+    g.setLineDash([4, 5]);
+    s.regions.forEach((region, i) => {
+      if (region.terrain !== "coast") return;
+      g.stroke(proj.paths[i]!);
+    });
+    g.setLineDash([]);
+    g.restore();
+
+    // Coastline ink: dark outline in the water, pale highlight just inside.
+    g.lineJoin = "round";
+    g.strokeStyle = OCEAN.coastLine;
+    g.lineWidth = 2.6;
+    g.stroke(proj.land);
+    g.save();
+    g.clip(proj.land);
+    g.strokeStyle = OCEAN.coastHighlight;
+    g.lineWidth = 2.2;
+    g.stroke(proj.land);
+    g.restore();
+
+    terrainSig = complete ? projSig : ""; // retry until every motif has decoded
+    return cv;
+  }
+
+  /** Offset a pixel-space polygon outward by `dist` along vertex normals. */
+  function offsetPoly(poly: Point[], dist: number): Point[] {
+    if (poly.length < 3) return poly;
+    let cx = 0;
+    let cy = 0;
+    for (const p of poly) {
+      cx += p.x;
+      cy += p.y;
+    }
+    cx /= poly.length;
+    cy /= poly.length;
+    return poly.map((p) => {
+      const dx = p.x - cx;
+      const dy = p.y - cy;
+      const len = Math.hypot(dx, dy) || 1;
+      return { x: p.x + (dx / len) * dist, y: p.y + (dy / len) * dist };
+    });
   }
 
   // --- Registry icon cache ---------------------------------------------------
@@ -165,7 +422,15 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   }
 
   /** Draw a registry icon centred at (x, y); false = not ready/absent → use fallback. */
-  function drawIcon(name: string, svg: string | null, color: string, x: number, y: number, size: number): boolean {
+  function drawIcon(
+    g: CanvasRenderingContext2D,
+    name: string,
+    svg: string | null,
+    color: string,
+    x: number,
+    y: number,
+    size: number,
+  ): boolean {
     if (!svg) return false;
     const entry = iconEntry(`${name}|${color}`, svg, color);
     if (!entry.ready) return false;
@@ -179,7 +444,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       raster.getContext("2d")?.drawImage(entry.img, 0, 0, px, px);
       entry.scaled.set(px, raster);
     }
-    context.drawImage(raster, x - size / 2, y - size / 2, size, size);
+    g.drawImage(raster, x - size / 2, y - size / 2, size, size);
     return true;
   }
 
@@ -192,22 +457,28 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   }
 
   /** Terrain fill: flat colour until the registry provides a hi/lo shade pair. */
-  function terrainFill(t: TerrainId, cx: number, cy: number, r: number): string | CanvasGradient {
+  function terrainFill(
+    g: CanvasRenderingContext2D,
+    t: TerrainId,
+    cx: number,
+    cy: number,
+    r: number,
+  ): string | CanvasGradient {
     const shade = TERRAIN_ART[t];
     const base = TERRAIN[t].color;
     if (!shade) return base;
-    const g = context.createRadialGradient(cx - r * 0.35, cy - r * 0.45, r * 0.15, cx, cy, r * 1.05);
-    g.addColorStop(0, shade.hi);
-    g.addColorStop(0.55, base);
-    g.addColorStop(1, shade.lo);
-    return g;
+    const grad = g.createRadialGradient(cx - r * 0.35, cy - r * 0.45, r * 0.15, cx, cy, r * 1.05);
+    grad.addColorStop(0, shade.hi);
+    grad.addColorStop(0.55, base);
+    grad.addColorStop(1, shade.lo);
+    return grad;
   }
 
   // Background vignette gradient, cached by canvas size (rebuilt only on resize).
   let bgGradient: CanvasGradient | null = null;
   let bgSize = "";
 
-  /** World background: flat until the registry provides a vignette pair. */
+  /** Node-view background: flat until the registry provides a vignette pair. */
   function paintBackground(w: number, h: number): void {
     if (!WORLD_BG) {
       context.fillStyle = BACKGROUND;
@@ -231,10 +502,31 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     return cbSafe(base, colourblind);
   }
 
+  /**
+   * Ocean margins around the land rect, from the archetype's framing. The
+   * bottom HUD (research pill, actions, log) is heavier than the top bar, so
+   * the frame biases the landmass slightly upward.
+   */
+  function frameMargins(): { x: number; top: number; bottom: number } {
+    const f = ISLAND_FRAME[archetype];
+    const my = canvas.clientHeight * f.marginY;
+    return { x: canvas.clientWidth * f.marginX + 8, top: my * 0.78 + 6, bottom: my * 1.22 + 30 };
+  }
+
   function projectXY(x: number, y: number): Point {
     const { clientWidth, clientHeight } = canvas;
-    const margin = NODE_RADIUS + 30;
-    return { x: margin + x * (clientWidth - margin * 2), y: margin + y * (clientHeight - margin * 2) };
+    const m = frameMargins();
+    return { x: m.x + x * (clientWidth - m.x * 2), y: m.top + y * (clientHeight - m.top - m.bottom) };
+  }
+
+  /** Inverse of projectXY — pixel position back to normalised map space. */
+  function unprojectXY(px: number, py: number): Point {
+    const { clientWidth, clientHeight } = canvas;
+    const m = frameMargins();
+    return {
+      x: (px - m.x) / Math.max(1, clientWidth - m.x * 2),
+      y: (py - m.top) / Math.max(1, clientHeight - m.top - m.bottom),
+    };
   }
 
   function project(region: Region): Point {
@@ -252,14 +544,16 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   function render(): void {
     if (!running) return;
     const { clientWidth, clientHeight } = canvas;
-    paintBackground(clientWidth, clientHeight);
-    if (state) {
-      if (layout === "voronoi") {
-        drawVoronoi(state);
-      } else {
+    if (state && layout === "voronoi") {
+      drawVoronoi(state);
+    } else {
+      paintBackground(clientWidth, clientHeight);
+      if (state) {
         drawEdges(state);
         drawNodes(state);
       }
+    }
+    if (state) {
       drawArmies(state);
       drawRipples(state);
     }
@@ -358,7 +652,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
       context.beginPath();
       context.arc(p.x, p.y, NODE_RADIUS, 0, Math.PI * 2);
-      context.fillStyle = terrainFill(terrain.id, p.x, p.y, NODE_RADIUS);
+      context.fillStyle = terrainFill(context, terrain.id, p.x, p.y, NODE_RADIUS);
       context.fill();
       context.lineWidth = isSelected ? 4 : 3;
       context.strokeStyle = isSelected ? SELECT_COLOR : ownerColor(region.ownerId);
@@ -377,71 +671,37 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     }
   }
 
-  /** Fill + border the Voronoi cells, then draw the shared markers on top. */
+  /**
+   * The island territory view: blit the cached ocean + terrain layers, then the
+   * dynamic political ink (owner tints, war fronts), selection, and markers.
+   */
   function drawVoronoi(s: GameState): void {
-    const { px: pxCells, sites, fills } = ensureProjection(s);
+    const proj = ensureProjection(s);
+    context.drawImage(ensureOcean(proj), 0, 0, canvas.clientWidth, canvas.clientHeight);
+    context.drawImage(ensureTerrain(s, proj), 0, 0, canvas.clientWidth, canvas.clientHeight);
     const capitals = capitalSet(s);
 
-    // Fills: terrain colour, then an owner tint (dark wash for neutral/barbarian).
+    context.save();
+    context.clip(proj.land);
+
+    // Owner tint over the terrain (dark wash for neutral).
     s.regions.forEach((region, i) => {
-      const poly = pxCells[i];
-      if (!poly || poly.length < 3) return;
-      tracePoly(poly);
-      context.fillStyle = fills[i]!;
-      context.fill();
-      tracePoly(poly);
       context.globalAlpha = OWNER_TINT_ALPHA;
       context.fillStyle = ownerColor(region.ownerId);
-      context.fill();
+      context.fill(proj.paths[i]!);
       context.globalAlpha = 1;
     });
-
-    // Faint terrain motif stamped in each cell — terrain reads by shape too.
-    s.regions.forEach((region, i) => {
-      const poly = pxCells[i];
-      if (!poly || poly.length < 3) return;
-      const motif = TERRAIN_MOTIF[region.terrain];
-      if (!motif) return;
-      const site = sites[i]!;
-      context.globalAlpha = 0.3;
-      drawIcon(`motif:${region.terrain}`, motif, "#0d0f14", site.x, site.y - 21, 17);
-      context.globalAlpha = 1;
-    });
-
-    // Normal cell borders.
-    context.lineWidth = 1.5;
-    context.strokeStyle = CELL_EDGE_COLOR;
-    for (const poly of pxCells) {
-      if (poly.length < 3) continue;
-      tracePoly(poly);
-      context.stroke();
-    }
-
-    // Shoreline treatment: coast cells get a light dashed water-edge inside
-    // their border, so the map's one "wet" terrain reads even under palette
-    // remaps (shape/texture, not hue alone).
-    context.strokeStyle = "rgba(126, 188, 226, 0.4)";
-    context.lineWidth = 1.2;
-    context.setLineDash([4, 5]);
-    s.regions.forEach((region, i) => {
-      if (region.terrain !== "coast") return;
-      const poly = pxCells[i];
-      if (!poly || poly.length < 3) return;
-      tracePoly(poly);
-      context.stroke();
-    });
-    context.setLineDash([]);
 
     // War fronts: shared edges between two warring, non-barbarian owners.
     context.strokeStyle = WAR_EDGE_COLOR;
     context.lineWidth = 3;
     s.regions.forEach((region, i) => {
-      const cell = cells[i];
-      const poly = pxCells[i];
-      if (!poly || poly.length < 3) return;
+      const cell = cells[i]!;
+      const poly = proj.px[i]!;
+      if (poly.length < 3) return;
       const oa = region.ownerId;
       for (let k = 0; k < cell.neighbor.length; k++) {
-        const j = cell.neighbor[k];
+        const j = cell.neighbor[k]!;
         if (j < 0) continue;
         const ob = s.regions[j]?.ownerId ?? null;
         const isFront =
@@ -449,8 +709,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
           oa !== BARBARIAN_ID && ob !== BARBARIAN_ID &&
           atWar(s, oa, ob);
         if (!isFront) continue;
-        const a = poly[k];
-        const b = poly[(k + 1) % poly.length];
+        const a = poly[k]!;
+        const b = poly[(k + 1) % poly.length]!;
         context.beginPath();
         context.moveTo(a.x, a.y);
         context.lineTo(b.x, b.y);
@@ -461,28 +721,22 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     // Target highlights, then the selection outline on top.
     for (const region of s.regions) {
       if (!highlights.has(region.id)) continue;
-      const poly = pxCells[region.id];
-      if (!poly || poly.length < 3) continue;
-      tracePoly(poly);
       context.strokeStyle = HIGHLIGHT_COLOR;
       context.lineWidth = 3;
       context.setLineDash([6, 4]);
-      context.stroke();
+      context.stroke(proj.paths[region.id]!);
       context.setLineDash([]);
     }
-    if (selected !== null) {
-      const poly = pxCells[selected];
-      if (poly && poly.length >= 3) {
-        tracePoly(poly);
-        context.strokeStyle = SELECT_COLOR;
-        context.lineWidth = 3.5;
-        context.stroke();
-      }
+    if (selected !== null && proj.paths[selected]) {
+      context.strokeStyle = SELECT_COLOR;
+      context.lineWidth = 3.5;
+      context.stroke(proj.paths[selected]!);
     }
+    context.restore();
 
     // Markers at each region's site (guaranteed inside its own cell).
     for (const region of s.regions) {
-      drawMarkers(region, project(region), capitals);
+      drawMarkers(region, proj.sites[region.id]!, capitals);
     }
   }
 
@@ -504,7 +758,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       const ry = p.y - NODE_RADIUS + 2;
       const art = RESOURCE_ART[region.resource];
       if (art) iconChip(rx, ry, 9);
-      if (!drawIcon(`res:${region.resource}`, art, MAP_ICON_COLOR, rx, ry, 13)) {
+      if (!drawIcon(context, `res:${region.resource}`, art, MAP_ICON_COLOR, rx, ry, 13)) {
         context.font = "13px system-ui, sans-serif";
         context.fillStyle = MAP_ICON_COLOR; // else the monochrome ⚒ inherits the pop-count ink
         context.fillText(RESOURCE_ICON[region.resource] ?? "?", rx, ry);
@@ -519,8 +773,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       const crestArt = owner === null ? null : crestSvg(owner, ownerColor(owner));
       if (crestArt || GLYPH_ART.crown) iconChip(cx, cy, 9.5);
       if (
-        !(crestArt && drawIcon(`crest:${owner}`, crestArt, ownerColor(owner), cx, cy, 15)) &&
-        !drawIcon("glyph:crown", GLYPH_ART.crown, CAPITAL_ICON_COLOR, cx, cy, 13)
+        !(crestArt && drawIcon(context, `crest:${owner}`, crestArt, ownerColor(owner), cx, cy, 15)) &&
+        !drawIcon(context, "glyph:crown", GLYPH_ART.crown, CAPITAL_ICON_COLOR, cx, cy, 13)
       ) {
         context.font = "13px system-ui, sans-serif";
         context.fillText("👑", cx, cy);
@@ -538,7 +792,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     if (region.construction) {
       const hy = p.y - NODE_RADIUS - 8;
       if (GLYPH_ART.hammer) iconChip(p.x, hy, 8);
-      if (!drawIcon("glyph:hammer", GLYPH_ART.hammer, MAP_ICON_COLOR, p.x, hy, 12)) {
+      if (!drawIcon(context, "glyph:hammer", GLYPH_ART.hammer, MAP_ICON_COLOR, p.x, hy, 12)) {
         context.font = "12px system-ui, sans-serif";
         context.fillText("🔨", p.x, hy);
       }
@@ -548,7 +802,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     // Bottom-centre is free: the crown sits bottom-left, the army badge bottom-right.
     if (region.fortification > 0) {
       const fy = p.y + NODE_RADIUS - 7;
-      if (drawIcon("glyph:shield", GLYPH_ART.shield, MAP_ICON_COLOR, p.x - 4, fy, 11)) {
+      if (drawIcon(context, "glyph:shield", GLYPH_ART.shield, MAP_ICON_COLOR, p.x - 4, fy, 11)) {
         context.font = "600 10px system-ui, sans-serif";
         context.fillStyle = MAP_ICON_COLOR;
         context.textAlign = "center";
@@ -596,11 +850,12 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     }
   }
 
-  function tracePoly(poly: Point[]): void {
-    context.beginPath();
-    context.moveTo(poly[0].x, poly[0].y);
-    for (let i = 1; i < poly.length; i++) context.lineTo(poly[i].x, poly[i].y);
-    context.closePath();
+  function tracePolyOn(g: CanvasRenderingContext2D, poly: Point[]): void {
+    if (poly.length === 0) return;
+    g.beginPath();
+    g.moveTo(poly[0]!.x, poly[0]!.y);
+    for (let i = 1; i < poly.length; i++) g.lineTo(poly[i]!.x, poly[i]!.y);
+    g.closePath();
   }
 
   function unrestDot(unrest: number): string | null {
@@ -613,8 +868,11 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     if (!state) return null;
     if (layout === "voronoi") {
       ensureCells(state);
+      // Ocean clicks select nothing — the sea deselects.
+      const n = unprojectXY(px, py);
+      if (!shape || !pointInIsland(shape, n.x, n.y)) return null;
       for (let i = 0; i < cells.length; i++) {
-        const poly = cells[i].poly.map((v) => projectXY(v.x, v.y));
+        const poly = cells[i]!.poly.map((v) => projectXY(v.x, v.y));
         if (pointInPolygon(poly, px, py)) return state.regions[i]?.id ?? i;
       }
       return null;
@@ -650,6 +908,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     },
     setState(next: GameState): void {
       state = next;
+      archetype = islandArchetype(next.regions.length, next.seed);
     },
     setSelected(regionId: number | null): void {
       selected = regionId;
