@@ -94,6 +94,10 @@ export interface Renderer {
   /** Flash a capture ripple at a region that just changed hands. */
   pulseCapture(regionId: number): void;
   onRegionClick(handler: (regionId: number | null) => void): void;
+  /** Zoom about the viewport centre (e.g. 1.25 in, 0.8 out). */
+  zoomBy(factor: number): void;
+  /** Reset the camera to the fitted full-map view. */
+  resetView(): void;
 }
 
 export function createRenderer(canvas: HTMLCanvasElement): Renderer {
@@ -120,6 +124,58 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   // Island archetype: pure function of the map (region count + seed), refreshed
   // on every setState so the projection frame is always in step with the state.
   let archetype: IslandArchetype = "medium";
+
+  // --- Camera: pan/zoom over the fitted base projection ----------------------
+  // screen = base * s + t. At s = 1 the map fits exactly (t clamps to 0), so
+  // the full-map view stays the default; zooming unlocks panning. While a
+  // gesture is in flight the cached layers are blitted through a delta
+  // transform (cheap, slightly soft); once input settles for a few frames the
+  // projection + layers rebuild at the live camera and everything is crisp.
+  const CAM_MIN = 1;
+  const CAM_MAX = 2.75;
+  const CAM_SETTLE_FRAMES = 10;
+  interface Camera {
+    s: number;
+    tx: number;
+    ty: number;
+  }
+  const cam: Camera = { s: 1, tx: 0, ty: 0 };
+  let camBuiltKey = ""; // camera baked into the current projection/layers
+  let staleCam: Camera | null = null; // snapshot matching the built projection
+  let camChangedTick = -999; // tick of the last camera input
+  let camOverride: Camera | null = null; // used while blitting a stale frame
+
+  function camKey(): string {
+    return `${cam.s.toFixed(3)}|${cam.tx.toFixed(1)}|${cam.ty.toFixed(1)}`;
+  }
+
+  function clampCam(): void {
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    cam.s = Math.min(CAM_MAX, Math.max(CAM_MIN, cam.s));
+    cam.tx = Math.min(0, Math.max(w - w * cam.s, cam.tx));
+    cam.ty = Math.min(0, Math.max(h - h * cam.s, cam.ty));
+  }
+
+  /** Zoom to `next` about the screen point (mx, my), keeping it fixed. */
+  function setZoom(next: number, mx: number, my: number): void {
+    const s0 = cam.s;
+    const s1 = Math.min(CAM_MAX, Math.max(CAM_MIN, next));
+    if (s1 === s0) return;
+    cam.tx = mx - ((mx - cam.tx) * s1) / s0;
+    cam.ty = my - ((my - cam.ty) * s1) / s0;
+    cam.s = s1;
+    clampCam();
+    camChangedTick = tick;
+  }
+
+  function panBy(dx: number, dy: number): void {
+    if (cam.s <= CAM_MIN) return; // the fitted view has nowhere to pan
+    cam.tx += dx;
+    cam.ty += dy;
+    clampCam();
+    camChangedTick = tick;
+  }
 
   // Voronoi cells (+ their organic-border variants) and the island silhouette
   // (normalised space), cached until the map geometry changes.
@@ -161,9 +217,11 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
   function ensureProjection(s: GameState): Projection {
     ensureCells(s);
-    const sig = `${cellSig}|${canvas.clientWidth}x${canvas.clientHeight}`;
+    const sig = `${cellSig}|${canvas.clientWidth}x${canvas.clientHeight}|${camKey()}`;
     if (projection && sig === projSig) return projection;
     projSig = sig;
+    camBuiltKey = camKey();
+    staleCam = { ...cam };
     const px = organic.map((c) => c.poly.map((v) => projectXY(v.x, v.y)));
     const edgesPx = organic.map((c) => c.edges.map((e) => e.map((v) => projectXY(v.x, v.y))));
     const paths = px.map((poly) => {
@@ -253,7 +311,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
    * shadow + base, shallow-water glow, islets and sea lanes. Static per
    * map ⊕ canvas size.
    */
-  function ensureOcean(proj: Projection): HTMLCanvasElement {
+  function ensureOcean(s: GameState, proj: Projection): HTMLCanvasElement {
     if (oceanLayer && oceanSig === projSig) return oceanLayer;
     const { cv, g } = makeLayer(oceanLayer);
     oceanLayer = cv;
@@ -266,6 +324,21 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     grad.addColorStop(1, OCEAN.outer);
     g.fillStyle = grad;
     g.fillRect(0, 0, w, h);
+
+    // Wave flecks across the open water — tiny ˘ strokes everywhere, so even
+    // the far corners read as sea. The land layers paint over any beneath them.
+    g.strokeStyle = OCEAN.fleck;
+    g.lineWidth = 1.1;
+    const flecks = Math.round((OCEAN.fleckCount * (w * h)) / (1600 * 900));
+    for (let t = 0; t < flecks; t++) {
+      const x = hashFloat(s.seed, 501, t, 1) * w;
+      const y = hashFloat(s.seed, 501, t, 2) * h;
+      const r = 3 + hashFloat(s.seed, 501, t, 3) * 5;
+      g.beginPath();
+      g.moveTo(x - r, y);
+      g.quadraticCurveTo(x, y - r * 0.55, x + r, y);
+      g.stroke();
+    }
 
     // Bathymetric contours: faint solid depth rings stepping out from the
     // coast — the classic cartographic cue that the island sits in water.
@@ -854,16 +927,22 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   function projectXY(x: number, y: number): Point {
     const { clientWidth, clientHeight } = canvas;
     const m = frameMargins();
-    return { x: m.x + x * (clientWidth - m.x * 2), y: m.top + y * (clientHeight - m.top - m.bottom) };
+    const c = camOverride ?? cam;
+    const bx = m.x + x * (clientWidth - m.x * 2);
+    const by = m.top + y * (clientHeight - m.top - m.bottom);
+    return { x: bx * c.s + c.tx, y: by * c.s + c.ty };
   }
 
   /** Inverse of projectXY — pixel position back to normalised map space. */
   function unprojectXY(px: number, py: number): Point {
     const { clientWidth, clientHeight } = canvas;
     const m = frameMargins();
+    const c = camOverride ?? cam;
+    const bx = (px - c.tx) / c.s;
+    const by = (py - c.ty) / c.s;
     return {
-      x: (px - m.x) / Math.max(1, clientWidth - m.x * 2),
-      y: (py - m.top) / Math.max(1, clientHeight - m.top - m.bottom),
+      x: (bx - m.x) / Math.max(1, clientWidth - m.x * 2),
+      y: (by - m.top) / Math.max(1, clientHeight - m.top - m.bottom),
     };
   }
 
@@ -877,23 +956,42 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     canvas.width = Math.max(1, Math.floor(clientWidth * dpr));
     canvas.height = Math.max(1, Math.floor(clientHeight * dpr));
     context.setTransform(dpr, 0, 0, dpr, 0, 0);
+    clampCam(); // a shrunken viewport must not leave the pan out of bounds
   }
 
   function render(): void {
     if (!running) return;
     const { clientWidth, clientHeight } = canvas;
     if (state && layout === "voronoi") {
-      drawVoronoi(state);
+      const gestureLive = projection && staleCam && camKey() !== camBuiltKey && tick - camChangedTick < CAM_SETTLE_FRAMES;
+      if (gestureLive) {
+        // Mid-gesture: blit the cached frame through the delta transform —
+        // slightly soft, but instant. The crisp rebuild lands once input rests.
+        const k = cam.s / staleCam!.s;
+        const dx = cam.tx - staleCam!.tx * k;
+        const dy = cam.ty - staleCam!.ty * k;
+        const dpr = window.devicePixelRatio || 1;
+        context.save();
+        context.setTransform(dpr * k, 0, 0, dpr * k, dpr * dx, dpr * dy);
+        camOverride = staleCam;
+        paintVoronoi(state, projection!);
+        drawArmies(state);
+        drawRipples(state);
+        camOverride = null;
+        context.restore();
+      } else {
+        paintVoronoi(state, ensureProjection(state));
+        drawArmies(state);
+        drawRipples(state);
+      }
     } else {
       paintBackground(clientWidth, clientHeight);
       if (state) {
         drawEdges(state);
         drawNodes(state);
+        drawArmies(state);
+        drawRipples(state);
       }
-    }
-    if (state) {
-      drawArmies(state);
-      drawRipples(state);
     }
     tick += 1;
     frame = window.requestAnimationFrame(render);
@@ -1012,10 +1110,10 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   /**
    * The island territory view: blit the cached ocean, terrain and political
    * layers, then the per-frame dynamics — selection, highlights, markers.
+   * Takes the projection to paint from (live or, mid-gesture, the stale one).
    */
-  function drawVoronoi(s: GameState): void {
-    const proj = ensureProjection(s);
-    context.drawImage(ensureOcean(proj), 0, 0, canvas.clientWidth, canvas.clientHeight);
+  function paintVoronoi(s: GameState, proj: Projection): void {
+    context.drawImage(ensureOcean(s, proj), 0, 0, canvas.clientWidth, canvas.clientHeight);
     context.drawImage(ensureTerrain(s, proj), 0, 0, canvas.clientWidth, canvas.clientHeight);
     context.drawImage(ensurePolitical(s, proj), 0, 0, canvas.clientWidth, canvas.clientHeight);
     const capitals = capitalSet(s);
@@ -1050,7 +1148,13 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     }
   }
 
-  /** Shared region markers (used by both layouts): pop, resource, capital, unrest, name. */
+  /**
+   * Shared region markers (both layouts), stacked as one tidy column so
+   * neighbouring regions stop colliding: (crest +) population chip at the
+   * site, the name beneath, then a compact status row — resource, fort,
+   * construction, unrest — centred under the name. The army badge keeps its
+   * own bottom-right corner (it belongs to an army, not the region).
+   */
   function drawMarkers(region: Region, p: Point, capitals: Set<number>): void {
     // Population count in a soft dark chip (same family as the icon chips), so
     // it reads identically over any terrain fill or political tint.
@@ -1070,76 +1174,24 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     context.fillStyle = "#f2f5fa";
     context.fillText(popText, p.x, p.y + 0.5);
 
-    // Strategic resource marker (top-left).
-    if (region.resource) {
-      const rx = p.x - NODE_RADIUS + 4;
-      const ry = p.y - NODE_RADIUS + 2;
-      const art = RESOURCE_ART[region.resource];
-      if (art) iconChip(rx, ry, 9);
-      if (!drawIcon(context, `res:${region.resource}`, art, MAP_ICON_COLOR, rx, ry, 13)) {
-        context.font = "13px system-ui, sans-serif";
-        context.fillStyle = MAP_ICON_COLOR; // else the monochrome ⚒ inherits the pop-count ink
-        context.fillText(RESOURCE_ICON[region.resource] ?? "?", rx, ry);
-      }
-    }
-
-    // Capital marker (bottom-left corner): the owner's crest, else the crown.
-    // A shade larger than the other chips — the seat of power should read first.
+    // Capital crest docked left of the population chip — the seat reads first.
     if (capitals.has(region.id)) {
-      const cx = p.x - NODE_RADIUS + 5;
-      const cy = p.y + NODE_RADIUS - 7;
+      const cx = p.x - popW / 2 - 13;
+      const cy = p.y;
       const owner = region.ownerId;
       const crestArt = owner === null ? null : crestSvg(owner, ownerColor(owner));
-      if (crestArt || GLYPH_ART.crown) {
-        iconChip(cx, cy, 10.5);
-        context.beginPath();
-        context.arc(cx, cy, 10.5, 0, Math.PI * 2);
-        context.lineWidth = 1;
-        context.strokeStyle = "rgba(244, 210, 122, 0.55)"; // faint gold ring
-        context.stroke();
-      }
+      iconChip(cx, cy, 10.5);
+      context.beginPath();
+      context.arc(cx, cy, 10.5, 0, Math.PI * 2);
+      context.lineWidth = 1;
+      context.strokeStyle = "rgba(244, 210, 122, 0.55)"; // faint gold ring
+      context.stroke();
       if (
         !(crestArt && drawIcon(context, `crest:${owner}`, crestArt, ownerColor(owner), cx, cy, 17)) &&
         !drawIcon(context, "glyph:crown", GLYPH_ART.crown, CAPITAL_ICON_COLOR, cx, cy, 14)
       ) {
         context.font = "13px system-ui, sans-serif";
         context.fillText("👑", cx, cy);
-      }
-    }
-
-    // Unrest marker (top-right dot) and construction (hammer, top).
-    const dot = unrestDot(region.unrest);
-    if (dot) {
-      context.beginPath();
-      context.arc(p.x + NODE_RADIUS - 5, p.y - NODE_RADIUS + 5, 5, 0, Math.PI * 2);
-      context.fillStyle = dot;
-      context.fill();
-    }
-    if (region.construction) {
-      const hy = p.y - NODE_RADIUS - 8;
-      if (GLYPH_ART.hammer) iconChip(p.x, hy, 8);
-      if (!drawIcon(context, "glyph:hammer", GLYPH_ART.hammer, MAP_ICON_COLOR, p.x, hy, 12)) {
-        context.font = "12px system-ui, sans-serif";
-        context.fillText("🔨", p.x, hy);
-      }
-    }
-
-    // Fortification marker (bottom-centre) — a defended region is harder to take.
-    // Bottom-centre is free: the crown sits bottom-left, the army badge bottom-right.
-    if (region.fortification > 0) {
-      const fy = p.y + NODE_RADIUS - 7;
-      if (drawIcon(context, "glyph:shield", GLYPH_ART.shield, MAP_ICON_COLOR, p.x - 4, fy, 11)) {
-        context.font = "600 10px system-ui, sans-serif";
-        context.fillStyle = MAP_ICON_COLOR;
-        context.textAlign = "center";
-        context.textBaseline = "middle";
-        context.fillText(String(region.fortification), p.x + 5, fy);
-      } else {
-        context.font = "600 10px system-ui, sans-serif";
-        context.fillStyle = MAP_ICON_COLOR; // the fort digit must not inherit a stale marker colour
-        context.textAlign = "center";
-        context.textBaseline = "middle";
-        context.fillText(`🛡${region.fortification}`, p.x, fy);
       }
     }
 
@@ -1158,6 +1210,66 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     context.fillStyle = "#e6eaf3";
     context.fillText(region.name, p.x, p.y + NODE_RADIUS + 4);
     if ("letterSpacing" in label) label.letterSpacing = "0px";
+
+    // Status row: one slot per active signal, centred under the name.
+    const slots: ((x: number, y: number) => void)[] = [];
+    if (region.resource) {
+      slots.push((x, y) => {
+        iconChip(x, y, 8.5);
+        const art = RESOURCE_ART[region.resource!];
+        if (!drawIcon(context, `res:${region.resource}`, art, MAP_ICON_COLOR, x, y, 12)) {
+          context.font = "11px system-ui, sans-serif";
+          context.fillStyle = MAP_ICON_COLOR;
+          context.textAlign = "center";
+          context.textBaseline = "middle";
+          context.fillText(RESOURCE_ICON[region.resource!] ?? "?", x, y);
+        }
+      });
+    }
+    if (region.fortification > 0) {
+      slots.push((x, y) => {
+        iconChip(x, y, 8.5);
+        context.font = "600 9.5px system-ui, sans-serif";
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        if (drawIcon(context, "glyph:shield", GLYPH_ART.shield, MAP_ICON_COLOR, x - 3.5, y, 10)) {
+          context.fillStyle = MAP_ICON_COLOR;
+          context.fillText(String(region.fortification), x + 4.5, y);
+        } else {
+          context.fillStyle = MAP_ICON_COLOR; // the digit must not inherit stale ink
+          context.fillText(`🛡${region.fortification}`, x, y);
+        }
+      });
+    }
+    if (region.construction) {
+      slots.push((x, y) => {
+        iconChip(x, y, 8.5);
+        if (!drawIcon(context, "glyph:hammer", GLYPH_ART.hammer, MAP_ICON_COLOR, x, y, 11)) {
+          context.font = "11px system-ui, sans-serif";
+          context.textAlign = "center";
+          context.textBaseline = "middle";
+          context.fillText("🔨", x, y);
+        }
+      });
+    }
+    const dot = unrestDot(region.unrest);
+    if (dot) {
+      slots.push((x, y) => {
+        context.beginPath();
+        context.arc(x, y, 4.5, 0, Math.PI * 2);
+        context.fillStyle = dot;
+        context.fill();
+        context.lineWidth = 1;
+        context.strokeStyle = "rgba(13, 15, 20, 0.6)";
+        context.stroke();
+      });
+    }
+    if (slots.length > 0) {
+      const gap = 19;
+      const rowY = p.y + NODE_RADIUS + 25;
+      const x0 = p.x - ((slots.length - 1) * gap) / 2;
+      slots.forEach((draw, i) => draw(x0 + i * gap, rowY));
+    }
   }
 
   function drawArmies(s: GameState): void {
@@ -1253,9 +1365,85 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     return null;
   }
 
-  function handleClick(ev: MouseEvent): void {
+  // --- Pointer input: tap to select, drag to pan, pinch/wheel to zoom --------
+  // A press only counts as a click if the pointer never strayed past the slop
+  // radius; anything further is a pan. Two active pointers form a pinch.
+  const pointers = new Map<number, Point>();
+  let pressMoved = false;
+  let wasPinch = false;
+  let pinchDist = 0;
+  let pinchMid: Point = { x: 0, y: 0 };
+
+  function localXY(ev: PointerEvent | WheelEvent | MouseEvent): Point {
     const rect = canvas.getBoundingClientRect();
-    clickHandler(hitTest(ev.clientX - rect.left, ev.clientY - rect.top));
+    return { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
+  }
+
+  function onPointerDown(ev: PointerEvent): void {
+    canvas.setPointerCapture(ev.pointerId);
+    pointers.set(ev.pointerId, localXY(ev));
+    if (pointers.size === 1) {
+      pressMoved = false;
+      wasPinch = false;
+    } else if (pointers.size === 2) {
+      wasPinch = true;
+      const [a, b] = [...pointers.values()];
+      pinchDist = Math.hypot(b!.x - a!.x, b!.y - a!.y) || 1;
+      pinchMid = { x: (a!.x + b!.x) / 2, y: (a!.y + b!.y) / 2 };
+    }
+  }
+
+  function onPointerMove(ev: PointerEvent): void {
+    const prev = pointers.get(ev.pointerId);
+    if (!prev) return;
+    const now = localXY(ev);
+    pointers.set(ev.pointerId, now);
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      const dist = Math.hypot(b!.x - a!.x, b!.y - a!.y) || 1;
+      const mid = { x: (a!.x + b!.x) / 2, y: (a!.y + b!.y) / 2 };
+      setZoom((cam.s * dist) / pinchDist, mid.x, mid.y);
+      panBy(mid.x - pinchMid.x, mid.y - pinchMid.y);
+      pinchDist = dist;
+      pinchMid = mid;
+      pressMoved = true;
+      return;
+    }
+    if (pointers.size === 1) {
+      const dx = now.x - prev.x;
+      const dy = now.y - prev.y;
+      if (pressMoved || Math.abs(dx) + Math.abs(dy) > 3) {
+        pressMoved = true;
+        panBy(dx, dy);
+      }
+    }
+  }
+
+  function onPointerUp(ev: PointerEvent): void {
+    const wasLast = pointers.size === 1;
+    const pos = pointers.get(ev.pointerId) ?? localXY(ev);
+    pointers.delete(ev.pointerId);
+    // A clean tap (no pan, no pinch) selects; everything else was navigation.
+    if (wasLast && !pressMoved && !wasPinch) clickHandler(hitTest(pos.x, pos.y));
+    if (pointers.size === 0) wasPinch = false;
+  }
+
+  function onWheel(ev: WheelEvent): void {
+    ev.preventDefault();
+    const p = localXY(ev);
+    setZoom(cam.s * Math.exp(-ev.deltaY * 0.0016), p.x, p.y);
+  }
+
+  function onDblClick(ev: MouseEvent): void {
+    // Double-click toggles between fitted view and a 2× look at the cursor.
+    const p = localXY(ev);
+    if (cam.s > 1.05) {
+      cam.s = 1;
+      clampCam();
+      camChangedTick = tick;
+    } else {
+      setZoom(2, p.x, p.y);
+    }
   }
 
   return {
@@ -1264,14 +1452,24 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       running = true;
       resize();
       window.addEventListener("resize", resize);
-      canvas.addEventListener("click", handleClick);
+      canvas.addEventListener("pointerdown", onPointerDown);
+      canvas.addEventListener("pointermove", onPointerMove);
+      canvas.addEventListener("pointerup", onPointerUp);
+      canvas.addEventListener("pointercancel", onPointerUp);
+      canvas.addEventListener("wheel", onWheel, { passive: false });
+      canvas.addEventListener("dblclick", onDblClick);
       frame = window.requestAnimationFrame(render);
     },
     stop(): void {
       running = false;
       window.cancelAnimationFrame(frame);
       window.removeEventListener("resize", resize);
-      canvas.removeEventListener("click", handleClick);
+      canvas.removeEventListener("pointerdown", onPointerDown);
+      canvas.removeEventListener("pointermove", onPointerMove);
+      canvas.removeEventListener("pointerup", onPointerUp);
+      canvas.removeEventListener("pointercancel", onPointerUp);
+      canvas.removeEventListener("wheel", onWheel);
+      canvas.removeEventListener("dblclick", onDblClick);
     },
     setState(next: GameState): void {
       state = next;
@@ -1302,6 +1500,14 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     },
     onRegionClick(handler: (regionId: number | null) => void): void {
       clickHandler = handler;
+    },
+    zoomBy(factor: number): void {
+      setZoom(cam.s * factor, canvas.clientWidth / 2, canvas.clientHeight / 2);
+    },
+    resetView(): void {
+      cam.s = 1;
+      clampCam();
+      camChangedTick = tick;
     },
   };
 }

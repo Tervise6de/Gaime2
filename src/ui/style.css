@@ -319,6 +319,35 @@ body {
   overflow-y: auto;
 }
 
+/* Map camera controls: a small vertical cluster above the turn log. */
+.hud-zoom {
+  position: absolute;
+  right: 12px;
+  bottom: 118px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: auto;
+}
+
+.hud-zoom-btn {
+  width: 32px;
+  height: 32px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--fg);
+  background: var(--panel-grad);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: var(--panel-shadow);
+  transition: border-color 0.12s ease, color 0.12s ease;
+}
+
+.hud-zoom-btn:hover {
+  border-color: rgba(244, 210, 122, 0.5);
+}
+
 /* Turn log: a slim collapsed strip that expands to the scrollback on click. */
 .hud-log {
   right: 12px;
@@ -499,7 +528,7 @@ body {
 .hud-region-flows {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .hud-region-flow {
@@ -818,7 +847,7 @@ body {
 
 /* --- Diplomacy (rendered inside its drawer) -------------------------------- */
 .hud-diplo-card {
-  padding: 8px 0;
+  padding: 10px 0;
   border-top: 1px solid var(--panel-border);
 }
 
@@ -2217,10 +2246,15 @@ a:focus-visible,
  * phones without horizontal overflow, and enlarge tap targets for touch.
  * ===================================================================== */
 
-/* No 300ms tap delay / double-tap zoom on the map and controls. */
-#app,
-#game-canvas {
+/* No 300ms tap delay / double-tap zoom on the controls. */
+#app {
   touch-action: manipulation;
+}
+
+/* The map runs its own gestures (drag pan, pinch zoom) — the browser must
+   not scroll or page-zoom on canvas touches. */
+#game-canvas {
+  touch-action: none;
 }
 
 /* Coarse pointers (touch): give every control a comfortable minimum hit area. */

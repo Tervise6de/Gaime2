@@ -122,6 +122,10 @@ export interface HudCallbacks {
   onResolveChoice(optionId: string): void;
   /** Switch the map between the node+edge fallback and the Voronoi polygon view. */
   onSetMapLayout(layout: MapLayout): void;
+  /** Camera controls (the map also pans by drag and zooms by wheel/pinch). */
+  onZoomIn(): void;
+  onZoomOut(): void;
+  onResetView(): void;
   /** Colour-blind palette toggled — the parent repaints the canvas + HUD. */
   onSetColourblind(on: boolean): void;
   /** Reduce-motion toggled — the parent tells the renderer to suppress motion. */
@@ -692,6 +696,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     "Set your tax rate on the left — more gold, but higher unrest.",
     "Click a region to develop it: queue buildings and raise armies.",
     "Move / Attack an army onto a neighbour to expand or conquer.",
+    "Zoom with the wheel or pinch; drag to pan; double-click to fit.",
     "End turn to advance; watch the victory progress up top.",
     "Tap Legend (L) to decode markers; Help (H) reopens these tips.",
   ]) {
@@ -739,6 +744,22 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     window.clearTimeout(toastTimer);
     toastTimer = window.setTimeout(() => (toast.style.display = "none"), 2200);
   }
+
+  // --- Map camera controls (bottom-right, above the log) ---------------------
+  // The map itself pans by drag and zooms by wheel/pinch; these buttons make
+  // that discoverable and give touch users a precise fallback.
+  const zoomBox = el("div", "hud-zoom");
+  const zoomBtn = (text: string, title: string, run: () => void): HTMLButtonElement => {
+    const b = btn(text, "hud-zoom-btn", run);
+    b.title = title;
+    return b;
+  };
+  zoomBox.append(
+    zoomBtn("＋", "Zoom in (mouse wheel / pinch)", () => callbacks.onZoomIn()),
+    zoomBtn("−", "Zoom out", () => callbacks.onZoomOut()),
+    zoomBtn("⛶", "Fit the whole island (double-click the map)", () => callbacks.onResetView()),
+  );
+  root.append(zoomBox);
 
   // --- Bottom-right: turn log, collapsed to its latest line by default -------
   // The full scrollback expands on click; an unseen counter keeps fresh news
@@ -1681,9 +1702,9 @@ function buildLegend(): HTMLElement {
   row(dot("#e8776b"), "Unrest — revolt risk (red dot)");
   row(resourceIconHtml("iron", "⚒", "hud-legend-ico"), "Iron deposit");
   row(resourceIconHtml("horses", "🐎", "hud-legend-ico"), "Horses");
-  row(glyphHtml("hammer", "🔨", "hud-legend-ico"), "Building under construction");
+  row(glyphHtml("hammer", "🔨", "hud-legend-ico"), "Building under construction (status row under the name)");
   row(glyphHtml("shield", "🛡", "hud-legend-ico"), "Fortification level (harder to capture; siege strips it)");
-  row(glyphHtml("crown", "👑", "hud-legend-ico"), "Capital — crown + double ring (a nation's seat of power)");
+  row(glyphHtml("crown", "👑", "hud-legend-ico"), "Capital — the crest beside the population chip");
   row('<span class="hud-legend-badge">3</span>', "Army (owner colour, unit count)");
 
   section("Borders");

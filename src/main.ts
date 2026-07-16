@@ -192,6 +192,15 @@ function main(): void {
       // View-only: the continuous render loop picks up the new layout next frame.
       renderer.setLayout(mapLayout);
     },
+    onZoomIn() {
+      renderer.zoomBy(1.3);
+    },
+    onZoomOut() {
+      renderer.zoomBy(1 / 1.3);
+    },
+    onResetView() {
+      renderer.resetView();
+    },
     onSetColourblind(on) {
       renderer.setColourblind(on);
       sync(); // repaint HUD swatches immediately (canvas repaints each frame)

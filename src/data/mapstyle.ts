@@ -118,9 +118,13 @@ export const DEPTH = {
 
 /** Ocean & coastline palette (the terrain palette stays in data/terrain.ts). */
 export const OCEAN = {
-  /** Radial vignette centre/edge — the open water. */
-  inner: "#141c28",
-  outer: "#090c12",
+  /** Radial vignette centre/edge — clearly *water* blue all the way to the
+      corners (never near-black), so the world reads as sea in every direction. */
+  inner: "#1e3049",
+  outer: "#122033",
+  /** Tiny wave flecks scattered across the open water (count at 1600×900). */
+  fleck: "rgba(168, 203, 232, 0.11)",
+  fleckCount: 260,
   /** Land underlay colour and its drop shadow (under the terrain fills). */
   landBase: "#1b222c",
   shadow: "rgba(0, 0, 0, 0.55)",

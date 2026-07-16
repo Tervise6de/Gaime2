@@ -278,6 +278,12 @@ anywhere in rendering):
   densities, political widths/alphas, ocean palette) lives in
   `data/mapstyle.ts` — balancing the look is editing that table, not code.
 
+- **Camera**: the fitted full-map view is the default (zoom 1 = everything
+  visible, pan locked); wheel/pinch zooms up to ~2.75×, drag pans, double-
+  click or the ⛶ button refits. Mid-gesture frames blit the cached layers
+  through a delta transform; the crisp rebuild lands when input settles.
+  Hit-testing runs through the same camera, so taps always match pixels.
+
 The node+edge fallback stays intact behind the map toggle, sharing markers
 and projection with the island view.
 
