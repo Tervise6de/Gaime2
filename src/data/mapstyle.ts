@@ -25,10 +25,10 @@ export interface IslandFrame {
  * fills most of the view; the archipelago sits in between with many islets.
  */
 export const ISLAND_FRAME: Record<IslandArchetype, IslandFrame> = {
-  small: { marginX: 0.16, marginY: 0.17, coastPad: 0.085, isletCount: 6 },
+  small: { marginX: 0.19, marginY: 0.2, coastPad: 0.085, isletCount: 6 },
   medium: { marginX: 0.12, marginY: 0.13, coastPad: 0.075, isletCount: 4 },
   large: { marginX: 0.085, marginY: 0.095, coastPad: 0.055, isletCount: 3 },
-  archipelago: { marginX: 0.1, marginY: 0.11, coastPad: 0.06, isletCount: 7 },
+  archipelago: { marginX: 0.11, marginY: 0.13, coastPad: 0.045, isletCount: 7 },
 };
 
 /** Region-count ceilings: ≤ small → "small", ≤ medium → "medium", else "large". */

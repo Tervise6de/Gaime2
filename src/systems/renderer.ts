@@ -140,6 +140,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     reach: number[];
     land: Path2D;
     blobsPx: Point[][];
+    /** One Path2D per landmass blob (land is their union). */
+    blobPaths: Path2D[];
     isletsPx: Point[][];
     /** Cross-water adjacency lanes (both endpoints at region sites). */
     lanes: [Point, Point][];
@@ -181,13 +183,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     });
 
     const blobsPx = (shape?.blobs ?? []).map((b) => b.map((v) => projectXY(v.x, v.y)));
+    const blobPaths = blobsPx.map((blob) => polyPath(blob));
     const land = new Path2D();
-    for (const blob of blobsPx) {
-      if (blob.length < 3) continue;
-      land.moveTo(blob[0]!.x, blob[0]!.y);
-      for (let i = 1; i < blob.length; i++) land.lineTo(blob[i]!.x, blob[i]!.y);
-      land.closePath();
-    }
+    for (const p of blobPaths) land.addPath(p);
     const isletsPx = (shape?.islets ?? []).map((b) => b.map((v) => projectXY(v.x, v.y)));
 
     // Sea lanes: game-adjacent pairs whose midpoint lies in open water — the
@@ -206,7 +204,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       }
     }
 
-    projection = { px, paths, edgesPx, sites, reach, land, blobsPx, isletsPx, lanes };
+    projection = { px, paths, edgesPx, sites, reach, land, blobsPx, blobPaths, isletsPx, lanes };
     oceanSig = ""; // dependent layers must rebuild against the new geometry
     terrainSig = "";
     politicalSig = "";
@@ -307,13 +305,19 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     g.restore();
 
     // Shallow-water glow hugging the coast (outer half of centred strokes).
+    // Stroked per blob, keeping each outline's ink off any sibling landmass.
     g.lineJoin = "round";
-    g.strokeStyle = OCEAN.shallowWide;
-    g.lineWidth = 26;
-    g.stroke(proj.land);
-    g.strokeStyle = OCEAN.shallow;
-    g.lineWidth = 12;
-    g.stroke(proj.land);
+    proj.blobPaths.forEach((path, i) => {
+      g.save();
+      clipOutOtherBlobs(g, proj, i);
+      g.strokeStyle = OCEAN.shallowWide;
+      g.lineWidth = 26;
+      g.stroke(path);
+      g.strokeStyle = OCEAN.shallow;
+      g.lineWidth = 12;
+      g.stroke(path);
+      g.restore();
+    });
 
     // Islets: inert offshore rocks — texture for the margin waters.
     for (const rock of proj.isletsPx) {
@@ -387,17 +391,21 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     g.setLineDash([]);
     g.restore();
 
-    // Coastline ink: dark outline in the water, pale highlight just inside.
+    // Coastline ink: dark outline in the water, pale highlight just inside —
+    // per blob, so touching archipelago blobs never ink across each other.
     g.lineJoin = "round";
-    g.strokeStyle = OCEAN.coastLine;
-    g.lineWidth = 2.6;
-    g.stroke(proj.land);
-    g.save();
-    g.clip(proj.land);
-    g.strokeStyle = OCEAN.coastHighlight;
-    g.lineWidth = 2.2;
-    g.stroke(proj.land);
-    g.restore();
+    proj.blobPaths.forEach((path, i) => {
+      g.save();
+      clipOutOtherBlobs(g, proj, i);
+      g.strokeStyle = OCEAN.coastLine;
+      g.lineWidth = 2.6;
+      g.stroke(path);
+      g.clip(path);
+      g.strokeStyle = OCEAN.coastHighlight;
+      g.lineWidth = 2.2;
+      g.stroke(path);
+      g.restore();
+    });
 
     terrainSig = complete ? projSig : ""; // retry until every motif has decoded
     return cv;
@@ -497,7 +505,12 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       g.globalAlpha = barb ? POLITICAL.barbarianBandAlpha : POLITICAL.bandAlpha;
       g.lineWidth = POLITICAL.bandWidth;
       strokePolylines(lines);
-      g.stroke(proj.land);
+      proj.blobPaths.forEach((path, bi) => {
+        g.save();
+        clipOutOtherBlobs(g, proj, bi);
+        g.stroke(path);
+        g.restore();
+      });
       // Crisp owner-coloured edge (this half of the two-tone frontier).
       g.globalAlpha = barb ? POLITICAL.barbarianEdgeAlpha : POLITICAL.edgeAlpha;
       g.lineWidth = POLITICAL.edgeWidth;
@@ -1100,6 +1113,35 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     g.moveTo(poly[0]!.x, poly[0]!.y);
     for (let i = 1; i < poly.length; i++) g.lineTo(poly[i]!.x, poly[i]!.y);
     g.closePath();
+  }
+
+  /** A closed Path2D from a pixel polygon. */
+  function polyPath(poly: Point[]): Path2D {
+    const p = new Path2D();
+    if (poly.length >= 3) {
+      p.moveTo(poly[0]!.x, poly[0]!.y);
+      for (let i = 1; i < poly.length; i++) p.lineTo(poly[i]!.x, poly[i]!.y);
+      p.closePath();
+    }
+    return p;
+  }
+
+  /**
+   * Clip to everywhere EXCEPT the other landmass blobs. Archipelago blobs may
+   * touch or overlap; stroking one blob's outline inside this clip keeps its
+   * coastline ink strictly off its neighbours' land — no lines across terrain.
+   */
+  function clipOutOtherBlobs(g: CanvasRenderingContext2D, proj: Projection, except: number): void {
+    if (proj.blobPaths.length <= 1) return;
+    const mask = new Path2D();
+    mask.rect(0, 0, canvas.clientWidth, canvas.clientHeight);
+    proj.blobsPx.forEach((blob, i) => {
+      if (i === except || blob.length < 3) return;
+      mask.moveTo(blob[0]!.x, blob[0]!.y);
+      for (let k = 1; k < blob.length; k++) mask.lineTo(blob[k]!.x, blob[k]!.y);
+      mask.closePath();
+    });
+    g.clip(mask, "evenodd");
   }
 
   function unrestDot(unrest: number): string | null {
