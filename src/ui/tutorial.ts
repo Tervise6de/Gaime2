@@ -34,17 +34,17 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     target: "#game-canvas",
     title: "The world map",
-    body: "Each node is a region you can click to inspect and develop: queue buildings, raise armies, read its unrest. Your armies (coloured badges) move along the links to expand or attack.",
+    body: "Click any region of your island to inspect and develop it — its panel opens on the right: queue buildings, raise armies, read its unrest. Your armies (coloured badges) move between adjacent regions to expand or attack.",
   },
   {
-    target: ".hud-tech-menu",
+    target: ".hud-research",
     title: "Research",
-    body: "Knowledge funds one technology at a time — each shows its effect inline. Techs unlock buildings, units and yield bonuses. Open the full tree with 'Tech tree'.",
+    body: "Knowledge funds one technology at a time. When a choice is due the chooser expands here; otherwise this pill tracks progress — click it for the full tree. Techs unlock buildings, units and yield bonuses.",
   },
   {
-    target: ".hud-right",
-    title: "Diplomacy",
-    body: "Make war or peace, sign pacts, gift gold, demand tribute — or open a trade route (gold each turn while at peace). The strength chip shows how each rival compares to you; a Reeling badge marks a rival in crisis.",
+    target: ".hud-rail",
+    title: "Diplomacy & notifications",
+    body: "These open on demand: Diplomacy for war, peace, pacts, gifts, tribute and trade (badge = offers awaiting your answer); Notifications for alerts and last turn's events. The crown jumps to your capital.",
   },
   {
     target: ".hud-endturn",
@@ -110,7 +110,10 @@ export function runTutorial(): void {
   function render(): void {
     const step = TUTORIAL_STEPS[i]!;
     const target = step.target ? document.querySelector(step.target) : null;
-    const rect = target instanceof HTMLElement ? target.getBoundingClientRect() : null;
+    const raw = target instanceof HTMLElement ? target.getBoundingClientRect() : null;
+    // A hidden target (e.g. a contextual panel with nothing selected) measures
+    // zero — treat it as "no target" so the card centres instead of hugging 0,0.
+    const rect = raw && raw.width > 0 && raw.height > 0 ? raw : null;
 
     if (rect && rect.width > 0) {
       const pad = 6;

@@ -42,7 +42,8 @@ body {
 }
 
 #hud .hud-panel,
-#hud .hud-topbar {
+#hud .hud-topbar,
+#hud .hud-rail {
   pointer-events: auto;
 }
 
@@ -125,6 +126,7 @@ body {
   font-size: 12px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .hud-turn.famine {
@@ -142,25 +144,208 @@ body {
   backdrop-filter: blur(6px);
 }
 
-.hud-left {
+/* Bottom-left action cluster: the per-turn levers (tax, End turn) plus the
+   Game menu entry — everything else on the left opens on demand. */
+.hud-actions {
   left: 12px;
   bottom: 12px;
-  width: 260px;
+  width: 236px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
+.hud-actions .hud-hint {
+  margin: 0;
+}
+
+.hud-gamemenu-btn {
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.hud-gamemenu-btn:hover {
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.hud-gamemenu-panel {
+  width: min(430px, 94vw);
+  max-height: 84vh;
+  overflow-y: auto;
+}
+
+/* Left stack: the compact rail plus whichever drawer is open beneath it. */
+.hud-leftstack {
+  position: absolute;
+  left: 12px;
+  top: 84px;
+  bottom: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.hud-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.hud-railbtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+
+.hud-railbtn:hover {
+  border-color: rgba(244, 210, 122, 0.5);
+}
+
+.hud-railbtn.active {
+  border-color: var(--accent);
+  background: rgba(244, 210, 122, 0.12);
+}
+
+.hud-railbtn .ico-label {
+  flex: 1;
+  text-align: left;
+}
+
+.hud-railbadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #1a1408;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Drawers flow under the rail inside the stack; one open at a time. */
+.hud-drawer {
+  position: static;
+  width: 268px;
+  max-height: 100%;
+  overflow-y: auto;
+  pointer-events: auto;
+}
+
+.hud-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.hud-drawer-head .hud-heading {
+  margin: 0;
+}
+
+.hud-drawer-head .hud-techtree-close {
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+}
+
+/* Notification feed rows (the alert chips, in list form). */
+.hud-notif-row {
+  padding: 6px 8px;
+  margin-bottom: 5px;
+  font-size: 12px;
+  line-height: 1.4;
+  border-radius: 6px;
+  border-left: 3px solid transparent;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.hud-notif-row.danger {
+  border-left-color: #e8776b;
+  color: #f0b9b1;
+}
+
+.hud-notif-row.warn {
+  border-left-color: #e0b74a;
+  color: #ecd9a8;
+}
+
+.hud-notif-row.good {
+  border-left-color: #6cae7a;
+  color: #b9dfc3;
+}
+
+/* Region inspector — contextual (present only while a region is selected). */
 .hud-right {
   right: 12px;
   top: 84px;
-  width: 244px;
+  width: 250px;
   max-height: calc(100vh - 320px);
   overflow-y: auto;
 }
 
+/* Turn log: a slim collapsed strip that expands to the scrollback on click. */
 .hud-log {
   right: 12px;
   bottom: 12px;
+  width: 300px;
+  padding: 10px 12px;
+}
+
+.hud-log.open {
   width: 320px;
-  max-height: 200px;
+}
+
+.hud-log-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.hud-log-head .hud-heading {
+  margin: 0;
+  flex: 1;
+}
+
+.hud-log-chevron {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.hud-log-latest {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
@@ -612,15 +797,7 @@ body {
   border-radius: 8px;
 }
 
-/* --- Diplomacy ------------------------------------------------------------ */
-.hud-diplo {
-  left: 12px;
-  top: 84px;
-  width: 244px;
-  max-height: calc(100vh - 360px);
-  overflow-y: auto;
-}
-
+/* --- Diplomacy (rendered inside its drawer) -------------------------------- */
 .hud-diplo-card {
   padding: 8px 0;
   border-top: 1px solid var(--panel-border);
@@ -789,6 +966,52 @@ body {
   min-width: 380px;
 }
 
+/* Compact shape: the panel chrome vanishes and only the pill remains, so the
+   map keeps the bottom of the screen while research merely ticks along. */
+.hud-research.compact {
+  width: auto;
+  min-width: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  backdrop-filter: none;
+}
+
+.hud-research-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+  font: inherit;
+}
+
+.hud-research-pill:hover {
+  border-color: rgba(244, 210, 122, 0.5);
+}
+
+.hud-research-pill .hud-research-title {
+  font-size: 12.5px;
+}
+
+.hud-research-mini {
+  width: 110px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.hud-research-minifill {
+  display: block;
+  height: 100%;
+}
+
 .hud-research-head {
   display: flex;
   align-items: center;
@@ -938,6 +1161,51 @@ body {
 
 .hud-victory.threat {
   color: #e8776b;
+}
+
+/* --- Top-bar ☰ menu (legend / records / options) --------------------------- */
+.hud-menu-wrap {
+  position: relative;
+}
+
+.hud-menu-toggle {
+  min-width: 34px;
+  font-size: 14px;
+}
+
+.hud-topmenu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 172px;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  z-index: 60;
+}
+
+.hud-topmenu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  font-size: 12.5px;
+  text-align: left;
+  color: var(--fg);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.hud-topmenu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 /* --- Map legend ----------------------------------------------------------- */
@@ -1527,7 +1795,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  max-height: 150px;
+  margin-top: 8px;
+  max-height: 180px;
   overflow-y: auto;
 }
 
@@ -1832,24 +2101,6 @@ a:focus-visible,
   transition-duration: 0.001s !important;
 }
 
-/* First-run orientation: jump to the player's capital from the empty region panel. */
-.hud-region-jump {
-  margin-top: 10px;
-  padding: 7px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--fg);
-  background: rgba(244, 210, 122, 0.1);
-  border: 1px solid var(--panel-border);
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.hud-region-jump:hover {
-  border-color: var(--accent);
-  background: rgba(244, 210, 122, 0.18);
-}
-
 /* Confirmation dialog — modal prompt before irreversible / heavy actions. */
 .confirm-overlay {
   position: fixed;
@@ -1946,7 +2197,9 @@ a:focus-visible,
   .hud-hints-btn,
   .hud-techtree-close,
   .confirm-btn,
-  .hud-region-jump {
+  .hud-railbtn,
+  .hud-gamemenu-btn,
+  .hud-research-pill {
     min-height: 40px;
   }
   .hud-endturn {
@@ -1958,22 +2211,27 @@ a:focus-visible,
   }
 }
 
-/* Tablet / small laptop: tighten the frame so the six panels still fit. */
+/* Tablet / small laptop: tighten the frame so the panels still fit. */
 @media (max-width: 1024px) {
   .hud-topbar {
     flex-wrap: wrap;
     justify-content: center;
     max-width: calc(100vw - 24px);
   }
-  .hud-diplo,
   .hud-right {
     width: 216px;
   }
-  .hud-left {
-    width: 232px;
+  .hud-drawer {
+    width: 240px;
+  }
+  .hud-actions {
+    width: 212px;
   }
   .hud-log {
     width: 264px;
+  }
+  .hud-log.open {
+    width: 280px;
   }
   .hud-research {
     width: min(520px, calc(100vw - 520px));
@@ -2015,11 +2273,14 @@ a:focus-visible,
     font-size: 14px;
   }
 
-  .hud-diplo {
+  .hud-leftstack {
     left: 6px;
     top: 62px;
-    width: 46vw;
-    max-height: 32vh;
+    bottom: 40vh;
+  }
+  .hud-drawer {
+    width: min(74vw, 300px);
+    max-height: 42vh;
   }
   .hud-right {
     right: 6px;
@@ -2027,18 +2288,19 @@ a:focus-visible,
     width: 46vw;
     max-height: 32vh;
   }
-  .hud-left {
+  .hud-actions {
     left: 6px;
-    bottom: 88px;
+    bottom: 62px;
     width: 46vw;
-    max-height: 30vh;
-    overflow-y: auto;
   }
   .hud-log {
     right: 6px;
-    bottom: 88px;
+    bottom: 62px;
     width: 46vw;
-    max-height: 22vh;
+  }
+  .hud-log.open {
+    width: 46vw;
+    max-height: 24vh;
   }
   .hud-research {
     left: 6px;
@@ -2047,6 +2309,11 @@ a:focus-visible,
     width: auto;
     min-width: 0;
     transform: none;
+  }
+  .hud-research.compact {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
   }
   .hud-panel {
     padding: 10px;
