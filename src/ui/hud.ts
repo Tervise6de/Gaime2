@@ -20,14 +20,7 @@ import { garrisonCalm } from "@/systems/stability";
 import { runTutorial } from "@/ui/tutorial";
 import { confirmAction } from "@/ui/confirm";
 import { isMuted, setMuted, play, isAmbientEnabled, setAmbientEnabled, getVolume, setVolume } from "@/ui/audio";
-import {
-  isColourblind,
-  setColourblind,
-  isReduceMotion,
-  setReduceMotion,
-  getDefaultMapLayout,
-  setDefaultMapLayout,
-} from "@/ui/settings";
+import { isColourblind, setColourblind, isReduceMotion, setReduceMotion } from "@/ui/settings";
 import { cbSafe } from "@/data/palette";
 import { OCEAN } from "@/data/mapstyle";
 import { badgeArt, BRANCH_ART, crestSvg, eventVignette, MOMENT_ART, safeColor, TERRAIN_ART, TREATY_ART } from "@/data/art";
@@ -40,13 +33,12 @@ import {
   iconHtml,
   resourceIconEl,
   resourceIconHtml,
-  setIconBtnLabel,
   unitIconHtml,
   buildingIconHtml,
 } from "@/ui/icons";
 import { loadProfile, type ProfileStats } from "@/ui/profile";
 import { ACHIEVEMENTS } from "@/data/achievements";
-import { EDGE_COLOR, WAR_EDGE_COLOR, type MapLayout } from "@/systems/renderer";
+import { WAR_EDGE_COLOR } from "@/systems/renderer";
 import { regionCapacity } from "@/systems/population";
 import { previewCombat } from "@/systems/combat";
 import {
@@ -120,8 +112,6 @@ export interface HudCallbacks {
   onSelectRegion(regionId: number | null): void;
   /** Resolve the pending choice event by picking one of its options. */
   onResolveChoice(optionId: string): void;
-  /** Switch the map between the node+edge fallback and the Voronoi polygon view. */
-  onSetMapLayout(layout: MapLayout): void;
   /** Camera controls (the map also pans by drag and zooms by wheel/pinch). */
   onZoomIn(): void;
   onZoomOut(): void;
@@ -186,8 +176,11 @@ const RESOURCE_META: Record<ResourceKey, { label: string; icon: string; tip: str
 export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   root.innerHTML = "";
 
-  // --- Top resource bar -----------------------------------------------------
+  // --- Top strip (AoE2-style): one slim full-width bar along the top edge ----
+  // Resources lead on the left, the turn/realm readout sits centred, victory
+  // progress and the ☰ menu (every low-frequency panel) close the right end.
   const topBar = el("div", "hud-topbar");
+  const barLeft = el("div", "hud-topbar-left");
   const resourceEls: Record<ResourceKey, { stock: HTMLElement; flow: HTMLElement }> =
     {} as never;
   for (const key of RESOURCE_KEYS) {
@@ -202,9 +195,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     const flow = el("span", "hud-resource-flow");
     body.append(label, stock, flow);
     cell.append(icon, body);
-    topBar.append(cell);
+    barLeft.append(cell);
     resourceEls[key] = { stock, flow };
   }
+  topBar.append(barLeft);
 
   // Resource-count tweening: the displayed stock eases toward the live value so the
   // numbers count up/down instead of snapping. Skipped (snaps) under reduce-motion.
@@ -257,46 +251,25 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     if (stockRaf === null) stockRaf = requestAnimationFrame(stepStock);
   }
 
+  const barCenter = el("div", "hud-topbar-center");
   const turnBadge = el("div", "hud-turn");
-  topBar.append(turnBadge);
+  barCenter.append(turnBadge);
+  topBar.append(barCenter);
+
+  const barRight = el("div", "hud-topbar-right");
   const victoryEl = el("div", "hud-victory");
   victoryEl.title = "Progress toward each victory: leading realm's territory share (domination at "
     + `${Math.round(DOMINATION_FRACTION * 100)}%), Great Works, and the turn ${TURN_LIMIT} prestige deadline.`;
-  topBar.append(victoryEl);
-  // High-frequency toolbar: map toggle, standings, help, tutorial. Everything
-  // low-frequency (legend / records / options) lives under the ☰ menu so the
-  // top bar stays one calm row and the map keeps the screen.
-  let mapLayout: MapLayout = getDefaultMapLayout();
-  const mapLayoutLabel = (l: MapLayout): string => (l === "voronoi" ? "Map: Territory" : "Map: Nodes");
-  const applyMapLayout = (l: MapLayout): void => {
-    mapLayout = l;
-    setIconBtnLabel(mapToggle, mapLayoutLabel(mapLayout));
-    callbacks.onSetMapLayout(mapLayout);
-  };
-  const mapToggle = iconBtn("map", "🗺", mapLayoutLabel(mapLayout), "hud-legend-toggle", () => {
-    applyMapLayout(mapLayout === "voronoi" ? "node" : "voronoi");
-  });
-  mapToggle.title = "Switch between the node/edge map and the Voronoi territory map. Shortcut: M";
-  topBar.append(mapToggle);
-  if (mapLayout !== "node") callbacks.onSetMapLayout(mapLayout); // honour a saved default at boot
+  barRight.append(victoryEl);
 
-  const standingsToggle = iconBtn("standings", "📊", "Standings", "hud-legend-toggle", () => toggleStandings());
-  standingsToggle.title = "See how you rank against every rival. Shortcut: S";
-  topBar.append(standingsToggle);
-  const helpToggle = iconBtn("help", "💡", "Help", "hud-legend-toggle", () => showHints());
-  helpToggle.title = "Reopen the getting-started tips. Shortcut: H";
-  topBar.append(helpToggle);
-  const tutorialToggle = iconBtn("tutorial", "🎓", "Tutorial", "hud-legend-toggle", () => runTutorial());
-  tutorialToggle.title = "Replay the guided tour of the interface.";
-  topBar.append(tutorialToggle);
-
-  // ☰ menu — legend, records and options tucked behind one toggle.
+  // ☰ menu — standings, help, tutorial, legend, records and options all live
+  // behind one toggle, so the strip itself stays pure information.
   const menuWrap = el("div", "hud-menu-wrap");
   const menuToggle = document.createElement("button");
   menuToggle.className = "hud-legend-toggle hud-menu-toggle";
   menuToggle.textContent = "☰";
-  menuToggle.title = "Legend, records and options.";
-  menuToggle.setAttribute("aria-label", "More panels");
+  menuToggle.title = "Standings, help, tutorial, legend, records and options.";
+  menuToggle.setAttribute("aria-label", "Menu");
   const topMenu = el("div", "hud-topmenu");
   topMenu.style.display = "none";
   const closeTopMenu = (): void => {
@@ -307,12 +280,19 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       closeTopMenu();
       run();
     });
+  const standingsItem = menuItem("standings", "📊", "Standings", () => toggleStandings());
+  standingsItem.title = "See how you rank against every rival. Shortcut: S";
   const legendToggleItem = menuItem("legend", "❔", "Map legend", () => {
     legendPanel.style.display = legendPanel.style.display === "none" ? "block" : "none";
   });
   legendToggleItem.title = "Decode the map markers. Shortcut: L";
+  const helpItem = menuItem("help", "💡", "Help", () => showHints());
+  helpItem.title = "Reopen the getting-started tips. Shortcut: H";
   topMenu.append(
+    standingsItem,
     legendToggleItem,
+    helpItem,
+    menuItem("tutorial", "🎓", "Tutorial", () => runTutorial()),
     menuItem("records", "🏅", "Records", () => openRecords()),
     menuItem("options", "⚙", "Options", () => openOptions()),
   );
@@ -326,7 +306,8 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     if (!(ev.target instanceof Node) || !menuWrap.contains(ev.target)) closeTopMenu();
   });
   menuWrap.append(menuToggle, topMenu);
-  topBar.append(menuWrap);
+  barRight.append(menuWrap);
+  topBar.append(barRight);
   root.append(topBar);
 
   // Critical-events alert strip (just below the resource bar).
@@ -367,9 +348,12 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const diploRail = railBtn("flag", "⚑", "Diplomacy", "Relations, treaties and offers. Shortcut: D", () =>
     toggleDrawer("diplo"),
   );
-  const notifRail = railBtn("warning", "🔔", "Notifications", "Alerts and last-turn events. Shortcut: N", () =>
-    toggleDrawer("notif"),
+  // Research lives beside Diplomacy — same drawer pattern, badge when a
+  // technology choice is waiting.
+  const researchRail = railBtn("book", "📖", "Research", "Technology and research. Shortcut: R", () =>
+    toggleDrawer("research"),
   );
+  researchRail.btn.classList.add("hud-railbtn-research");
   // One-click orientation: jump to your capital (shown only while you hold it).
   const capitalBtn = iconBtn("crown", "👑", "Capital", "hud-railbtn hud-railbtn-capital", () => {
     const player = lastState?.nations.find((n) => n.isPlayer);
@@ -377,7 +361,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     if (cap !== undefined && lastState?.regions[cap]?.ownerId === PLAYER_ID) callbacks.onSelectRegion(cap);
   });
   capitalBtn.title = "Select and highlight your seat of power on the map.";
-  rail.append(diploRail.btn, notifRail.btn, capitalBtn);
+  rail.append(diploRail.btn, researchRail.btn, capitalBtn);
   leftStack.append(rail);
 
   // --- Drawers (one open at a time, sharing the left stack) ------------------
@@ -395,19 +379,18 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     return { root: drawerRoot, body };
   }
   const diploDrawer = buildDrawer("Diplomacy", "hud-drawer-diplo");
-  const notifDrawer = buildDrawer("Notifications", "hud-drawer-notif");
-  leftStack.append(diploDrawer.root, notifDrawer.root);
+  const researchDrawer = buildDrawer("Research", "hud-drawer-research");
+  leftStack.append(diploDrawer.root, researchDrawer.root);
   root.append(leftStack);
 
-  type DrawerId = "diplo" | "notif";
+  type DrawerId = "diplo" | "research";
   let openDrawer: DrawerId | null = null;
   function setDrawer(id: DrawerId | null): void {
     openDrawer = id;
     diploDrawer.root.style.display = id === "diplo" ? "block" : "none";
-    notifDrawer.root.style.display = id === "notif" ? "block" : "none";
+    researchDrawer.root.style.display = id === "research" ? "block" : "none";
     diploRail.btn.classList.toggle("active", id === "diplo");
-    notifRail.btn.classList.toggle("active", id === "notif");
-    if (id === "notif") markLogSeen(); // opening the feed acknowledges its news
+    researchRail.btn.classList.toggle("active", id === "research");
   }
   function toggleDrawer(id: DrawerId): void {
     setDrawer(openDrawer === id ? null : id);
@@ -415,14 +398,16 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
   const diploBody = el("div", "hud-diplo-body");
   diploDrawer.body.append(diploBody);
-  // Notifications: the alert chips in list form + the last-turn summary.
-  const notifAlerts = el("div", "hud-notif-alerts");
-  const summaryBox = el("div", "hud-summary");
-  summaryBox.style.display = "none";
-  notifDrawer.body.append(notifAlerts, summaryBox);
+  const researchBody = el("div", "hud-research-body");
+  researchDrawer.body.append(researchBody);
 
   // --- Bottom-left: the per-turn levers that must stay in reach --------------
+  // Tax sits beside End turn deliberately: it is the one global policy you
+  // review every turn, so the cluster reads as "set policy → commit". The
+  // heading separates the lever from the button so they don't blur together.
   const actions = el("div", "hud-panel hud-actions");
+  const fiscalHead = heading("Fiscal policy");
+  fiscalHead.classList.add("hud-actions-head");
   const taxRow = el("div", "hud-tax-row");
   const taxLabel = el("span", "hud-tax-label");
   const taxInput = document.createElement("input");
@@ -446,7 +431,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   // Admin (new game / saves / backup) hides behind one Game menu button.
   const gameMenuBtn = btn("Game menu", "hud-gamemenu-btn", () => openGameMenu());
   gameMenuBtn.title = "New game, save slots, import & export.";
-  actions.append(taxRow, upkeepLine, endTurnBtn, gameMenuBtn);
+  actions.append(fiscalHead, taxRow, upkeepLine, endTurnBtn, gameMenuBtn);
   root.append(actions);
 
   // --- Game menu overlay: the administrative controls, out of the way --------
@@ -606,12 +591,6 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   rightPanel.append(regionBody);
   root.append(rightPanel);
 
-  // --- Research panel (bottom centre) ---------------------------------------
-  const researchPanel = el("div", "hud-panel hud-research");
-  const researchBody = el("div", "hud-research-body");
-  researchPanel.append(researchBody);
-  root.append(researchPanel);
-
   // --- End-game screen (a full modal recap, hidden until the game is decided) --
   const endOverlay = el("div", "hud-techtree-overlay hud-end-overlay");
   endOverlay.style.display = "none";
@@ -761,9 +740,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   );
   root.append(zoomBox);
 
-  // --- Bottom-right: turn log, collapsed to its latest line by default -------
-  // The full scrollback expands on click; an unseen counter keeps fresh news
-  // noticeable while collapsed. Open/closed persists across sessions.
+  // --- Bottom-right: the events & log hub -----------------------------------
+  // Notifications live here with the log: collapsed, the hub shows the latest
+  // line plus an unseen counter; expanded, it leads with the active alerts and
+  // the last-turn summary, then the full scrollback. Open state persists.
   const LOG_OPEN_KEY = "gaime2:logOpen";
   let logOpen = false;
   try {
@@ -774,15 +754,21 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   let logSeen: number | null = null; // log entries acknowledged so far
   const logPanel = el("div", "hud-panel hud-log");
   const logHead = el("div", "hud-log-head");
-  logHead.title = "Expand or collapse the full turn log.";
-  const logHeading = heading("Turn log");
+  logHead.title = "Expand or collapse the events feed and turn log. Shortcut: N";
+  const logHeading = heading("Events & log");
   const logBadge = el("span", "hud-railbadge hud-log-badge");
   logBadge.style.display = "none";
   const logChevron = el("span", "hud-log-chevron");
   logHead.append(logHeading, logBadge, logChevron);
   const logLatest = el("p", "hud-log-latest");
+  // The notification feed (alert rows + last-turn summary), shown while open.
+  const logEvents = el("div", "hud-log-events");
+  const notifAlerts = el("div", "hud-notif-alerts");
+  const summaryBox = el("div", "hud-summary");
+  summaryBox.style.display = "none";
+  logEvents.append(notifAlerts, summaryBox);
   const logBody = el("div", "hud-log-body");
-  logPanel.append(logHead, logLatest, logBody);
+  logPanel.append(logHead, logLatest, logEvents, logBody);
   root.append(logPanel);
 
   function markLogSeen(): void {
@@ -792,10 +778,11 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   function applyLogOpen(): void {
     logPanel.classList.toggle("open", logOpen);
     logBody.style.display = logOpen ? "flex" : "none";
+    logEvents.style.display = logOpen ? "block" : "none";
     logLatest.style.display = logOpen ? "none" : "block";
     logChevron.textContent = logOpen ? "▾" : "▸";
   }
-  logHead.addEventListener("click", () => {
+  function toggleLog(): void {
     logOpen = !logOpen;
     try {
       localStorage.setItem(LOG_OPEN_KEY, logOpen ? "1" : "0");
@@ -805,7 +792,8 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     markLogSeen();
     applyLogOpen();
     if (lastState) renderLog(lastState);
-  });
+  }
+  logHead.addEventListener("click", toggleLog);
   applyLogOpen();
 
   // --- Tech-tree overlay (whole branching tree; opened from the research bar) -
@@ -953,27 +941,6 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
         "Disable non-essential UI transitions and animation.",
       ),
     );
-
-    // Display ----------------------------------------------------------------
-    panel.append(sectionHeading("Display"));
-    const mapRow = el("label", "hud-opt-row");
-    const mapLabel = el("span", "hud-opt-label");
-    mapLabel.textContent = "Default map view";
-    const mapSel = select(
-      "hud-select",
-      [
-        ["node", "Nodes"],
-        ["voronoi", "Territory"],
-      ],
-      getDefaultMapLayout(),
-    );
-    mapSel.addEventListener("change", () => {
-      const layout = mapSel.value as MapLayout;
-      setDefaultMapLayout(layout);
-      applyMapLayout(layout); // apply to the current session too
-    });
-    mapRow.append(mapLabel, mapSel);
-    panel.append(mapRow);
 
     optionsOverlay.append(panel);
   }
@@ -1138,15 +1105,15 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     } else if (key === "s") {
       ev.preventDefault();
       toggleStandings();
-    } else if (key === "m") {
-      ev.preventDefault();
-      mapToggle.click();
     } else if (key === "d") {
       ev.preventDefault();
       toggleDrawer("diplo");
+    } else if (key === "r") {
+      ev.preventDefault();
+      toggleDrawer("research");
     } else if (key === "n") {
       ev.preventDefault();
-      toggleDrawer("notif");
+      toggleLog();
     } else if (ev.key === "Escape") {
       closeTechTree();
       closeStandings();
@@ -1175,10 +1142,13 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     lastPlayer = player;
     lastState = state;
 
-    // Rail badges: offers awaiting your answer, and the live alert count. The
-    // capital jump shows only while you still hold your seat.
+    // Rail badges: offers awaiting your answer; a research choice waiting.
+    // The capital jump shows only while you still hold your seat.
     setBadge(diploRail.badge, state.offers.filter((o) => o.to === PLAYER_ID).length);
-    setBadge(notifRail.badge, alerts.length);
+    const mustChoose =
+      !player.research.current && researchFrontier(player.research.done).length > 0;
+    setBadge(researchRail.badge, mustChoose ? 1 : 0);
+    researchRail.btn.classList.toggle("attention", mustChoose);
     const capId = player.capitalRegionId;
     capitalBtn.style.display =
       capId !== undefined && state.regions[capId]?.ownerId === PLAYER_ID ? "" : "none";
@@ -1269,7 +1239,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     // First paint (or a fresh/shorter log after New game) counts as seen.
     if (logSeen === null || logSeen > total) logSeen = total;
     if (logOpen) logSeen = total;
-    logHeading.textContent = `Turn log (${total})`;
+    logHeading.textContent = `Events & log (${total})`;
     const unseen = total - logSeen;
     logBadge.textContent = unseen > 9 ? "9+" : String(unseen);
     logBadge.style.display = unseen > 0 && !logOpen ? "inline-flex" : "none";
@@ -1692,13 +1662,12 @@ function buildLegend(): HTMLElement {
   const line = (color: string): string =>
     `<span class="hud-legend-line" style="border-top-color:${color}"></span>`;
 
-  section("Terrain (node fill)");
+  section("Terrain");
   for (const t of TERRAIN_IDS) row(disc(terrainCss(t)), TERRAIN[t].name);
 
   section("Region markers");
-  row(ring("#d8a24a"), "Owner colour (ring) · dark = neutral/barbarian");
-  row('<span class="hud-legend-num">6</span>', "Population (number in node)");
-  row(dot("#e0b74a"), "Unrest — unhappy (amber dot)");
+  row('<span class="hud-legend-num">6</span>', "Population (dark chip at the region's heart)");
+  row(dot("#e0b74a"), "Unrest — unhappy (amber dot in the status row)");
   row(dot("#e8776b"), "Unrest — revolt risk (red dot)");
   row(resourceIconHtml("iron", "⚒", "hud-legend-ico"), "Iron deposit");
   row(resourceIconHtml("horses", "🐎", "hud-legend-ico"), "Horses");
@@ -1708,10 +1677,10 @@ function buildLegend(): HTMLElement {
   row('<span class="hud-legend-badge">3</span>', "Army (owner colour, unit count)");
 
   section("Borders");
-  row(line("#5b8bd0"), "Realm border — each nation inks its own side (two-tone)");
+  row(line("#d8a24a"), "Your realm — the widest, brightest rim is always yours");
+  row(line("#5b8bd0"), "Rival realm — each nation inks its own side (two-tone)");
   row(line(WAR_EDGE_COLOR), "War front — a border between two nations at war");
   row(line(OCEAN.lane), "Sea lane — regions connected across water (armies may cross)");
-  row(line(EDGE_COLOR), "Adjacency edge (Nodes view) — regions connected");
 
   section("Selection");
   row(ring("#f4d27a"), "Selected region");
@@ -2134,11 +2103,10 @@ function renderDiplomacy(
 }
 
 /**
- * Research, bottom centre. Two shapes: while a technology is in progress (or
- * everything is researched) it is a one-line pill — name, mini progress bar,
- * tallies — that opens the tech tree on click, so the map keeps the space.
- * Only when a choice is actually due (nothing researching, frontier non-empty)
- * does the full chooser with the frontier cards expand.
+ * Research drawer (left rail, like Diplomacy). Leads with the state — current
+ * technology + progress bar, or a loud "choose" prompt when a pick is due —
+ * then the counts, the tech-tree button, and the frontier cards stacked
+ * vertically. Cards mark the in-progress tech; clicking one sets research.
  */
 function renderResearch(
   container: HTMLElement,
@@ -2150,47 +2118,42 @@ function renderResearch(
   const research = player.research;
   const frontier = researchFrontier(research.done);
   const mustChoose = !research.current && frontier.length > 0;
-  container.parentElement?.classList.toggle("compact", !mustChoose);
   const countText = `${research.done.length}/${Object.keys(TECHS).length} techs · ${player.wonders}/${WONDER_GOAL} wonders`;
-
-  if (!mustChoose) {
-    const pill = document.createElement("button");
-    pill.className = "hud-research-pill";
-    pill.title = "Open the technology tree (switch research there).";
-    if (research.current) {
-      const def = TECHS[research.current];
-      const pct = Math.min(100, (research.progress / def.cost) * 100);
-      // Progress can overshoot the cost mid-turn (completion lands at resolve);
-      // clamp the display so the pill never reads "32/20".
-      const shown = Math.min(Math.floor(research.progress), def.cost);
-      pill.innerHTML =
-        `<span class="hud-research-title">${resourceIconHtml("knowledge", "📖")} ${def.name}</span>` +
-        `<span class="hud-research-mini"><span class="hud-research-minifill" style="width:${pct}%;background:${BRANCH_COLOR[def.branch]}"></span></span>` +
-        `<span class="hud-research-count">${shown}/${def.cost} · ${countText}</span>`;
-    } else {
-      pill.innerHTML =
-        `<span class="hud-research-title">${resourceIconHtml("knowledge", "📖")} All technologies researched</span>` +
-        `<span class="hud-research-count">${countText}</span>`;
-    }
-    pill.addEventListener("click", onOpenTree);
-    container.append(pill);
-    return;
-  }
 
   const header = el("div", "hud-research-head");
   const title = el("span", "hud-research-title");
-  title.textContent = "Choose a technology to research →";
-  const count = el("span", "hud-research-count");
-  count.textContent = countText;
-  const treeBtn = btn("Tech tree ▤", "hud-techtree-open", onOpenTree);
-  header.append(title, count, treeBtn);
+  if (research.current) {
+    const def = TECHS[research.current];
+    const pct = Math.min(100, (research.progress / def.cost) * 100);
+    // Progress can overshoot the cost mid-turn (completion lands at resolve);
+    // clamp the display so it never reads "32/20".
+    const shown = Math.min(Math.floor(research.progress), def.cost);
+    title.innerHTML = `${resourceIconHtml("knowledge", "📖")} ${def.name} — ${shown}/${def.cost}`;
+    const bar = el("div", "hud-research-bar");
+    const fill = el("div", "hud-research-fill");
+    fill.style.width = `${pct}%`;
+    fill.style.background = BRANCH_COLOR[def.branch];
+    bar.append(fill);
+    header.append(title, bar);
+  } else if (mustChoose) {
+    title.textContent = "Choose a technology to research:";
+    header.append(title);
+  } else {
+    title.innerHTML = `${resourceIconHtml("knowledge", "📖")} All technologies researched`;
+    header.append(title);
+  }
   container.append(header);
+
+  const count = el("p", "hud-research-count");
+  count.textContent = countText;
+  container.append(count);
+  container.append(btn("Open tech tree ▤", "hud-techtree-open", onOpenTree));
 
   const menu = el("div", "hud-tech-menu");
   for (const id of frontier) {
     const def = TECHS[id];
     const b = document.createElement("button");
-    b.className = "hud-tech-btn";
+    b.className = "hud-tech-btn" + (research.current === id ? " active" : "");
     b.title = def.blurb;
     b.style.borderLeftColor = BRANCH_COLOR[def.branch];
     b.innerHTML =

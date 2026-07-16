@@ -80,16 +80,28 @@ export const TERRAIN_TEXTURE_ALPHA = 0.75;
  */
 export const POLITICAL = {
   /** Owner wash over the terrain fill (barbarians fainter, unowned none). */
-  washAlpha: 0.2,
+  washAlpha: 0.26,
   barbarianWashAlpha: 0.12,
-  /** Inner border band (clipped to the realm): width px + alpha. */
-  bandWidth: 14,
-  bandAlpha: 0.3,
-  barbarianBandAlpha: 0.14,
+  /** Inner border band (clipped to the realm): width px + alpha. Barbarian
+      camps get no band/edge at all — wash + centrelines only — so the only
+      warm rim on the map is the player's gold. */
+  bandWidth: 16,
+  bandAlpha: 0.42,
   /** Crisp owner-coloured edge on the realm side of a border. */
   edgeWidth: 3,
-  edgeAlpha: 0.85,
-  barbarianEdgeAlpha: 0.45,
+  edgeAlpha: 0.95,
+  /**
+   * The player's realm gets the loudest treatment — "mine" must read at a
+   * glance: a stronger wash, a wider double band (soft outer + bright inner)
+   * and a full-strength edge.
+   */
+  playerWashAlpha: 0.34,
+  playerBandWidth: 24,
+  playerBandAlpha: 0.5,
+  playerInnerBandWidth: 9,
+  playerInnerBandAlpha: 0.55,
+  playerEdgeWidth: 3.5,
+  playerEdgeAlpha: 1,
   /** Dark centreline drawn over every national border for definition. */
   core: "rgba(10, 12, 16, 0.75)",
   coreWidth: 1.3,

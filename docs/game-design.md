@@ -284,8 +284,11 @@ anywhere in rendering):
   through a delta transform; the crisp rebuild lands when input settles.
   Hit-testing runs through the same camera, so taps always match pixels.
 
-The node+edge fallback stays intact behind the map toggle, sharing markers
-and projection with the island view.
+The M1 node+edge fallback served its purpose during development and has been
+retired — the island territory view is the game's sole renderer. Political
+emphasis is tiered: every realm carries a loud rim (band + crisp two-tone
+edge), and the player's realm is unmistakably loudest (stronger wash, wider
+double band, full-strength edge) so "mine" reads at a glance.
 
 ---
 

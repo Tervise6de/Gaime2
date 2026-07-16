@@ -6,11 +6,8 @@
  * react. UI-only — never touches the sim.
  */
 
-import type { MapLayout } from "@/systems/renderer";
-
 const COLOURBLIND_KEY = "gaime2:colourblind";
 const REDUCE_MOTION_KEY = "gaime2:reduceMotion";
-const MAP_LAYOUT_KEY = "gaime2:mapLayout";
 
 function readBool(key: string): boolean {
   try {
@@ -48,28 +45,6 @@ export function setReduceMotion(v: boolean): boolean {
   writeBool(REDUCE_MOTION_KEY, v);
   applyDisplaySettings();
   return v;
-}
-
-/**
- * The map layout a fresh session opens with. The island territory view is the
- * game's face, so it is the default; "node" persists only when explicitly
- * chosen (the fallback remains one toggle away).
- */
-export function getDefaultMapLayout(): MapLayout {
-  try {
-    return localStorage.getItem(MAP_LAYOUT_KEY) === "node" ? "node" : "voronoi";
-  } catch {
-    return "voronoi";
-  }
-}
-
-export function setDefaultMapLayout(layout: MapLayout): MapLayout {
-  try {
-    localStorage.setItem(MAP_LAYOUT_KEY, layout);
-  } catch {
-    /* storage unavailable */
-  }
-  return layout;
 }
 
 /**

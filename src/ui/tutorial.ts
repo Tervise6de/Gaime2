@@ -24,7 +24,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     target: ".hud-topbar",
     title: "Your treasury & production",
-    body: "Gold, food, materials and knowledge — with each resource's per-turn flow. Watch food (famine bites) and gold (bankruptcy disbands troops). The victory bar up top tracks who's nearest a victory.",
+    body: "The top strip: gold, food, materials and knowledge with per-turn flows, the turn readout in the centre, and victory progress + the ☰ menu (standings, legend, help, options) on the right. Watch food (famine bites) and gold (bankruptcy disbands troops).",
   },
   {
     target: ".hud-tax-slider",
@@ -34,17 +34,17 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     target: "#game-canvas",
     title: "The world map",
-    body: "Click any region of your island to inspect and develop it — its panel opens on the right: queue buildings, raise armies, read its unrest. Your armies (coloured badges) move between adjacent regions to expand or attack.",
+    body: "Your realm carries the widest, brightest border — that's always you. Click any region to inspect and develop it; zoom with the wheel or pinch, drag to pan. Armies (coloured badges) move between adjacent regions to expand or attack.",
   },
   {
-    target: ".hud-research",
+    target: ".hud-railbtn-research",
     title: "Research",
-    body: "Knowledge funds one technology at a time. When a choice is due the chooser expands here; otherwise this pill tracks progress — click it for the full tree. Techs unlock buildings, units and yield bonuses.",
+    body: "Knowledge funds one technology at a time. This drawer holds your current progress, the frontier of available techs and the full tree — a gold badge means a choice is waiting.",
   },
   {
     target: ".hud-rail",
-    title: "Diplomacy & notifications",
-    body: "These open on demand: Diplomacy for war, peace, pacts, gifts, tribute and trade (badge = offers awaiting your answer); Notifications for alerts and last turn's events. The crown jumps to your capital.",
+    title: "Diplomacy & your capital",
+    body: "Diplomacy opens war, peace, pacts, gifts, tribute and trade (badge = offers awaiting your answer). The crown jumps to your capital. Alerts and last turn's events live bottom-right in Events & log.",
   },
   {
     target: ".hud-endturn",

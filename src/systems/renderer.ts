@@ -1,32 +1,28 @@
 /**
- * Renderer system.
+ * Renderer system — the island-world territory view.
  *
- * Draws the region graph onto the 2D canvas. Two interchangeable layouts over
- * the *identical* adjacency graph and markers:
- *
- *  - **node** (default fallback): each region a terrain-coloured node ringed by
- *    its owner's colour, adjacency drawn as edges.
- *  - **voronoi**: the island-world territory view — an organic landmass
- *    silhouette floating in ocean, region cells clipped to the coastline,
- *    terrain fills + owner tints, borders and war fronts on shared edges.
- *
- * Both share every marker (population, resources, unrest, capital, construction,
- * army badges) and both are read-only over state — the renderer never mutates
- * the sim. Rendering is deterministic: all shapes derive from the map seed
- * (systems/island.ts), never from Math.random or the clock.
+ * Draws the region graph as an organic landmass floating in ocean: region
+ * cells clipped to the coastline, terrain fills + political ink, borders and
+ * war fronts on shared edges, and the shared marker set (population, name,
+ * status row, capital crest, army badges). Read-only over state — the
+ * renderer never mutates the sim — and deterministic: every shape derives
+ * from the map seed (systems/island.ts), never Math.random or the clock.
  *
  * Performance discipline: everything expensive is cached and rebuilt only when
  * its inputs change —
  *  - Voronoi cells + island silhouette: recomputed when the map changes.
- *  - Projected geometry (pixel polygons, Path2Ds, land path): map ⊕ canvas size.
- *  - Ocean underlay + terrain base: pre-rendered offscreen once per map ⊕ size
- *    (terrain never changes mid-game), then blitted each frame.
- * Steady-state per-frame work is two drawImage blits plus the dynamic political
- * tint, selection and markers.
+ *  - Projected geometry (pixel polygons, Path2Ds, land path): map ⊕ canvas
+ *    size ⊕ settled camera.
+ *  - Ocean / terrain / political layers: pre-rendered offscreens, blitted per
+ *    frame; the political layer refreshes when ownership, wars or the palette
+ *    change.
+ * Steady-state per-frame work is three drawImage blits plus selection and
+ * markers; mid-gesture camera frames reuse the cached layers via a delta
+ * transform until input settles.
  */
 
 import { TERRAIN, type TerrainId } from "@/data/terrain";
-import { GLYPH_ART, RESOURCE_ART, TERRAIN_ART, TERRAIN_MOTIF, WORLD_BG, crestSvg } from "@/data/art";
+import { GLYPH_ART, RESOURCE_ART, TERRAIN_ART, TERRAIN_MOTIF, crestSvg } from "@/data/art";
 import { cbSafe } from "@/data/palette";
 import {
   DEPTH,
@@ -58,13 +54,11 @@ import {
   type OrganicCell,
 } from "@/systems/island";
 
-const BACKGROUND = "#11151c";
-/** Adjacency edge (a normal border). Exported so the map legend matches exactly. */
-export const EDGE_COLOR = "rgba(230, 233, 239, 0.14)";
 /** A border between two nations at war — the map's front line. */
 export const WAR_EDGE_COLOR = "rgba(232, 119, 107, 0.6)";
 /** Seam between two regions inside the landmass (kept faint; owners add ink). */
 const CELL_EDGE_COLOR = "rgba(13, 15, 20, 0.38)";
+/** Marker layout radius: the footprint each region's marker stack occupies. */
 const NODE_RADIUS = 26;
 const SELECT_COLOR = "#f4d27a";
 const HIGHLIGHT_COLOR = "#63c7d6";
@@ -75,8 +69,6 @@ const RESOURCE_ICON: Record<string, string> = { iron: "⚒", horses: "🐎" };
 const MAP_ICON_COLOR = "#e8e2cf";
 const CAPITAL_ICON_COLOR = "#f4d27a";
 
-export type MapLayout = "node" | "voronoi";
-
 export interface Renderer {
   start(): void;
   stop(): void;
@@ -84,9 +76,6 @@ export interface Renderer {
   setSelected(regionId: number | null): void;
   /** Regions to highlight as move/attack targets. */
   setHighlights(regionIds: number[]): void;
-  /** Switch between the node+edge fallback and the Voronoi polygon view. */
-  setLayout(layout: MapLayout): void;
-  getLayout(): MapLayout;
   /** Remap owner colours to the colour-blind-safe palette (or back). */
   setColourblind(on: boolean): void;
   /** Suppress cosmetic motion (capture ripples) when true. */
@@ -110,7 +99,6 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   let state: GameState | null = null;
   let selected: number | null = null;
   let highlights = new Set<number>();
-  let layout: MapLayout = "node";
   let colourblind = false;
   let reduceMotion = false;
   let clickHandler: (regionId: number | null) => void = () => {};
@@ -599,42 +587,62 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     g.lineJoin = "round";
     g.lineCap = "round";
 
-    // 1) Owner wash — subtle, so the terrain stays the first read.
+    const playerId = s.nations.find((n) => n.isPlayer)?.id ?? -1;
+
+    // 1) Owner wash — the player's realm noticeably stronger than rivals'.
     s.regions.forEach((region, i) => {
       if (region.ownerId === null) return; // wilderness: bare terrain
       const barb = region.ownerId === BARBARIAN_ID;
-      g.globalAlpha = barb ? POLITICAL.barbarianWashAlpha : POLITICAL.washAlpha;
+      const mine = region.ownerId === playerId;
+      g.globalAlpha = barb
+        ? POLITICAL.barbarianWashAlpha
+        : mine
+          ? POLITICAL.playerWashAlpha
+          : POLITICAL.washAlpha;
       g.fillStyle = ownerColor(region.ownerId);
       g.fill(proj.paths[i]!);
     });
     g.globalAlpha = 1;
 
     // 2) Realm rims, one nation at a time, confined to that nation's cells.
+    //    Every *nation* carries a loud rim; the player's is louder still — a
+    //    wide soft band plus a bright inner band. Barbarian camps get no rim
+    //    at all (their warm brown read too close to the player's gold): the
+    //    faint wash + dark centrelines are enough for "hostile wilderness".
     for (const nation of s.nations) {
+      if (nation.isBarbarian) continue;
       const owned = s.regions.filter((r) => r.ownerId === nation.id);
       if (owned.length === 0) continue;
       const nationPath = new Path2D();
       for (const r of owned) nationPath.addPath(proj.paths[r.id]!);
       const lines = borderPolylines(nation.id);
       const color = ownerColor(nation.id);
-      const barb = nation.isBarbarian;
+      const mine = nation.id === playerId;
+
+      const strokeRim = (width: number, alpha: number): void => {
+        g.globalAlpha = alpha;
+        g.lineWidth = width;
+        strokePolylines(lines);
+        proj.blobPaths.forEach((path, bi) => {
+          g.save();
+          clipOutOtherBlobs(g, proj, bi);
+          g.stroke(path);
+          g.restore();
+        });
+      };
 
       g.save();
       g.clip(nationPath);
       g.strokeStyle = color;
       // Wide inner band along borders and along the realm's own coastline.
-      g.globalAlpha = barb ? POLITICAL.barbarianBandAlpha : POLITICAL.bandAlpha;
-      g.lineWidth = POLITICAL.bandWidth;
-      strokePolylines(lines);
-      proj.blobPaths.forEach((path, bi) => {
-        g.save();
-        clipOutOtherBlobs(g, proj, bi);
-        g.stroke(path);
-        g.restore();
-      });
+      strokeRim(
+        mine ? POLITICAL.playerBandWidth : POLITICAL.bandWidth,
+        mine ? POLITICAL.playerBandAlpha : POLITICAL.bandAlpha,
+      );
+      if (mine) strokeRim(POLITICAL.playerInnerBandWidth, POLITICAL.playerInnerBandAlpha);
       // Crisp owner-coloured edge (this half of the two-tone frontier).
-      g.globalAlpha = barb ? POLITICAL.barbarianEdgeAlpha : POLITICAL.edgeAlpha;
-      g.lineWidth = POLITICAL.edgeWidth;
+      g.globalAlpha = mine ? POLITICAL.playerEdgeAlpha : POLITICAL.edgeAlpha;
+      g.lineWidth = mine ? POLITICAL.playerEdgeWidth : POLITICAL.edgeWidth;
       strokePolylines(lines);
       g.globalAlpha = 1;
       g.restore();
@@ -885,28 +893,6 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     return grad;
   }
 
-  // Background vignette gradient, cached by canvas size (rebuilt only on resize).
-  let bgGradient: CanvasGradient | null = null;
-  let bgSize = "";
-
-  /** Node-view background: flat until the registry provides a vignette pair. */
-  function paintBackground(w: number, h: number): void {
-    if (!WORLD_BG) {
-      context.fillStyle = BACKGROUND;
-      context.fillRect(0, 0, w, h);
-      return;
-    }
-    const sizeKey = `${w}x${h}`;
-    if (!bgGradient || sizeKey !== bgSize) {
-      bgSize = sizeKey;
-      bgGradient = context.createRadialGradient(w / 2, h * 0.42, Math.min(w, h) * 0.1, w / 2, h / 2, Math.max(w, h) * 0.72);
-      bgGradient.addColorStop(0, WORLD_BG.inner);
-      bgGradient.addColorStop(1, WORLD_BG.outer);
-    }
-    context.fillStyle = bgGradient;
-    context.fillRect(0, 0, w, h);
-  }
-
   function ownerColor(ownerId: number | null): string {
     if (ownerId === null || !state) return NEUTRAL_OWNER;
     const base = state.nations.find((n) => n.id === ownerId)?.color ?? NEUTRAL_OWNER;
@@ -961,8 +947,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
   function render(): void {
     if (!running) return;
-    const { clientWidth, clientHeight } = canvas;
-    if (state && layout === "voronoi") {
+    if (state) {
       const gestureLive = projection && staleCam && camKey() !== camBuiltKey && tick - camChangedTick < CAM_SETTLE_FRAMES;
       if (gestureLive) {
         // Mid-gesture: blit the cached frame through the delta transform —
@@ -985,13 +970,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         drawRipples(state);
       }
     } else {
-      paintBackground(clientWidth, clientHeight);
-      if (state) {
-        drawEdges(state);
-        drawNodes(state);
-        drawArmies(state);
-        drawRipples(state);
-      }
+      context.fillStyle = OCEAN.outer;
+      context.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
     }
     tick += 1;
     frame = window.requestAnimationFrame(render);
@@ -1039,72 +1019,6 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       if (cap && cap.ownerId === n.id) capitals.add(n.capitalRegionId);
     }
     return capitals;
-  }
-
-  function drawEdges(s: GameState): void {
-    for (const region of s.regions) {
-      const a = project(region);
-      for (const neighbourId of region.adjacency) {
-        if (region.id >= neighbourId) continue;
-        const neighbour = s.regions[neighbourId];
-        if (!neighbour) continue;
-        const b = project(neighbour);
-        const oa = region.ownerId;
-        const ob = neighbour.ownerId;
-        const isFront =
-          oa !== null && ob !== null && oa !== ob &&
-          oa !== BARBARIAN_ID && ob !== BARBARIAN_ID &&
-          atWar(s, oa, ob);
-        context.strokeStyle = isFront ? WAR_EDGE_COLOR : EDGE_COLOR;
-        context.lineWidth = isFront ? 3 : 2;
-        context.beginPath();
-        context.moveTo(a.x, a.y);
-        context.lineTo(b.x, b.y);
-        context.stroke();
-      }
-    }
-    context.lineWidth = 2;
-  }
-
-  function drawNodes(s: GameState): void {
-    const capitals = capitalSet(s);
-
-    for (const region of s.regions) {
-      const p = project(region);
-      const terrain = TERRAIN[region.terrain];
-      const isSelected = region.id === selected;
-      const isTarget = highlights.has(region.id);
-
-      // Move/attack target glow.
-      if (isTarget) {
-        context.beginPath();
-        context.arc(p.x, p.y, NODE_RADIUS + 6, 0, Math.PI * 2);
-        context.strokeStyle = HIGHLIGHT_COLOR;
-        context.lineWidth = 3;
-        context.setLineDash([5, 4]);
-        context.stroke();
-        context.setLineDash([]);
-      }
-
-      context.beginPath();
-      context.arc(p.x, p.y, NODE_RADIUS, 0, Math.PI * 2);
-      context.fillStyle = terrainFill(context, terrain.id, p.x, p.y, NODE_RADIUS);
-      context.fill();
-      context.lineWidth = isSelected ? 4 : 3;
-      context.strokeStyle = isSelected ? SELECT_COLOR : ownerColor(region.ownerId);
-      context.stroke();
-
-      // Capital: a second concentric ring in the owner's colour.
-      if (capitals.has(region.id)) {
-        context.beginPath();
-        context.arc(p.x, p.y, NODE_RADIUS + 4.5, 0, Math.PI * 2);
-        context.lineWidth = 2;
-        context.strokeStyle = ownerColor(region.ownerId);
-        context.stroke();
-      }
-
-      drawMarkers(region, p, capitals);
-    }
   }
 
   /**
@@ -1344,23 +1258,14 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
   function hitTest(px: number, py: number): number | null {
     if (!state) return null;
-    if (layout === "voronoi") {
-      ensureCells(state);
-      // Ocean clicks select nothing — the sea deselects.
-      const n = unprojectXY(px, py);
-      if (!shape || !pointInIsland(shape, n.x, n.y)) return null;
-      // Hit-test against the *organic* polygons — exactly what is drawn.
-      for (let i = 0; i < organic.length; i++) {
-        const poly = organic[i]!.poly.map((v) => projectXY(v.x, v.y));
-        if (pointInPolygon(poly, px, py)) return state.regions[i]?.id ?? i;
-      }
-      return null;
-    }
-    for (const region of state.regions) {
-      const p = project(region);
-      const dx = px - p.x;
-      const dy = py - p.y;
-      if (dx * dx + dy * dy <= NODE_RADIUS * NODE_RADIUS) return region.id;
+    ensureCells(state);
+    // Ocean clicks select nothing — the sea deselects.
+    const n = unprojectXY(px, py);
+    if (!shape || !pointInIsland(shape, n.x, n.y)) return null;
+    // Hit-test against the *organic* polygons — exactly what is drawn.
+    for (let i = 0; i < organic.length; i++) {
+      const poly = organic[i]!.poly.map((v) => projectXY(v.x, v.y));
+      if (pointInPolygon(poly, px, py)) return state.regions[i]?.id ?? i;
     }
     return null;
   }
@@ -1480,12 +1385,6 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     },
     setHighlights(regionIds: number[]): void {
       highlights = new Set(regionIds);
-    },
-    setLayout(next: MapLayout): void {
-      layout = next;
-    },
-    getLayout(): MapLayout {
-      return layout;
     },
     setColourblind(on: boolean): void {
       colourblind = on;
