@@ -46,6 +46,33 @@ export const COAST_DETAIL = 3;
 /** Longest outline segment (normalised) before resampling splits it. */
 export const COAST_MAX_SEGMENT = 0.055;
 
+/**
+ * Political ink — terrain reads first, ownership second. Realm interiors get
+ * only a light wash; the realm identity is carried by an inner colour band
+ * along the *outer* national border plus a crisp two-tone edge, so same-owner
+ * cells visually merge while different-owner borders stay unmistakable.
+ */
+export const POLITICAL = {
+  /** Owner wash over the terrain fill (barbarians fainter, unowned none). */
+  washAlpha: 0.2,
+  barbarianWashAlpha: 0.12,
+  /** Inner border band (clipped to the realm): width px + alpha. */
+  bandWidth: 14,
+  bandAlpha: 0.3,
+  barbarianBandAlpha: 0.14,
+  /** Crisp owner-coloured edge on the realm side of a border. */
+  edgeWidth: 3,
+  edgeAlpha: 0.85,
+  barbarianEdgeAlpha: 0.45,
+  /** Dark centreline drawn over every national border for definition. */
+  core: "rgba(10, 12, 16, 0.75)",
+  coreWidth: 1.3,
+  /** War fronts: soft glow + loud core along contested borders. */
+  warGlow: "rgba(232, 119, 107, 0.3)",
+  warGlowWidth: 9,
+  warCoreWidth: 3,
+} as const;
+
 /** Ocean & coastline palette (the terrain palette stays in data/terrain.ts). */
 export const OCEAN = {
   /** Radial vignette centre/edge — the open water. */

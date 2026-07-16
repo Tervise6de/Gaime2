@@ -28,7 +28,7 @@
 import { TERRAIN, type TerrainId } from "@/data/terrain";
 import { GLYPH_ART, RESOURCE_ART, TERRAIN_ART, TERRAIN_MOTIF, WORLD_BG, crestSvg } from "@/data/art";
 import { cbSafe } from "@/data/palette";
-import { ISLAND_FRAME, OCEAN, type IslandArchetype } from "@/data/mapstyle";
+import { ISLAND_FRAME, OCEAN, POLITICAL, type IslandArchetype } from "@/data/mapstyle";
 import { armySize, BARBARIAN_ID } from "@/systems/state";
 import {
   UNREST_PENALTY_START,
@@ -52,8 +52,6 @@ const NODE_RADIUS = 26;
 const SELECT_COLOR = "#f4d27a";
 const HIGHLIGHT_COLOR = "#63c7d6";
 const NEUTRAL_OWNER = "rgba(0,0,0,0.35)";
-/** Owner tint strength painted over the terrain fill in the polygon view. */
-const OWNER_TINT_ALPHA = 0.5;
 
 const RESOURCE_ICON: Record<string, string> = { iron: "⚒", horses: "🐎" };
 /** Light ink used when rasterising registry icons for the dark map. */
@@ -135,6 +133,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   let oceanSig = "";
   let terrainLayer: HTMLCanvasElement | null = null;
   let terrainSig = "";
+  // Political ink layer — rebuilt only when ownership, wars or palette change.
+  let politicalLayer: HTMLCanvasElement | null = null;
+  let politicalSig = "";
 
   function ensureProjection(s: GameState): Projection {
     ensureCells(s);
@@ -372,6 +373,161 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     g.restore();
 
     terrainSig = complete ? projSig : ""; // retry until every motif has decoded
+    return cv;
+  }
+
+  /**
+   * The dynamic inputs the political layer depends on: region ownership, the
+   * set of wars, and the palette mode. Cheap to roll up per frame (~30 regions,
+   * ≤21 nation pairs); a change rebuilds the layer, otherwise it blits as-is.
+   */
+  function politicalSignature(s: GameState): string {
+    let acc = 7;
+    for (const r of s.regions) acc = (acc * 33 + (r.ownerId === null ? 998 : r.ownerId + 1)) % 1e12;
+    let wars = "";
+    for (let i = 0; i < s.nations.length; i++) {
+      for (let j = i + 1; j < s.nations.length; j++) {
+        const a = s.nations[i]!;
+        const b = s.nations[j]!;
+        if (!a.isBarbarian && !b.isBarbarian && atWar(s, a.id, b.id)) wars += `${a.id}:${b.id},`;
+      }
+    }
+    return `${projSig}|${acc}|${wars}|${colourblind ? 1 : 0}`;
+  }
+
+  /**
+   * Political ink: terrain reads first, ownership second.
+   *  1. A light owner wash over each realm's cells (unowned stays bare).
+   *  2. Per nation, clipped to its own cells: a wide translucent band along its
+   *     *outer* border and coastline (the realm rim), then a crisp owner-
+   *     coloured edge — both sides of a border paint their own half, giving a
+   *     two-tone frontier. Interior same-owner seams get no ink at all.
+   *  3. A thin dark centreline over every national border for definition.
+   *  4. War fronts: a soft glow + loud core along contested shared edges.
+   */
+  function ensurePolitical(s: GameState, proj: Projection): HTMLCanvasElement {
+    const sig = politicalSignature(s);
+    if (politicalLayer && politicalSig === sig) return politicalLayer;
+    const { cv, g } = makeLayer(politicalLayer);
+    politicalLayer = cv;
+    politicalSig = sig;
+
+    /** Shared border polylines around one nation (edges facing another owner). */
+    const borderSegments = (nid: number): [Point, Point][] => {
+      const segs: [Point, Point][] = [];
+      s.regions.forEach((region, i) => {
+        if (region.ownerId !== nid) return;
+        const cell = cells[i]!;
+        const poly = proj.px[i]!;
+        if (poly.length < 3) return;
+        for (let k = 0; k < cell.neighbor.length; k++) {
+          const j = cell.neighbor[k]!;
+          if (j < 0) continue; // outer bounds — the coastline stroke covers it
+          if ((s.regions[j]?.ownerId ?? null) === nid) continue;
+          segs.push([poly[k]!, poly[(k + 1) % poly.length]!]);
+        }
+      });
+      return segs;
+    };
+
+    const strokeSegments = (segs: [Point, Point][]): void => {
+      g.beginPath();
+      for (const [a, b] of segs) {
+        g.moveTo(a.x, a.y);
+        g.lineTo(b.x, b.y);
+      }
+      g.stroke();
+    };
+
+    g.save();
+    g.clip(proj.land);
+    g.lineJoin = "round";
+    g.lineCap = "round";
+
+    // 1) Owner wash — subtle, so the terrain stays the first read.
+    s.regions.forEach((region, i) => {
+      if (region.ownerId === null) return; // wilderness: bare terrain
+      const barb = region.ownerId === BARBARIAN_ID;
+      g.globalAlpha = barb ? POLITICAL.barbarianWashAlpha : POLITICAL.washAlpha;
+      g.fillStyle = ownerColor(region.ownerId);
+      g.fill(proj.paths[i]!);
+    });
+    g.globalAlpha = 1;
+
+    // 2) Realm rims, one nation at a time, confined to that nation's cells.
+    for (const nation of s.nations) {
+      const owned = s.regions.filter((r) => r.ownerId === nation.id);
+      if (owned.length === 0) continue;
+      const nationPath = new Path2D();
+      for (const r of owned) nationPath.addPath(proj.paths[r.id]!);
+      const segs = borderSegments(nation.id);
+      const color = ownerColor(nation.id);
+      const barb = nation.isBarbarian;
+
+      g.save();
+      g.clip(nationPath);
+      g.strokeStyle = color;
+      // Wide inner band along borders and along the realm's own coastline.
+      g.globalAlpha = barb ? POLITICAL.barbarianBandAlpha : POLITICAL.bandAlpha;
+      g.lineWidth = POLITICAL.bandWidth;
+      strokeSegments(segs);
+      g.stroke(proj.land);
+      // Crisp owner-coloured edge (this half of the two-tone frontier).
+      g.globalAlpha = barb ? POLITICAL.barbarianEdgeAlpha : POLITICAL.edgeAlpha;
+      g.lineWidth = POLITICAL.edgeWidth;
+      strokeSegments(segs);
+      g.globalAlpha = 1;
+      g.restore();
+    }
+
+    // 3) Dark centreline over every border between two different owners.
+    g.strokeStyle = POLITICAL.core;
+    g.lineWidth = POLITICAL.coreWidth;
+    s.regions.forEach((region, i) => {
+      const cell = cells[i]!;
+      const poly = proj.px[i]!;
+      if (poly.length < 3) return;
+      for (let k = 0; k < cell.neighbor.length; k++) {
+        const j = cell.neighbor[k]!;
+        if (j < 0 || j < i) continue; // each shared edge once
+        const other = s.regions[j]?.ownerId ?? null;
+        if (other === region.ownerId) continue;
+        g.beginPath();
+        g.moveTo(poly[k]!.x, poly[k]!.y);
+        const b = poly[(k + 1) % poly.length]!;
+        g.lineTo(b.x, b.y);
+        g.stroke();
+      }
+    });
+
+    // 4) War fronts: shared edges between two warring, non-barbarian owners.
+    const fronts: [Point, Point][] = [];
+    s.regions.forEach((region, i) => {
+      const cell = cells[i]!;
+      const poly = proj.px[i]!;
+      if (poly.length < 3) return;
+      const oa = region.ownerId;
+      for (let k = 0; k < cell.neighbor.length; k++) {
+        const j = cell.neighbor[k]!;
+        if (j < 0 || j < i) continue;
+        const ob = s.regions[j]?.ownerId ?? null;
+        const isFront =
+          oa !== null && ob !== null && oa !== ob &&
+          oa !== BARBARIAN_ID && ob !== BARBARIAN_ID &&
+          atWar(s, oa, ob);
+        if (isFront) fronts.push([poly[k]!, poly[(k + 1) % poly.length]!]);
+      }
+    });
+    if (fronts.length > 0) {
+      g.strokeStyle = POLITICAL.warGlow;
+      g.lineWidth = POLITICAL.warGlowWidth;
+      strokeSegments(fronts);
+      g.strokeStyle = WAR_EDGE_COLOR;
+      g.lineWidth = POLITICAL.warCoreWidth;
+      strokeSegments(fronts);
+    }
+
+    g.restore();
     return cv;
   }
 
@@ -672,51 +828,18 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   }
 
   /**
-   * The island territory view: blit the cached ocean + terrain layers, then the
-   * dynamic political ink (owner tints, war fronts), selection, and markers.
+   * The island territory view: blit the cached ocean, terrain and political
+   * layers, then the per-frame dynamics — selection, highlights, markers.
    */
   function drawVoronoi(s: GameState): void {
     const proj = ensureProjection(s);
     context.drawImage(ensureOcean(proj), 0, 0, canvas.clientWidth, canvas.clientHeight);
     context.drawImage(ensureTerrain(s, proj), 0, 0, canvas.clientWidth, canvas.clientHeight);
+    context.drawImage(ensurePolitical(s, proj), 0, 0, canvas.clientWidth, canvas.clientHeight);
     const capitals = capitalSet(s);
 
     context.save();
     context.clip(proj.land);
-
-    // Owner tint over the terrain (dark wash for neutral).
-    s.regions.forEach((region, i) => {
-      context.globalAlpha = OWNER_TINT_ALPHA;
-      context.fillStyle = ownerColor(region.ownerId);
-      context.fill(proj.paths[i]!);
-      context.globalAlpha = 1;
-    });
-
-    // War fronts: shared edges between two warring, non-barbarian owners.
-    context.strokeStyle = WAR_EDGE_COLOR;
-    context.lineWidth = 3;
-    s.regions.forEach((region, i) => {
-      const cell = cells[i]!;
-      const poly = proj.px[i]!;
-      if (poly.length < 3) return;
-      const oa = region.ownerId;
-      for (let k = 0; k < cell.neighbor.length; k++) {
-        const j = cell.neighbor[k]!;
-        if (j < 0) continue;
-        const ob = s.regions[j]?.ownerId ?? null;
-        const isFront =
-          oa !== null && ob !== null && oa !== ob &&
-          oa !== BARBARIAN_ID && ob !== BARBARIAN_ID &&
-          atWar(s, oa, ob);
-        if (!isFront) continue;
-        const a = poly[k]!;
-        const b = poly[(k + 1) % poly.length]!;
-        context.beginPath();
-        context.moveTo(a.x, a.y);
-        context.lineTo(b.x, b.y);
-        context.stroke();
-      }
-    });
 
     // Target highlights, then the selection outline on top.
     for (const region of s.regions) {
