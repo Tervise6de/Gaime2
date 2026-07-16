@@ -29,6 +29,7 @@ import { TERRAIN, type TerrainId } from "@/data/terrain";
 import { GLYPH_ART, RESOURCE_ART, TERRAIN_ART, TERRAIN_MOTIF, WORLD_BG, crestSvg } from "@/data/art";
 import { cbSafe } from "@/data/palette";
 import {
+  DEPTH,
   ISLAND_FRAME,
   OCEAN,
   POLITICAL,
@@ -266,16 +267,24 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     g.fillStyle = grad;
     g.fillRect(0, 0, w, h);
 
-    // Offshore wave rings: dashed outlines drifting outward from the coast.
+    // Bathymetric contours: faint solid depth rings stepping out from the
+    // coast — the classic cartographic cue that the island sits in water.
+    g.lineWidth = 1;
+    for (const blob of proj.blobsPx) {
+      DEPTH.contours.forEach((dist, idx) => {
+        g.strokeStyle = `rgba(120, 162, 198, ${Math.max(0.02, DEPTH.contourAlpha - idx * 0.03)})`;
+        tracePolyOn(g, offsetPoly(blob, dist));
+        g.stroke();
+      });
+    }
+
+    // Offshore wave dashes drifting just off the shoreline.
     g.setLineDash([3, 13]);
     g.lineWidth = 1.2;
     g.strokeStyle = OCEAN.wave;
     for (const blob of proj.blobsPx) {
-      for (const dist of [12, 26]) {
-        const ring = offsetPoly(blob, dist);
-        tracePolyOn(g, ring);
-        g.stroke();
-      }
+      tracePolyOn(g, offsetPoly(blob, 11));
+      g.stroke();
     }
     g.setLineDash([]);
 
@@ -372,6 +381,45 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     // so trees/ridges/grass cost nothing per frame. Shape carries terrain
     // identity alongside hue (colour-blind safety).
     s.regions.forEach((region, i) => drawTerrainTexture(g, s.seed, region, i));
+
+    // Paper grain: a hashed light/dark speckle so the land reads as material,
+    // not flat vector fill. Still inside the land clip; baked once.
+    {
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      const n = Math.round((DEPTH.grainCount * (w * h)) / (1600 * 900));
+      for (let t = 0; t < n; t++) {
+        const x = hashFloat(s.seed, 909, t, 1) * w;
+        const y = hashFloat(s.seed, 909, t, 2) * h;
+        const light = hashFloat(s.seed, 909, t, 3) < 0.5;
+        g.fillStyle = light
+          ? `rgba(255, 250, 235, ${DEPTH.grainAlpha})`
+          : `rgba(10, 14, 18, ${DEPTH.grainAlpha})`;
+        g.fillRect(x, y, 1.3, 1.3);
+      }
+    }
+
+    // Soft relief: interior light, coastal shade — the landmass gains volume.
+    for (let b = 0; b < proj.blobsPx.length; b++) {
+      const blob = proj.blobsPx[b]!;
+      if (blob.length < 3) continue;
+      let cx = 0;
+      let cy = 0;
+      for (const v of blob) {
+        cx += v.x;
+        cy += v.y;
+      }
+      cx /= blob.length;
+      cy /= blob.length;
+      let r = 0;
+      for (const v of blob) r = Math.max(r, Math.hypot(v.x - cx, v.y - cy));
+      const relief = g.createRadialGradient(cx - r * 0.12, cy - r * 0.18, r * 0.1, cx, cy, r);
+      relief.addColorStop(0, DEPTH.reliefLight);
+      relief.addColorStop(0.62, "rgba(0, 0, 0, 0)");
+      relief.addColorStop(1, DEPTH.reliefShade);
+      g.fillStyle = relief;
+      g.fill(proj.blobPaths[b]!);
+    }
 
     // Interior seams: faint hairlines — political ink is layered on top later.
     g.lineWidth = 1;
@@ -1036,15 +1084,23 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     }
 
     // Capital marker (bottom-left corner): the owner's crest, else the crown.
+    // A shade larger than the other chips — the seat of power should read first.
     if (capitals.has(region.id)) {
       const cx = p.x - NODE_RADIUS + 5;
       const cy = p.y + NODE_RADIUS - 7;
       const owner = region.ownerId;
       const crestArt = owner === null ? null : crestSvg(owner, ownerColor(owner));
-      if (crestArt || GLYPH_ART.crown) iconChip(cx, cy, 9.5);
+      if (crestArt || GLYPH_ART.crown) {
+        iconChip(cx, cy, 10.5);
+        context.beginPath();
+        context.arc(cx, cy, 10.5, 0, Math.PI * 2);
+        context.lineWidth = 1;
+        context.strokeStyle = "rgba(244, 210, 122, 0.55)"; // faint gold ring
+        context.stroke();
+      }
       if (
-        !(crestArt && drawIcon(context, `crest:${owner}`, crestArt, ownerColor(owner), cx, cy, 15)) &&
-        !drawIcon(context, "glyph:crown", GLYPH_ART.crown, CAPITAL_ICON_COLOR, cx, cy, 13)
+        !(crestArt && drawIcon(context, `crest:${owner}`, crestArt, ownerColor(owner), cx, cy, 17)) &&
+        !drawIcon(context, "glyph:crown", GLYPH_ART.crown, CAPITAL_ICON_COLOR, cx, cy, 14)
       ) {
         context.font = "13px system-ui, sans-serif";
         context.fillText("👑", cx, cy);
@@ -1088,6 +1144,10 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     }
 
     // Region name below, with a dark halo so it reads on bright terrain too.
+    // A touch of tracking gives the labels a cartographic voice where the
+    // browser supports canvas letterSpacing (harmless no-op elsewhere).
+    const label = context as CanvasRenderingContext2D & { letterSpacing?: string };
+    if ("letterSpacing" in label) label.letterSpacing = "0.4px";
     context.font = "600 11px system-ui, sans-serif";
     context.textAlign = "center";
     context.textBaseline = "top";
@@ -1097,6 +1157,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     context.strokeText(region.name, p.x, p.y + NODE_RADIUS + 4);
     context.fillStyle = "#e6eaf3";
     context.fillText(region.name, p.x, p.y + NODE_RADIUS + 4);
+    if ("letterSpacing" in label) label.letterSpacing = "0px";
   }
 
   function drawArmies(s: GameState): void {

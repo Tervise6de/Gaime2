@@ -3,8 +3,13 @@
   --bg: #11151c;
   --fg: #e6e9ef;
   --panel: rgba(22, 28, 38, 0.86);
+  /* Layered "glass" panel treatment shared by every floating surface. */
+  --panel-grad: linear-gradient(180deg, rgba(28, 35, 47, 0.92), rgba(17, 22, 30, 0.88));
+  --panel-shadow: 0 10px 28px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   --panel-border: rgba(230, 233, 239, 0.12);
   --accent: #f4d27a;
+  /* Gold CTA gradient (End turn, Move/Attack, primary actions). */
+  --gold-grad: linear-gradient(180deg, #f7df9a, #e5bc60 55%, #cc9a41);
   --muted: #99a2b4;
   --negative: #e8776b;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -73,10 +78,11 @@ body {
   gap: 10px;
   align-items: center;
   padding: 8px 12px;
-  background: var(--panel);
+  background: var(--panel-grad);
   border: 1px solid var(--panel-border);
   border-radius: 12px;
   backdrop-filter: blur(6px);
+  box-shadow: var(--panel-shadow);
   /* The bar's backdrop-filter makes a stacking context; without a z-index its
      ☰ dropdown would paint beneath later-added panels (the region inspector). */
   z-index: 40;
@@ -140,11 +146,12 @@ body {
 /* --- Panels --------------------------------------------------------------- */
 .hud-panel {
   position: absolute;
-  background: var(--panel);
+  background: var(--panel-grad);
   border: 1px solid var(--panel-border);
   border-radius: 12px;
   padding: 14px;
   backdrop-filter: blur(6px);
+  box-shadow: var(--panel-shadow);
 }
 
 /* Bottom-left action cluster: the per-turn levers (tax, End turn) plus the
@@ -213,11 +220,12 @@ body {
   font-size: 12px;
   font-weight: 600;
   color: var(--fg);
-  background: var(--panel);
+  background: var(--panel-grad);
   border: 1px solid var(--panel-border);
   border-radius: 10px;
   cursor: pointer;
   backdrop-filter: blur(6px);
+  box-shadow: var(--panel-shadow);
 }
 
 .hud-railbtn:hover {
@@ -380,17 +388,23 @@ body {
   width: 100%;
   padding: 10px;
   font-size: 15px;
-  font-weight: 600;
-  color: #1a1408;
-  background: var(--accent);
-  border: none;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #241a06;
+  background: var(--gold-grad);
+  border: 1px solid rgba(255, 236, 190, 0.55);
   border-radius: 8px;
   cursor: pointer;
-  transition: filter 0.12s ease;
+  box-shadow: 0 4px 14px rgba(214, 168, 74, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition: filter 0.12s ease, transform 0.06s ease;
 }
 
 .hud-endturn:hover {
-  filter: brightness(1.08);
+  filter: brightness(1.06);
+}
+
+.hud-endturn:active {
+  transform: translateY(1px);
 }
 
 .hud-newgame {
@@ -429,10 +443,11 @@ body {
 }
 
 .hud-newgame-btn.primary {
-  color: #1a1408;
-  background: var(--accent);
-  border-color: transparent;
-  font-weight: 600;
+  color: #241a06;
+  background: var(--gold-grad);
+  border-color: rgba(255, 236, 190, 0.45);
+  font-weight: 700;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 .hud-newgame-btn.primary:hover {
@@ -679,12 +694,13 @@ body {
   margin: 6px 0;
   padding: 8px;
   font-size: 13px;
-  font-weight: 600;
-  color: #1a1408;
-  background: var(--accent);
-  border: none;
+  font-weight: 700;
+  color: #241a06;
+  background: var(--gold-grad);
+  border: 1px solid rgba(255, 236, 190, 0.45);
   border-radius: 7px;
   cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 .hud-move-btn:disabled {
@@ -986,10 +1002,11 @@ body {
   gap: 10px;
   padding: 8px 14px;
   color: var(--fg);
-  background: var(--panel);
+  background: var(--panel-grad);
   border: 1px solid var(--panel-border);
   border-radius: 999px;
   backdrop-filter: blur(6px);
+  box-shadow: var(--panel-shadow);
   cursor: pointer;
   font: inherit;
 }
@@ -1974,6 +1991,20 @@ body {
 .hud-techtree-panel,
 .confirm-panel {
   animation: hud-panel-rise 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Gentle hover feel on the common controls (reduce-motion squashes these). */
+.hud-legend-toggle,
+.hud-railbtn,
+.hud-diplo-btn,
+.hud-newgame-btn,
+.hud-build-btn,
+.hud-unit-btn,
+.hud-tech-btn,
+.hud-topmenu-item,
+.hud-gamemenu-btn,
+.hud-research-pill {
+  transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
 
 /* Accessibility: a clear keyboard focus ring on every interactive control.

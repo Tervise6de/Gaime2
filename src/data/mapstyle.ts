@@ -99,6 +99,23 @@ export const POLITICAL = {
   warCoreWidth: 3,
 } as const;
 
+/**
+ * Depth & relief: bathymetric contour rings stepping out from the coast, a
+ * soft interior-light/coast-shade wash over the landmass, and a hashed paper
+ * grain — all baked into the cached layers, all deterministic.
+ */
+export const DEPTH = {
+  /** Contour ring offsets (px) and the alpha of the nearest ring. */
+  contours: [22, 46, 76],
+  contourAlpha: 0.09,
+  /** Relief wash: interior highlight / coastal shade strengths. */
+  reliefLight: "rgba(255, 243, 210, 0.09)",
+  reliefShade: "rgba(6, 9, 14, 0.2)",
+  /** Paper-grain speckles scattered over the land (count at 1600×900). */
+  grainCount: 1500,
+  grainAlpha: 0.07,
+} as const;
+
 /** Ocean & coastline palette (the terrain palette stays in data/terrain.ts). */
 export const OCEAN = {
   /** Radial vignette centre/edge — the open water. */
