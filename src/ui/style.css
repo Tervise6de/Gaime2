@@ -1342,6 +1342,20 @@ body {
   font-size: 14px;
 }
 
+.hud-legend-hatch {
+  width: 18px;
+  height: 12px;
+  display: inline-block;
+  border-radius: 2px;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(12, 16, 23, 0.6),
+    rgba(12, 16, 23, 0.6) 3px,
+    rgba(215, 225, 240, 0.25) 3px,
+    rgba(215, 225, 240, 0.25) 4px
+  );
+}
+
 .hud-legend-badge {
   min-width: 16px;
   height: 16px;
@@ -2455,6 +2469,31 @@ a:focus-visible,
   padding-left: 0.42em;
   text-transform: uppercase;
   color: var(--muted);
+}
+
+/* Studio credit above the wordmark. */
+.title-studio {
+  margin: 12px 0 -8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5em;
+  padding-left: 0.5em;
+  text-align: center;
+  text-transform: uppercase;
+  color: rgba(230, 200, 116, 0.65);
+}
+
+/* Version + studio stamp, tucked into the splash corner. */
+.title-version {
+  position: absolute;
+  right: 16px;
+  bottom: 12px;
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
 }
 
 .title-begin {

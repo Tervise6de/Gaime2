@@ -1,9 +1,9 @@
 {
   "name": "gaime2",
-  "version": "0.0.1",
+  "version": "0.6.0",
   "description": "Kingdom Management / 4X-lite strategy game (browser-based).",
   "type": "module",
-  "author": "GAIME",
+  "author": "GAIME Studio",
   "license": "MIT",
   "engines": {
     "node": ">=18"

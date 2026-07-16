@@ -1676,9 +1676,11 @@ function buildLegend(): HTMLElement {
   row(glyphHtml("crown", "👑", "hud-legend-ico"), "Capital — the crest beside the population chip");
   row('<span class="hud-legend-badge">3</span>', "Army (owner colour, unit count)");
 
-  section("Borders");
-  row(line("#d8a24a"), "Your realm — the widest, brightest rim is always yours");
-  row(line("#5b8bd0"), "Rival realm — each nation inks its own side (two-tone)");
+  section("Territory");
+  row(line("#d8a24a"), "Your realm — gold wash, the widest and brightest rim, named YOU");
+  row(line("#5b8bd0"), "Rival realm — its colour wash + rim, named on the map");
+  row(line("#9a5b53"), "Barbarian camps — faint brown wash, no rim");
+  row('<span class="hud-legend-hatch"></span>', "Unclaimed land — darkened with hatching, free to take");
   row(line(WAR_EDGE_COLOR), "War front — a border between two nations at war");
   row(line(OCEAN.lane), "Sea lane — regions connected across water (armies may cross)");
 

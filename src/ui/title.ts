@@ -46,6 +46,11 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
     art.setAttribute("aria-hidden", "true");
     art.innerHTML = keyArt;
 
+    // Studio credit above the wordmark; the version sits in the corner below.
+    const studio = document.createElement("p");
+    studio.className = "title-studio";
+    studio.textContent = "GAIME Studio";
+
     const wordmark = document.createElement("h1");
     wordmark.className = "title-wordmark";
     wordmark.textContent = "Petty Kingdoms";
@@ -53,6 +58,11 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
     const tagline = document.createElement("p");
     tagline.className = "title-tagline";
     tagline.textContent = "Small realms, grand ambitions";
+
+    const version = document.createElement("p");
+    version.className = "title-version";
+    version.textContent =
+      `v${typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev"} · GAIME Studio`;
 
     const menu = document.createElement("div");
     menu.className = "title-menu";
@@ -99,7 +109,7 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
     hint.className = "title-hint";
     hint.textContent = "Esc to continue";
 
-    overlay.append(art, wordmark, tagline, menu, hint);
+    overlay.append(art, studio, wordmark, tagline, menu, hint, version);
     // Mount inside #hud so the HUD's own overlays (Options/Records, z 250 while
     // the menu is up) share this stacking context and can render above the menu
     // — #hud is position:fixed, which traps its children's z-index otherwise.

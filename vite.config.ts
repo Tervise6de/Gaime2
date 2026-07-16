@@ -1,5 +1,11 @@
 import { defineConfig, type Plugin } from "vite";
 import { fileURLToPath, URL } from "node:url";
+import { readFileSync } from "node:fs";
+
+/** The game version, read from package.json so the title screen never drifts. */
+const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf-8")) as {
+  version: string;
+};
 
 /**
  * Content-Security-Policy for the production build (injected as a <meta> so it
@@ -36,6 +42,9 @@ function cspMeta(): Plugin {
 
 export default defineConfig({
   plugins: [cspMeta()],
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),

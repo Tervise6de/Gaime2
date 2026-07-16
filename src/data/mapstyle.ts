@@ -26,9 +26,9 @@ export interface IslandFrame {
  */
 export const ISLAND_FRAME: Record<IslandArchetype, IslandFrame> = {
   small: { marginX: 0.19, marginY: 0.2, coastPad: 0.085, isletCount: 6 },
-  medium: { marginX: 0.12, marginY: 0.13, coastPad: 0.075, isletCount: 4 },
-  large: { marginX: 0.085, marginY: 0.095, coastPad: 0.055, isletCount: 3 },
-  archipelago: { marginX: 0.11, marginY: 0.13, coastPad: 0.045, isletCount: 7 },
+  medium: { marginX: 0.14, marginY: 0.15, coastPad: 0.075, isletCount: 4 },
+  large: { marginX: 0.105, marginY: 0.115, coastPad: 0.055, isletCount: 3 },
+  archipelago: { marginX: 0.12, marginY: 0.14, coastPad: 0.045, isletCount: 7 },
 };
 
 /** Region-count ceilings: ≤ small → "small", ≤ medium → "medium", else "large". */
@@ -79,29 +79,38 @@ export const TERRAIN_TEXTURE_ALPHA = 0.75;
  * cells visually merge while different-owner borders stay unmistakable.
  */
 export const POLITICAL = {
-  /** Owner wash over the terrain fill (barbarians fainter, unowned none). */
-  washAlpha: 0.26,
-  barbarianWashAlpha: 0.12,
+  /** Owner wash over the terrain fill — political colour is the first read;
+      terrain stays visible as texture and value beneath it. */
+  washAlpha: 0.38,
+  barbarianWashAlpha: 0.18,
+  /** Unclaimed land: darkened and hatched so "no one's" is as legible as
+      "someone's" (shape-coded, so it survives any palette). */
+  neutralWash: "rgba(12, 16, 23, 0.32)",
+  neutralHatch: "rgba(215, 225, 240, 0.07)",
+  neutralHatchSpacing: 13,
   /** Inner border band (clipped to the realm): width px + alpha. Barbarian
       camps get no band/edge at all — wash + centrelines only — so the only
       warm rim on the map is the player's gold. */
   bandWidth: 16,
-  bandAlpha: 0.42,
+  bandAlpha: 0.5,
   /** Crisp owner-coloured edge on the realm side of a border. */
   edgeWidth: 3,
-  edgeAlpha: 0.95,
+  edgeAlpha: 1,
   /**
    * The player's realm gets the loudest treatment — "mine" must read at a
    * glance: a stronger wash, a wider double band (soft outer + bright inner)
    * and a full-strength edge.
    */
-  playerWashAlpha: 0.34,
+  playerWashAlpha: 0.5,
   playerBandWidth: 24,
-  playerBandAlpha: 0.5,
+  playerBandAlpha: 0.55,
   playerInnerBandWidth: 9,
-  playerInnerBandAlpha: 0.55,
+  playerInnerBandAlpha: 0.6,
   playerEdgeWidth: 3.5,
   playerEdgeAlpha: 1,
+  /** Realm nameplates floating over each nation's lands. */
+  nameplateHalo: "rgba(9, 11, 16, 0.7)",
+  nameplateAlpha: 0.92,
   /** Dark centreline drawn over every national border for definition. */
   core: "rgba(10, 12, 16, 0.75)",
   coreWidth: 1.3,

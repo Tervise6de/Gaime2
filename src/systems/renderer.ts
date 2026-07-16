@@ -119,8 +119,11 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   // gesture is in flight the cached layers are blitted through a delta
   // transform (cheap, slightly soft); once input settles for a few frames the
   // projection + layers rebuild at the live camera and everything is crisp.
-  const CAM_MIN = 1;
+  const CAM_MIN = 0.8; // zoom out past fit — the whole island with extra sea room
   const CAM_MAX = 2.75;
+  /** How far (fraction of the viewport) the map may pan beyond its fitted
+      bounds — so dragging always answers, even at fit zoom. */
+  const PAN_SLACK = 0.22;
   const CAM_SETTLE_FRAMES = 10;
   interface Camera {
     s: number;
@@ -141,8 +144,16 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
     cam.s = Math.min(CAM_MAX, Math.max(CAM_MIN, cam.s));
-    cam.tx = Math.min(0, Math.max(w - w * cam.s, cam.tx));
-    cam.ty = Math.min(0, Math.max(h - h * cam.s, cam.ty));
+    // Natural bounds keep the map covering the viewport (zoomed in) or fully
+    // inside it (zoomed out); the slack allows a bounded overscroll beyond
+    // both, so panning never feels dead. ⛶ / double-click re-centres.
+    const clampAxis = (t: number, view: number): number => {
+      const lo = Math.min(0, view - view * cam.s) - view * PAN_SLACK;
+      const hi = Math.max(0, view - view * cam.s) + view * PAN_SLACK;
+      return Math.min(hi, Math.max(lo, t));
+    };
+    cam.tx = clampAxis(cam.tx, w);
+    cam.ty = clampAxis(cam.ty, h);
   }
 
   /** Zoom to `next` about the screen point (mx, my), keeping it fixed. */
@@ -158,10 +169,17 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   }
 
   function panBy(dx: number, dy: number): void {
-    if (cam.s <= CAM_MIN) return; // the fitted view has nowhere to pan
     cam.tx += dx;
     cam.ty += dy;
     clampCam();
+    camChangedTick = tick;
+  }
+
+  /** Back to the fitted, centred full-map view. */
+  function fitView(): void {
+    cam.s = 1;
+    cam.tx = 0;
+    cam.ty = 0;
     camChangedTick = tick;
   }
 
@@ -589,9 +607,32 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
     const playerId = s.nations.find((n) => n.isPlayer)?.id ?? -1;
 
+    // 0) Unclaimed land recedes: a dark wash plus a faint diagonal hatch —
+    //    "empty" is a positive signal, not just the absence of colour.
+    const unclaimed = s.regions.filter((r) => r.ownerId === null);
+    if (unclaimed.length > 0) {
+      const path = new Path2D();
+      for (const r of unclaimed) path.addPath(proj.paths[r.id]!);
+      g.fillStyle = POLITICAL.neutralWash;
+      g.fill(path);
+      g.save();
+      g.clip(path);
+      g.strokeStyle = POLITICAL.neutralHatch;
+      g.lineWidth = 1;
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      g.beginPath();
+      for (let x = -h; x < w; x += POLITICAL.neutralHatchSpacing) {
+        g.moveTo(x, 0);
+        g.lineTo(x + h, h);
+      }
+      g.stroke();
+      g.restore();
+    }
+
     // 1) Owner wash — the player's realm noticeably stronger than rivals'.
     s.regions.forEach((region, i) => {
-      if (region.ownerId === null) return; // wilderness: bare terrain
+      if (region.ownerId === null) return; // handled above
       const barb = region.ownerId === BARBARIAN_ID;
       const mine = region.ownerId === playerId;
       g.globalAlpha = barb
@@ -678,6 +719,52 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       g.strokeStyle = WAR_EDGE_COLOR;
       g.lineWidth = POLITICAL.warCoreWidth;
       strokePolylines(fronts);
+    }
+
+    // 5) Realm nameplates: each living nation's name floats over its lands —
+    //    the fastest answer to "who is where". Anchored to the owned region
+    //    nearest the realm's centroid, so it stays on the realm even when the
+    //    territory is disjoint. The player's plate reads "YOU".
+    const plate = g as CanvasRenderingContext2D & { letterSpacing?: string };
+    for (const nation of s.nations) {
+      if (nation.isBarbarian || !nation.alive) continue;
+      const owned = s.regions.filter((r) => r.ownerId === nation.id);
+      if (owned.length === 0) continue;
+      let cx = 0;
+      let cy = 0;
+      for (const r of owned) {
+        const p = proj.sites[r.id]!;
+        cx += p.x;
+        cy += p.y;
+      }
+      cx /= owned.length;
+      cy /= owned.length;
+      let anchor = proj.sites[owned[0]!.id]!;
+      let best = Infinity;
+      for (const r of owned) {
+        const p = proj.sites[r.id]!;
+        const d = (p.x - cx) ** 2 + (p.y - cy) ** 2;
+        if (d < best) {
+          best = d;
+          anchor = p;
+        }
+      }
+      const label = (nation.isPlayer ? "You" : nation.name).toUpperCase();
+      const size = Math.min(24, 13 + owned.length * 1.5);
+      if ("letterSpacing" in plate) plate.letterSpacing = "2px";
+      g.font = `800 ${size}px system-ui, sans-serif`;
+      g.textAlign = "center";
+      g.textBaseline = "middle";
+      const y = anchor.y - 44;
+      g.lineWidth = 4;
+      g.lineJoin = "round";
+      g.strokeStyle = POLITICAL.nameplateHalo;
+      g.strokeText(label, anchor.x, y);
+      g.globalAlpha = POLITICAL.nameplateAlpha;
+      g.fillStyle = ownerColor(nation.id);
+      g.fillText(label, anchor.x, y);
+      g.globalAlpha = 1;
+      if ("letterSpacing" in plate) plate.letterSpacing = "0px";
     }
 
     g.restore();
@@ -947,6 +1034,10 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
   function render(): void {
     if (!running) return;
+    // Base water fill: overscroll slack and zoomed-out views expose canvas
+    // beyond the cached layers — it must always read as sea, never as void.
+    context.fillStyle = OCEAN.outer;
+    context.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
     if (state) {
       const gestureLive = projection && staleCam && camKey() !== camBuiltKey && tick - camChangedTick < CAM_SETTLE_FRAMES;
       if (gestureLive) {
@@ -969,9 +1060,6 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         drawArmies(state);
         drawRipples(state);
       }
-    } else {
-      context.fillStyle = OCEAN.outer;
-      context.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
     }
     tick += 1;
     frame = window.requestAnimationFrame(render);
@@ -1340,12 +1428,10 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   }
 
   function onDblClick(ev: MouseEvent): void {
-    // Double-click toggles between fitted view and a 2× look at the cursor.
+    // Double-click toggles: away from fit → re-centre at fit; at fit → 2×.
     const p = localXY(ev);
-    if (cam.s > 1.05) {
-      cam.s = 1;
-      clampCam();
-      camChangedTick = tick;
+    if (Math.abs(cam.s - 1) > 0.05 || Math.abs(cam.tx) > 4 || Math.abs(cam.ty) > 4) {
+      fitView();
     } else {
       setZoom(2, p.x, p.y);
     }
@@ -1404,9 +1490,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       setZoom(cam.s * factor, canvas.clientWidth / 2, canvas.clientHeight / 2);
     },
     resetView(): void {
-      cam.s = 1;
-      clampCam();
-      camChangedTick = tick;
+      fitView();
     },
   };
 }
