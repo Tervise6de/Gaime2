@@ -77,6 +77,9 @@ body {
   border: 1px solid var(--panel-border);
   border-radius: 12px;
   backdrop-filter: blur(6px);
+  /* The bar's backdrop-filter makes a stacking context; without a z-index its
+     ☰ dropdown would paint beneath later-added panels (the region inspector). */
+  z-index: 40;
 }
 
 .hud-resource {
@@ -2211,13 +2214,18 @@ a:focus-visible,
   }
 }
 
-/* Tablet / small laptop: tighten the frame so the panels still fit. */
-@media (max-width: 1024px) {
+/* The single-row top bar needs ~1400px; below that it wraps to two rows. */
+@media (max-width: 1400px) {
   .hud-topbar {
     flex-wrap: wrap;
     justify-content: center;
     max-width: calc(100vw - 24px);
+    row-gap: 4px;
   }
+}
+
+/* Tablet / small laptop: tighten the frame so the panels still fit. */
+@media (max-width: 1024px) {
   .hud-right {
     width: 216px;
   }

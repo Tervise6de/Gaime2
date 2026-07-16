@@ -324,7 +324,7 @@ export const TERRAIN_ART: Record<TerrainId, TerrainShade | null> = {
   forest: { hi: "#549465", lo: "#2c5c3a" },
   hills: { hi: "#c2a468", lo: "#866c3d" },
   mountains: { hi: "#979aa5", lo: "#5e616b" },
-  coast: { hi: "#62a2cf", lo: "#35688f" },
+  coast: { hi: "#6cb39d", lo: "#3a6e5f" },
 };
 
 /**

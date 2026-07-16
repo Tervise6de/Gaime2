@@ -1092,7 +1092,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   // inputs keep their own keys. (Enter/Space to end turn live in main.ts.)
   window.addEventListener("keydown", (ev) => {
     const target = ev.target as HTMLElement | null;
-    if (target && (target.tagName === "INPUT" || target.tagName === "SELECT")) return;
+    // Form controls own their keys (the seed input must keep "l", "s", …) —
+    // except Escape, which must always close whatever is open, even when a
+    // checkbox or slider inside a modal still holds focus.
+    if (target && (target.tagName === "INPUT" || target.tagName === "SELECT") && ev.key !== "Escape") return;
     // A pending decision is modal: number keys pick an option; nothing else fires.
     if (currentChoice && choiceOverlay.style.display !== "none") {
       const idx = Number(ev.key) - 1;
@@ -2136,10 +2139,13 @@ function renderResearch(
     if (research.current) {
       const def = TECHS[research.current];
       const pct = Math.min(100, (research.progress / def.cost) * 100);
+      // Progress can overshoot the cost mid-turn (completion lands at resolve);
+      // clamp the display so the pill never reads "32/20".
+      const shown = Math.min(Math.floor(research.progress), def.cost);
       pill.innerHTML =
         `<span class="hud-research-title">${resourceIconHtml("knowledge", "📖")} ${def.name}</span>` +
         `<span class="hud-research-mini"><span class="hud-research-minifill" style="width:${pct}%;background:${BRANCH_COLOR[def.branch]}"></span></span>` +
-        `<span class="hud-research-count">${Math.floor(research.progress)}/${def.cost} · ${countText}</span>`;
+        `<span class="hud-research-count">${shown}/${def.cost} · ${countText}</span>`;
     } else {
       pill.innerHTML =
         `<span class="hud-research-title">${resourceIconHtml("knowledge", "📖")} All technologies researched</span>` +

@@ -82,7 +82,9 @@ export const TERRAIN: Record<TerrainId, TerrainDef> = {
   coast: {
     id: "coast",
     name: "Coast",
-    color: "#4a89b8",
+    // Teal-green coastal lowland — deliberately NOT ocean-blue, so coast cells
+    // read as wet *land* rather than lakes inside the island silhouette.
+    color: "#569a87",
     base: { food: 3, materials: 1, gold: 4, knowledge: 1 },
     popCapacity: 10,
     defense: 1.0,

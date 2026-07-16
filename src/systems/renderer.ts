@@ -985,8 +985,13 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       context.setLineDash([]);
     }
     if (selected !== null && proj.paths[selected]) {
+      // Soft gold glow beneath the crisp selection line.
+      context.strokeStyle = "rgba(244, 210, 122, 0.28)";
+      context.lineWidth = 10;
+      context.lineJoin = "round";
+      context.stroke(proj.paths[selected]!);
       context.strokeStyle = SELECT_COLOR;
-      context.lineWidth = 3.5;
+      context.lineWidth = 3;
       context.stroke(proj.paths[selected]!);
     }
     context.restore();
@@ -999,15 +1004,23 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
   /** Shared region markers (used by both layouts): pop, resource, capital, unrest, name. */
   function drawMarkers(region: Region, p: Point, capitals: Set<number>): void {
-    // Population count with a legibility halo so it reads over any fill/tint.
-    context.font = "600 13px system-ui, sans-serif";
+    // Population count in a soft dark chip (same family as the icon chips), so
+    // it reads identically over any terrain fill or political tint.
+    const popText = String(Math.round(region.population));
+    context.font = "600 12px system-ui, sans-serif";
     context.textAlign = "center";
     context.textBaseline = "middle";
-    context.lineWidth = 3;
-    context.strokeStyle = "rgba(244, 246, 250, 0.85)";
-    context.strokeText(String(Math.round(region.population)), p.x, p.y);
-    context.fillStyle = "#0d0f14";
-    context.fillText(String(Math.round(region.population)), p.x, p.y);
+    const popW = Math.max(19, context.measureText(popText).width + 11);
+    context.beginPath();
+    if (typeof context.roundRect === "function") {
+      context.roundRect(p.x - popW / 2, p.y - 9.5, popW, 19, 9.5);
+    } else {
+      context.arc(p.x, p.y, 9.5, 0, Math.PI * 2); // ancient-canvas fallback: a disc
+    }
+    context.fillStyle = "rgba(13, 15, 20, 0.6)";
+    context.fill();
+    context.fillStyle = "#f2f5fa";
+    context.fillText(popText, p.x, p.y + 0.5);
 
     // Strategic resource marker (top-left).
     if (region.resource) {
@@ -1074,10 +1087,15 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       }
     }
 
-    // Region name below.
-    context.fillStyle = "#c9cedb";
-    context.font = "500 11px system-ui, sans-serif";
+    // Region name below, with a dark halo so it reads on bright terrain too.
+    context.font = "600 11px system-ui, sans-serif";
+    context.textAlign = "center";
     context.textBaseline = "top";
+    context.lineWidth = 3;
+    context.lineJoin = "round";
+    context.strokeStyle = "rgba(10, 12, 16, 0.7)";
+    context.strokeText(region.name, p.x, p.y + NODE_RADIUS + 4);
+    context.fillStyle = "#e6eaf3";
     context.fillText(region.name, p.x, p.y + NODE_RADIUS + 4);
   }
 
@@ -1095,8 +1113,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       context.arc(bx, by, 10, 0, Math.PI * 2);
       context.fillStyle = ownerColor(army.ownerId);
       context.fill();
+      // Light ring lifts the badge off the map (a dark ring sank into tints).
       context.lineWidth = 1.5;
-      context.strokeStyle = "rgba(0,0,0,0.5)";
+      context.strokeStyle = "rgba(238, 242, 248, 0.85)";
       context.stroke();
 
       context.fillStyle = "#0d0f14";

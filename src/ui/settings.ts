@@ -50,12 +50,16 @@ export function setReduceMotion(v: boolean): boolean {
   return v;
 }
 
-/** The map layout a fresh session opens with. */
+/**
+ * The map layout a fresh session opens with. The island territory view is the
+ * game's face, so it is the default; "node" persists only when explicitly
+ * chosen (the fallback remains one toggle away).
+ */
 export function getDefaultMapLayout(): MapLayout {
   try {
-    return localStorage.getItem(MAP_LAYOUT_KEY) === "voronoi" ? "voronoi" : "node";
+    return localStorage.getItem(MAP_LAYOUT_KEY) === "node" ? "node" : "voronoi";
   } catch {
-    return "node";
+    return "voronoi";
   }
 }
 
