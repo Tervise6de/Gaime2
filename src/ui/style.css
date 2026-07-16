@@ -775,9 +775,89 @@ body {
   margin: 0 0 6px;
 }
 
+/* A tribute demand is a threat, not an offer — tint it accordingly. */
+.hud-offer.tribute {
+  background: rgba(232, 119, 107, 0.12);
+  border-color: rgba(232, 119, 107, 0.4);
+}
+
+.hud-offer-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.hud-offer-title {
+  font-size: 12px;
+  font-weight: 700;
+  flex: 1;
+}
+
+.hud-offer-rel {
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.hud-offer-terms {
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0.85;
+  margin: 0 0 6px;
+}
+
 .hud-offer-actions {
   display: flex;
   gap: 6px;
+}
+
+/* Runaway-leader flag on a rival's diplomacy card (mirrors the reeling badge). */
+.hud-diplo-leader {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: #f4d27a;
+  background: rgba(244, 210, 122, 0.16);
+  border: 1px solid rgba(244, 210, 122, 0.4);
+  cursor: help;
+}
+
+/* "Ways to win" explainer at the top of the Standings overlay. */
+.hud-victory-paths {
+  margin-bottom: 12px;
+}
+
+.hud-victory-path {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.hud-victory-path-desc {
+  font-size: 12px;
+}
+
+.hud-victory-path-who {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
+/* Chronicle headline above the itemised "Last turn" rows. */
+.hud-summary-headline {
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1.4;
+  margin: 2px 0 8px;
+  opacity: 0.9;
 }
 
 /* --- Research ------------------------------------------------------------- */
@@ -1071,12 +1151,26 @@ body {
 }
 
 .hud-alert {
-  padding: 3px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  max-width: 300px;
+  padding: 4px 10px;
   font-size: 12px;
   font-weight: 600;
+  text-align: left;
   border-radius: 12px;
   border: 1px solid transparent;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+/* The "what to do about it" second line under an alert headline. */
+.hud-alert-hint {
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.25;
+  opacity: 0.82;
 }
 
 .hud-alert.danger {

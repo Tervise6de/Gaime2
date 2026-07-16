@@ -29,6 +29,7 @@ import {
   setDefaultMapLayout,
 } from "@/ui/settings";
 import { cbSafe } from "@/data/palette";
+import { flavor, CHRONICLE_LEAD, QUIET_TURN } from "@/data/flavor";
 import { badgeArt, BRANCH_ART, crestSvg, eventVignette, MOMENT_ART, safeColor, TERRAIN_ART, TREATY_ART } from "@/data/art";
 import {
   escapeHtml,
@@ -57,7 +58,7 @@ import {
   unitCost,
 } from "@/systems/military";
 import { getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, nationPower, hasTrade, tradeIncome, TRIBUTE_DEMAND } from "@/systems/diplomacy";
-import { nationScore, victoryProgress, endGameSummary } from "@/systems/victory";
+import { nationScore, victoryProgress, victoryThreatText, victoryCounterPlay, endGameSummary } from "@/systems/victory";
 import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
 import type { TurnSummary } from "@/systems/summary";
 import { deriveAlerts } from "@/ui/alerts";
@@ -80,6 +81,7 @@ import {
   nationInstability,
   playerNation,
   type Army,
+  type DiplomaticOffer,
   type GameState,
   type Nation,
   type Region,
@@ -655,6 +657,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     title.textContent = `Standings — turn ${lastState.turn}`;
     head.append(title, closeButton(closeStandings));
     panel.append(head);
+    panel.append(buildVictoryPaths(lastState)); // explain the race before the ranking
     const body = el("div", "hud-standings");
     // Rows are clickable here: jump to that nation's capital and close the modal.
     renderStandings(body, lastState, (regionId) => {
@@ -966,7 +969,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     moveArmyId: number | null,
     summary?: TurnSummary | null,
   ): void {
-    renderSummary(summaryBox, summary ?? null);
+    renderSummary(summaryBox, state, summary ?? null);
     renderAlerts(alertStrip, state, summary ?? null);
     const player = playerNation(state);
     lastPlayer = player;
@@ -1507,28 +1510,55 @@ function buildLegend(): HTMLElement {
  * `checkVictory` exactly (share of all owned regions, barbarians included), so
  * the number matches the actual win condition. Flags a rival nearing domination.
  */
+/** The bar turns to a threat colour once a rival is this far toward any win. */
+const LEADER_WATCH = 0.6;
+
 function renderVictoryProgress(elm: HTMLElement, state: GameState): void {
-  const total = state.regions.filter((r) => r.ownerId !== null).length || 1;
+  // The nation *nearest to any victory* is the one worth watching — not merely
+  // whoever holds the most land — so the bar agrees with the near-victory alert.
   let leader: Nation | null = null;
-  let leaderRegions = -1;
+  let leaderVp: ReturnType<typeof victoryProgress> | null = null;
   for (const n of state.nations) {
     if (n.isBarbarian || !n.alive) continue;
-    const held = state.regions.filter((r) => r.ownerId === n.id).length;
-    if (held > leaderRegions) {
-      leaderRegions = held;
+    const vp = victoryProgress(state, n.id);
+    if (!leaderVp || vp.fraction > leaderVp.fraction) {
       leader = n;
+      leaderVp = vp;
     }
   }
-  const share = Math.round((Math.max(0, leaderRegions) / total) * 100);
-  const leaderName = leader ? (leader.isPlayer ? "You" : leader.name) : "—";
   const player = playerNation(state);
-  // Nation names can come from an imported save — escape before HTML interpolation.
+  const need = Math.round(DOMINATION_FRACTION * 100);
+
+  // Leader segment shows concrete progress (held/total regions, or wonders), not
+  // a bare percentage — so "who's winning and by how much" reads at a glance.
+  let leaderSeg = `${glyphHtml("victory", "🏆")} —`;
+  if (leader && leaderVp) {
+    const who = escapeHtml(leader.isPlayer ? "You" : leader.name);
+    leaderSeg =
+      leaderVp.kind === "great works"
+        ? `${glyphHtml("victory", "🏆")} ${who} ${leaderVp.wonders}/${WONDER_GOAL}${glyphHtml("star", "★")}`
+        : `${glyphHtml("victory", "🏆")} ${who} ${leaderVp.held}/${leaderVp.total}${glyphHtml("region", "⬢")} ${Math.round(leaderVp.share * 100)}%`;
+  }
   elm.innerHTML =
-    `${glyphHtml("victory", "🏆")} ${escapeHtml(leaderName)} ${share}%  ·  ` +
+    `${leaderSeg}  ·  ` +
     `${glyphHtml("star", "⭐")} ${player.wonders}/${WONDER_GOAL}  ·  ` +
     `${glyphHtml("hourglass", "⏳")} ${state.turn}/${TURN_LIMIT}`;
-  const rivalNearing = !!leader && !leader.isPlayer && share >= DOMINATION_FRACTION * 100 - 12;
+
+  const rivalNearing = !!leader && !leader.isPlayer && (leaderVp?.fraction ?? 0) >= LEADER_WATCH;
   elm.classList.toggle("threat", rivalNearing);
+
+  // A live, plain-language tooltip: who leads and by what path, plus the three
+  // ways any realm (you included) can win — the reference for a puzzled player.
+  const leaderLine =
+    leader && leaderVp
+      ? `Closest to victory: ${victoryThreatText(leaderVp, leader.isPlayer ? "You" : leader.name)}\n\n`
+      : "";
+  elm.title =
+    leaderLine +
+    "Ways to win:\n" +
+    `• Domination — hold ${need}% of all regions (or eliminate every rival).\n` +
+    `• Great Works — complete ${WONDER_GOAL} wonders.\n` +
+    `• Prestige — lead on score at turn ${TURN_LIMIT}.`;
 }
 
 /**
@@ -1606,6 +1636,69 @@ function renderStandings(
     const spark = buildSparkline(state.scoreHistory ?? {}, state.nations);
     if (spark) container.append(spark);
   }
+}
+
+/**
+ * A compact "ways to win" panel: the three victory paths in plain terms, each
+ * with who is currently closest and their concrete numbers — so a player can see
+ * *what is happening in the race* rather than guessing at a lone percentage.
+ * Uses textContent throughout (names may come from an imported save), so it is
+ * XSS-safe without explicit escaping.
+ */
+function buildVictoryPaths(state: GameState): HTMLElement {
+  const living = state.nations.filter((n) => !n.isBarbarian && n.alive);
+  const named = (n: Nation | null): string => (!n ? "—" : n.isPlayer ? "You" : n.name);
+
+  let domLeader: Nation | null = null;
+  let domVp: ReturnType<typeof victoryProgress> | null = null;
+  let gwLeader: Nation | null = null;
+  let scoreLeader: Nation | null = null;
+  let bestScore = -1;
+  for (const n of living) {
+    const vp = victoryProgress(state, n.id);
+    if (!domVp || vp.share > domVp.share) {
+      domLeader = n;
+      domVp = vp;
+    }
+    if (!gwLeader || n.wonders > gwLeader.wonders) gwLeader = n;
+    const s = nationScore(state, n.id);
+    if (s > bestScore) {
+      bestScore = s;
+      scoreLeader = n;
+    }
+  }
+
+  const need = Math.round(DOMINATION_FRACTION * 100);
+  const wrap = el("div", "hud-victory-paths");
+  wrap.append(heading("Ways to win"));
+
+  const rows: Array<[string, string, string]> = [
+    [
+      "🏆",
+      `Domination — hold ${need}% of all regions, or eliminate every rival.`,
+      domLeader && domVp ? `Closest: ${named(domLeader)} — ${domVp.held}/${domVp.total} regions (${Math.round(domVp.share * 100)}%)` : "",
+    ],
+    [
+      "⭐",
+      `Great Works — complete ${WONDER_GOAL} wonders.`,
+      gwLeader ? `Closest: ${named(gwLeader)} — ${gwLeader.wonders}/${WONDER_GOAL}` : "",
+    ],
+    [
+      "📜",
+      `Prestige — the highest score at turn ${TURN_LIMIT}.`,
+      scoreLeader ? `Leading: ${named(scoreLeader)} — ${nationScore(state, scoreLeader.id)} pts` : "",
+    ],
+  ];
+  for (const [icon, desc, who] of rows) {
+    const row = el("div", "hud-victory-path");
+    const t = el("div", "hud-victory-path-desc");
+    t.textContent = `${icon} ${desc}`;
+    const w = el("div", "hud-victory-path-who");
+    w.textContent = who;
+    row.append(t, w);
+    wrap.append(row);
+  }
+  return wrap;
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -1695,13 +1788,49 @@ function renderAlerts(strip: HTMLElement, state: GameState, summary: TurnSummary
   strip.innerHTML = "";
   for (const a of alerts) {
     const chip = el("span", "hud-alert " + a.severity);
-    chip.textContent = a.text;
+    const head = el("span", "hud-alert-text");
+    head.textContent = a.text;
+    chip.append(head);
+    // The strip is pointer-events:none, so a title tooltip never fires — render
+    // the "what it means / what to do" hint inline as a quiet second line.
+    if (a.hint) {
+      const hint = el("span", "hud-alert-hint");
+      hint.textContent = a.hint;
+      chip.append(hint);
+    }
     strip.append(chip);
   }
 }
 
+/** Join clauses into a readable list: "a", "a and b", "a, b, and c". */
+function joinClauses(clauses: string[]): string {
+  if (clauses.length <= 1) return clauses[0] ?? "";
+  if (clauses.length === 2) return `${clauses[0]} and ${clauses[1]}`;
+  return `${clauses.slice(0, -1).join(", ")}, and ${clauses[clauses.length - 1]}`;
+}
+
+/**
+ * A one-line chronicle of the turn, woven from the summary diff — the warm,
+ * contextual lead above the terse itemised rows (addresses "the text is too
+ * dry"). Deterministic phrasing (seeded by the turn) keeps it reproducible.
+ */
+function summaryHeadline(state: GameState, s: TurnSummary): string {
+  const list = (xs: string[]): string => xs.join(", ");
+  const clauses: string[] = [];
+  if (s.regionsGained.length) clauses.push(`took ${list(s.regionsGained)}`);
+  if (s.regionsLost.length) clauses.push(`lost ${list(s.regionsLost)}`);
+  if (s.warsDeclared.length) clauses.push(`went to war with ${list(s.warsDeclared)}`);
+  if (s.peaceMade.length) clauses.push(`made peace with ${list(s.peaceMade)}`);
+  if (s.eliminated.length) clauses.push(`saw the end of ${list(s.eliminated)}`);
+  if (s.techsCompleted.length) clauses.push(`mastered ${s.techsCompleted.map((t) => TECHS[t].name).join(", ")}`);
+  if (s.famine) clauses.push("suffered famine");
+  if (s.bankrupt) clauses.push("emptied its coffers");
+  if (!clauses.length) return flavor(QUIET_TURN, {}, state.turn);
+  return `${flavor(CHRONICLE_LEAD, {}, state.turn)}, your realm ${joinClauses(clauses)}.`;
+}
+
 /** Render the "last turn" summary of strategic changes, or hide it. */
-function renderSummary(box: HTMLElement, summary: TurnSummary | null): void {
+function renderSummary(box: HTMLElement, state: GameState, summary: TurnSummary | null): void {
   if (!summary) {
     box.style.display = "none";
     return;
@@ -1709,6 +1838,11 @@ function renderSummary(box: HTMLElement, summary: TurnSummary | null): void {
   box.style.display = "block";
   box.innerHTML = "";
   box.append(heading("Last turn"));
+
+  // A chronicle-style headline (textContent, so names from imported saves are safe).
+  const headline = el("p", "hud-summary-headline");
+  headline.textContent = summaryHeadline(state, summary);
+  box.append(headline);
 
   const items: Array<[string, string]> = [];
   const g = summary.goldDelta;
@@ -1745,21 +1879,37 @@ function renderDiplomacy(
     return;
   }
 
-  // Pending offers addressed to the player.
+  // Pending offers addressed to the player — a titled card that states plainly
+  // WHO is proposing WHAT, and the concrete terms (so "X offers trade" is no
+  // longer a mystery). Tribute demands read as a threat; the rest as offers.
   for (const offer of state.offers.filter((o) => o.to === PLAYER_ID)) {
-    const from = state.nations.find((n) => n.id === offer.from)?.name ?? "A rival";
-    const box = el("div", "hud-offer");
-    const text =
-      offer.type === "tribute"
-        ? `${from} demands ${offer.gold ?? 0}g tribute.`
-        : offer.type === "peace" && offer.gold
-          ? `${from} sues for peace, offering ${offer.gold}g in reparations.`
-          : `${from} offers ${offer.type === "nap" ? "a non-aggression pact" : offer.type}.`;
-    box.append(line(text, "hud-offer-text"));
+    const fromNation = state.nations.find((n) => n.id === offer.from);
+    const from = fromNation?.name ?? "A rival";
+    const box = el("div", "hud-offer " + offer.type);
+
+    const head = el("div", "hud-offer-head");
+    if (fromNation) head.append(nationMark(fromNation));
+    const title = el("span", "hud-offer-title");
+    title.textContent = offerTitle(from, offer);
+    head.append(title);
+    // Current standing with the proposer — useful context for the decision.
+    const rel = getRelation(state, PLAYER_ID, offer.from);
+    const relChip = el("span", "hud-offer-rel");
+    relChip.textContent = `${rel > 0 ? "+" : ""}${rel} ${relationLabel(rel)}`;
+    relChip.style.color = relationColor(rel);
+    head.append(relChip);
+    box.append(head);
+
+    const terms = el("p", "hud-offer-terms");
+    terms.textContent = offerTerms(state, offer);
+    box.append(terms);
+
     const row = el("div", "hud-offer-actions");
+    const acceptLabel = offer.type === "tribute" ? `Pay ${offer.gold ?? 0}g` : "Accept";
+    const rejectLabel = offer.type === "tribute" ? "Refuse" : "Decline";
     row.append(
-      btn("Accept", "hud-diplo-btn accept", () => callbacks.onAcceptOffer(offer.id)),
-      btn("Reject", "hud-diplo-btn", () => callbacks.onRejectOffer(offer.id)),
+      btn(acceptLabel, "hud-diplo-btn accept", () => callbacks.onAcceptOffer(offer.id)),
+      btn(rejectLabel, "hud-diplo-btn", () => callbacks.onRejectOffer(offer.id)),
     );
     box.append(row);
     container.append(box);
@@ -1823,6 +1973,17 @@ function renderDiplomacy(
         `${rival.name} is reeling — ${crises.join(", ")}. Distracted and poorly ` +
         "placed to defend: a tempting moment to strike (rivals read this on you too).";
       powerRow.append(reelChip);
+    }
+
+    // Runaway-leader flag: this rival is closing on a victory — the realm to
+    // rally against. The tooltip spells out the concrete threat and counter-play,
+    // so the standings alarm has a visible cause right here on their card.
+    const rvp = victoryProgress(state, rival.id);
+    if (rvp.fraction >= LEADER_WATCH) {
+      const leadChip = el("span", "hud-diplo-leader");
+      leadChip.append(glyphEl("victory", "🏆"), document.createTextNode(" Leader"));
+      leadChip.title = `${victoryThreatText(rvp, rival.name)} ${victoryCounterPlay(rvp)}`;
+      powerRow.append(leadChip);
     }
     card.append(powerRow);
 
@@ -2026,6 +2187,42 @@ function relationColor(rel: number): string {
   if (rel >= 40) return "#6fb98a";
   if (rel <= -30) return "#e8776b";
   return "#c9cedb";
+}
+
+/** The headline for an offer card: who is proposing what. */
+function offerTitle(from: string, offer: DiplomaticOffer): string {
+  switch (offer.type) {
+    case "trade":
+      return `${from} proposes a trade route`;
+    case "peace":
+      return `${from} sues for peace`;
+    case "nap":
+      return `${from} proposes a non-aggression pact`;
+    case "alliance":
+      return `${from} proposes an alliance`;
+    case "tribute":
+      return `${from} demands tribute`;
+  }
+}
+
+/** The concrete terms of an offer — what accepting it actually does. */
+function offerTerms(state: GameState, offer: DiplomaticOffer): string {
+  switch (offer.type) {
+    case "trade": {
+      const inc = tradeIncome(state, offer.from, offer.to);
+      return `Opens a trade route: +${inc}g to each of you every turn. Going to war would end it.`;
+    }
+    case "peace":
+      return offer.gold
+        ? `Ends the war between you. They pay ${offer.gold}g in reparations.`
+        : "Ends the war between you — no more losses on this front.";
+    case "nap":
+      return "Neither of you may attack the other, and it warms relations a little.";
+    case "alliance":
+      return "Mutual defence and shared wars — you may call each other to arms. Warms relations.";
+    case "tribute":
+      return `Pay ${offer.gold ?? 0}g to avoid war. Refusing sours relations — they may strike.`;
+  }
 }
 
 /** A rival's strength relative to the player (ratio = their power / yours) → a label + class. */

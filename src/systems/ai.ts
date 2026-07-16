@@ -466,12 +466,11 @@ function offerPact(
   return setPact(state, from, target.id, kind);
 }
 
-/** A strong rival demands gold of the player; logs the ultimatum. */
+/** A strong rival demands gold of the player. `addOffer` logs the ultimatum. */
 function demandTribute(state: GameState, from: number, playerId: number, gold: number): GameState {
-  const next = addOffer(state, from, playerId, "tribute", gold);
-  if (next === state) return state; // a demand already stands (dedup)
-  const name = state.nations.find((n) => n.id === from)?.name ?? "A rival";
-  return { ...next, log: [...next.log, `${name} demands ${gold}g in tribute — pay, or risk war.`].slice(-50) };
+  // The player-facing announcement (with terms) is emitted by addOffer; dedup is
+  // handled there too (it returns state unchanged when a demand already stands).
+  return addOffer(state, from, playerId, "tribute", gold);
 }
 
 // --- military ---------------------------------------------------------------

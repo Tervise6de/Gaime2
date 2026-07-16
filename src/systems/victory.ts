@@ -40,6 +40,20 @@ export interface VictoryProgress {
   label: string;
   /** How far toward that win, 0..1 (1 = would trigger it). */
   fraction: number;
+  // --- Absolute context, so the UI can explain the number rather than just
+  //     show a bare percentage (docs/game-design.md §8 M6: understandable UX). ---
+  /** Raw share of all in-play regions this nation holds, 0..1. */
+  share: number;
+  /** Regions this nation holds. */
+  held: number;
+  /** Regions currently in play (owned by anyone). */
+  total: number;
+  /** Regions still needed to reach the domination threshold (≥0). */
+  regionsToWin: number;
+  /** Great Works this nation has completed. */
+  wonders: number;
+  /** Great Works still needed to win (≥0). */
+  wondersToWin: number;
 }
 
 /**
@@ -56,10 +70,50 @@ export function victoryProgress(state: GameState, id: number): VictoryProgress {
   const wonders = nation?.wonders ?? 0;
   const wonderFraction = Math.min(1, wonders / WONDER_GOAL);
 
+  const regionsToWin = Math.max(0, Math.ceil(DOMINATION_FRACTION * total) - held);
+  const wondersToWin = Math.max(0, WONDER_GOAL - wonders);
+  const context = { share: domShare, held, total, regionsToWin, wonders, wondersToWin };
+
   if (wonderFraction >= domFraction && wonders > 0) {
-    return { kind: "great works", label: `${wonders}/${WONDER_GOAL}★`, fraction: wonderFraction };
+    return { kind: "great works", label: `${wonders}/${WONDER_GOAL}★`, fraction: wonderFraction, ...context };
   }
-  return { kind: "domination", label: `${Math.round(domShare * 100)}%⬢`, fraction: domFraction };
+  return { kind: "domination", label: `${Math.round(domShare * 100)}%⬢`, fraction: domFraction, ...context };
+}
+
+/**
+ * A plain-language, self-explaining description of how close `name` is to
+ * winning and by which path — with the concrete numbers behind the percentage,
+ * so a player reading it understands *what is happening* and what it takes to
+ * win. Pure (no DOM); shared by the alert strip and the standings explainer so
+ * they never disagree.
+ */
+export function victoryThreatText(vp: VictoryProgress, name: string): string {
+  // Read naturally in both the second person ("You hold…") and third ("AX holds…").
+  const you = name === "You";
+  if (vp.kind === "great works") {
+    const has = you ? "have" : "has";
+    const more = vp.wondersToWin;
+    return (
+      `${name} ${has} raised ${vp.wonders} of ${WONDER_GOAL} Great Works` +
+      (more <= 0 ? " — enough to win." : ` — ${more} more would win the game.`)
+    );
+  }
+  const holds = you ? "hold" : "holds";
+  const need = Math.round(DOMINATION_FRACTION * 100);
+  const more = vp.regionsToWin;
+  return (
+    `${name} ${holds} ${vp.held} of ${vp.total} regions (${Math.round(vp.share * 100)}% of the map)` +
+    (more <= 0
+      ? ` — past the ${need}% needed to dominate.`
+      : ` — ${more} more region${more === 1 ? "" : "s"} reaches the ${need}% that wins by domination.`)
+  );
+}
+
+/** A short counter-play prompt for a rival closing on victory (alert hint). */
+export function victoryCounterPlay(vp: VictoryProgress): string {
+  return vp.kind === "great works"
+    ? "Race your own wonders, or go to war to slow theirs."
+    : "Retake regions or rally rivals against them before they hit the threshold.";
 }
 
 export interface VictoryCheck {

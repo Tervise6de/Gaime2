@@ -15,6 +15,7 @@
 import { UNITS, type UnitType } from "@/data/units";
 import { TERRAIN, type StrategicResource } from "@/data/terrain";
 import { traitUnitCostMult } from "@/data/traits";
+import { flavor, ASSAULT_WON, ASSAULT_REPELLED, CAPTURE_TAG } from "@/data/flavor";
 import { createRng } from "@/systems/rng";
 import { resolveCombat, type UnitCounts } from "@/systems/combat";
 import { atWar, declareWar } from "@/systems/diplomacy";
@@ -222,11 +223,15 @@ export function moveArmy(
   const atkName = state.nations.find((n) => n.id === owner)?.name ?? "Army";
   const myLoss = armySize(result.attackerLosses);
   const theirLoss = armySize(result.defenderLosses);
-  log.push(
-    `${atkName} ${result.attackerWins ? "won" : "was repelled"} at ${target.name}` +
-      (result.captured ? ` — ${target.name} captured!` : ".") +
-      ` (losses ${myLoss} vs ${theirLoss})`,
-  );
+  // Deterministic flavour on the verb clause (keyed on turn + the two armies), with
+  // the exact "(losses X vs Y)" tally always appended so the numbers stay legible.
+  const vars = { atk: atkName, region: target.name };
+  const keys = [state.turn, army.id, enemyAtTarget.id] as const;
+  const clause = result.attackerWins
+    ? flavor(ASSAULT_WON, vars, ...keys) +
+      (result.captured ? ` — ${flavor(CAPTURE_TAG, vars, ...keys)}` : ".")
+    : flavor(ASSAULT_REPELLED, vars, ...keys) + ".";
+  log.push(`${clause} (losses ${myLoss} vs ${theirLoss})`);
 
   // Update both armies with survivors; drop empty stacks.
   let armies = state.armies

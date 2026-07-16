@@ -34,23 +34,24 @@ const texts = (alerts: Alert[]): string[] => alerts.map((a) => a.text);
 describe("deriveAlerts", () => {
   it("emits a danger alert for each region lost", () => {
     const alerts = deriveAlerts(calmGame(), quietSummary({ regionsLost: ["Aldia", "Bryn"] }));
-    expect(alerts).toContainEqual({ severity: "danger", text: "Lost Aldia" });
-    expect(alerts).toContainEqual({ severity: "danger", text: "Lost Bryn" });
+    // Alerts may carry an optional action hint, so match on severity + text only.
+    expect(alerts).toContainEqual(expect.objectContaining({ severity: "danger", text: "Lost Aldia" }));
+    expect(alerts).toContainEqual(expect.objectContaining({ severity: "danger", text: "Lost Bryn" }));
   });
 
   it("emits a danger alert for each war declared", () => {
     const alerts = deriveAlerts(calmGame(), quietSummary({ warsDeclared: ["Rurik"] }));
-    expect(alerts).toContainEqual({ severity: "danger", text: "Now at war with Rurik" });
+    expect(alerts).toContainEqual(expect.objectContaining({ severity: "danger", text: "Now at war with Rurik" }));
   });
 
   it("emits a danger alert for famine", () => {
     const alerts = deriveAlerts(calmGame(), quietSummary({ famine: true }));
-    expect(alerts).toContainEqual({ severity: "danger", text: "Famine — population starving" });
+    expect(alerts).toContainEqual(expect.objectContaining({ severity: "danger", text: "Famine — population starving" }));
   });
 
   it("emits a danger alert for bankruptcy", () => {
     const alerts = deriveAlerts(calmGame(), quietSummary({ bankrupt: true }));
-    expect(alerts).toContainEqual({ severity: "danger", text: "Bankruptcy — troops disbanded" });
+    expect(alerts).toContainEqual(expect.objectContaining({ severity: "danger", text: "Bankruptcy — troops disbanded" }));
   });
 
   it("raises a danger alert when a rival nears a victory", () => {
@@ -70,9 +71,45 @@ describe("deriveAlerts", () => {
 
   it("does not raise the near-victory alarm for the player's own lead", () => {
     const g = calmGame();
-    g.nations[PLAYER_ID]!.wonders = 4; // player at a win — not an alert
+    g.nations[PLAYER_ID]!.wonders = 4; // player at a win — not a rival alarm
     const alerts = deriveAlerts(g, quietSummary());
     expect(alerts.some((a) => a.text.includes("nears a"))).toBe(false);
+  });
+
+  it("attaches a concrete, actionable hint to the near-victory alarm", () => {
+    const g = calmGame();
+    const rival = g.nations.find((n) => !n.isPlayer && !n.isBarbarian)!;
+    rival.wonders = WONDER_GOAL - 1;
+    const alert = deriveAlerts(g, quietSummary()).find((a) => a.text.includes("nears a"));
+    expect(alert?.hint).toBeTruthy();
+    expect(alert!.hint).toMatch(/Great Works/); // spells out the concrete threat
+  });
+
+  it("cues the player's own approaching victory as a good alert", () => {
+    const g = calmGame();
+    g.nations[PLAYER_ID]!.wonders = WONDER_GOAL - 1; // ≥75% toward a Great Works win
+    const alerts = deriveAlerts(g, quietSummary());
+    expect(alerts.some((a) => a.severity === "good" && a.text.startsWith("Victory within reach"))).toBe(true);
+    expect(alerts.some((a) => a.text.includes("nears a"))).toBe(false); // not the rival phrasing
+  });
+
+  it("surfaces a pending trade offer as a good alert naming the proposer", () => {
+    const g = calmGame();
+    const rival = g.nations.find((n) => !n.isPlayer && !n.isBarbarian)!;
+    g.offers = [{ id: 1, from: rival.id, to: PLAYER_ID, type: "trade" }];
+    const alert = deriveAlerts(g, quietSummary()).find(
+      (a) => a.severity === "good" && a.text.includes("trade route"),
+    );
+    expect(alert).toBeTruthy();
+    expect(alert!.text).toContain(rival.name);
+  });
+
+  it("surfaces a tribute demand as a warn alert", () => {
+    const g = calmGame();
+    const rival = g.nations.find((n) => !n.isPlayer && !n.isBarbarian)!;
+    g.offers = [{ id: 2, from: rival.id, to: PLAYER_ID, type: "tribute", gold: 30 }];
+    const alerts = deriveAlerts(g, quietSummary());
+    expect(alerts.some((a) => a.severity === "warn" && a.text.includes("tribute"))).toBe(true);
   });
 
   it("emits good alerts for gains, eliminations, and techs", () => {
@@ -97,7 +134,7 @@ describe("deriveAlerts", () => {
     mine[0]!.name = "Riotville";
 
     const alerts = deriveAlerts(g, quietSummary());
-    expect(alerts).toContainEqual({ severity: "warn", text: "Revolt in Riotville" });
+    expect(alerts).toContainEqual(expect.objectContaining({ severity: "warn", text: "Revolt in Riotville" }));
   });
 
   it("does not warn on a region below the revolt threshold or owned by others", () => {
@@ -119,7 +156,8 @@ describe("deriveAlerts", () => {
     mine[0]!.name = "Emberford";
 
     const alerts = deriveAlerts(g, null);
-    expect(alerts).toEqual([{ severity: "warn", text: "Revolt in Emberford" }]);
+    expect(alerts).toEqual([expect.objectContaining({ severity: "warn", text: "Revolt in Emberford" })]);
+    expect(alerts[0]!.hint).toBeTruthy(); // carries an actionable hint
   });
 
   it("returns nothing on a quiet turn with no revolts", () => {

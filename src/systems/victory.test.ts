@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { checkVictory, nationScore, victoryProgress, endGameSummary } from "@/systems/victory";
+import {
+  checkVictory,
+  nationScore,
+  victoryProgress,
+  victoryThreatText,
+  victoryCounterPlay,
+  endGameSummary,
+} from "@/systems/victory";
 import { createGame } from "@/systems/turn";
 import { DOMINATION_FRACTION, PLAYER_ID, WONDER_GOAL, TURN_LIMIT } from "@/systems/state";
 
@@ -131,5 +138,46 @@ describe("victoryProgress", () => {
     const g = createGame({ seed: 1, rivals: 2 });
     g.nations[PLAYER_ID]!.wonders = WONDER_GOAL + 2;
     expect(victoryProgress(g, PLAYER_ID).fraction).toBe(1);
+  });
+
+  it("reports the absolute context behind the percentage", () => {
+    const g = createGame({ seed: 1, rivals: 2 });
+    const owned = g.regions.filter((r) => r.ownerId !== null);
+    const held = 3;
+    owned.forEach((r, i) => { r.ownerId = i < held ? PLAYER_ID : 2; });
+    const vp = victoryProgress(g, PLAYER_ID);
+    expect(vp.held).toBe(held);
+    expect(vp.total).toBe(owned.length);
+    // Regions still needed to reach the domination threshold.
+    expect(vp.regionsToWin).toBe(Math.ceil(DOMINATION_FRACTION * owned.length) - held);
+    expect(vp.wondersToWin).toBe(WONDER_GOAL);
+  });
+});
+
+describe("victoryThreatText", () => {
+  it("explains a domination lead with concrete region counts", () => {
+    const g = createGame({ seed: 1, rivals: 2 });
+    const owned = g.regions.filter((r) => r.ownerId !== null);
+    owned.forEach((r, i) => { r.ownerId = i < 4 ? 2 : r.ownerId; });
+    const vp = victoryProgress(g, 2);
+    const text = victoryThreatText(vp, "Rurik");
+    expect(text).toContain("Rurik");
+    expect(text).toMatch(/\d+ of \d+ regions/);
+    expect(text).toContain(`${Math.round(DOMINATION_FRACTION * 100)}%`);
+  });
+
+  it("reads in the second person for the player", () => {
+    const g = createGame({ seed: 1, rivals: 2 });
+    g.nations[PLAYER_ID]!.wonders = 3;
+    const vp = victoryProgress(g, PLAYER_ID);
+    const text = victoryThreatText(vp, "You");
+    expect(text).toMatch(/^You have raised 3 of/);
+  });
+
+  it("offers a path-appropriate counter-play prompt", () => {
+    const dom = { kind: "domination" } as ReturnType<typeof victoryProgress>;
+    const gw = { kind: "great works" } as ReturnType<typeof victoryProgress>;
+    expect(victoryCounterPlay(dom)).toMatch(/region|rall/i);
+    expect(victoryCounterPlay(gw)).toMatch(/wonder|war/i);
   });
 });

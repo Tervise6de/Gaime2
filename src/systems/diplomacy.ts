@@ -14,10 +14,12 @@
  */
 
 import { UNITS, type UnitType } from "@/data/units";
+import { flavor, PEACE_MADE, TRADE_OPENED, WAR_DECLARED } from "@/data/flavor";
 import {
   BARBARIAN_ID,
   GIFT_RELATION,
   HOSTILE_THRESHOLD,
+  PLAYER_ID,
   RELATION_MAX,
   RELATION_MIN,
   RELATION_WAR_HIT,
@@ -27,6 +29,7 @@ import {
   armySize,
   nationInstability,
   pairKey,
+  type DiplomaticOffer,
   type GameState,
   type TreatyStatus,
 } from "@/systems/state";
@@ -112,7 +115,8 @@ export function declareWar(state: GameState, a: number, b: number): GameState {
   let next = setTreaty(state, a, b, "war");
   next = adjustRelation(next, a, b, -RELATION_WAR_HIT);
   next = severTrade(next, a, b); // war ends commerce
-  return { ...next, log: [...next.log, `${name(next, a)} declared war on ${name(next, b)}!`].slice(-50) };
+  const msg = flavor(WAR_DECLARED, { a: name(next, a), b: name(next, b) }, next.turn, a, b);
+  return { ...next, log: [...next.log, msg].slice(-50) };
 }
 
 // --- trade routes (economic diplomacy) --------------------------------------
@@ -141,7 +145,9 @@ export function establishTrade(state: GameState, a: number, b: number): GameStat
   if (hasTrade(state, a, b)) return state;
   let next: GameState = { ...state, trades: { ...(state.trades ?? {}), [pairKey(a, b)]: true } };
   next = adjustRelation(next, a, b, +8);
-  return { ...next, log: [...next.log, `${name(next, a)} and ${name(next, b)} opened a trade route.`].slice(-50) };
+  const inc = tradeIncome(next, a, b);
+  const msg = `${flavor(TRADE_OPENED, { a: name(next, a), b: name(next, b) }, next.turn, a, b)} (+${inc}g each per turn)`;
+  return { ...next, log: [...next.log, msg].slice(-50) };
 }
 
 /** Sever any trade route between `a` and `b` (on war). Silent — the war line covers it. */
@@ -156,7 +162,8 @@ export function severTrade(state: GameState, a: number, b: number): GameState {
 export function makePeace(state: GameState, a: number, b: number): GameState {
   let next = setTreaty(state, a, b, "peace");
   next = adjustRelation(next, a, b, +10);
-  return { ...next, log: [...next.log, `${name(next, a)} and ${name(next, b)} made peace.`].slice(-50) };
+  const msg = flavor(PEACE_MADE, { a: name(next, a), b: name(next, b) }, next.turn, a, b);
+  return { ...next, log: [...next.log, msg].slice(-50) };
 }
 
 export function setPact(
@@ -258,8 +265,36 @@ export function addOffer(
 ): GameState {
   // Avoid duplicate pending offers of the same kind.
   if (state.offers.some((o) => o.from === from && o.to === to && o.type === type)) return state;
-  const offer = { id: state.nextOfferId, from, to, type, gold };
-  return { ...state, offers: [...state.offers, offer], nextOfferId: state.nextOfferId + 1 };
+  const offer: DiplomaticOffer = { id: state.nextOfferId, from, to, type, gold };
+  const next = { ...state, offers: [...state.offers, offer], nextOfferId: state.nextOfferId + 1 };
+  // Announce a player-facing proposal in the log with its concrete terms, so the
+  // player actually notices it arrived and understands what is on the table
+  // (rather than a bare "X offers trade" parked in a panel).
+  if (to === PLAYER_ID) {
+    return { ...next, log: [...next.log, offerAnnouncement(next, offer)].slice(-50) };
+  }
+  return next;
+}
+
+/** A one-line, terms-bearing announcement of an offer sent to the player. Pure. */
+export function offerAnnouncement(state: GameState, offer: DiplomaticOffer): string {
+  const from = name(state, offer.from);
+  switch (offer.type) {
+    case "trade": {
+      const inc = tradeIncome(state, offer.from, offer.to);
+      return `${from} proposes a trade route — +${inc}g to each of you per turn (ended by war).`;
+    }
+    case "peace":
+      return offer.gold
+        ? `${from} sues for peace, offering ${offer.gold}g in reparations.`
+        : `${from} sues for peace.`;
+    case "nap":
+      return `${from} proposes a non-aggression pact — a pledge that neither attacks the other.`;
+    case "alliance":
+      return `${from} proposes an alliance — mutual defence, and you may call each other to war.`;
+    case "tribute":
+      return `${from} demands ${offer.gold ?? 0}g in tribute — pay, or risk war.`;
+  }
 }
 
 /** The player accepts an offer, applying its effect. */

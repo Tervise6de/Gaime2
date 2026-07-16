@@ -28,6 +28,7 @@ import {
   tradeIncome,
   tradePartners,
   peaceReparations,
+  offerAnnouncement,
 } from "@/systems/diplomacy";
 import { createGame } from "@/systems/turn";
 import {
@@ -445,5 +446,31 @@ describe("trade routes (economic diplomacy)", () => {
     const s = establishTrade(game(), PLAYER_ID, RIVAL_A);
     expect(tradePartners(s, PLAYER_ID)).toContain(RIVAL_A);
     expect(tradePartners(s, PLAYER_ID)).not.toContain(RIVAL_B);
+  });
+});
+
+describe("offer announcements", () => {
+  it("logs a terms-bearing line when an offer reaches the player", () => {
+    const g = addOffer(game(), RIVAL_A, PLAYER_ID, "trade");
+    const last = g.log[g.log.length - 1]!;
+    expect(last).toMatch(/trade route/);
+    expect(last).toMatch(/per turn/); // states the concrete benefit, not just "offers trade"
+  });
+
+  it("does not log a duplicate offer", () => {
+    let g = addOffer(game(), RIVAL_A, PLAYER_ID, "nap");
+    const len = g.log.length;
+    g = addOffer(g, RIVAL_A, PLAYER_ID, "nap"); // dedup — no second line
+    expect(g.log.length).toBe(len);
+    expect(g.offers).toHaveLength(1);
+  });
+
+  it("offerAnnouncement spells out every offer type in plain terms", () => {
+    const g = game();
+    expect(offerAnnouncement(g, { id: 0, from: RIVAL_A, to: PLAYER_ID, type: "tribute", gold: 30 })).toMatch(/30g in tribute/);
+    expect(offerAnnouncement(g, { id: 0, from: RIVAL_A, to: PLAYER_ID, type: "alliance" })).toMatch(/alliance/i);
+    expect(offerAnnouncement(g, { id: 0, from: RIVAL_A, to: PLAYER_ID, type: "nap" })).toMatch(/non-aggression/i);
+    expect(offerAnnouncement(g, { id: 0, from: RIVAL_A, to: PLAYER_ID, type: "peace", gold: 20 })).toMatch(/reparations/);
+    expect(offerAnnouncement(g, { id: 0, from: RIVAL_A, to: PLAYER_ID, type: "trade" })).toMatch(/\+[\d.]+g/);
   });
 });
