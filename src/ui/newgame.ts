@@ -19,6 +19,7 @@
 import { SCENARIOS } from "@/data/scenarios";
 import { TRAITS, type TraitId } from "@/data/traits";
 import { FACTION_NAMES, factionByName } from "@/data/factions";
+import { ARCHETYPE_LABEL, ARCHETYPE_BLURB } from "@/data/personalities";
 import { DEFAULT_MAP_OPTIONS, type MapGenOptions } from "@/systems/mapgen";
 import { scriptedMap } from "@/data/maps/types";
 import type { Difficulty } from "@/systems/state";
@@ -232,9 +233,12 @@ export function buildNewGameForm(): NewGameForm {
       playAsBlurb.textContent = playAsSel.value === "" ? "A realm is picked for you from the seed." : "";
       return;
     }
+    const disp = def.disposition
+      ? `  ·  Temperament — ${ARCHETYPE_LABEL[def.disposition]}: ${ARCHETYPE_BLURB[def.disposition]} (when AI-led)`
+      : "";
     playAsBlurb.textContent =
       `${def.blurb}  ·  Trait — ${TRAITS[def.trait].label}: ${TRAITS[def.trait].blurb}` +
-      `  ·  Bonus — ${def.bonus.label}: ${def.bonus.detail}`;
+      `  ·  Bonus — ${def.bonus.label}: ${def.bonus.detail}${disp}`;
   }
   playAsSel.addEventListener("change", updatePlayAsBlurb);
 

@@ -21,3 +21,16 @@ export const ARCHETYPE_LABEL: Record<Personality["archetype"], string> = {
   builder: "Builder",
   opportunist: "Opportunist",
 };
+
+/** A short one-line flavour of how each archetype plays, for the realm picker. */
+export const ARCHETYPE_BLURB: Record<Personality["archetype"], string> = {
+  warlord: "wars readily and trusts little",
+  merchant: "prefers trade and keeps its word",
+  builder: "turns inward to grow, slow to fight",
+  opportunist: "strikes at weakness, expands hard",
+};
+
+/** The archetype id → its Personality weights (falls back to the opportunist mean). */
+export function personalityByArchetype(archetype: Personality["archetype"]): Personality {
+  return ARCHETYPES.find((p) => p.archetype === archetype) ?? ARCHETYPES[3]!;
+}

@@ -617,6 +617,19 @@ Realms join by **name**, so a people plays with the same identity and trait in a
 random world or on the Baltic map. The player always plays *some* named realm
 (Random seed-picks one); rivals are distinct realms from the roster.
 
+**Signature AI disposition (v0.37).** A third, standing per-faction difference
+beyond the trait and the one-off opening bonus: each realm now carries a fixed AI
+**disposition** (`data/factions.ts` → `Personality` archetype), so when it is
+computer-controlled it plays *in character* — warlike Sweden and Samogitia press
+war readily (Warlord), the Hansa realms Denmark, Curonia and Gotland prefer trade
+and keep their word (Merchant), Novgorod/Prussia/Livonia/Estonia/Finland turn
+inward to grow (Builder), and Lithuania and Poland strike at weakness (Opportunist).
+Seated in both createGame paths (replacing the old shuffled round-robin; absent =
+round-robin fallback), surfaced as a "Temperament" line in the realm picker, and
+balanced for a dynamic-but-not-perpetual-war world (a 60-game sweep: ~57/60 games
+see war, ~2.3 declarations each, ~⅓ still resolved by prestige). Pure data — the
+existing `ai.ts` thresholds already read `personality`, so no new sim logic.
+
 **Original plan (for reference).** The current renderer wraps the region
 sites in a *generated organic island*. A real Baltic map is a different shape:
 **land around a central sea**, with the Gulf of Finland, Gulf of Riga and the

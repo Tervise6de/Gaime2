@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { FACTIONS, FACTION_NAMES, factionByName } from "@/data/factions";
+import { ARCHETYPES, personalityByArchetype } from "@/data/personalities";
 import { TRAIT_IDS } from "@/data/traits";
 import { createGame } from "@/systems/turn";
 import { BALTIC_MAP } from "@/data/maps/baltic";
@@ -70,6 +71,44 @@ describe("faction identity on the scripted Baltic map", () => {
     const p = playerNation(g);
     expect(p.name).toBe("Lithuania");
     expect(p.trait).toBe(factionByName("Lithuania")!.trait);
+  });
+});
+
+describe("faction AI disposition (per-faction temperament)", () => {
+  it("every faction declares a valid AI disposition", () => {
+    const valid = new Set(ARCHETYPES.map((a) => a.archetype));
+    for (const f of FACTIONS) {
+      expect(f.disposition, `${f.name} has a disposition`).toBeDefined();
+      expect(valid.has(f.disposition!), `${f.name}'s disposition is a real archetype`).toBe(true);
+    }
+  });
+
+  it("personalityByArchetype maps an archetype to its weights", () => {
+    expect(personalityByArchetype("warlord").aggression).toBe(0.9);
+    expect(personalityByArchetype("merchant").economy).toBe(0.9);
+    expect(personalityByArchetype("builder").aggression).toBe(0.2);
+  });
+
+  it("seats each AI realm with its faction's signature disposition (random game)", () => {
+    const g = createGame({ seed: 7, rivals: 5 });
+    for (const n of g.nations) {
+      if (n.isPlayer || n.isBarbarian) continue;
+      const def = factionByName(n.name);
+      if (def?.disposition) expect(n.personality?.archetype).toBe(def.disposition);
+    }
+  });
+
+  it("seats dispositions on the scripted Baltic map too", () => {
+    const g = createGame({ seed: 5, mapId: "baltic", playerFaction: "Lithuania" });
+    const sweden = g.nations.find((n) => n.name === "Sweden");
+    if (sweden) expect(sweden.personality?.archetype).toBe("warlord");
+  });
+
+  it("the roster keeps a balanced spread (not everyone a warlord)", () => {
+    const warlords = FACTIONS.filter((f) => f.disposition === "warlord").length;
+    // A handful of aggressors at most, so the world isn't perpetual war.
+    expect(warlords).toBeLessThanOrEqual(4);
+    expect(new Set(FACTIONS.map((f) => f.disposition)).size).toBeGreaterThanOrEqual(3); // variety
   });
 });
 

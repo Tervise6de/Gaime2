@@ -16,7 +16,7 @@
 
 import { BUILDINGS, buildingFocusOk, type BuildingId } from "@/data/buildings";
 import { UNITS, type UnitType } from "@/data/units";
-import { ARCHETYPES } from "@/data/personalities";
+import { ARCHETYPES, personalityByArchetype } from "@/data/personalities";
 import { TRAIT_IDS, type TraitId } from "@/data/traits";
 import { FACTIONS, factionByName, type FactionDef, type FactionBonus } from "@/data/factions";
 import type { FocusId } from "@/data/focuses";
@@ -170,7 +170,9 @@ export function createGame(options: NewGameOptions): GameState {
       alive: true,
       stocks: { ...STARTING_STOCKS },
       taxRate: DEFAULT_TAX,
-      personality: personalities[i % personalities.length],
+      // A realm plays with its signature disposition (data/factions.ts); absent
+      // falls back to the shuffled round-robin so nothing is left personality-less.
+      personality: def.disposition ? personalityByArchetype(def.disposition) : personalities[i % personalities.length],
       research: emptyResearch(),
       wonders: 0,
       famine: false,
@@ -301,7 +303,10 @@ function createScriptedGame(map: ScriptedMap, regions: Region[], options: NewGam
       alive: true,
       stocks: { ...STARTING_STOCKS },
       taxRate: DEFAULT_TAX,
-      personality: personalities[(nextId - 2) % personalities.length],
+      // Seat the realm's signature disposition (looked up by name), else round-robin.
+      personality: factionByName(f.name)?.disposition
+        ? personalityByArchetype(factionByName(f.name)!.disposition!)
+        : personalities[(nextId - 2) % personalities.length],
       research: emptyResearch(),
       wonders: 0,
       famine: false,
