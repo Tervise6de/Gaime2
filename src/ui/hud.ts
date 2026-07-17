@@ -112,8 +112,8 @@ export interface HudCallbacks {
   onRaiseUnit(regionId: number, unit: UnitType): void;
   onBeginMove(armyId: number): void;
   onCancelMove(): void;
-  /** One-click attack: strike this region with the strongest adjacent army. */
-  onAttackRegion(regionId: number): void;
+  /** Attack a region with a specific one of your adjacent armies. */
+  onAttackWith(armyId: number, regionId: number): void;
   onDeclareWar(targetId: number): void;
   onMakePeace(targetId: number): void;
   onProposePact(targetId: number, kind: "nap" | "alliance"): void;
@@ -1256,14 +1256,25 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     head.append(title, closeButton(closeRegionScreen));
     panel.append(head);
     const body = el("div", "hud-region-body hud-capital-body");
-    // Starting a move needs the map — hand over and get out of the way.
-    renderRegion(body, lastState, regionScreenId, null, {
-      ...callbacks,
-      onBeginMove(armyId) {
-        closeRegionScreen();
-        callbacks.onBeginMove(armyId);
+    // Starting a move or an attack needs the map — hand over and get out of
+    // the way (the attack chooser is its own modal, so close this one first).
+    renderRegion(
+      body,
+      lastState,
+      regionScreenId,
+      null,
+      {
+        ...callbacks,
+        onBeginMove(armyId) {
+          closeRegionScreen();
+          callbacks.onBeginMove(armyId);
+        },
       },
-    });
+      (rid) => {
+        closeRegionScreen();
+        openAttack(rid);
+      },
+    );
     panel.append(body);
     regionOverlay.append(panel);
   }
@@ -1477,6 +1488,101 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     armiesOverlay.innerHTML = "";
   }
 
+  // --- Attack chooser: pick WHICH of your armies strikes a region ------------
+  const attackOverlay = el("div", "hud-techtree-overlay");
+  attackOverlay.style.display = "none";
+  attackOverlay.addEventListener("click", (ev) => {
+    if (ev.target === attackOverlay) closeAttack();
+  });
+  root.append(attackOverlay);
+
+  /** The player's adjacent, ready armies that could strike `regionId`. */
+  function eligibleAttackers(state: GameState, regionId: number): Army[] {
+    return state.armies
+      .filter(
+        (a) =>
+          a.ownerId === PLAYER_ID &&
+          a.movesLeft > 0 &&
+          armySize(a.units) > 0 &&
+          state.regions[a.regionId]?.adjacency.includes(regionId),
+      )
+      .sort((a, b) => armySize(b.units) - armySize(a.units));
+  }
+
+  /** Open the attack flow for a region: 0 → nothing, 1 → strike, 2+ → chooser. */
+  function openAttack(regionId: number): void {
+    if (!lastState) return;
+    const attackers = eligibleAttackers(lastState, regionId);
+    if (attackers.length === 0) return;
+    if (attackers.length === 1) {
+      callbacks.onAttackWith(attackers[0]!.id, regionId);
+      return;
+    }
+    renderAttack(regionId);
+    attackOverlay.style.display = "flex";
+  }
+  function renderAttack(regionId: number): void {
+    if (!lastState) return;
+    const state = lastState;
+    const target = state.regions[regionId];
+    if (!target) return closeAttack();
+    const attackers = eligibleAttackers(state, regionId);
+    if (attackers.length <= 1) return closeAttack(); // a resolved fight emptied the list
+
+    attackOverlay.innerHTML = "";
+    const panel = el("div", "hud-techtree-panel hud-attack-panel");
+    const head = el("div", "hud-techtree-head");
+    const title = el("h2", "hud-techtree-title");
+    title.textContent = `Attack ${target.name}`;
+    head.append(title, closeButton(closeAttack));
+    panel.append(head);
+
+    const garrison = anyArmyAt(state, regionId);
+    const defLine = el("p", "hud-hint hud-prod-summary");
+    defLine.innerHTML = garrison
+      ? `Defender: ${soldiersDisplay(armySize(garrison.units))} soldiers (${composition(garrison)}) · ` +
+        `${glyphHtml("shield", "🛡")} ×${TERRAIN[target.terrain].defense}${target.fortification ? ` +fort ${target.fortification}` : ""}. ` +
+        `Choose which army leads the assault.`
+      : "Undefended — any army that walks in captures it. Choose which one.";
+    panel.append(defLine);
+
+    const list = el("div", "hud-prod-list");
+    attackers.forEach((army, i) => {
+      const from = state.regions[army.regionId];
+      const preview = previewCombat(army.units, garrison?.units ?? emptyUnits(), {
+        terrainDefense: TERRAIN[target.terrain].defense,
+        fortification: target.fortification,
+      });
+      const row = el("div", "hud-prod-row");
+      const name = el("div", "hud-attack-from");
+      name.innerHTML =
+        `<span class="hud-attack-fromname">${escapeHtml(from?.name ?? "Army")}</span>` +
+        `<span class="hud-attack-comp">${soldiersDisplay(armySize(army.units))} — ${composition(army)}</span>`;
+      row.append(name);
+      const chipWrap = el("div", "hud-prod-status");
+      const chip = el("span", "hud-odds-chip " + (preview.undefended ? "win" : oddsClass(preview.winChance)));
+      chip.textContent = preview.undefended ? "capture" : `${Math.round(preview.winChance * 100)}%`;
+      const go = btn(i === 0 ? "Attack ▸ (strongest)" : "Attack ▸", "hud-army-move", () => {
+        callbacks.onAttackWith(army.id, regionId);
+        // Re-render for a follow-up strike, or close once one army remains.
+        if (eligibleAttackers(lastState!, regionId).length > 1 && lastState!.regions[regionId]?.ownerId !== PLAYER_ID) {
+          renderAttack(regionId);
+        } else {
+          closeAttack();
+        }
+      });
+      chipWrap.append(chip, go);
+      row.append(chipWrap);
+      list.append(row);
+    });
+    panel.append(list);
+    attackOverlay.append(panel);
+  }
+  function closeAttack(): void {
+    attackOverlay.style.display = "none";
+    attackOverlay.innerHTML = "";
+  }
+
   // --- Turn report (the "what just happened" pause) ---------------------------
   // Turn resolution is instant; this modal replays the outcome at reading
   // speed — the summary diff plus any standing dangers — before play moves on.
@@ -1608,6 +1714,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       closeRegionScreen();
       closeProduction();
       closeArmies();
+      closeAttack();
       setScreen(null);
       legendPanel.style.display = "none";
       if (hints.style.display !== "none") dismissHints();
@@ -1812,7 +1919,12 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
     // The region inspector exists only while a region is selected.
     rightPanel.style.display = selectedRegionId === null ? "none" : "block";
-    renderRegion(regionBody, state, selectedRegionId, moveArmyId, callbacks);
+    renderRegion(regionBody, state, selectedRegionId, moveArmyId, callbacks, openAttack);
+    // Keep an open attack chooser live as the roster changes (a resolved
+    // strike removes that army; a capture flips the region to yours).
+    if (attackOverlay.style.display !== "none" && selectedRegionId !== null) {
+      renderAttack(selectedRegionId);
+    }
     renderDiplomacy(diploBody, state, callbacks);
     renderResearch(researchBody, player, flow.knowledge, callbacks, openTechTree);
 
@@ -1876,6 +1988,7 @@ function renderRegion(
   selectedRegionId: number | null,
   moveArmyId: number | null,
   callbacks: HudCallbacks,
+  openAttack: (regionId: number) => void,
 ): void {
   container.innerHTML = "";
   // No selection → the panel itself is hidden by the caller; nothing to draw.
@@ -1940,7 +2053,7 @@ function renderRegion(
   if (owned) {
     renderOwnedRegion(container, state, region, moveArmyId, callbacks);
   } else {
-    renderEnemyRegion(container, state, region, callbacks);
+    renderEnemyRegion(container, state, region, openAttack);
   }
 }
 
@@ -2077,7 +2190,7 @@ function renderEnemyRegion(
   container: HTMLElement,
   state: GameState,
   region: Region,
-  callbacks: HudCallbacks,
+  openAttack: (regionId: number) => void,
 ): void {
   const garrison = anyArmyAt(state, region.id);
   const box = el("div", "hud-enemy");
@@ -2087,41 +2200,45 @@ function renderEnemyRegion(
     box.append(line("Undefended — an army walking in captures it."));
   }
 
-  // One-click Attack: the strongest of your adjacent armies with moves left
-  // strikes immediately, with the odds shown on the button itself.
-  const attackers = state.armies.filter(
-    (a) =>
-      a.ownerId === PLAYER_ID &&
-      a.movesLeft > 0 &&
-      state.regions[a.regionId]?.adjacency.includes(region.id),
-  );
-  const best = attackers.reduce<Army | null>(
-    (p, c) => (p === null || armySize(c.units) > armySize(p.units) ? c : p),
-    null,
-  );
+  // Attack: your adjacent, ready armies that could strike here. One → the
+  // button attacks with it (odds on the label); several → it opens a chooser
+  // so YOU pick which army leads the assault (CK3-style).
+  const attackers = state.armies
+    .filter(
+      (a) =>
+        a.ownerId === PLAYER_ID &&
+        a.movesLeft > 0 &&
+        armySize(a.units) > 0 &&
+        state.regions[a.regionId]?.adjacency.includes(region.id),
+    )
+    .sort((a, b) => armySize(b.units) - armySize(a.units));
   const attackBtn = document.createElement("button");
   attackBtn.className = "hud-attack-btn";
-  if (best) {
-    const preview = previewCombat(best.units, garrison?.units ?? emptyUnits(), {
+  if (attackers.length === 0) {
+    attackBtn.innerHTML = `${glyphHtml("attack", "⚔")} Attack`;
+    attackBtn.disabled = true;
+    attackBtn.title = "No army of yours with moves left borders this region — march one next door first.";
+  } else if (attackers.length === 1) {
+    const preview = previewCombat(attackers[0]!.units, garrison?.units ?? emptyUnits(), {
       terrainDefense: TERRAIN[region.terrain].defense,
       fortification: region.fortification,
     });
     const oddsText = preview.undefended ? "capture" : `${Math.round(preview.winChance * 100)}%`;
     attackBtn.innerHTML = `${glyphHtml("attack", "⚔")} Attack (${oddsText})`;
     attackBtn.title =
-      `Strike with your ${soldiersDisplay(armySize(best.units))}-soldier army from ` +
-      `${state.regions[best.regionId]?.name ?? "next door"}` +
+      `Strike with your ${soldiersDisplay(armySize(attackers[0]!.units))}-soldier army from ` +
+      `${state.regions[attackers[0]!.regionId]?.name ?? "next door"}` +
       (preview.undefended ? " — undefended, walking in captures it." : ` — estimated ${oddsText} to win.`);
-    attackBtn.addEventListener("click", () => callbacks.onAttackRegion(region.id));
+    attackBtn.addEventListener("click", () => openAttack(region.id));
   } else {
-    attackBtn.innerHTML = `${glyphHtml("attack", "⚔")} Attack`;
-    attackBtn.disabled = true;
-    attackBtn.title = "No army of yours with moves left borders this region — march one next door first.";
+    attackBtn.innerHTML = `${glyphHtml("attack", "⚔")} Attack (${attackers.length} armies)`;
+    attackBtn.title = `Choose which of your ${attackers.length} bordering armies leads the assault.`;
+    attackBtn.addEventListener("click", () => openAttack(region.id));
   }
   box.append(attackBtn);
   box.append(
     line(
-      "Or pick the army yourself: Armies (A) → Move ▸, then click this region.",
+      "Or pick from the map: Armies (A) → Move ▸, then click this region.",
       "hud-hint",
     ),
   );

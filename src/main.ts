@@ -20,7 +20,7 @@ import {
 import { resolveChoice } from "@/systems/events";
 import { saveToLocal, loadFromLocal, hasLocalSave, clearLocalSave, serializeGame, deserializeGame } from "@/systems/save";
 import { summarizeTurn, type TurnSummary } from "@/systems/summary";
-import { PLAYER_ID, armySize, type GameState } from "@/systems/state";
+import { PLAYER_ID, type GameState } from "@/systems/state";
 import { createHud } from "@/ui/hud";
 import { showMainMenu } from "@/ui/title";
 import { runTutorial, hasSeenTutorial } from "@/ui/tutorial";
@@ -139,21 +139,24 @@ function main(): void {
       moveArmyId = null;
       sync();
     },
-    onAttackRegion(regionId) {
-      // One-click attack from the region panel: the strongest adjacent army
-      // with moves left strikes immediately (same sim path as the map flow).
-      const candidates = state.armies.filter(
+    onAttackWith(armyId, regionId) {
+      // Attack a region with the army the player chose (same sim path as the
+      // map move/attack flow). Guarded to a real, adjacent, ready army.
+      const army = state.armies.find(
         (a) =>
+          a.id === armyId &&
           a.ownerId === PLAYER_ID &&
           a.movesLeft > 0 &&
           state.regions[a.regionId]?.adjacency.includes(regionId),
       );
-      if (candidates.length === 0) return;
-      const best = candidates.reduce((p, c) => (armySize(c.units) > armySize(p.units) ? c : p));
+      if (!army) return;
       const before = state;
-      state = moveArmy(state, best.id, regionId);
+      state = moveArmy(state, army.id, regionId);
+      const moved = state.armies.find((a) => a.id === army.id);
+      // Stay on the fight's outcome region: the captured target, or the army's
+      // spot if it was repelled.
+      selectedRegion = state.regions[regionId]?.ownerId === PLAYER_ID ? regionId : (moved?.regionId ?? regionId);
       moveArmyId = null;
-      selectedRegion = regionId;
       commit();
       for (const after of state.regions) {
         if (before.regions[after.id]?.ownerId !== after.ownerId) renderer.pulseCapture(after.id);
