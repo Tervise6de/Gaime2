@@ -569,9 +569,16 @@ Finland, Livonia/Rus, Prussia/Poland, Denmark, Gotland, Ösel) and **Europe**
 (the continent + Iberia/Italy peninsulas, with Britain, Ireland and
 Scandinavia across the seas) — chosen from a **World** picker (Random /
 Baltic / Europe) in new-game setup. A guard test asserts every region sits on
-land and each graph is connected. *Remaining refinement:* factions still start
-in geographically-random regions (Denmark may open in Sweden's spot); a future
-pass can let a scripted map pin each power's historical homeland/capital.
+land and each graph is connected.
+
+**Historical homelands + play-as (v0.16).** Each scripted map declares its
+starting **factions** — the real powers, each owning its home regions (Baltic:
+Sweden, Novgorod, Livonia, Lithuania, Prussia, Poland, Denmark; Europe:
+England, Norway, Castile, France, Germany, Italy, Poland, Hungary, Rus). Every
+region belongs to exactly one realm (guard-tested). New-game setup gains a
+CK3-style **"Play as"** picker — choose your realm (or Random); the rest are AI,
+all seated on their own ground, the human's realm re-coloured to the player
+gold. `createGame` takes a scripted-faction path (no random capitals).
 
 **Original plan (for reference).** The current renderer wraps the region
 sites in a *generated organic island*. A real Baltic map is a different shape:

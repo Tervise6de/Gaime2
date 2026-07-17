@@ -84,4 +84,22 @@ export const BALTIC_MAP: ScriptedMap = {
     { name: "Visby", x: 0.43, y: 0.56, terrain: "coast" },
     { name: "Arensburg", x: 0.60, y: 0.49, terrain: "coast" },
   ],
+  // Historical realms of the Baltic rim, each on its home ground. Every region
+  // belongs to exactly one. (Region indices match the order above.)
+  factions: [
+    // Sweden — the Swedish heartland, its Finnish sphere, and Gotland.
+    { name: "Sweden", color: "#5b8bd0", capital: 0, regions: [0, 1, 2, 3, 4, 5, 6, 26] },
+    // Novgorod — Karelia and the Rus north-east.
+    { name: "Novgorod", color: "#b06ec0", capital: 11, regions: [7, 11, 12, 15] },
+    // Livonia — Estonia, the Livonian coast and Ösel.
+    { name: "Livonia", color: "#4fb0a0", capital: 13, regions: [8, 9, 10, 13, 14, 27] },
+    // Lithuania — the pagan grand duchy.
+    { name: "Lithuania", color: "#6cae7a", capital: 16, regions: [16, 17] },
+    // Prussia — the Baltic tribes of the southern shore.
+    { name: "Prussia", color: "#8f86d8", capital: 19, regions: [18, 19] },
+    // Poland — the Vistula lands.
+    { name: "Poland", color: "#d64f7d", capital: 20, regions: [20, 21, 22, 23] },
+    // Denmark — Jutland and the isles.
+    { name: "Denmark", color: "#d0796e", capital: 24, regions: [24, 25] },
+  ],
 };

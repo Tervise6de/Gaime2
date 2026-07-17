@@ -86,4 +86,17 @@ export const EUROPE_MAP: ScriptedMap = {
     { name: "Novgorod", x: 0.85, y: 0.47, terrain: "forest" },
     { name: "Lwów", x: 0.72, y: 0.56, terrain: "plains" },
   ],
+  // Great powers of high-medieval Europe, each on its home ground. Every region
+  // belongs to exactly one. (Region indices match the order above.)
+  factions: [
+    { name: "England", color: "#d0796e", capital: 0, regions: [0, 1, 2] },
+    { name: "Norway", color: "#4fb0a0", capital: 4, regions: [3, 4, 5] },
+    { name: "Castile", color: "#cf7a4a", capital: 8, regions: [6, 7, 8, 9] },
+    { name: "France", color: "#5b8bd0", capital: 11, regions: [10, 11, 12, 13] },
+    { name: "Germany", color: "#8a8f9e", capital: 16, regions: [14, 15, 16] },
+    { name: "Italy", color: "#b06ec0", capital: 19, regions: [17, 18, 19, 20] },
+    { name: "Poland", color: "#d64f7d", capital: 23, regions: [21, 22, 23, 24] },
+    { name: "Hungary", color: "#6cae7a", capital: 25, regions: [25, 26, 27] },
+    { name: "Rus", color: "#7a86d8", capital: 28, regions: [28, 29, 30, 31, 32] },
+  ],
 };

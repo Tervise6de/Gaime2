@@ -27,6 +27,17 @@ export interface ScriptedRegion {
   resource?: StrategicResource | null;
 }
 
+/** A historical realm that starts on the map, owning its home regions. */
+export interface ScriptedFaction {
+  name: string;
+  /** Map colour (the realm the human plays is re-coloured to the player gold). */
+  color: string;
+  /** Region index (into `regions`) that is this realm's capital. */
+  capital: number;
+  /** Region indices this realm owns at game start (must include `capital`). */
+  regions: number[];
+}
+
 export interface ScriptedMap {
   id: string;
   name: string;
@@ -38,6 +49,9 @@ export interface ScriptedMap {
   islets?: Coord[][];
   /** Fixed regions, in author order (index === region id). */
   regions: ScriptedRegion[];
+  /** Starting realms; every region should belong to exactly one. The human
+      plays one of these (chosen in setup, or picked from the seed). */
+  factions: ScriptedFaction[];
 }
 
 import { BALTIC_MAP } from "@/data/maps/baltic";

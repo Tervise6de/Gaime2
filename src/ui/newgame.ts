@@ -19,6 +19,7 @@
 import { SCENARIOS } from "@/data/scenarios";
 import type { TraitId } from "@/data/traits";
 import { DEFAULT_MAP_OPTIONS, type MapGenOptions } from "@/systems/mapgen";
+import { scriptedMap } from "@/data/maps/types";
 import type { Difficulty } from "@/systems/state";
 
 export interface NewGameConfig {
@@ -29,6 +30,8 @@ export interface NewGameConfig {
   map?: MapGenOptions;
   /** Scripted real-geography map ("baltic"/"europe"); absent = random realm. */
   mapId?: string;
+  /** On a real map, the realm the human plays (else picked from the seed). */
+  playerFaction?: string;
   /** Scenario twist: force the player's opening trait. */
   playerTrait?: TraitId;
 }
@@ -201,9 +204,32 @@ export function buildNewGameForm(): NewGameForm {
   }
 
   const sizeField = field("World size", mapSizeSeg.root);
-  /** Hide the size field while a fixed real-geography map is selected. */
+  const rivalsField = field("Rivals", rivalsSeg.root);
+
+  // CK3-style "play as" — on a real map you pick your realm (or Random). The
+  // options repopulate for whichever world is chosen.
+  const playAsSel = select([["", "Random realm"]], "", "hud-select hud-playas");
+  playAsSel.title = "Which historical realm you rule. Random picks one for you.";
+  const playAsField = field("Play as", playAsSel);
+
+  /** A real map fixes its own size + factions: swap the size/rivals fields for
+      the realm picker; a random realm shows the size/rivals fields instead. */
   function syncWorld(): void {
-    sizeField.style.display = worldSeg.get() ? "none" : "";
+    const map = scriptedMap(worldSeg.get());
+    sizeField.style.display = map ? "none" : "";
+    rivalsField.style.display = map ? "none" : "";
+    playAsField.style.display = map ? "" : "none";
+    if (map) {
+      const want = playAsSel.value;
+      playAsSel.innerHTML = "";
+      for (const [v, label] of [["", "Random realm"], ...map.factions.map((f) => [f.name, f.name] as [string, string])]) {
+        const opt = document.createElement("option");
+        opt.value = v;
+        opt.textContent = label;
+        playAsSel.append(opt);
+      }
+      playAsSel.value = map.factions.some((f) => f.name === want) ? want : "";
+    }
   }
   syncWorld();
 
@@ -213,8 +239,9 @@ export function buildNewGameForm(): NewGameForm {
       scenarioBlurb,
       field("World seed", seedRow),
       field("World", worldSeg.root),
+      playAsField,
       field("Difficulty", difficultySeg.root),
-      field("Rivals", rivalsSeg.root),
+      rivalsField,
       sizeField,
     ],
     readConfig(): NewGameConfig {
@@ -235,6 +262,7 @@ export function buildNewGameForm(): NewGameForm {
         rivals,
         map: { ...DEFAULT_MAP_OPTIONS, regionCount },
         mapId: world || undefined,
+        playerFaction: world && playAsSel.value ? playAsSel.value : undefined,
         playerTrait: scenarioTrait,
       };
     },

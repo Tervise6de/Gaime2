@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { SCRIPTED_MAPS } from "@/data/maps/types";
 import { generateMap } from "@/systems/mapgen";
+import { createGame } from "@/systems/turn";
+import { PLAYER_ID } from "@/systems/state";
 import { pointInPolygon } from "@/systems/voronoi";
 import { TERRAIN } from "@/data/terrain";
 
@@ -26,6 +28,42 @@ describe("scripted maps", () => {
           expect(TERRAIN[r.terrain]).toBeDefined();
           expect(names.has(r.name)).toBe(false);
           names.add(r.name);
+        }
+      });
+
+      it("assigns every region to exactly one historical faction", () => {
+        expect(map.factions.length).toBeGreaterThanOrEqual(2);
+        const owner = new Map<number, string>();
+        for (const f of map.factions) {
+          expect(f.regions).toContain(f.capital);
+          for (const rid of f.regions) {
+            expect(rid, `region ${rid} in range`).toBeGreaterThanOrEqual(0);
+            expect(rid).toBeLessThan(map.regions.length);
+            expect(owner.has(rid), `region ${map.regions[rid]?.name} double-owned`).toBe(false);
+            owner.set(rid, f.name);
+          }
+        }
+        // Every region belongs to some realm (no orphan sea-provinces).
+        for (let i = 0; i < map.regions.length; i++) {
+          expect(owner.has(i), `${map.regions[i]!.name} unassigned`).toBe(true);
+        }
+      });
+
+      it("seats the chosen realm as the player, on its own capital", () => {
+        const faction = map.factions[1]!; // any non-default realm
+        const g = createGame({ seed: 7, mapId: map.id, playerFaction: faction.name });
+        expect(g.mapId).toBe(map.id);
+        const player = g.nations[PLAYER_ID]!;
+        expect(player.name).toBe(faction.name);
+        // The player owns its home regions and no others' capitals.
+        expect(g.regions[faction.capital]!.ownerId).toBe(PLAYER_ID);
+        for (const rid of faction.regions) expect(g.regions[rid]!.ownerId).toBe(PLAYER_ID);
+        // Every other faction is present and holds its capital.
+        for (const f of map.factions) {
+          if (f.name === faction.name) continue;
+          const n = g.nations.find((x) => x.name === f.name);
+          expect(n, `${f.name} seated`).toBeDefined();
+          expect(g.regions[f.capital]!.ownerId).toBe(n!.id);
         }
       });
 

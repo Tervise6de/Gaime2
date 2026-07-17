@@ -20,6 +20,8 @@ import { ARCHETYPES } from "@/data/personalities";
 import { TRAIT_IDS, type TraitId } from "@/data/traits";
 import { TECHS, type TechId } from "@/data/techs";
 import { generateMap, type MapGenOptions } from "@/systems/mapgen";
+import { scriptedMap } from "@/data/maps/types";
+import type { ScriptedMap } from "@/data/maps/types";
 import { nationalProduction, round1 } from "@/systems/economy";
 import { advanceConstruction } from "@/systems/construction";
 import { nextPopulation } from "@/systems/population";
@@ -115,11 +117,17 @@ export interface NewGameOptions {
   playerTrait?: TraitId;
   /** Scripted real-geography map id ("baltic"/"europe"); absent = procedural. */
   mapId?: string;
+  /** On a scripted map, the faction name the human plays (else picked from seed). */
+  playerFaction?: string;
 }
 
 /** Build a fresh game from a seed. Pure: same seed → identical starting state. */
 export function createGame(options: NewGameOptions): GameState {
   const { regions } = generateMap(options.seed, options.map, options.mapId);
+  // Scripted maps seat every historical realm on its own home ground.
+  const smap = scriptedMap(options.mapId);
+  if (smap && smap.factions.length > 0) return createScriptedGame(smap, regions, options);
+
   const rng = createRng((options.seed ^ 0x9e3779b9) >>> 0);
   // Cap rivals by the roster and by the map: every realm needs room for a capital
   // and neighbours (~3 regions each), so a small map silently seats fewer rivals
@@ -246,6 +254,124 @@ export function createGame(options: NewGameOptions): GameState {
     scoreHistory: {},
   };
   // Seed the score graph with the opening position (one sample per nation).
+  game.scoreHistory = appendScores(game);
+  return game;
+}
+
+/**
+ * Start a game on a scripted map: every historical realm is seated on its own
+ * home ground (no random capitals). The human plays the chosen faction (or one
+ * picked from the seed), rendered in the player gold; the rest are AI. Regions
+ * not owned by any faction fall to the Free Tribes.
+ */
+function createScriptedGame(map: ScriptedMap, regions: Region[], options: NewGameOptions): GameState {
+  const rng = createRng((options.seed ^ 0x9e3779b9) >>> 0);
+
+  // Which faction the human plays: the named one if valid, else seed-picked.
+  const named = map.factions.findIndex((f) => f.name === options.playerFaction);
+  const playerIdx = named >= 0 ? named : options.seed % map.factions.length;
+
+  // Nation 0 = player, 1 = Free Tribes, 2.. = the other realms (author order).
+  const nations: Nation[] = [
+    {
+      id: PLAYER_ID,
+      name: map.factions[playerIdx]!.name,
+      color: "#d8a24a", // player gold — "mine" reads at a glance regardless of realm
+      isPlayer: true,
+      isBarbarian: false,
+      alive: true,
+      stocks: { ...STARTING_STOCKS },
+      taxRate: clampTax(options.taxRate ?? DEFAULT_TAX),
+      research: emptyResearch(),
+      wonders: 0,
+      famine: false,
+      bankrupt: false,
+    },
+    { ...BARBARIAN_NATION, stocks: zeroStocks(), research: emptyResearch(), wonders: 0 },
+  ];
+  const personalities = shuffled(ARCHETYPES, rng);
+  const factionToNation = new Map<number, number>([[playerIdx, PLAYER_ID]]);
+  let nextId = 2;
+  map.factions.forEach((f, fi) => {
+    if (fi === playerIdx) return;
+    factionToNation.set(fi, nextId);
+    nations.push({
+      id: nextId,
+      name: f.name,
+      color: f.color,
+      isPlayer: false,
+      isBarbarian: false,
+      alive: true,
+      stocks: { ...STARTING_STOCKS },
+      taxRate: DEFAULT_TAX,
+      personality: personalities[(nextId - 2) % personalities.length],
+      research: emptyResearch(),
+      wonders: 0,
+      famine: false,
+      bankrupt: false,
+    });
+    nextId += 1;
+  });
+
+  // Ownership + capitals + a starting army per realm.
+  const ownerOf = new Map<number, number>();
+  const capitalSet = new Set<number>();
+  const armies: Army[] = [];
+  let nextArmyId = 0;
+  map.factions.forEach((f, fi) => {
+    const nationId = factionToNation.get(fi)!;
+    nations[nationId]!.capitalRegionId = f.capital;
+    capitalSet.add(f.capital);
+    for (const rid of f.regions) ownerOf.set(rid, nationId);
+    const startUnits = { ...emptyUnits(), militia: 2, infantry: 1 };
+    armies.push({ id: nextArmyId++, ownerId: nationId, regionId: f.capital, units: startUnits, movesLeft: armyMoves(startUnits) });
+  });
+
+  // Lay out regions: owned (fort on capitals) or Free-Tribe held (light garrison).
+  const laidOut: Region[] = regions.map((r) => {
+    const owner = ownerOf.get(r.id);
+    if (owner !== undefined) {
+      return { ...r, ownerId: owner, fortification: capitalSet.has(r.id) ? 1 : 0 };
+    }
+    const fort = rng.int(0, 2);
+    const garrison = { ...emptyUnits(), militia: rng.int(1, 2) };
+    if (rng.next() < 0.35) garrison.infantry = 1;
+    armies.push({ id: nextArmyId++, ownerId: BARBARIAN_ID, regionId: r.id, units: garrison, movesLeft: 0 });
+    return { ...r, ownerId: BARBARIAN_ID, fortification: fort };
+  });
+
+  // Opening national traits for each realm.
+  const traitPool = shuffled(TRAIT_IDS, rng);
+  let traitIdx = 0;
+  for (const n of nations) {
+    if (n.isBarbarian) continue;
+    n.trait = traitPool[traitIdx % traitPool.length];
+    traitIdx += 1;
+  }
+
+  const playerName = nations[PLAYER_ID]!.name;
+  const rivalCount = map.factions.length - 1;
+  const game: GameState = {
+    seed: options.seed,
+    mapId: options.mapId,
+    rngState: rng.seed,
+    turn: 1,
+    nations,
+    regions: laidOut,
+    armies,
+    nextArmyId,
+    relations: {},
+    treaties: {},
+    offers: [],
+    nextOfferId: 0,
+    difficulty: options.difficulty ?? "normal",
+    outcome: "playing",
+    log: [
+      `Turn 1 — you rule ${playerName} on the ${map.name} map; ` +
+        `${rivalCount} rival power${rivalCount === 1 ? "" : "s"} share the land (seed ${options.seed}).`,
+    ],
+    scoreHistory: {},
+  };
   game.scoreHistory = appendScores(game);
   return game;
 }
