@@ -16,7 +16,8 @@ import { BUILDINGS, BUILDING_IDS, BUILD_RATE, type BuildingId } from "@/data/bui
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
 import { TERRAIN, TERRAIN_IDS } from "@/data/terrain";
 import { regionProduction, nationalProduction, nationYieldMult, yieldFactors, singleModifierMult, unrestPenalty } from "@/systems/economy";
-import { garrisonCalm } from "@/systems/stability";
+import { garrisonCalm, overexpansionUnrest } from "@/systems/stability";
+import { techUnrestReduction } from "@/systems/tech";
 import { runTutorial } from "@/ui/tutorial";
 import { confirmAction } from "@/ui/confirm";
 import { isMuted, setMuted, play, isAmbientEnabled, setAmbientEnabled, getVolume, setVolume } from "@/ui/audio";
@@ -48,7 +49,7 @@ import { ACHIEVEMENTS } from "@/data/achievements";
 import { WAR_EDGE_COLOR } from "@/systems/renderer";
 import { regionCapacity } from "@/systems/population";
 import { popDisplay, soldiersCompact, soldiersDisplay } from "@/systems/format";
-import { buildOptions, deriveAdvice } from "@/ui/advisor";
+import { buildOptions, deriveAdvice, regionCanStartBuild } from "@/ui/advisor";
 import { previewCombat } from "@/systems/combat";
 import {
   armyAt,
@@ -76,6 +77,8 @@ import {
   TAX_MAX,
   TAX_MIN,
   TAX_STEP,
+  UNREST_BASE,
+  UNREST_TAX_MAX,
   UNREST_PENALTY_START,
   UNREST_REVOLT,
   SECESSION_REVOLT_TURNS,
@@ -400,6 +403,14 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     "Every region's construction — and the idle ones. Shortcut: B",
     () => openProduction(),
   );
+  // Armies: every stack on one screen — strength, readiness, a Move order.
+  const armiesRail = railBtn(
+    "attack",
+    "⚔",
+    "Armies",
+    "All your armies — strength, readiness, and move orders. Shortcut: A",
+    () => openArmies(),
+  );
   // Capital: highlight the seat of power on the map *and* open the full-size
   // region screen — the compact inspector is too cramped for your most
   // important province (shown only while you still hold it).
@@ -411,7 +422,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     openRegionScreen(cap);
   });
   capitalBtn.title = "Open your capital full-screen and highlight it on the map.";
-  rail.append(diploRail.btn, researchRail.btn, productionRail.btn, capitalBtn);
+  rail.append(diploRail.btn, researchRail.btn, productionRail.btn, armiesRail.btn, capitalBtn);
   leftStack.append(rail);
 
   // --- Drawers (one open at a time, sharing the left stack) ------------------
@@ -475,6 +486,9 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   taxInput.addEventListener("input", () => callbacks.onTaxChange(Number(taxInput.value) / 100));
   taxRow.append(taxInput, taxLabel);
   const upkeepLine = el("p", "hud-hint");
+  // The other half of the tax trade-off, live: where this tax level pulls
+  // every region's unrest — so "more gold" is never a free lunch on screen.
+  const taxUnrestLine = el("p", "hud-hint hud-tax-unrest");
 
   const endTurnBtn = document.createElement("button");
   endTurnBtn.className = "hud-endturn";
@@ -486,13 +500,11 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   // guidance, never a hard block — End turn always works.
   const advisorBox = el("div", "hud-advisor");
   advisorBox.style.display = "none";
-  // Cycle position for the army chip: repeated clicks visit each restless army.
-  let armyCycle = 0;
 
   // Admin (new game / saves / backup) hides behind one Game menu button.
   const gameMenuBtn = btn("Game menu", "hud-gamemenu-btn", () => openGameMenu());
   gameMenuBtn.title = "New game, save slots, import & export.";
-  actions.append(fiscalHead, taxRow, upkeepLine, advisorBox, endTurnBtn, gameMenuBtn);
+  actions.append(fiscalHead, taxRow, upkeepLine, taxUnrestLine, advisorBox, endTurnBtn, gameMenuBtn);
   root.append(actions);
 
   // --- Game menu overlay: the administrative controls, out of the way --------
@@ -1246,6 +1258,8 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     if (ev.target === productionOverlay) closeProduction();
   });
   root.append(productionOverlay);
+  // Which idle region's build cards are expanded (persists across re-renders).
+  let prodExpanded: number | null = null;
 
   function renderProduction(): void {
     if (!lastState) return;
@@ -1268,6 +1282,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
     const list = el("div", "hud-prod-list");
     for (const region of owned) {
+      const item = el("div", "hud-prod-item");
       const rowEl = el("div", "hud-prod-row");
       const name = btn(region.name, "hud-prod-name", () => {
         callbacks.onSelectRegion(region.id);
@@ -1288,7 +1303,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
         const fill = el("div", "hud-build-fill");
         fill.style.width = `${(region.construction.progress / def.cost) * 100}%`;
         bar.append(fill);
-        status.append(label, bar);
+        const cancel = btn("✕", "hud-prod-cancel", () => callbacks.onCancelConstruction(region.id));
+        cancel.title = `Cancel ${def.name} (progress is lost).`;
+        cancel.setAttribute("aria-label", `Cancel ${def.name}`);
+        status.append(label, bar, cancel);
       } else {
         const options = buildOptions(state, region.id);
         if (options.length === 0) {
@@ -1298,36 +1316,135 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
         } else {
           const idle = el("span", "hud-prod-idle");
           idle.textContent = "Idle";
-          const sel = select(
-            "hud-select hud-prod-select",
-            [
-              ["", "Build…"],
-              ...options.map((id): [string, string] => [
-                id,
-                `${BUILDINGS[id].name} — ${BUILDINGS[id].cost}⛏`,
-              ]),
-            ],
-            "",
-          );
-          sel.addEventListener("change", () => {
-            if (sel.value) callbacks.onQueueBuilding(region.id, sel.value as BuildingId);
+          const expanded = prodExpanded === region.id;
+          const choose = btn(expanded ? "Choose build ▴" : "Choose build ▾", "hud-prod-choose" + (expanded ? " open" : ""), () => {
+            prodExpanded = expanded ? null : region.id;
+            renderProduction();
           });
-          status.append(idle, sel);
+          status.append(idle, choose);
         }
       }
       rowEl.append(status);
-      list.append(rowEl);
+      item.append(rowEl);
+
+      // Expanded: the same build cards the region screen uses — icon, name,
+      // cost and duration on gold-bordered buttons, no native dropdowns.
+      if (prodExpanded === region.id && !region.construction) {
+        const cards = el("div", "hud-build-menu hud-prod-cards");
+        for (const id of buildOptions(state, region.id)) {
+          const def = BUILDINGS[id];
+          const eta = Math.max(1, Math.ceil(def.cost / BUILD_RATE));
+          const card = document.createElement("button");
+          card.className = "hud-build-btn";
+          card.title = `${def.blurb}\n\nCosts ${def.cost} materials over ~${eta} turn${eta === 1 ? "" : "s"}.`;
+          card.innerHTML =
+            `<span class="hud-build-name">${buildingIconHtml(id, "")}${def.name}</span>` +
+            `<span class="hud-build-cost">${def.cost}${resourceIconHtml("materials", "⛏")} · ${eta}t</span>`;
+          card.addEventListener("click", () => {
+            prodExpanded = null;
+            callbacks.onQueueBuilding(region.id, id);
+          });
+          cards.append(card);
+        }
+        item.append(cards);
+      }
+      list.append(item);
     }
     panel.append(list);
     productionOverlay.append(panel);
   }
   function openProduction(): void {
+    // Auto-expand when exactly one region is idle — one less click.
+    if (lastState) {
+      const idle = lastState.regions.filter((r) => regionCanStartBuild(lastState!, r.id));
+      prodExpanded = idle.length === 1 ? idle[0]!.id : null;
+    }
     renderProduction();
     productionOverlay.style.display = "flex";
   }
   function closeProduction(): void {
     productionOverlay.style.display = "none";
     productionOverlay.innerHTML = "";
+  }
+
+  // --- Armies overview (every stack, its strength, and a Move order) ---------
+  const armiesOverlay = el("div", "hud-techtree-overlay");
+  armiesOverlay.style.display = "none";
+  armiesOverlay.addEventListener("click", (ev) => {
+    if (ev.target === armiesOverlay) closeArmies();
+  });
+  root.append(armiesOverlay);
+
+  function renderArmies(): void {
+    if (!lastState) return;
+    const state = lastState;
+    armiesOverlay.innerHTML = "";
+    const panel = el("div", "hud-techtree-panel hud-armies-panel");
+    const head = el("div", "hud-techtree-head");
+    const title = el("h2", "hud-techtree-title");
+    title.textContent = "Armies";
+    head.append(title, closeButton(closeArmies));
+    panel.append(head);
+
+    const mine = state.armies.filter((a) => a.ownerId === PLAYER_ID && armySize(a.units) > 0);
+    const totalSoldiers = mine.reduce((s, a) => s + armySize(a.units), 0);
+    const upkeep = totalUpkeep(state, PLAYER_ID);
+    const summaryLine = el("p", "hud-hint hud-prod-summary");
+    summaryLine.textContent =
+      `${mine.length} arm${mine.length === 1 ? "y" : "ies"} · ${soldiersDisplay(totalSoldiers)} soldiers · ` +
+      `upkeep ${fmt(upkeep)}g/turn. Moving onto your own army merges the stacks.`;
+    panel.append(summaryLine);
+
+    if (mine.length === 0) {
+      panel.append(line("No armies — open one of your regions and raise units there.", "hud-hint"));
+    }
+    const list = el("div", "hud-prod-list");
+    for (const army of mine) {
+      const region = state.regions[army.regionId];
+      if (!region) continue;
+      const item = el("div", "hud-prod-item");
+      const rowEl = el("div", "hud-prod-row");
+      const name = btn(region.name, "hud-prod-name", () => {
+        callbacks.onSelectRegion(region.id);
+        closeArmies();
+        openRegionScreen(region.id);
+      });
+      name.title = `Open ${region.name} full-screen.`;
+      rowEl.append(name);
+
+      const status = el("div", "hud-prod-status");
+      status.append(compositionLine(army));
+      const ready = army.movesLeft > 0;
+      const pill = el("span", ready ? "hud-army-ready" : "hud-prod-label muted");
+      pill.textContent = ready ? "Ready" : "Moved";
+      pill.title = ready
+        ? "This army can still act this turn."
+        : "Out of moves — it acts again after End turn.";
+      status.append(pill);
+      const moveBtn = btn("Move ▸", "hud-army-move", () => {
+        closeArmies();
+        callbacks.onSelectRegion(region.id);
+        callbacks.onBeginMove(army.id);
+      });
+      moveBtn.disabled = !ready;
+      moveBtn.title = ready
+        ? "Pick a destination on the map (highlighted regions)."
+        : "No moves left this turn.";
+      status.append(moveBtn);
+      rowEl.append(status);
+      item.append(rowEl);
+      list.append(item);
+    }
+    panel.append(list);
+    armiesOverlay.append(panel);
+  }
+  function openArmies(): void {
+    renderArmies();
+    armiesOverlay.style.display = "flex";
+  }
+  function closeArmies(): void {
+    armiesOverlay.style.display = "none";
+    armiesOverlay.innerHTML = "";
   }
 
   // --- Turn report (the "what just happened" pause) ---------------------------
@@ -1445,6 +1562,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       ev.preventDefault();
       if (productionOverlay.style.display === "none") openProduction();
       else closeProduction();
+    } else if (key === "a") {
+      ev.preventDefault();
+      if (armiesOverlay.style.display === "none") openArmies();
+      else closeArmies();
     } else if (ev.key === "Escape") {
       if (lastMoveArmy !== null) callbacks.onCancelMove(); // abort picking a destination
       closeTechTree();
@@ -1456,6 +1577,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       closeTurnReport();
       closeRegionScreen();
       closeProduction();
+      closeArmies();
       setDrawer(null);
       legendPanel.style.display = "none";
       if (hints.style.display !== "none") dismissHints();
@@ -1509,13 +1631,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       const chip = btn("", "hud-advice-chip " + item.kind, () => {
         if (item.kind === "research") setDrawer("research");
         else if (item.kind === "build") openProduction();
-        else if (item.regionIds.length > 0) {
-          // Cycle through the restless armies, one click per visit.
-          const target = item.regionIds[armyCycle % item.regionIds.length]!;
-          armyCycle += 1;
-          callbacks.onSelectRegion(target);
-          openRegionScreen(target);
-        }
+        else openArmies();
       });
       chip.innerHTML = `${glyph} ${escapeHtml(item.label)}`;
       chip.title =
@@ -1523,7 +1639,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
           ? "Pick a technology — knowledge income is wasted without one."
           : item.kind === "build"
             ? "Open the production overview and put the idle slots to work."
-            : "Jump to the next army that can still act this turn.";
+            : "Open the armies overview — every stack that can still act.";
       advisorBox.append(chip);
     }
 
@@ -1532,6 +1648,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     setBadge(productionRail.badge, idleBuilds);
     // Keep an open production overview live (queueing from it re-renders).
     if (productionOverlay.style.display !== "none") renderProduction();
+    // Armies rail badge: stacks that can still act this turn.
+    const readyArmies = state.armies.filter((a) => a.ownerId === PLAYER_ID && a.movesLeft > 0 && armySize(a.units) > 0).length;
+    setBadge(armiesRail.badge, readyArmies);
+    if (armiesOverlay.style.display !== "none") renderArmies();
 
     // Rail badges: offers awaiting your answer; a research choice waiting.
     // The capital jump shows only while you still hold your seat.
@@ -1638,7 +1758,29 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
     taxInput.value = String(Math.round(player.taxRate * 100));
     taxLabel.textContent = `Tax ${Math.round(player.taxRate * 100)}%`;
-    upkeepLine.textContent = `Army upkeep: ${fmt(upkeep)}g/turn. Higher taxes raise gold but push unrest up.`;
+    upkeepLine.textContent = `Army upkeep: ${fmt(upkeep)}g/turn.`;
+    // The unrest side of the tax lever, with real numbers: the steady state
+    // this policy drifts regions toward (before local calming effects).
+    const ownedCount = state.regions.filter((r) => r.ownerId === PLAYER_ID).length;
+    const unrestPull =
+      UNREST_BASE +
+      (player.taxRate / TAX_MAX) * UNREST_TAX_MAX +
+      overexpansionUnrest(ownedCount) -
+      techUnrestReduction(player.research.done);
+    const pull = Math.max(0, Math.round(unrestPull * 10) / 10);
+    taxUnrestLine.textContent = "";
+    taxUnrestLine.append(document.createTextNode("Unrest pull: regions drift toward "));
+    const pullVal = el("span", "hud-tax-unrest-val");
+    pullVal.textContent = `~${fmt(pull)}`;
+    pullVal.classList.add(pull >= UNREST_PENALTY_START ? "bad" : pull >= UNREST_PENALTY_START - 8 ? "warn" : "good");
+    taxUnrestLine.append(pullVal, document.createTextNode(` (output suffers at ${UNREST_PENALTY_START}+).`));
+    taxUnrestLine.title =
+      `Every region drifts a few points per turn toward a target set by your policy:\n` +
+      `base ${UNREST_BASE} + tax pressure ${fmt(Math.round((player.taxRate / TAX_MAX) * UNREST_TAX_MAX * 10) / 10)}` +
+      ` + over-expansion ${fmt(overexpansionUnrest(ownedCount))}` +
+      ` − tech calm ${fmt(techUnrestReduction(player.research.done))}.\n` +
+      `Temples and stationed garrisons lower it further per region. ` +
+      `At ${UNREST_PENALTY_START}+ a region's output suffers; at ${UNREST_REVOLT}+ it revolts.`;
 
     // The region inspector exists only while a region is selected.
     rightPanel.style.display = selectedRegionId === null ? "none" : "block";

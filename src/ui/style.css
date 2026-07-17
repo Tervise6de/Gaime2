@@ -261,8 +261,107 @@ body {
   border-radius: 999px;
 }
 
-.hud-prod-select {
+/* A region's row + (when expanded) its build cards beneath. */
+.hud-prod-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.hud-prod-choose {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 5px 11px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #10131a;
+  background: var(--gold-grad);
+  border: 1px solid #efd694;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.hud-prod-choose.open {
+  filter: brightness(1.1);
+}
+
+.hud-prod-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
+  margin: 6px 4px 2px;
+}
+
+.hud-prod-cancel {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.hud-prod-cancel:hover {
+  color: #f0b9b1;
+  border-color: rgba(232, 119, 107, 0.6);
+}
+
+/* Armies overview rows share the production chrome. */
+.hud-armies-panel {
+  width: min(560px, 94vw);
+}
+
+.hud-armies-panel .hud-army-comp {
+  margin: 0;
   flex: 1;
+  min-width: 0;
+}
+
+.hud-army-ready {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #b9dfc3;
+  background: rgba(108, 174, 122, 0.16);
+  border: 1px solid rgba(108, 174, 122, 0.45);
+  border-radius: 999px;
+}
+
+.hud-army-move {
+  flex: 0 0 auto;
+  padding: 5px 11px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #10131a;
+  background: var(--gold-grad);
+  border: 1px solid #efd694;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.hud-army-move:disabled {
+  filter: grayscale(0.7) brightness(0.75);
+  cursor: default;
+}
+
+/* Tax → unrest feedback under the fiscal slider. */
+.hud-tax-unrest-val.good {
+  color: #6cae7a;
+  font-weight: 700;
+}
+
+.hud-tax-unrest-val.warn {
+  color: #e0b74a;
+  font-weight: 700;
+}
+
+.hud-tax-unrest-val.bad {
+  color: #e8776b;
+  font-weight: 700;
 }
 
 /* Move-mode banner: shown while an army is picking its destination. */
@@ -430,6 +529,9 @@ body {
   align-items: flex-start;
   gap: 10px;
   pointer-events: none;
+  /* Open drawers must paint over the bottom-left actions cluster (which has
+     grown taller with the advisor) — never slide behind it. */
+  z-index: 34;
 }
 
 .hud-rail {
