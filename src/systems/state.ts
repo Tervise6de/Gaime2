@@ -174,6 +174,11 @@ export interface Research {
   progress: number;
   /** Completed techs. */
   done: TechId[];
+  /**
+   * A queued research path: when `current` completes, the next still-valid tech
+   * here is auto-selected (prereqs met + age reached). Optional (legacy saves).
+   */
+  queue?: TechId[];
 }
 
 /** A region's single construction slot. */

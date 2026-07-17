@@ -9,7 +9,7 @@
  * Pure helpers over a nation's `Research` record and the static `TECHS` table.
  */
 
-import { TECHS, TECH_IDS, type TechId } from "@/data/techs";
+import { TECHS, TECH_IDS, type TechId, type TechBranch } from "@/data/techs";
 import type { BuildingId } from "@/data/buildings";
 import type { UnitType } from "@/data/units";
 import type { ResourceYield } from "@/data/terrain";
@@ -112,10 +112,52 @@ export function advanceResearch(research: Research, knowledge: number): Research
   return { research: { ...research, progress: round1(progress) }, completed: null };
 }
 
-/** Select a tech to research (keeps banked progress). Age-gated when `era` given. */
+/** Select a tech to research (keeps banked progress; drops it from the queue).
+    Age-gated when `era` given. */
 export function selectTech(research: Research, tech: TechId, era?: number): Research {
   if (!canResearch(research.done, tech, era)) return research;
-  return { ...research, current: tech };
+  const queue = research.queue?.filter((t) => t !== tech);
+  return { ...research, current: tech, queue };
+}
+
+/** Append a tech to the research queue (dedup; skips done/current). Pure. */
+export function queueResearch(research: Research, tech: TechId): Research {
+  if (research.done.includes(tech) || research.current === tech) return research;
+  const queue = research.queue ?? [];
+  if (queue.includes(tech)) return research;
+  return { ...research, queue: [...queue, tech] };
+}
+
+/** Clear the research queue. */
+export function clearQueue(research: Research): Research {
+  return research.queue?.length ? { ...research, queue: [] } : research;
+}
+
+/**
+ * When nothing is being researched, pull the next still-valid tech off the queue
+ * (prereqs met + age reached); drop any that have become invalid. Pure.
+ */
+export function dequeueResearch(research: Research, era?: number): Research {
+  if (research.current || !research.queue?.length) return research;
+  const queue = [...research.queue];
+  while (queue.length) {
+    const next = queue.shift()!;
+    if (canResearch(research.done, next, era)) return { ...research, current: next, queue };
+  }
+  return { ...research, queue: [] };
+}
+
+/**
+ * The recommended next tech for a realm: the cheapest available tech in its
+ * preferred branch, else the cheapest available overall. Null when the frontier
+ * is empty (age-gated). Pure.
+ */
+export function recommendedTech(done: TechId[], era: number, branch: TechBranch): TechId | null {
+  const frontier = researchFrontier(done, era);
+  if (!frontier.length) return null;
+  const inBranch = frontier.filter((t) => TECHS[t].branch === branch);
+  const pool = inBranch.length ? inBranch : frontier;
+  return pool.reduce((best, t) => (TECHS[t].cost < TECHS[best].cost ? t : best), pool[0]!);
 }
 
 function round1(v: number): number {

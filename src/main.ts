@@ -7,6 +7,8 @@ import {
   cancelConstruction,
   setRegionFocus,
   chooseResearch,
+  queueResearch,
+  clearResearchQueue,
 } from "@/systems/turn";
 import { raiseUnit, moveArmy, reachableRegions } from "@/systems/military";
 import {
@@ -214,6 +216,14 @@ function main(): void {
     },
     onChooseResearch(tech) {
       state = chooseResearch(state, tech);
+      commit();
+    },
+    onQueueResearch(tech) {
+      state = queueResearch(state, tech);
+      commit();
+    },
+    onClearResearchQueue() {
+      state = clearResearchQueue(state);
       commit();
     },
     onResolveChoice(optionId) {

@@ -70,7 +70,7 @@ import { nationScore, victoryProgress, victoryRaces, endGameSummary } from "@/sy
 import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
 import type { TurnSummary } from "@/systems/summary";
 import { deriveAlerts, type Alert } from "@/ui/alerts";
-import { researchFrontier, isBuildingUnlockedFor } from "@/systems/tech";
+import { researchFrontier, recommendedTech, isBuildingUnlockedFor } from "@/systems/tech";
 import { eraIndexForTurn, eraByIndex } from "@/data/eras";
 import { ARCHETYPE_LABEL } from "@/data/personalities";
 import { eraForTurn, yearForTurn } from "@/data/eras";
@@ -132,6 +132,10 @@ export interface HudCallbacks {
   onAcceptOffer(offerId: number): void;
   onRejectOffer(offerId: number): void;
   onChooseResearch(tech: TechId): void;
+  /** Append a tech to the research queue (auto-starts after the current). */
+  onQueueResearch(tech: TechId): void;
+  /** Clear the research queue. */
+  onClearResearchQueue(): void;
   /** Select a region on the map (e.g. from a clicked log entry); null deselects. */
   onSelectRegion(regionId: number | null): void;
   /** Resolve the pending choice event by picking one of its options. */
@@ -3394,21 +3398,47 @@ function renderResearch(
   container.append(count);
   container.append(btn("Open tech tree ▤", "hud-techtree-open", onOpenTree));
 
+  // Recommended pick: cheapest available tech in the realm's trait branch.
+  const branch: TechBranch =
+    player.trait === "martial" ? "military" : player.trait === "scholarly" ? "civics" : "economy";
+  const rec = recommendedTech(research.done, era, branch);
+
   const menu = el("div", "hud-tech-menu");
   for (const id of frontier) {
     const def = TECHS[id];
+    const row = el("div", "hud-tech-row");
     const b = document.createElement("button");
-    b.className = "hud-tech-btn" + (research.current === id ? " active" : "");
-    b.title = def.blurb;
+    b.className = "hud-tech-btn" + (research.current === id ? " active" : "") + (id === rec ? " recommended" : "");
+    b.title = def.blurb + (id === rec ? " — recommended for your realm." : "");
     b.style.borderLeftColor = BRANCH_COLOR[def.branch];
     b.innerHTML =
-      `<span class="hud-tech-name">${def.name}</span>` +
+      `<span class="hud-tech-name">${def.name}${id === rec ? ' <span class="hud-tech-rec">★ recommended</span>' : ""}</span>` +
       `<span class="hud-tech-blurb">${def.blurb}</span>` +
       `<span class="hud-tech-cost">${def.cost}${resourceIconHtml("knowledge", "📖")} · ${iconHtml(BRANCH_ART[def.branch], "")} ${def.branch}</span>`;
     b.addEventListener("click", () => callbacks.onChooseResearch(id));
-    menu.append(b);
+    // Queue button: research this after the current tech (auto-starts on completion).
+    const q = btn("＋", "hud-tech-queue-btn", () => callbacks.onQueueResearch(id));
+    q.title = "Queue this technology to research after the current one.";
+    row.append(b, q);
+    menu.append(row);
   }
   container.append(menu);
+
+  // The research queue — the path you've lined up.
+  if (research.queue && research.queue.length) {
+    const qbox = el("div", "hud-tech-queue-list");
+    const qhead = el("div", "hud-tech-queue-head");
+    const qlabel = el("span", "");
+    qlabel.textContent = `Queued (${research.queue.length})`;
+    qhead.append(qlabel, btn("Clear", "hud-tech-queue-clear", () => callbacks.onClearResearchQueue()));
+    qbox.append(qhead);
+    research.queue.forEach((tid, i) => {
+      const row = el("div", "hud-tech-queue-row");
+      row.innerHTML = `<span class="muted">${i + 1}.</span> ${escapeHtml(TECHS[tid].name)}`;
+      qbox.append(row);
+    });
+    container.append(qbox);
+  }
 
   // The road ahead: a preview of the next age's techs, so the player sees what
   // dawns when the age turns (and why they can't be picked yet).

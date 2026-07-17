@@ -32,7 +32,7 @@ import { nextUnrest } from "@/systems/stability";
 import { armyMoves, totalUpkeep } from "@/systems/military";
 import { driftRelations, decayOpinions, atWar, tradePartners, tradeIncome } from "@/systems/diplomacy";
 import { runNationTurn } from "@/systems/ai";
-import { advanceResearch, techUnrestReduction, isBuildingUnlockedFor, selectTech } from "@/systems/tech";
+import { advanceResearch, dequeueResearch, techUnrestReduction, isBuildingUnlockedFor, selectTech, queueResearch as queueResearchTech, clearQueue } from "@/systems/tech";
 import { fireEvent } from "@/systems/events";
 import { checkVictory, nationScore } from "@/systems/victory";
 import { createRng, type Rng } from "@/systems/rng";
@@ -520,6 +520,20 @@ export function chooseResearch(state: GameState, tech: TechId, nationId = PLAYER
   return { ...state, nations };
 }
 
+/** Append a tech to a nation's research queue (auto-starts after the current). Pure. */
+export function queueResearch(state: GameState, tech: TechId, nationId = PLAYER_ID): GameState {
+  const nations = state.nations.map((n) =>
+    n.id === nationId ? { ...n, research: queueResearchTech(n.research, tech) } : n,
+  );
+  return { ...state, nations };
+}
+
+/** Clear a nation's research queue. Pure. */
+export function clearResearchQueue(state: GameState, nationId = PLAYER_ID): GameState {
+  const nations = state.nations.map((n) => (n.id === nationId ? { ...n, research: clearQueue(n.research) } : n));
+  return { ...state, nations };
+}
+
 /** Clear a region's construction order (progress is lost). Pure. */
 export function cancelConstruction(state: GameState, regionId: number): GameState {
   const region = state.regions[regionId];
@@ -564,9 +578,10 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
   // Difficulty scales rival economies (never the player's).
   const econMult = nation.isPlayer ? 1 : DIFFICULTY[state.difficulty].rivalEconomy;
 
-  // Research: knowledge produced funds the current tech.
+  // Research: knowledge produced funds the current tech; on completion the next
+  // queued tech (still valid + age-appropriate) auto-starts.
   const step = advanceResearch(nation.research, flow.knowledge);
-  const research = step.research;
+  const research = dequeueResearch(step.research, eraIndexForTurn(state.turn));
 
   const stocks: ResourceStocks = {
     gold: round1(nation.stocks.gold + flow.gold * econMult - upkeep),

@@ -127,3 +127,42 @@ describe("era-gated research", () => {
     }
   });
 });
+
+import { queueResearch, dequeueResearch, clearQueue, recommendedTech } from "@/systems/tech";
+
+describe("research queue + recommendation", () => {
+  const r0 = { current: null as string | null, progress: 0, done: [] as string[], queue: [] as string[] };
+
+  it("queues techs (dedup; skips done/current)", () => {
+    let r = queueResearch({ ...r0 } as never, "agriculture");
+    r = queueResearch(r, "agriculture"); // dedup
+    r = queueResearch(r, "currency");
+    expect(r.queue).toEqual(["agriculture", "currency"]);
+    // skip a completed tech
+    expect(queueResearch({ ...r0, done: ["writing"] } as never, "writing").queue ?? []).toEqual([]);
+  });
+
+  it("selectTech drops the picked tech from the queue", () => {
+    const r = { current: null, progress: 0, done: [], queue: ["agriculture", "currency"] } as never;
+    expect(selectTech(r, "agriculture", 0).queue).toEqual(["currency"]);
+  });
+
+  it("dequeues the next valid tech when idle, skipping invalid/age-locked", () => {
+    // irrigation (era 1) is age-locked at era 0; currency (era 0) is next valid.
+    const r = { current: null, progress: 0, done: [], queue: ["irrigation", "currency"] } as never;
+    const d0 = dequeueResearch(r, 0);
+    expect(d0.current).toBe("currency"); // irrigation skipped (wrong age at era 0... its prereq also missing)
+  });
+
+  it("does nothing while a tech is in progress", () => {
+    const r = { current: "agriculture", progress: 5, done: [], queue: ["currency"] } as never;
+    expect(dequeueResearch(r, 0)).toBe(r);
+  });
+
+  it("recommends the cheapest tech in the realm's branch", () => {
+    // At era 0 with nothing done, military branch's cheapest frontier tech is bronze_working (22 < warcraft 26).
+    expect(recommendedTech([], 0, "military")).toBe("bronze_working");
+    expect(recommendedTech([], 0, "civics")).toBe("writing");
+    expect(clearQueue({ ...r0, queue: ["currency"] } as never).queue).toEqual([]);
+  });
+});

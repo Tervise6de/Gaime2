@@ -707,8 +707,15 @@ a martial realm musters Garrisons on its rough ground), kept stable once set.
 - **A tree that reads by age** — the tech-tree overlay labels every node with its
   age and marks future-age techs 🔒; the research drawer previews "Awaiting the
   {next age}".
-- Still open: a **recommended** next tech and **queueing** a path; new **unit
-  types** (deferred — they ripple through `emptyUnits`/`armySize` widely).
+- **A recommended next tech + a research queue** (v0.30) — the drawer stars the
+  cheapest frontier tech in the realm's natural branch (military/civics/economy by
+  trait) as ★ recommended, and every frontier tech carries a ＋ that appends it to
+  a **queue**. When the current study finishes, `dequeueResearch` auto-starts the
+  next queued tech that's valid for the age, skipping any that aren't yet. Queue up
+  a path before bed and the realm studies it in order. (`queueResearch` /
+  `dequeueResearch` / `clearQueue` / `recommendedTech`, all pure in `systems/tech.ts`.)
+- Still open: new **unit types** (deferred — they ripple through
+  `emptyUnits`/`armySize` widely).
 
 ### 9.6 Victory types — SHIPPED v1 (v0.26)
 The three paths (Domination / Great Works / Prestige) are now a **legible race**.
