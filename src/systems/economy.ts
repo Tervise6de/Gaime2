@@ -16,6 +16,7 @@
  */
 
 import { BUILDINGS } from "@/data/buildings";
+import { focusYieldMult } from "@/data/focuses";
 import { TERRAIN, type ResourceYield } from "@/data/terrain";
 import {
   PROSPERITY_GOLD_MULT,
@@ -112,11 +113,13 @@ export function regionProduction(
   const b = buildingYield(region);
   const pop = region.population;
   const m = unrestPenalty(region.unrest);
+  // A region's focus biases its output on top of the national multiplier.
+  const f = focusYieldMult(region.focus);
 
-  const food = (base.food + b.food + pop * FOOD_PER_WORKER - pop * FOOD_PER_HEAD) * m * mult.food;
-  const materials = (base.materials + b.materials + pop * MAT_PER_WORKER) * m * mult.materials;
-  const gold = ((base.gold + b.gold) * (1 + taxRate) + pop * GOLD_PER_WORKER) * m * mult.gold;
-  const knowledge = (base.knowledge + b.knowledge) * m * mult.knowledge;
+  const food = (base.food + b.food + pop * FOOD_PER_WORKER - pop * FOOD_PER_HEAD) * m * mult.food * f.food;
+  const materials = (base.materials + b.materials + pop * MAT_PER_WORKER) * m * mult.materials * f.materials;
+  const gold = ((base.gold + b.gold) * (1 + taxRate) + pop * GOLD_PER_WORKER) * m * mult.gold * f.gold;
+  const knowledge = (base.knowledge + b.knowledge) * m * mult.knowledge * f.knowledge;
 
   return {
     food: round1(food),

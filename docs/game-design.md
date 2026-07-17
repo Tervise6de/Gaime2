@@ -670,25 +670,33 @@ into the renderer's political layer (`setLens`), so the heat reads at any zoom.
 Later, optionally: a **Military lens** (army moves / border threat) and a
 **Political-relations lens** (allies green, enemies red).
 
-### 9.4 Region development & focus (the Civ city layer)
-Today: one build slot, a short shared building list. Planned depth without
-city-screen micro:
-- **Region focus / specialisation**: a region can lean *military* (musters,
-  forts), *economic* (trade, gold), *agrarian* (food, growth) or *learned*
-  (knowledge) — a cheap identity that biases yields and unlocks a couple of
-  focus-specific buildings. Makes "what is this province for?" a real question.
-- A few **more buildings** with clear identities (granary, watchtower, guild,
-  monastery, harbour-upgrade) and a visible **built-here** list on the region.
-- Optional later: a modest **build queue** if playtests show single-slot pacing
-  drags on Grand maps (deliberately omitted in v1 to keep decisions per-turn).
+### 9.4 Region development & focus — SHIPPED v1 (`data/focuses.ts`, v0.24)
+Regions can be **specialised** (the "what is this province for?" decision) from
+the region panel, one focus each: **Farmland** (+food, +pop cap), **Market town**
+(+gold), **Workshops** (+materials), **Academy** (+knowledge), or **Garrison**
+(cheaper local musters + a calmer province). Data-driven in `data/focuses.ts`;
+effects plug into the existing hooks (economy yields, population cap, stability,
+unit cost) via `focus*` helpers; `setRegionFocus()` is owner-gated and durable.
+One focus per region is the whole trade-off.
+- Still open: focus-specific **buildings** and a couple more building identities
+  (granary, watchtower, guild, monastery); an optional **build queue** on Grand
+  maps. AI does not yet set focuses (player tool for now).
 
-### 9.5 Research tree with a destination
-Today: pick one of the frontier, flat. Planned: present the tree by **era**
-(tie to the world ages already in `data/eras.ts`), show **what each tech
-unlocks** (unit / building / yield / victory-enabler) at the choice point, mark
-a **recommended** next tech for the realm's situation, and let players **queue**
-a short research path. No new sim maths — a presentation + light path layer over
-the existing tech graph.
+### 9.5 Research, ages & game length (bigger, era-realistic)
+Today: pick one of the frontier, flat; a ~15-node tree; 150-turn games. Planned
+(one big pillar):
+- **Era-gated research** — every tech belongs to an **age** (`data/eras.ts`); you
+  cannot research a tech before its age has dawned, so progression is historically
+  plausible (no crossbows in the Age of Founding). The frontier only offers
+  age-appropriate techs; reaching the next age unlocks its branch.
+- **A bigger tree + more content** — more techs spread across the ages, and the
+  **units / buildings** they unlock, so a full game is a longer arc of meaningful
+  choices (not everything researchable by turn 40).
+- **Longer games** — raise the turn limit to **~220** (a game "usually" runs 200+
+  turns), with era pacing tuned so the ages actually span the game.
+- **A tree with a destination** — present the tree by era, show **what each tech
+  unlocks** at the choice point, mark a **recommended** next tech, and let players
+  **queue** a short path.
 
 ### 9.6 Victory types (plan the win conditions)
 Today: domination (territory), Great Works (wonders), prestige (score at the

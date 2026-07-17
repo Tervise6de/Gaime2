@@ -11,6 +11,7 @@
  */
 
 import { BUILDINGS } from "@/data/buildings";
+import { focusCalm } from "@/data/focuses";
 import {
   FAMINE_UNREST_SPIKE,
   FREE_REGIONS,
@@ -29,6 +30,7 @@ import {
 function buildingCalm(region: Region): number {
   let calm = 0;
   for (const id of region.buildings) calm += BUILDINGS[id].unrest;
+  calm += focusCalm(region.focus); // a Garrison focus keeps the province calmer
   return calm;
 }
 

@@ -5,6 +5,7 @@ import {
   setTaxRate,
   queueBuilding,
   cancelConstruction,
+  setRegionFocus,
   chooseResearch,
 } from "@/systems/turn";
 import { raiseUnit, moveArmy, reachableRegions } from "@/systems/military";
@@ -126,6 +127,10 @@ function main(): void {
     },
     onCancelConstruction(regionId) {
       state = cancelConstruction(state, regionId);
+      commit();
+    },
+    onSetFocus(regionId, focus) {
+      state = setRegionFocus(state, regionId, focus);
       commit();
     },
     onRaiseUnit(regionId, unit) {

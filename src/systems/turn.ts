@@ -19,6 +19,7 @@ import { UNITS, type UnitType } from "@/data/units";
 import { ARCHETYPES } from "@/data/personalities";
 import { TRAIT_IDS, type TraitId } from "@/data/traits";
 import { FACTIONS, factionByName } from "@/data/factions";
+import type { FocusId } from "@/data/focuses";
 import { TECHS, type TechId } from "@/data/techs";
 import { generateMap, type MapGenOptions } from "@/systems/mapgen";
 import { scriptedMap } from "@/data/maps/types";
@@ -494,6 +495,25 @@ export function cancelConstruction(state: GameState, regionId: number): GameStat
   const regions = state.regions.map((r) =>
     r.id === regionId ? { ...r, construction: null } : r,
   );
+  return { ...state, regions };
+}
+
+/**
+ * Assign (or clear) a region's specialisation focus. Owner-gated — you can only
+ * re-purpose a region you hold. Takes effect immediately (no build time); the
+ * one-focus-per-region limit is the whole trade-off. Pure.
+ */
+export function setRegionFocus(
+  state: GameState,
+  regionId: number,
+  focus: FocusId,
+  ownerId = PLAYER_ID,
+): GameState {
+  const region = state.regions[regionId];
+  if (!region || region.ownerId !== ownerId) return state;
+  const next: FocusId | undefined = focus === "balanced" ? undefined : focus;
+  if (region.focus === next) return state;
+  const regions = state.regions.map((r) => (r.id === regionId ? { ...r, focus: next } : r));
   return { ...state, regions };
 }
 

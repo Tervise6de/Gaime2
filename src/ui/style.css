@@ -1318,6 +1318,20 @@ body {
   color: var(--negative);
 }
 
+/* Region focus picker — "what is this province for?". */
+.hud-focus {
+  margin: 12px 0 4px;
+}
+
+.hud-focus-select {
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.hud-focus-blurb {
+  margin: 2px 0 0;
+}
+
 /* Small uppercase divider inside the region panel ("Income / turn"). */
 .hud-region-subhead {
   margin: 12px 0 6px;

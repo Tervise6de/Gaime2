@@ -12,6 +12,7 @@
  */
 
 import type { BuildingId } from "@/data/buildings";
+import type { FocusId } from "@/data/focuses";
 import type { ResourceYield, StrategicResource, TerrainId } from "@/data/terrain";
 import type { UnitType } from "@/data/units";
 import type { BattleReport } from "@/systems/combat";
@@ -196,6 +197,11 @@ export interface Region {
   resource: StrategicResource | null;
   /** Completed building ids in this region. */
   buildings: BuildingId[];
+  /**
+   * Player-assigned specialisation biasing this region's output (data/focuses.ts).
+   * Absent/undefined = balanced (no lean). Only owned regions carry one.
+   */
+  focus?: FocusId;
   /** What's under construction here, if anything. */
   construction: ConstructionOrder | null;
   /** Ids of adjacent regions (the pure logic graph). */

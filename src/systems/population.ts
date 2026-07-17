@@ -10,6 +10,7 @@
  */
 
 import { BUILDINGS } from "@/data/buildings";
+import { focusPopCapacity } from "@/data/focuses";
 import { TERRAIN } from "@/data/terrain";
 import {
   GROWTH_BASE,
@@ -25,6 +26,7 @@ import { round1 } from "@/systems/economy";
 export function regionCapacity(region: Region): number {
   let cap = TERRAIN[region.terrain].popCapacity;
   for (const id of region.buildings) cap += BUILDINGS[id].popCapacity;
+  cap += focusPopCapacity(region.focus); // Farmland focus raises the ceiling
   return cap;
 }
 

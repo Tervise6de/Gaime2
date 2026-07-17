@@ -15,6 +15,7 @@
 import { UNITS, type UnitType } from "@/data/units";
 import { TERRAIN, type StrategicResource } from "@/data/terrain";
 import { traitUnitCostMult } from "@/data/traits";
+import { focusUnitCostMult, type FocusId } from "@/data/focuses";
 import { createRng } from "@/systems/rng";
 import { resolveCombat, type UnitCounts } from "@/systems/combat";
 import { soldiersDisplay } from "@/systems/format";
@@ -33,9 +34,13 @@ import {
 } from "@/systems/state";
 
 /** Unit gold+materials cost after the owner's national trait (Martial discount). */
-export function unitCost(nation: Nation | undefined, unit: UnitType): { gold: number; materials: number } {
+export function unitCost(
+  nation: Nation | undefined,
+  unit: UnitType,
+  focus?: FocusId,
+): { gold: number; materials: number } {
   const c = UNITS[unit].cost;
-  const m = traitUnitCostMult(nation?.trait);
+  const m = traitUnitCostMult(nation?.trait) * focusUnitCostMult(focus); // Garrison focus discounts musters
   return { gold: Math.round(c.gold * m), materials: Math.round(c.materials * m) };
 }
 
@@ -96,7 +101,7 @@ export function canRaiseUnit(
   if (def.requiresTech && !nation.research.done.includes(def.requiresTech)) {
     return { ok: false, reason: `Requires ${def.requiresTech.replace(/_/g, " ")}.` };
   }
-  const cost = unitCost(nation, unit);
+  const cost = unitCost(nation, unit, region.focus);
   if (nation.stocks.gold < cost.gold) return { ok: false, reason: "Not enough gold." };
   if (nation.stocks.materials < cost.materials) {
     return { ok: false, reason: "Not enough materials." };
@@ -116,7 +121,7 @@ export function raiseUnit(
 ): GameState {
   if (!canRaiseUnit(state, regionId, unit, ownerId).ok) return state;
   const owner = state.nations.find((n) => n.id === ownerId);
-  const cost = unitCost(owner, unit);
+  const cost = unitCost(owner, unit, state.regions[regionId]?.focus);
 
   const nations = state.nations.map((n) =>
     n.id === ownerId

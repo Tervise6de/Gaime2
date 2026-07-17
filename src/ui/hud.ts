@@ -33,6 +33,7 @@ import {
 } from "@/ui/settings";
 import type { BattleReport } from "@/systems/combat";
 import { LENSES, lensGradient, type LensId } from "@/ui/lenses";
+import { FOCUSES, FOCUS_IDS, type FocusId } from "@/data/focuses";
 import { cbSafe } from "@/data/palette";
 import { OCEAN } from "@/data/mapstyle";
 import { badgeArt, BRANCH_ART, crestSvg, eventVignette, MOMENT_ART, safeColor, TERRAIN_ART, TREATY_ART } from "@/data/art";
@@ -113,6 +114,8 @@ export interface HudCallbacks {
   onImport(json: string): void;
   onQueueBuilding(regionId: number, building: BuildingId): void;
   onCancelConstruction(regionId: number): void;
+  /** Assign a region's specialisation focus (or "balanced" to clear it). */
+  onSetFocus(regionId: number, focus: FocusId): void;
   onRaiseUnit(regionId: number, unit: UnitType): void;
   onBeginMove(armyId: number): void;
   onCancelMove(): void;
@@ -2229,6 +2232,7 @@ function renderRegion(
         : `${resourceIconHtml("horses", "🐎")} horses`,
     );
   }
+  if (region.focus) bits.push(`${FOCUSES[region.focus].icon} ${escapeHtml(FOCUSES[region.focus].label)}`);
   meta.innerHTML = bits.join(" · ");
   container.append(title, meta);
 
@@ -2348,6 +2352,30 @@ function buildingsSection(region: Region): HTMLElement {
   }
   details.append(list);
   return details;
+}
+
+/**
+ * Region focus picker — the "what is this province for?" control. A dropdown of
+ * the specialisations with the current one's effect below. Owned regions only.
+ */
+function focusSection(region: Region, callbacks: HudCallbacks): HTMLElement {
+  const wrap = el("div", "hud-focus");
+  const current: FocusId = region.focus ?? "balanced";
+  const sel = document.createElement("select");
+  sel.className = "hud-select hud-focus-select";
+  for (const id of FOCUS_IDS) {
+    const opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent = `${FOCUSES[id].icon} ${FOCUSES[id].label}`;
+    sel.append(opt);
+  }
+  sel.value = current;
+  sel.title = "Specialise this province — a cheap identity that biases its output.";
+  sel.addEventListener("change", () => callbacks.onSetFocus(region.id, sel.value as FocusId));
+  const blurb = el("p", "hud-hint hud-focus-blurb");
+  blurb.textContent = FOCUSES[current].blurb;
+  wrap.append(regionSubhead("Focus"), sel, blurb);
+  return wrap;
 }
 
 /**
@@ -2471,6 +2499,9 @@ function renderOwnedRegion(
   // effect (its "level" of benefit), plus the region's fortification level.
   container.append(buildingsSection(region));
 
+  // Focus: what this province is *for* — a cheap specialisation biasing output.
+  container.append(focusSection(region, callbacks));
+
   // Army in the region.
   const army = armyAt(state, region.id, PLAYER_ID);
   container.append(renderArmySection(state, region, army, moveArmyId, callbacks));
@@ -2583,7 +2614,7 @@ function renderArmySection(
       ? `Raises a 1,000-strong ${def.name} regiment (deploys next turn). ` +
         `${def.attack} atk / ${def.defense} def · ${def.upkeep}g upkeep${def.requires ? ` · needs ${def.requires}` : ""}`
       : check.reason ?? "";
-    const cost = unitCost(playerNation(state), t);
+    const cost = unitCost(playerNation(state), t, region.focus); // Garrison focus discounts musters
     const resourceLocked = !!def.requires && !access.has(def.requires);
     const costHtml = resourceLocked
       ? `needs ${resourceIconHtml(def.requires!, def.requires === "iron" ? "⚒" : "🐎")}`
