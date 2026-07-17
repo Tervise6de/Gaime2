@@ -112,6 +112,8 @@ export interface HudCallbacks {
   onRaiseUnit(regionId: number, unit: UnitType): void;
   onBeginMove(armyId: number): void;
   onCancelMove(): void;
+  /** One-click attack: strike this region with the strongest adjacent army. */
+  onAttackRegion(regionId: number): void;
   onDeclareWar(targetId: number): void;
   onMakePeace(targetId: number): void;
   onProposePact(targetId: number, kind: "nap" | "alliance"): void;
@@ -199,11 +201,12 @@ const RESOURCE_META: Record<ResourceKey, { label: string; icon: string; tip: str
 export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   root.innerHTML = "";
 
-  // --- Top strip (Civ-style): one slim full-width bar along the top edge -----
-  // Compact icon+value(+flow) resource chips lead on the left; crisis chips,
-  // timed modifiers and victory progress sit centred; the grand turn/era
-  // readout and the ☰ menu close the right end. (Resource names live in the
-  // chip tooltips — the icons carry the identity, Civ-style.)
+  // --- Top strip: one slim full-width bar along the top edge ------------------
+  // Labelled resource segments lead on the left (icon · name / value /
+  // +flow per turn, divided like cards); the turn block (turn·year, age·
+  // difficulty·trait, active modifiers) sits centre-left with crisis chips
+  // and victory progress beside it; labelled quick buttons (Legend / Help /
+  // Standing / Game) and the ☰ menu close the right end.
   const topBar = el("div", "hud-topbar");
   const barLeft = el("div", "hud-topbar-left");
   const resourceEls: Record<ResourceKey, { stock: HTMLElement; flow: HTMLElement }> =
@@ -213,9 +216,13 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     const cell = el("div", "hud-resource");
     cell.title = `${meta.label} — ${meta.tip}`;
     const icon = resourceIconEl(key, meta.icon, "hud-resource-icon");
+    const body = el("div", "hud-resource-body");
+    const label = el("span", "hud-resource-label");
+    label.textContent = meta.label;
     const stock = el("span", "hud-resource-stock");
     const flow = el("span", "hud-resource-flow");
-    cell.append(icon, stock, flow);
+    body.append(label, stock, flow);
+    cell.append(icon, body);
     barLeft.append(cell);
     resourceEls[key] = { stock, flow };
   }
@@ -272,26 +279,48 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     if (stockRaf === null) stockRaf = requestAnimationFrame(stepStock);
   }
 
+  // The turn block: turn·year on top, then age · difficulty · trait, then any
+  // active timed modifiers ("War-weariness ×2 (3)") — one bordered segment.
+  const turnBlock = el("div", "hud-turnblock");
+  const turnMain = el("div", "hud-turn-main");
+  const turnSub = el("div", "hud-turn-sub");
+  const turnMods = el("div", "hud-turn-mods");
+  turnMods.style.display = "none";
+  turnBlock.append(turnMain, turnSub, turnMods);
+  topBar.append(turnBlock);
+
   const barCenter = el("div", "hud-topbar-center");
   // Crises never hide behind a digest: famine/bankruptcy chips persist every
-  // turn the condition holds. Timed realm modifiers show as compact chips.
+  // turn the condition holds.
   const crisisEl = el("div", "hud-crisis");
   crisisEl.style.display = "none";
-  const modsBox = el("div", "hud-mods");
-  modsBox.style.display = "none";
   const victoryEl = el("div", "hud-victory");
   victoryEl.title = "Progress toward each victory: leading realm's territory share (domination at "
     + `${Math.round(DOMINATION_FRACTION * 100)}%), Great Works, and the turn ${TURN_LIMIT} prestige deadline.`;
-  barCenter.append(crisisEl, modsBox, victoryEl);
+  barCenter.append(crisisEl, victoryEl);
   topBar.append(barCenter);
 
   const barRight = el("div", "hud-topbar-right");
-  // The grand turn readout: turn, calendar year and the age of the world.
-  const turnWrap = el("div", "hud-turnwrap");
-  const turnMain = el("div", "hud-turn-main");
-  const turnEra = el("div", "hud-turn-era");
-  turnWrap.append(turnMain, turnEra);
-  barRight.append(turnWrap);
+  // Labelled quick buttons — the everyday panels one click from anywhere.
+  const quickBtn = (
+    glyph: Parameters<typeof iconBtn>[0],
+    fb: string,
+    label: string,
+    title: string,
+    run: () => void,
+  ): HTMLButtonElement => {
+    const b = iconBtn(glyph, fb, label, "hud-topbtn", run);
+    b.title = title;
+    return b;
+  };
+  barRight.append(
+    quickBtn("legend", "❔", "Legend", "Decode the map markers. Shortcut: L", () => {
+      legendPanel.style.display = legendPanel.style.display === "none" ? "block" : "none";
+    }),
+    quickBtn("help", "💡", "Help", "Reopen the getting-started tips. Shortcut: H", () => showHints()),
+    quickBtn("standings", "📊", "Standing", "See how you rank against every rival. Shortcut: S", () => toggleStandings()),
+    quickBtn("options", "🎛", "Game", "New game, save slots, import & export.", () => openGameMenu()),
+  );
 
   // ☰ menu — standings, help, tutorial, legend, records and options all live
   // behind one toggle, so the strip itself stays pure information.
@@ -299,7 +328,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const menuToggle = document.createElement("button");
   menuToggle.className = "hud-legend-toggle hud-menu-toggle";
   menuToggle.textContent = "☰";
-  menuToggle.title = "Standings, help, tutorial, legend, records and options.";
+  menuToggle.title = "Tutorial, records and options.";
   menuToggle.setAttribute("aria-label", "Menu");
   const topMenu = el("div", "hud-topmenu");
   topMenu.style.display = "none";
@@ -311,18 +340,9 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       closeTopMenu();
       run();
     });
-  const standingsItem = menuItem("standings", "📊", "Standings", () => toggleStandings());
-  standingsItem.title = "See how you rank against every rival. Shortcut: S";
-  const legendToggleItem = menuItem("legend", "❔", "Map legend", () => {
-    legendPanel.style.display = legendPanel.style.display === "none" ? "block" : "none";
-  });
-  legendToggleItem.title = "Decode the map markers. Shortcut: L";
-  const helpItem = menuItem("help", "💡", "Help", () => showHints());
-  helpItem.title = "Reopen the getting-started tips. Shortcut: H";
+  // Legend / Help / Standing / Game are first-class buttons on the bar now;
+  // the ☰ keeps the rarer panels.
   topMenu.append(
-    standingsItem,
-    legendToggleItem,
-    helpItem,
     menuItem("tutorial", "🎓", "Tutorial", () => runTutorial()),
     menuItem("records", "🏅", "Records", () => openRecords()),
     menuItem("options", "⚙", "Options", () => openOptions()),
@@ -513,10 +533,8 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const advisorBox = el("div", "hud-advisor");
   advisorBox.style.display = "none";
 
-  // Admin (new game / saves / backup) hides behind one Game menu button.
-  const gameMenuBtn = btn("Game menu", "hud-gamemenu-btn", () => openGameMenu());
-  gameMenuBtn.title = "New game, save slots, import & export.";
-  actions.append(fiscalHead, taxRow, upkeepLine, taxUnrestLine, advisorBox, endTurnBtn, gameMenuBtn);
+  // Admin (new game / saves / backup) lives behind the top bar's Game button.
+  actions.append(fiscalHead, taxRow, upkeepLine, taxUnrestLine, advisorBox, endTurnBtn);
   root.append(actions);
 
   // --- Game menu overlay: the administrative controls, out of the way --------
@@ -1716,27 +1734,25 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       "Famine: population starves and unrest climbs — fix your food flow. " +
       "Bankruptcy: the treasury ran dry and troops disband.";
 
-    // Timed realm modifiers as compact chips (label ×stacks · turns left).
-    modsBox.innerHTML = "";
-    const mods = (player.modifiers ?? []).filter((m) => m.turnsLeft > 0);
-    for (const m of mods) {
-      const chip = el("span", "hud-mod-chip");
-      const stacks = (m.stacks ?? 1) > 1 ? ` ×${m.stacks}` : "";
-      chip.textContent = `${MODIFIER_LABEL[m.id]}${stacks} · ${m.turnsLeft}`;
-      chip.title = `${MODIFIER_LABEL[m.id]}${stacks} — ${m.turnsLeft} turn${m.turnsLeft === 1 ? "" : "s"} remaining.`;
-      modsBox.append(chip);
-    }
-    modsBox.style.display = mods.length ? "flex" : "none";
-
-    // The grand turn readout: turn, calendar year and the age of the world.
-    // Seed/difficulty/trait move off the bar into the legend's World card
-    // (and this readout's tooltip) — the bar stays clean, Civ-style.
+    // The turn block: turn·year, then age · difficulty · trait, then any
+    // active timed modifiers ("War-weariness ×2 (3)"). Seed stays in the
+    // legend's World card.
     const era = eraForTurn(state.turn);
     turnMain.textContent = `Turn ${state.turn} · ${yearForTurn(state.turn)} AD`;
-    turnEra.textContent = era.name;
-    turnWrap.title =
+    turnSub.textContent =
+      `${era.name} · ${state.difficulty}` + (player.trait ? ` · ${TRAITS[player.trait].label}` : "");
+    const mods = (player.modifiers ?? []).filter((m) => m.turnsLeft > 0);
+    turnMods.textContent = mods
+      .map((m) => {
+        const stacks = (m.stacks ?? 1) > 1 ? ` ×${m.stacks}` : "";
+        return `${MODIFIER_LABEL[m.id]}${stacks} (${m.turnsLeft})`;
+      })
+      .join(" · ");
+    turnMods.style.display = mods.length ? "block" : "none";
+    turnBlock.title =
       `${era.blurb}\n\nDifficulty: ${state.difficulty} · seed ${state.seed}` +
-      (player.trait ? `\n${TRAITS[player.trait].label} — ${TRAITS[player.trait].blurb}` : "");
+      (player.trait ? `\n${TRAITS[player.trait].label} — ${TRAITS[player.trait].blurb}` : "") +
+      (mods.length ? `\nActive effects: ${turnMods.textContent} — number in brackets = turns remaining.` : "");
 
     // Legend "This world" card: the game's identity facts, off the busy bar.
     legendWorld.innerHTML = "";
@@ -1902,10 +1918,29 @@ function renderRegion(
   meta.innerHTML = bits.join(" · ");
   container.append(title, meta);
 
+  // At-a-glance stat row: defence, unrest state, garrison strength.
+  const stats = el("div", "hud-region-stats");
+  const defStat = el("span", "hud-region-stat");
+  defStat.innerHTML = `${glyphHtml("shield", "🛡")} ×${terrain.defense}${region.fortification ? ` +fort ${region.fortification}` : ""}`;
+  defStat.title = `Defence: terrain ×${terrain.defense}${region.fortification ? `, fortification level ${region.fortification} (siege strips it)` : ""}.`;
+  const unrestStat = el("span", "hud-region-stat");
+  unrestStat.append(unrestTag(region));
+  unrestStat.title = `Unrest ${fmt(region.unrest)} — output suffers at ${UNREST_PENALTY_START}+, revolt at ${UNREST_REVOLT}+.`;
+  const garrison = anyArmyAt(state, region.id);
+  const garrisonStat = el("span", "hud-region-stat");
+  garrisonStat.innerHTML = garrison
+    ? `${glyphHtml("attack", "⚔")} ${soldiersCompact(armySize(garrison.units))}`
+    : `${glyphHtml("attack", "⚔")} —`;
+  garrisonStat.title = garrison
+    ? `${soldiersDisplay(armySize(garrison.units))} soldiers garrison this region.`
+    : "No garrison stationed here.";
+  stats.append(defStat, unrestStat, garrisonStat);
+  container.append(stats);
+
   if (owned) {
     renderOwnedRegion(container, state, region, moveArmyId, callbacks);
   } else {
-    renderEnemyRegion(container, state, region);
+    renderEnemyRegion(container, state, region, callbacks);
   }
 }
 
@@ -2038,19 +2073,55 @@ function renderOwnedRegion(
   container.append(renderBuildSection(region, playerNation(state).research.done, callbacks));
 }
 
-function renderEnemyRegion(container: HTMLElement, state: GameState, region: Region): void {
+function renderEnemyRegion(
+  container: HTMLElement,
+  state: GameState,
+  region: Region,
+  callbacks: HudCallbacks,
+): void {
   const garrison = anyArmyAt(state, region.id);
   const box = el("div", "hud-enemy");
-  const t = TERRAIN[region.terrain];
   if (garrison && armySize(garrison.units) > 0) {
     box.append(line(`Enemy garrison: ${soldiersDisplay(armySize(garrison.units))} soldiers (${composition(garrison)})`));
   } else {
     box.append(line("Undefended — an army walking in captures it."));
   }
-  box.append(line(`Terrain defence ×${t.defense}${region.fortification ? `, fort ${region.fortification}` : ""}.`, "hud-hint"));
+
+  // One-click Attack: the strongest of your adjacent armies with moves left
+  // strikes immediately, with the odds shown on the button itself.
+  const attackers = state.armies.filter(
+    (a) =>
+      a.ownerId === PLAYER_ID &&
+      a.movesLeft > 0 &&
+      state.regions[a.regionId]?.adjacency.includes(region.id),
+  );
+  const best = attackers.reduce<Army | null>(
+    (p, c) => (p === null || armySize(c.units) > armySize(p.units) ? c : p),
+    null,
+  );
+  const attackBtn = document.createElement("button");
+  attackBtn.className = "hud-attack-btn";
+  if (best) {
+    const preview = previewCombat(best.units, garrison?.units ?? emptyUnits(), {
+      terrainDefense: TERRAIN[region.terrain].defense,
+      fortification: region.fortification,
+    });
+    const oddsText = preview.undefended ? "capture" : `${Math.round(preview.winChance * 100)}%`;
+    attackBtn.innerHTML = `${glyphHtml("attack", "⚔")} Attack (${oddsText})`;
+    attackBtn.title =
+      `Strike with your ${soldiersDisplay(armySize(best.units))}-soldier army from ` +
+      `${state.regions[best.regionId]?.name ?? "next door"}` +
+      (preview.undefended ? " — undefended, walking in captures it." : ` — estimated ${oddsText} to win.`);
+    attackBtn.addEventListener("click", () => callbacks.onAttackRegion(region.id));
+  } else {
+    attackBtn.innerHTML = `${glyphHtml("attack", "⚔")} Attack`;
+    attackBtn.disabled = true;
+    attackBtn.title = "No army of yours with moves left borders this region — march one next door first.";
+  }
+  box.append(attackBtn);
   box.append(
     line(
-      "To attack: open one of YOUR regions with an army next door → Move / Attack ▸ → click this region.",
+      "Or pick the army yourself: Armies (A) → Move ▸, then click this region.",
       "hud-hint",
     ),
   );

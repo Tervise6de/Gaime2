@@ -109,23 +109,32 @@ body {
   gap: 10px;
 }
 
-/* Civ-style resource chip: icon + stock + flow on one line; the name lives
-   in the tooltip. */
+/* Labelled resource segment: icon beside a small column of name / value /
+   +flow per turn, divided from its neighbour like a card. */
 .hud-resource {
   display: flex;
-  gap: 6px;
-  align-items: baseline;
-  padding: 2px 9px;
-  border-right: 1px solid rgba(230, 233, 239, 0.08);
-}
-
-.hud-resource:last-child {
-  border-right: none;
+  gap: 8px;
+  align-items: center;
+  padding: 3px 14px 3px 10px;
+  border-right: 1px solid rgba(230, 233, 239, 0.1);
 }
 
 .hud-resource-icon {
-  font-size: 17px;
-  align-self: center;
+  font-size: 18px;
+}
+
+.hud-resource-body {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.18;
+}
+
+.hud-resource-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
 }
 
 .hud-resource-stock {
@@ -135,13 +144,57 @@ body {
 }
 
 .hud-resource-flow {
-  font-size: 11px;
+  font-size: 10.5px;
   color: #82c99a;
   font-variant-numeric: tabular-nums;
 }
 
 .hud-resource-flow.negative {
   color: var(--negative);
+}
+
+/* The turn block: turn·year / age·difficulty·trait / active modifiers. */
+.hud-turnblock {
+  padding: 2px 14px;
+  border-right: 1px solid rgba(230, 233, 239, 0.1);
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.hud-turn-mods {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #e8a68a;
+}
+
+/* Labelled quick buttons (Legend / Help / Standing / Game). */
+.hud-topbtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 56px;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.hud-topbtn:hover {
+  border-color: rgba(230, 200, 116, 0.55);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.hud-topbtn .ico,
+.hud-topbtn .ico-svg svg {
+  width: 16px;
+  height: 16px;
 }
 
 /* --- End-turn advisor: chips for whatever still wants orders --------------- */
@@ -441,38 +494,8 @@ body {
   white-space: nowrap;
 }
 
-/* Timed realm modifiers (golden age, plague…) as compact chips. */
-.hud-mods {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.hud-mod-chip {
-  padding: 2.5px 8px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #ecd9a8;
-  background: rgba(224, 183, 74, 0.14);
-  border: 1px solid rgba(224, 183, 74, 0.4);
-  border-radius: 999px;
-  white-space: nowrap;
-}
-
-/* The grand turn readout: turn + year over the age of the world. */
-.hud-turnwrap {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  line-height: 1.2;
-  text-align: right;
-  white-space: nowrap;
-}
-
 .hud-turn-main {
-  font-size: 15px;
+  font-size: 14.5px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   background: linear-gradient(180deg, #f2dfa8, #d8ab55);
@@ -481,12 +504,11 @@ body {
   color: transparent;
 }
 
-.hud-turn-era {
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgba(230, 200, 116, 0.72);
+.hud-turn-sub {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
 }
 
 /* --- Panels --------------------------------------------------------------- */
@@ -678,9 +700,53 @@ body {
 .hud-right {
   right: 12px;
   top: 66px;
-  width: 250px;
+  width: 282px;
   max-height: calc(100vh - 320px);
   overflow-y: auto;
+}
+
+/* At-a-glance stat row under the region title: defence / unrest / garrison. */
+.hud-region-stats {
+  display: flex;
+  gap: 6px;
+  margin: 8px 0 10px;
+}
+
+.hud-region-stat {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(230, 233, 239, 0.09);
+  border-radius: 7px;
+  white-space: nowrap;
+}
+
+/* One-click Attack on enemy regions (odds baked into the label). */
+.hud-attack-btn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px 12px;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #1a0d0a;
+  background: linear-gradient(180deg, #f0a08c, #d96a52 60%, #b84a35);
+  border: 1px solid #f4b8a6;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.hud-attack-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.hud-attack-btn:disabled {
+  filter: grayscale(0.75) brightness(0.7);
+  cursor: default;
 }
 
 /* Events feed inside the log hub (alert rows + last-turn summary). */

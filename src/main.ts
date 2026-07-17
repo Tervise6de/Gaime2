@@ -20,7 +20,7 @@ import {
 import { resolveChoice } from "@/systems/events";
 import { saveToLocal, loadFromLocal, hasLocalSave, clearLocalSave, serializeGame, deserializeGame } from "@/systems/save";
 import { summarizeTurn, type TurnSummary } from "@/systems/summary";
-import { PLAYER_ID, type GameState } from "@/systems/state";
+import { PLAYER_ID, armySize, type GameState } from "@/systems/state";
 import { createHud } from "@/ui/hud";
 import { showMainMenu } from "@/ui/title";
 import { runTutorial, hasSeenTutorial } from "@/ui/tutorial";
@@ -139,6 +139,26 @@ function main(): void {
       moveArmyId = null;
       sync();
     },
+    onAttackRegion(regionId) {
+      // One-click attack from the region panel: the strongest adjacent army
+      // with moves left strikes immediately (same sim path as the map flow).
+      const candidates = state.armies.filter(
+        (a) =>
+          a.ownerId === PLAYER_ID &&
+          a.movesLeft > 0 &&
+          state.regions[a.regionId]?.adjacency.includes(regionId),
+      );
+      if (candidates.length === 0) return;
+      const best = candidates.reduce((p, c) => (armySize(c.units) > armySize(p.units) ? c : p));
+      const before = state;
+      state = moveArmy(state, best.id, regionId);
+      moveArmyId = null;
+      selectedRegion = regionId;
+      commit();
+      for (const after of state.regions) {
+        if (before.regions[after.id]?.ownerId !== after.ownerId) renderer.pulseCapture(after.id);
+      }
+    },
     onDeclareWar(targetId) {
       state = declareWar(state, PLAYER_ID, targetId);
       commit();
@@ -224,9 +244,9 @@ function main(): void {
     selectedRegion = regionId;
     moveArmyId = null;
     sync();
-    // A plain map click opens the region full-size (same screen as Capital);
-    // ocean clicks just deselect.
-    if (regionId !== null) hud.openRegionScreen(regionId);
+    // A plain map click inspects the region in the right-side panel (the map
+    // stays visible for the next move); ⛶ or the Capital button open the
+    // full-size screen when more room is wanted. Ocean clicks just deselect.
   });
 
   // Keyboard: Enter / Space ends the turn (unless typing in an input, or a modal
