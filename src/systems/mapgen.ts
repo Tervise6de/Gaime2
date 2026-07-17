@@ -28,18 +28,23 @@ export interface MapGenOptions {
 }
 
 export const DEFAULT_MAP_OPTIONS: MapGenOptions = {
-  regionCount: 22,
+  regionCount: 30,
   relaxIterations: 6,
   maxNeighbours: 4,
 };
 
+// Real toponyms of the medieval Baltic rim — Livonian, Prussian, Lithuanian,
+// Rus, Polish and Norse towns and strongholds (period-anglicised spellings) —
+// so the world reads as a real place. Enough for the largest map size; the
+// generator shuffles and takes the first N per game.
 const REGION_NAMES = [
-  "Aldermoor", "Brightvale", "Cinderhold", "Duskford", "Eastmarch",
-  "Frosthaven", "Grimwald", "Hollowmere", "Ironreach", "Jorvik",
-  "Kelmoor", "Larkspur", "Millbrook", "Northgate", "Oakhurst",
-  "Pinecrest", "Quillhaven", "Ravenfell", "Stormhold", "Thornwood",
-  "Umbervale", "Vesterlund", "Westford", "Wyrmholt", "Yarrowfield",
-  "Zephyrmoor", "Ashcombe", "Blackfen", "Cragmaw", "Dunwallow",
+  "Riga", "Reval", "Dorpat", "Narva", "Pernau", "Wenden", "Fellin", "Memel",
+  "Konigsberg", "Danzig", "Elbing", "Thorn", "Kulm", "Vilna", "Kovno", "Troki",
+  "Grodno", "Novgorod", "Pskov", "Polotsk", "Ladoga", "Izborsk", "Smolensk",
+  "Minsk", "Visby", "Kalmar", "Lubeck", "Wolin", "Stettin", "Gnesen", "Plock",
+  "Krakau", "Abo", "Viborg", "Kexholm", "Sigtuna", "Roskilde", "Hedeby",
+  "Truso", "Gdov", "Kokenhusen", "Mitau", "Bauska", "Goldingen", "Windau",
+  "Libau", "Rakvere", "Weissenstein",
 ];
 
 interface Site {

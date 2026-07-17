@@ -127,16 +127,18 @@ export function buildNewGameForm(): NewGameForm {
       ["3", "3"],
       ["4", "4"],
       ["5", "5"],
+      ["6", "6"],
     ],
-    prefs.rivals ?? "2",
-    "2",
+    prefs.rivals ?? "3",
+    "3",
     () => dropToCustom(),
   );
   const mapSizeSeg = segmented(
     [
-      ["16", "Small"],
-      ["22", "Medium"],
-      ["30", "Large"],
+      ["18", "Small"],
+      ["30", "Medium"],
+      ["40", "Large"],
+      ["48", "Grand"],
     ],
     prefs.mapSize ?? String(DEFAULT_MAP_OPTIONS.regionCount),
     String(DEFAULT_MAP_OPTIONS.regionCount),

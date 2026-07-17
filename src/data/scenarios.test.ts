@@ -13,8 +13,8 @@ describe("SCENARIOS", () => {
       expect(s.name.length).toBeGreaterThan(0);
       expect(s.blurb.length).toBeGreaterThan(10);
       expect(s.rivals).toBeGreaterThanOrEqual(1);
-      expect(s.rivals).toBeLessThanOrEqual(5);
-      expect([16, 22, 30]).toContain(s.regionCount);
+      expect(s.rivals).toBeLessThanOrEqual(6);
+      expect([18, 30, 40, 48]).toContain(s.regionCount);
       expect(["easy", "normal", "hard"]).toContain(s.difficulty);
       if (s.playerTrait !== undefined) expect(TRAIT_IDS).toContain(s.playerTrait);
     }

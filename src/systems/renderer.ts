@@ -1634,7 +1634,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       context.fillStyle = "#0d0f14";
       context.fillText(label, bx, by);
 
-      const who = ownerNation?.isPlayer ? "Your" : ownerNation?.isBarbarian ? "Barbarian" : `${ownerNation?.name ?? "Rival"}'s`;
+      const who = ownerNation?.isPlayer ? "Your" : ownerNation?.isBarbarian ? "Tribal" : `${ownerNation?.name ?? "Rival"}'s`;
       const hint = mine
         ? " Click the region, then Move / Attack to send it somewhere."
         : "";

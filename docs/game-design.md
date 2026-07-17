@@ -541,3 +541,113 @@ play and test.
   seeded RNG, and pure-function deterministic turn resolution.
 - **Build plan:** M1 economy → M2 population/unrest → M3 military → M4 AI/diplomacy
   → M5 tech/victory → M6 polish, each a playable, testable slice.
+
+---
+
+## 9. Post-v1 Roadmap — "CK3 × Civilization" direction (planned)
+
+v1 is a complete, playable loop. This section records the agreed direction for
+the next phase and the concrete design for each system, so implementation is
+"build the plan", not "invent while coding". Sequenced by felt impact.
+
+### 9.0 World identity — real setting, real powers, wider board
+**Shipped (v0.14):** the procedural world is now themed as the **medieval
+Baltic rim** (~900 AD onward — the era the game already opens in). Rival powers
+are real: **Lithuania, Novgorod, Denmark, Prussia, Livonia, Poland, Sweden,
+Curonia** (a mix of pagan tribal confederations, Rus republics and Christian
+kingdoms). Regions carry real Baltic toponyms (Riga, Reval, Dorpat, Danzig,
+Novgorod, Visby, …). Neutral holders are **Free Tribes**. Map sizes widened
+(Small 18 / Medium 30 / Large 40 / Grand 48; default Medium) and up to 6 rivals.
+
+**Planned — a real geographic map.** The current renderer wraps the region
+sites in a *generated organic island*. A real Baltic map is a different shape:
+**land around a central sea**, with the Gulf of Finland, Gulf of Riga and the
+islands (Gotland, Ösel/Saaremaa). Plan:
+- New **scenario-map data format**: a hand-authored landmass outline (one or
+  more coast polygons in normalised space) + fixed region sites with real
+  positions, names, terrain and adjacency — instead of pure procedural scatter.
+- Renderer gains a **"scripted map" mode**: clip the Voronoi/organic cells to
+  the authored coastline(s) rather than to a generated island blob. The camera,
+  layer-caching and political pipeline are unchanged (they already consume an
+  arbitrary land path).
+- Ship **Baltic** first (≈30–40 regions), then extend the same format to a
+  wider **Europe** map as a larger scenario. Procedural "random realm" stays as
+  the replayable alternative.
+- Keep everything deterministic and data-driven — a new map is a new data file,
+  not new engine code.
+
+### 9.1 Diplomacy with opinion (the CK3 pillar)
+Today: a relation number + action buttons. Planned: **opinion modifiers** — a
+list of dated reasons a power feels how it does about you ("−20 you demanded
+tribute", "+15 we share an enemy", "−10 you border my heartland", "+10 kept the
+peace 10 turns"). Surface them in the diplomacy card so relations are legible,
+not opaque. Add **rival-to-rival relations** (who likes/hates whom) and show
+**alliances/wars between third parties**, so the board is a political map, not
+just you-vs-each. Casus-belli-lite: declaring war with a *reason* (reclaim a
+lost region, ally's call) costs less opinion than naked aggression.
+
+### 9.2 Combat model + unit roles (needs the most care)
+Today combat is a single opposed-strength roll per attack. Planned redesign
+(to be specced before building), aiming for readable depth, not tactics micro:
+- **Unit roles that matter at the decision point.** Infantry (line/hold),
+  Ranged (soften, weak in melee), Cavalry (fast, flanks, strong on open plains,
+  poor in forest/siege), Siege (strips fortification, weak in the field),
+  Militia (cheap fodder). A light **counter loop** so composition is a choice.
+- **Terrain & fortification** already feed defence; make their effect explicit
+  in the combat preview (per-unit, not just a single %).
+- **A combat report** (see 9.3-adjacent): the fight resolves into a surfaced
+  card — attacker vs defender, per-side casualties in soldiers, terrain/fort
+  modifiers, outcome — instead of one log line. This is cheap and high-impact.
+- Open question to resolve in the spec: do multiple armies **combine** into one
+  battle (CK3 stacks) or attack **sequentially** (current)? Likely: allow
+  pre-battle **merge at a staging region**, keep resolution single-battle.
+
+### 9.3 Map lenses (Civ-style overlays)
+Toggleable map overlays so the board is readable at a glance without clicking
+each region: **Unrest lens** (heat over your regions), **Military lens** (which
+armies still have moves; enemy strength near your borders), **Political lens**
+(relations coloured — allies green, enemies red), **Development lens** (what
+each region produces / is building). One hotkey cycles; the active lens tints
+the cached political layer. Complements the existing advisor chips.
+
+### 9.4 Region development & focus (the Civ city layer)
+Today: one build slot, a short shared building list. Planned depth without
+city-screen micro:
+- **Region focus / specialisation**: a region can lean *military* (musters,
+  forts), *economic* (trade, gold), *agrarian* (food, growth) or *learned*
+  (knowledge) — a cheap identity that biases yields and unlocks a couple of
+  focus-specific buildings. Makes "what is this province for?" a real question.
+- A few **more buildings** with clear identities (granary, watchtower, guild,
+  monastery, harbour-upgrade) and a visible **built-here** list on the region.
+- Optional later: a modest **build queue** if playtests show single-slot pacing
+  drags on Grand maps (deliberately omitted in v1 to keep decisions per-turn).
+
+### 9.5 Research tree with a destination
+Today: pick one of the frontier, flat. Planned: present the tree by **era**
+(tie to the world ages already in `data/eras.ts`), show **what each tech
+unlocks** (unit / building / yield / victory-enabler) at the choice point, mark
+a **recommended** next tech for the realm's situation, and let players **queue**
+a short research path. No new sim maths — a presentation + light path layer over
+the existing tech graph.
+
+### 9.6 Victory types (plan the win conditions)
+Today: domination (territory), Great Works (wonders), prestige (score at the
+turn limit). Planned — make each a real, legible race with its own progress and
+flavour fitting the setting:
+- **Domination / Conquest** — hold X% of the land, or eliminate all rivals.
+- **Great Works** — complete N wonders (cathedrals, universities, great halls).
+- **Prestige** — highest score at the turn limit (the timed default).
+- **Faith / Culture (new, tentative)** — a Christianisation/cultural-sway path
+  fitting the Northern-Crusades setting: convert or culturally dominate a
+  threshold of regions. To be specced with the region-focus work.
+Each victory shows a dedicated progress readout and a "closest rival on this
+path" warning, so no one wins or loses a path invisibly.
+
+### 9.7 Suggested build sequence
+1. **Combat report** (9.2 report slice) — cheap, high drama, immediate.
+2. **Map lenses** (9.3) — makes the wider Baltic board readable.
+3. **Diplomacy opinion** (9.1) — the CK3 pillar.
+4. **Real Baltic map** (9.0 scripted-map mode) — the setting made literal.
+5. **Region focus + buildings** (9.4) and **research tree** (9.5) — the Civ depth.
+6. **Victory-type pass** (9.6) — once focus/culture exist to hang a path on.
+Each remains a playable, testable slice, per the M1–M6 discipline above.

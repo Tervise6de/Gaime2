@@ -61,7 +61,7 @@ import {
 
 const BARBARIAN_NATION: Nation = {
   id: BARBARIAN_ID,
-  name: "Free Peoples",
+  name: "Free Tribes",
   color: "#9a5b53",
   isPlayer: false,
   isBarbarian: true,
@@ -74,8 +74,30 @@ const BARBARIAN_NATION: Nation = {
   bankrupt: false,
 };
 
-const RIVAL_NAMES = ["Valdheim", "Suzerain of Kael", "Sundered League", "Emberhold", "Korrath Hegemony"];
-const RIVAL_COLORS = ["#5b8bd0", "#b06ec0", "#6cae7a", "#d0796e", "#4fb0a0"];
+// Rival powers of the medieval Baltic rim (~900 AD onward, the "Age of
+// Founding" this game opens in): a mix of pagan tribal confederations, Rus
+// republics and Christian kingdoms. Colours are well-spaced hues, kept clear
+// of the player's gold and the tribes' brown. Bigger maps seat more of them.
+const RIVAL_NAMES = [
+  "Lithuania",
+  "Novgorod",
+  "Denmark",
+  "Prussia",
+  "Livonia",
+  "Poland",
+  "Sweden",
+  "Curonia",
+];
+const RIVAL_COLORS = [
+  "#5b8bd0", // Lithuania — steel blue
+  "#b06ec0", // Novgorod — violet
+  "#d0796e", // Denmark — terracotta
+  "#6cae7a", // Prussia — green
+  "#4fb0a0", // Livonia — teal
+  "#d64f7d", // Poland — rose
+  "#8f86d8", // Sweden — indigo
+  "#cf954a", // Curonia — amber
+];
 
 const STARTING_STOCKS: ResourceStocks = { gold: 60, food: 20, materials: 15, knowledge: 0 };
 /** How many regions each nation begins with (capital + neighbours). */

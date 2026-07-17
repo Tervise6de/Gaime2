@@ -2515,7 +2515,7 @@ function buildLegend(): HTMLElement {
   section("Territory");
   row(line("#d8a24a"), "Your realm — gold wash, the widest and brightest rim, named YOU");
   row(line("#5b8bd0"), "Rival realm — its colour wash + rim, named on the map");
-  row(line("#9a5b53"), "Barbarian camps — faint brown wash, no rim");
+  row(line("#9a5b53"), "Free tribes — independent holdings, faint brown wash, no rim");
   row('<span class="hud-legend-hatch"></span>', "Unclaimed land — darkened with hatching, free to take");
   row(line(WAR_EDGE_COLOR), "War front — a border between two nations at war");
   row(line(OCEAN.lane), "Sea lane — regions connected across water (armies may cross)");

@@ -12,8 +12,8 @@ export interface Scenario {
   name: string;
   blurb: string;
   rivals: number;
-  /** Region count — matches the map-size options (16 small / 22 medium / 30 large). */
-  regionCount: 16 | 22 | 30;
+  /** Region count — matches the map-size options (18 small / 30 medium / 40 large / 48 grand). */
+  regionCount: 18 | 30 | 40 | 48;
   difficulty: "easy" | "normal" | "hard";
   /** Optional twist: force the player's opening national trait for a theme. */
   playerTrait?: TraitId;
@@ -25,7 +25,7 @@ export const SCENARIOS: Scenario[] = [
     name: "Classic Realm",
     blurb: "A balanced footing: three rivals on a middling map. The standard contest.",
     rivals: 3,
-    regionCount: 22,
+    regionCount: 30,
     difficulty: "normal",
   },
   {
@@ -33,7 +33,7 @@ export const SCENARIOS: Scenario[] = [
     name: "Border Duel",
     blurb: "One neighbour, one small land — a tight head-to-head with nowhere to hide.",
     rivals: 1,
-    regionCount: 16,
+    regionCount: 18,
     difficulty: "normal",
   },
   {
@@ -41,7 +41,7 @@ export const SCENARIOS: Scenario[] = [
     name: "Age of Warlords",
     blurb: "Five hungry powers on a broad, brutal continent. Survival is not assured.",
     rivals: 5,
-    regionCount: 30,
+    regionCount: 40,
     difficulty: "hard",
   },
   {
@@ -49,7 +49,7 @@ export const SCENARIOS: Scenario[] = [
     name: "The Long Peace",
     blurb: "A sprawling land and few rivals — room to build toward a Great Works or prestige win.",
     rivals: 2,
-    regionCount: 30,
+    regionCount: 48,
     difficulty: "easy",
   },
   {
@@ -57,7 +57,7 @@ export const SCENARIOS: Scenario[] = [
     name: "Scholar-Kings",
     blurb: "Your realm prizes learning above all — you open with the Scholarly trait.",
     rivals: 3,
-    regionCount: 22,
+    regionCount: 30,
     difficulty: "normal",
     playerTrait: "scholarly",
   },
@@ -66,7 +66,7 @@ export const SCENARIOS: Scenario[] = [
     name: "The Warhost",
     blurb: "Forged for war, on a hard footing — you open with the Martial trait.",
     rivals: 3,
-    regionCount: 22,
+    regionCount: 30,
     difficulty: "hard",
     playerTrait: "martial",
   },
