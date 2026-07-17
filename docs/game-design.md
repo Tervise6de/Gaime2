@@ -624,15 +624,22 @@ islands (Gotland, Ösel/Saaremaa). Plan:
 - Keep everything deterministic and data-driven — a new map is a new data file,
   not new engine code.
 
-### 9.1 Diplomacy with opinion (the CK3 pillar)
-Today: a relation number + action buttons. Planned: **opinion modifiers** — a
-list of dated reasons a power feels how it does about you ("−20 you demanded
-tribute", "+15 we share an enemy", "−10 you border my heartland", "+10 kept the
-peace 10 turns"). Surface them in the diplomacy card so relations are legible,
-not opaque. Add **rival-to-rival relations** (who likes/hates whom) and show
-**alliances/wars between third parties**, so the board is a political map, not
-just you-vs-each. Casus-belli-lite: declaring war with a *reason* (reclaim a
-lost region, ally's call) costs less opinion than naked aggression.
+### 9.1 Diplomacy with opinion — SHIPPED v1 (`systems/diplomacy.ts`, v0.23)
+Relations are now **legible**, not an opaque number. Each pair carries an
+**opinion log** (`state.opinions`): dated dealings — war, gifts, peace, pacts,
+trade — merged by reason and decaying each turn (`recordOpinion` / `decayOpinions`).
+`opinionReasons()` returns a CK3-style breakdown surfaced in the diplomacy card:
+the recent dated dealings ("The war between us (turn 1) −29", "Gifts given +9")
+plus the ongoing standing pulls ("We share an enemy +2/turn", "Bordering my
+lands −5/turn"). Each card also shows **rival-to-rival foreign relations**
+(`foreignRelations()`: who this realm is at war with / allied to), so the board
+reads as a political map, not just you-vs-each. The `relations` scalar the AI
+acts on is unchanged, so balance is untouched.
+
+**Still open (9.1 remainder):** casus-belli-lite — declaring war with a *reason*
+(reclaim a lost region, ally's call) costing less standing with third parties
+than naked aggression (needs a reputation term); and a "kept the peace N turns"
+goodwill modifier (needs treaty-start tracking).
 
 ### 9.2 Combat model + unit roles — SHIPPED v2 (`systems/combat.ts`)
 Combat is now **phased**: an opening volley (ranged + siege fire first; siege
@@ -703,7 +710,7 @@ path" warning, so no one wins or loses a path invisibly.
    roles, replayable battle report.
 3. ✅ **HUD overhaul + map lenses** (9.3) — shipped: top-bar nav, Politics page,
    redesigned region panel, and CIV5-style population/income/unrest map filters.
-4. **Diplomacy opinion** (9.1) — the CK3 pillar.
+4. ✅ **Diplomacy opinion** (9.1) — shipped: dated opinion breakdown + rival-to-rival relations (casus belli still open).
 5. **Region focus + buildings** (9.4) and **research tree** (9.5) — the Civ depth.
 6. **Victory-type pass** (9.6) — once focus/culture exist to hang a path on.
 Each remains a playable, testable slice, per the M1–M6 discipline above.

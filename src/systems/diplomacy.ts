@@ -28,6 +28,7 @@ import {
   nationInstability,
   pairKey,
   type GameState,
+  type OpinionEvent,
   type TreatyStatus,
 } from "@/systems/state";
 
@@ -44,6 +45,103 @@ export function setRelation(state: GameState, a: number, b: number, value: numbe
 
 export function adjustRelation(state: GameState, a: number, b: number, delta: number): GameState {
   return setRelation(state, a, b, getRelation(state, a, b) + delta);
+}
+
+// --- opinion log: the dated "why" behind relations --------------------------
+
+/** Labels for logged dealings (keyed by OpinionEvent.reason; the pair key is
+    order-independent, so phrasings stay direction-neutral). */
+export const OPINION_LABEL: Record<string, string> = {
+  war: "The war between us",
+  peace: "We made peace",
+  nap: "Non-aggression pact",
+  alliance: "Our alliance",
+  gift: "Gifts given",
+  trade: "Our trade route",
+};
+
+/**
+ * Adjust a pair's relations AND log the dated reason, so the change is legible
+ * later. Same numeric effect on the scalar as `adjustRelation` (what the AI
+ * acts on); the log is explanatory. Events merge by reason — repeat dealings
+ * accumulate into one decaying entry — so the list stays short.
+ */
+export function recordOpinion(state: GameState, a: number, b: number, delta: number, reason: string): GameState {
+  const next = adjustRelation(state, a, b, delta);
+  if (delta === 0) return next;
+  const key = pairKey(a, b);
+  const list = (next.opinions?.[key] ?? []).map((e) => ({ ...e }));
+  const existing = list.find((e) => e.reason === reason);
+  if (existing) {
+    existing.delta = clamp(existing.delta + delta, RELATION_MIN, RELATION_MAX);
+    existing.turn = next.turn;
+  } else {
+    list.push({ reason, delta, turn: next.turn });
+  }
+  const pruned = list.filter((e) => e.delta !== 0);
+  return { ...next, opinions: { ...(next.opinions ?? {}), [key]: pruned } };
+}
+
+/**
+ * Decay the opinion log toward zero each turn (grudges and goodwill fade), so
+ * only live dealings show; spent entries are pruned. Mirrors the relations
+ * scalar's drift. Pure.
+ */
+export function decayOpinions(state: GameState): GameState {
+  if (!state.opinions) return state;
+  const opinions: Record<string, OpinionEvent[]> = {};
+  for (const [key, list] of Object.entries(state.opinions)) {
+    const decayed = list
+      .map((e) => ({ ...e, delta: e.delta > 0 ? e.delta - 1 : e.delta + 1 }))
+      .filter((e) => e.delta !== 0);
+    if (decayed.length) opinions[key] = decayed;
+  }
+  return { ...state, opinions };
+}
+
+/** One line of an opinion breakdown: a dated dealing, or an ongoing pull. */
+export interface OpinionReason {
+  label: string;
+  delta: number;
+  kind: "event" | "standing";
+  /** Turn the dealing last happened (events only). */
+  turn?: number;
+}
+
+/**
+ * Why `to` feels about `from` as it does: the recent dated dealings (from the
+ * log) plus the ongoing standing forces (border friction, shared enemies, an
+ * alliance) — the same pulls `driftRelations` applies. Pure; for the UI.
+ */
+export function opinionReasons(state: GameState, from: number, to: number): OpinionReason[] {
+  const out: OpinionReason[] = [];
+  for (const e of state.opinions?.[pairKey(from, to)] ?? []) {
+    out.push({ label: OPINION_LABEL[e.reason] ?? e.reason, delta: e.delta, kind: "event", turn: e.turn });
+  }
+  const borders = sharedBorders(state, from, to);
+  if (borders > 0) out.push({ label: "Bordering my lands", delta: -Math.max(1, Math.round(borders * 0.5)), kind: "standing" });
+  const shared = sharedEnemies(state, from, to);
+  if (shared > 0) out.push({ label: "We share an enemy", delta: 2 * shared, kind: "standing" });
+  if (getTreaty(state, from, to) === "alliance") out.push({ label: "Our alliance holds", delta: 2, kind: "standing" });
+  return out;
+}
+
+/** A nation's standing with every other living realm — for the rival-to-rival view. */
+export function foreignRelations(
+  state: GameState,
+  id: number,
+): { wars: number[]; allies: number[]; naps: number[] } {
+  const wars: number[] = [];
+  const allies: number[] = [];
+  const naps: number[] = [];
+  for (const n of state.nations) {
+    if (n.isBarbarian || !n.alive || n.id === id) continue;
+    const t = getTreaty(state, id, n.id);
+    if (t === "war") wars.push(n.id);
+    else if (t === "alliance") allies.push(n.id);
+    else if (t === "nap") naps.push(n.id);
+  }
+  return { wars, allies, naps };
 }
 
 export function getTreaty(state: GameState, a: number, b: number): TreatyStatus {
@@ -110,7 +208,7 @@ export function sharedBorders(state: GameState, a: number, b: number): number {
 
 export function declareWar(state: GameState, a: number, b: number): GameState {
   let next = setTreaty(state, a, b, "war");
-  next = adjustRelation(next, a, b, -RELATION_WAR_HIT);
+  next = recordOpinion(next, a, b, -RELATION_WAR_HIT, "war");
   next = severTrade(next, a, b); // war ends commerce
   return { ...next, log: [...next.log, `${name(next, a)} declared war on ${name(next, b)}!`].slice(-50) };
 }
@@ -140,7 +238,7 @@ export function tradePartners(state: GameState, id: number): number[] {
 export function establishTrade(state: GameState, a: number, b: number): GameState {
   if (hasTrade(state, a, b)) return state;
   let next: GameState = { ...state, trades: { ...(state.trades ?? {}), [pairKey(a, b)]: true } };
-  next = adjustRelation(next, a, b, +8);
+  next = recordOpinion(next, a, b, +8, "trade");
   return { ...next, log: [...next.log, `${name(next, a)} and ${name(next, b)} opened a trade route.`].slice(-50) };
 }
 
@@ -155,7 +253,12 @@ export function severTrade(state: GameState, a: number, b: number): GameState {
 
 export function makePeace(state: GameState, a: number, b: number): GameState {
   let next = setTreaty(state, a, b, "peace");
-  next = adjustRelation(next, a, b, +10);
+  next = recordOpinion(next, a, b, +10, "peace");
+  // Peace lifts the war grudge, so relations can recover instead of staying pinned.
+  const key = pairKey(a, b);
+  if (next.opinions?.[key]) {
+    next = { ...next, opinions: { ...next.opinions, [key]: next.opinions[key]!.filter((e) => e.reason !== "war") } };
+  }
   return { ...next, log: [...next.log, `${name(next, a)} and ${name(next, b)} made peace.`].slice(-50) };
 }
 
@@ -166,7 +269,7 @@ export function setPact(
   status: "nap" | "alliance",
 ): GameState {
   let next = setTreaty(state, a, b, status);
-  next = adjustRelation(next, a, b, status === "alliance" ? +20 : +10);
+  next = recordOpinion(next, a, b, status === "alliance" ? +20 : +10, status);
   const label = status === "alliance" ? "an alliance" : "a non-aggression pact";
   return { ...next, log: [...next.log, `${name(next, a)} and ${name(next, b)} signed ${label}.`].slice(-50) };
 }
@@ -182,7 +285,7 @@ export function gift(state: GameState, from: number, to: number, gold: number): 
   });
   let next: GameState = { ...state, nations };
   const bump = Math.min(25, Math.round(gold * GIFT_RELATION));
-  next = adjustRelation(next, from, to, bump);
+  next = recordOpinion(next, from, to, bump, "gift");
   return { ...next, log: [...next.log, `${name(next, from)} gifted ${gold}g to ${name(next, to)}.`].slice(-50) };
 }
 

@@ -314,6 +314,20 @@ export const RESEARCH_SURGE_TURNS = 4;
 /** Diplomatic standing between two nations. */
 export type TreatyStatus = "war" | "peace" | "nap" | "alliance";
 
+/**
+ * One dated dealing behind a pair's relations (a grudge or goodwill), merged by
+ * reason and decaying toward zero each turn. Explanatory only — the `relations`
+ * scalar is what the AI acts on.
+ */
+export interface OpinionEvent {
+  /** Stable reason id (keys the label in diplomacy.ts). */
+  reason: string;
+  /** Current signed contribution (decays toward 0 over turns). */
+  delta: number;
+  /** Turn the dealing last happened. */
+  turn: number;
+}
+
 /** A pending diplomatic offer awaiting the recipient's decision (AI → player). */
 export interface DiplomaticOffer {
   id: number;
@@ -341,6 +355,13 @@ export interface GameState {
   nextArmyId: number;
   /** Pairwise relations, keyed by pairKey(a,b): −100..+100. */
   relations: Record<string, number>;
+  /**
+   * Opinion log: the dated discrete dealings behind each pair's relations
+   * (keyed by pairKey(a,b)) — war, gifts, peace, pacts, trade — one merged entry
+   * per reason, decaying each turn. Explains *why* a realm feels as it does; the
+   * `relations` scalar remains what the AI acts on. Optional (legacy saves = none).
+   */
+  opinions?: Record<string, OpinionEvent[]>;
   /** Pairwise treaty status, keyed by pairKey(a,b). Missing = peace. */
   treaties: Record<string, TreatyStatus>;
   /**

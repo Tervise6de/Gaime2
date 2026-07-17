@@ -28,6 +28,10 @@ import {
   tradeIncome,
   tradePartners,
   peaceReparations,
+  recordOpinion,
+  decayOpinions,
+  opinionReasons,
+  foreignRelations,
 } from "@/systems/diplomacy";
 import { createGame } from "@/systems/turn";
 import {
@@ -445,5 +449,60 @@ describe("trade routes (economic diplomacy)", () => {
     const s = establishTrade(game(), PLAYER_ID, RIVAL_A);
     expect(tradePartners(s, PLAYER_ID)).toContain(RIVAL_A);
     expect(tradePartners(s, PLAYER_ID)).not.toContain(RIVAL_B);
+  });
+});
+
+describe("opinion log — the 'why' behind relations", () => {
+  it("logs a dated dealing and moves the scalar the same as adjustRelation", () => {
+    const g = game();
+    const before = getRelation(g, PLAYER_ID, RIVAL_A);
+    const g2 = recordOpinion(g, PLAYER_ID, RIVAL_A, +8, "trade");
+    expect(getRelation(g2, PLAYER_ID, RIVAL_A)).toBe(before + 8); // same as adjustRelation
+    const entry = g2.opinions![pairKey(PLAYER_ID, RIVAL_A)]!.find((e) => e.reason === "trade")!;
+    expect(entry.delta).toBe(8);
+    expect(entry.turn).toBe(g2.turn);
+  });
+
+  it("merges repeat dealings of the same reason into one entry", () => {
+    let g = game();
+    g = recordOpinion(g, PLAYER_ID, RIVAL_A, +5, "gift");
+    g = recordOpinion(g, PLAYER_ID, RIVAL_A, +5, "gift");
+    const gifts = g.opinions![pairKey(PLAYER_ID, RIVAL_A)]!.filter((e) => e.reason === "gift");
+    expect(gifts.length).toBe(1);
+    expect(gifts[0]!.delta).toBe(10);
+  });
+
+  it("decays the log toward zero and prunes spent entries", () => {
+    let g = recordOpinion(game(), PLAYER_ID, RIVAL_A, +3, "gift");
+    for (let i = 0; i < 3; i++) g = decayOpinions(g);
+    const log = g.opinions?.[pairKey(PLAYER_ID, RIVAL_A)] ?? [];
+    expect(log.find((e) => e.reason === "gift")).toBeUndefined(); // +3 → 0 in 3 turns, pruned
+  });
+
+  it("surfaces the war grudge as a dated event in the breakdown", () => {
+    const g = declareWar(game(), PLAYER_ID, RIVAL_A);
+    const reasons = opinionReasons(g, PLAYER_ID, RIVAL_A);
+    expect(reasons.some((r) => r.kind === "event" && r.delta < 0)).toBe(true);
+  });
+
+  it("includes standing forces (an alliance pull) in the breakdown", () => {
+    const g = setPact(game(), PLAYER_ID, RIVAL_A, "alliance");
+    const reasons = opinionReasons(g, PLAYER_ID, RIVAL_A);
+    expect(reasons.some((r) => r.kind === "standing" && /alliance/i.test(r.label))).toBe(true);
+  });
+
+  it("clears the war grudge when peace is made", () => {
+    let g = declareWar(game(), PLAYER_ID, RIVAL_A);
+    expect(g.opinions![pairKey(PLAYER_ID, RIVAL_A)]!.some((e) => e.reason === "war")).toBe(true);
+    g = makePeace(g, PLAYER_ID, RIVAL_A);
+    expect(g.opinions![pairKey(PLAYER_ID, RIVAL_A)]!.some((e) => e.reason === "war")).toBe(false);
+  });
+
+  it("reports each realm's wars and alliances (rival-to-rival view)", () => {
+    let g = declareWar(game(), RIVAL_A, RIVAL_B);
+    let fr = foreignRelations(g, RIVAL_A);
+    expect(fr.wars).toContain(RIVAL_B);
+    g = setPact(g, PLAYER_ID, RIVAL_A, "alliance");
+    expect(foreignRelations(g, RIVAL_A).allies).toContain(PLAYER_ID);
   });
 });

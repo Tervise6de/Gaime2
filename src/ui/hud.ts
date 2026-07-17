@@ -64,7 +64,7 @@ import {
   totalUpkeep,
   unitCost,
 } from "@/systems/military";
-import { getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, nationPower, hasTrade, tradeIncome, TRIBUTE_DEMAND } from "@/systems/diplomacy";
+import { getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, nationPower, hasTrade, tradeIncome, opinionReasons, foreignRelations, TRIBUTE_DEMAND } from "@/systems/diplomacy";
 import { nationScore, victoryProgress, endGameSummary } from "@/systems/victory";
 import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
 import type { TurnSummary } from "@/systems/summary";
@@ -3178,6 +3178,44 @@ function renderDiplomacy(
       powerRow.append(reelChip);
     }
     card.append(powerRow);
+
+    // Foreign relations — who this rival stands with or against (the board is a
+    // political map, not just you-vs-each).
+    const fr = foreignRelations(state, rival.id);
+    const nameOf = (id: number): string => escapeHtml(state.nations.find((n) => n.id === id)?.name ?? "?");
+    if (fr.wars.length || fr.allies.length || fr.naps.length) {
+      const frRow = el("div", "hud-diplo-foreign");
+      const parts: string[] = [];
+      if (fr.wars.length) parts.push(`${glyphHtml("attack", "⚔")} at war with ${fr.wars.map(nameOf).join(", ")}`);
+      if (fr.allies.length) parts.push(`${glyphHtml("flag", "⚑")} allied with ${fr.allies.map(nameOf).join(", ")}`);
+      if (fr.naps.length) parts.push(`NAP: ${fr.naps.map(nameOf).join(", ")}`);
+      frRow.innerHTML = parts.join(" · ");
+      card.append(frRow);
+    }
+
+    // Why they feel this way — the opinion breakdown: recent dated dealings and
+    // the ongoing standing pulls (border friction, shared enemies, a pact).
+    const reasons = opinionReasons(state, PLAYER_ID, rival.id);
+    if (reasons.length) {
+      const why = document.createElement("details");
+      why.className = "hud-diplo-why";
+      const sum = document.createElement("summary");
+      sum.className = "hud-diplo-why-summary";
+      sum.textContent = `Why ${rival.name} feels this way`;
+      why.append(sum);
+      const list = el("div", "hud-diplo-why-list");
+      for (const r of reasons) {
+        const row = el("div", "hud-diplo-why-row");
+        const lab = el("span", "hud-diplo-why-label");
+        lab.textContent = r.kind === "event" && r.turn ? `${r.label} (turn ${r.turn})` : r.label;
+        const val = el("span", "hud-diplo-why-val " + (r.delta >= 0 ? "good" : "bad"));
+        val.textContent = `${r.delta > 0 ? "+" : ""}${r.delta}${r.kind === "standing" ? "/turn" : ""}`;
+        row.append(lab, val);
+        list.append(row);
+      }
+      why.append(list);
+      card.append(why);
+    }
 
     const actions = el("div", "hud-diplo-actions");
     if (treaty === "war") {

@@ -1854,6 +1854,83 @@ body {
   border: 1px solid rgba(240, 179, 74, 0.35);
 }
 
+/* Rival-to-rival standing (foreign relations) — a compact political line. */
+.hud-diplo-foreign {
+  margin: 6px 0 2px;
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.hud-diplo-foreign .ico-svg svg,
+.hud-diplo-foreign .ico {
+  width: 12px;
+  height: 12px;
+  vertical-align: -2px;
+}
+
+/* Opinion breakdown — the CK3-style "why they feel this way", collapsible. */
+.hud-diplo-why {
+  margin: 6px 0 2px;
+}
+
+.hud-diplo-why-summary {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.hud-diplo-why-summary::-webkit-details-marker {
+  display: none;
+}
+
+.hud-diplo-why-summary::before {
+  content: "▸ ";
+  color: var(--muted);
+}
+
+.hud-diplo-why[open] .hud-diplo-why-summary::before {
+  content: "▾ ";
+}
+
+.hud-diplo-why-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 6px 0 2px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.hud-diplo-why-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.hud-diplo-why-label {
+  color: var(--fg);
+}
+
+.hud-diplo-why-val {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.hud-diplo-why-val.good {
+  color: #6cae7a;
+}
+
+.hud-diplo-why-val.bad {
+  color: #e8776b;
+}
+
 .hud-diplo-actions {
   display: flex;
   flex-wrap: wrap;

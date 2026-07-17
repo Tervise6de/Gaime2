@@ -28,7 +28,7 @@ import { advanceConstruction } from "@/systems/construction";
 import { nextPopulation } from "@/systems/population";
 import { nextUnrest } from "@/systems/stability";
 import { armyMoves, totalUpkeep } from "@/systems/military";
-import { driftRelations, atWar, tradePartners, tradeIncome } from "@/systems/diplomacy";
+import { driftRelations, decayOpinions, atWar, tradePartners, tradeIncome } from "@/systems/diplomacy";
 import { runNationTurn } from "@/systems/ai";
 import { advanceResearch, techUnrestReduction, isBuildingUnlockedFor, selectTech } from "@/systems/tech";
 import { fireEvent } from "@/systems/events";
@@ -646,8 +646,9 @@ export function resolveTurn(state: GameState): GameState {
   }
   s = { ...s, rngState: rng.seed };
 
-  // 3. Relations drift.
+  // 3. Relations drift; the opinion log fades in step (grudges cool off).
   s = driftRelations(s);
+  s = decayOpinions(s);
 
   // 3.5. War-weariness: a nation at war carries a lingering −gold modifier,
   // refreshed each turn the war continues (the cost of a long conflict).
