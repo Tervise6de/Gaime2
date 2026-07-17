@@ -167,6 +167,25 @@ describe("moveArmy", () => {
     moveArmy(g, 0, 1);
     expect(JSON.stringify(g)).toBe(snapshot);
   });
+
+  it("merges when moving onto a friendly stack, and logs it", () => {
+    const g = battlefield({ infantry: 2 }, {});
+    g.regions[1] = region(1, { ownerId: PLAYER_ID, adjacency: [0] });
+    g.armies.push({
+      id: 1,
+      ownerId: PLAYER_ID,
+      regionId: 1,
+      units: { ...emptyUnits(), militia: 3 },
+      movesLeft: 1,
+    });
+    const next = moveArmy(g, 0, 1);
+    expect(next.armies).toHaveLength(1);
+    const merged = armyAt(next, 1, PLAYER_ID)!;
+    expect(armySize(merged.units)).toBe(5);
+    expect(merged.units.infantry).toBe(2);
+    expect(merged.units.militia).toBe(3);
+    expect(next.log.some((l) => l.includes("merged") && l.includes("2 + 3 = 5"))).toBe(true);
+  });
 });
 
 describe("upkeep and bankruptcy", () => {

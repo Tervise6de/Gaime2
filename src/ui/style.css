@@ -144,6 +144,127 @@ body {
   color: var(--negative);
 }
 
+/* --- End-turn advisor: chips for whatever still wants orders --------------- */
+.hud-advisor {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.hud-advice-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 9px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--panel-border);
+  border-left-width: 3px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.hud-advice-chip:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.hud-advice-chip.research {
+  border-left-color: #63c7d6;
+}
+
+.hud-advice-chip.build {
+  border-left-color: #e0b74a;
+}
+
+.hud-advice-chip.army {
+  border-left-color: #e8776b;
+}
+
+/* --- Production overview ---------------------------------------------------- */
+.hud-production-panel {
+  width: min(560px, 94vw);
+}
+
+.hud-prod-summary {
+  margin: 0 0 12px;
+}
+
+.hud-prod-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hud-prod-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(230, 233, 239, 0.07);
+  border-radius: 8px;
+}
+
+.hud-prod-name {
+  flex: 0 0 132px;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--fg);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.hud-prod-name:hover {
+  background: rgba(255, 255, 255, 0.08);
+  text-decoration: underline;
+}
+
+.hud-prod-status {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.hud-prod-label {
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.hud-prod-label.muted {
+  color: var(--muted);
+}
+
+.hud-prod-bar {
+  flex: 1;
+  min-width: 60px;
+}
+
+.hud-prod-idle {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #ecd9a8;
+  background: rgba(224, 183, 74, 0.14);
+  border: 1px solid rgba(224, 183, 74, 0.4);
+  border-radius: 999px;
+}
+
+.hud-prod-select {
+  flex: 1;
+}
+
 /* Move-mode banner: shown while an army is picking its destination. */
 .hud-move-banner {
   position: absolute;
@@ -1002,6 +1123,12 @@ body {
 .hud-odds-chip.win {
   color: #0d1a10;
   background: #6cae7a;
+}
+
+/* Friendly-stack destination: moving there merges the armies. */
+.hud-odds-chip.merge {
+  color: #0c161a;
+  background: #63c7d6;
 }
 
 .hud-odds-chip.even {

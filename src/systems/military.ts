@@ -260,7 +260,8 @@ function relocateOrMerge(
   const target = armyAt(state, targetRegionId, army.ownerId);
   let armies: Army[];
   if (target && target.id !== army.id) {
-    // Merge moving army into the destination stack.
+    // Merge moving army into the destination stack (CK3-style: walking onto
+    // your own army combines the two). Logged so the merge is never silent.
     const mergedUnits = addUnits(target.units, army.units);
     armies = state.armies
       .filter((a) => a.id !== army.id)
@@ -273,13 +274,18 @@ function relocateOrMerge(
             }
           : a,
       );
-  } else {
-    armies = state.armies.map((a) =>
-      a.id === army.id
-        ? { ...a, regionId: targetRegionId, movesLeft: a.movesLeft - 1 }
-        : a,
-    );
+    const where = state.regions[targetRegionId]?.name ?? "the field";
+    const owner = state.nations.find((n) => n.id === army.ownerId);
+    const line =
+      `${owner?.isPlayer ? "Your armies" : `${owner?.name ?? "A rival"}'s armies`} merged at ${where} — ` +
+      `${armySize(army.units)} + ${armySize(target.units)} = ${armySize(mergedUnits)} units.`;
+    return { ...state, armies, log: appendLog(state, [line]) };
   }
+  armies = state.armies.map((a) =>
+    a.id === army.id
+      ? { ...a, regionId: targetRegionId, movesLeft: a.movesLeft - 1 }
+      : a,
+  );
   return { ...state, armies };
 }
 

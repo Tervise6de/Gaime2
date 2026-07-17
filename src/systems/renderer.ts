@@ -44,6 +44,7 @@ import {
 } from "@/systems/state";
 import { atWar } from "@/systems/diplomacy";
 import { regionCapacity } from "@/systems/population";
+import { popCompact, popDisplay } from "@/systems/format";
 import { computeVoronoiCells, pointInPolygon, type Point, type VoronoiCell } from "@/systems/voronoi";
 import {
   hashFloat,
@@ -1417,8 +1418,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
    */
   function drawMarkers(region: Region, p: Point, capitals: Set<number>): void {
     // Population count in a soft dark chip (same family as the icon chips), so
-    // it reads identically over any terrain fill or political tint.
-    const popText = String(Math.round(region.population));
+    // it reads identically over any terrain fill or political tint. Shown as
+    // people ("4.3k"), not sim units — the world reads as populated.
+    const popText = popCompact(region.population);
     context.font = "600 12px system-ui, sans-serif";
     context.textAlign = "center";
     context.textBaseline = "middle";
@@ -1437,7 +1439,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       x: p.x,
       y: p.y,
       r: Math.max(11, popW / 2),
-      text: `Population ${popText} of ${Math.round(regionCapacity(region))} — grows with food surplus, works the land.`,
+      text: `Population ${popDisplay(region.population)} of ${popDisplay(regionCapacity(region))} — grows with food surplus, works the land.`,
     });
 
     // Capital crest docked left of the population chip — the seat reads first.

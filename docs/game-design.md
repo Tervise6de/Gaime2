@@ -325,6 +325,25 @@ age of the world (`data/eras.ts`: one turn = one year from 900 AD, five named
 ages across the 150-turn game). Seed, difficulty and the realm trait live in
 the map legend's "This world" card instead of crowding the bar.
 
+**Population presentation.** The sim tracks population in abstract units
+(~1–20 per region); the UI presents them as people at ×1,000
+(`systems/format.ts`) — "4,300 / 10,000" in panels, "4.3k" on the map chip —
+so the world reads as populated without touching the simulation's numbers.
+
+**Nothing idle, ever (advisor + production overview).** Deliberate design:
+one construction slot per region and NO build queues — each build is a
+per-turn decision, kept legible instead of automated away. Two aids carry
+that: the end-turn advisor (chips above End turn listing unchosen research,
+idle build slots and armies with moves left — each a jump, never a hard
+block; `ui/advisor.ts`, pure and unit-tested) and the Production overview
+(B / rail button, badge = idle count): every region's project, bar and ETA
+on one screen, with a quick-build picker on idle rows.
+
+**Army merging (CK3-style).** Moving an army onto a region holding another
+of your armies merges the stacks — the targets panel says "merge → N" before
+the click, and the merge is logged ("3 + 2 = 5 units"), so combining forces
+is a deliberate, visible act rather than a silent side effect.
+
 ---
 
 ## 5. AI Opponents
