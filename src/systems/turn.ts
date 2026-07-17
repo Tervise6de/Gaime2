@@ -18,7 +18,7 @@ import { BUILDINGS, type BuildingId } from "@/data/buildings";
 import { UNITS, type UnitType } from "@/data/units";
 import { ARCHETYPES } from "@/data/personalities";
 import { TRAIT_IDS, type TraitId } from "@/data/traits";
-import { FACTIONS, factionByName } from "@/data/factions";
+import { FACTIONS, factionByName, type FactionDef, type FactionBonus } from "@/data/factions";
 import type { FocusId } from "@/data/focuses";
 import { eraIndexForTurn } from "@/data/eras";
 import { TECHS, type TechId } from "@/data/techs";
@@ -99,6 +99,25 @@ export interface NewGameOptions {
   playerFaction?: string;
 }
 
+/** Apply a faction's opening gold / free tech to a nation (units handled separately). */
+function applyStartBonus(nation: Nation, bonus: FactionBonus | undefined): Nation {
+  if (!bonus) return nation;
+  let n = nation;
+  if (bonus.startGold) n = { ...n, stocks: { ...n.stocks, gold: n.stocks.gold + bonus.startGold } };
+  if (bonus.startTech && !n.research.done.includes(bonus.startTech)) {
+    n = { ...n, research: { ...n.research, done: [...n.research.done, bonus.startTech] } };
+  }
+  return n;
+}
+
+/** Add a faction's opening extra regiments to a starting unit stack. */
+function addStartUnits(base: Record<UnitType, number>, bonus: FactionBonus | undefined): Record<UnitType, number> {
+  if (!bonus?.startUnits) return base;
+  const out = { ...base };
+  for (const t of Object.keys(bonus.startUnits) as UnitType[]) out[t] += bonus.startUnits[t] ?? 0;
+  return out;
+}
+
 /** Build a fresh game from a seed. Pure: same seed → identical starting state. */
 export function createGame(options: NewGameOptions): GameState {
   const { regions } = generateMap(options.seed, options.map, options.mapId);
@@ -162,6 +181,11 @@ export function createGame(options: NewGameOptions): GameState {
   // Choose well-separated capitals for the player + rivals.
   const capitals = pickCapitals(regions, rng, 1 + rivalCount);
   const nationIds = [PLAYER_ID, ...Array.from({ length: rivalCount }, (_, i) => 2 + i)];
+  // Each realm's faction (for its opening bonus): player + rivals, by nation id.
+  const defByNation = new Map<number, FactionDef>([[PLAYER_ID, playerDef]]);
+  rivalDefs.forEach((d, i) => defByNation.set(2 + i, d));
+  // Apply each realm's opening gold / free tech (units are added to the army below).
+  for (const [id, def] of defByNation) nations[id] = applyStartBonus(nations[id]!, def.bonus);
 
   let nextArmyId = 0;
   const armies: Army[] = [];
@@ -176,7 +200,7 @@ export function createGame(options: NewGameOptions): GameState {
       if (![...ownerOf.keys()].includes(n)) owned.add(n);
     }
     for (const rid of owned) ownerOf.set(rid, nationId);
-    const startUnits = { ...emptyUnits(), militia: 2, infantry: 1 };
+    const startUnits = addStartUnits({ ...emptyUnits(), militia: 2, infantry: 1 }, defByNation.get(nationId)?.bonus);
     armies.push({
       id: nextArmyId++,
       ownerId: nationId,
@@ -295,7 +319,7 @@ function createScriptedGame(map: ScriptedMap, regions: Region[], options: NewGam
     nations[nationId]!.capitalRegionId = f.capital;
     capitalSet.add(f.capital);
     for (const rid of f.regions) ownerOf.set(rid, nationId);
-    const startUnits = { ...emptyUnits(), militia: 2, infantry: 1 };
+    const startUnits = addStartUnits({ ...emptyUnits(), militia: 2, infantry: 1 }, factionByName(f.name)?.bonus);
     armies.push({ id: nextArmyId++, ownerId: nationId, regionId: f.capital, units: startUnits, movesLeft: armyMoves(startUnits) });
   });
 
@@ -318,11 +342,17 @@ function createScriptedGame(map: ScriptedMap, regions: Region[], options: NewGam
   let traitIdx = 0;
   for (const n of nations) {
     if (n.isBarbarian) continue;
-    const factionTrait = factionByName(n.name)?.trait;
+    const def = factionByName(n.name);
     n.trait =
       n.isPlayer && options.playerTrait
         ? options.playerTrait
-        : factionTrait ?? traitPool[traitIdx++ % traitPool.length];
+        : def?.trait ?? traitPool[traitIdx++ % traitPool.length];
+    // Opening bonus: gold + free tech (extra regiments added to the army above).
+    const bonus = def?.bonus;
+    if (bonus?.startGold) n.stocks = { ...n.stocks, gold: n.stocks.gold + bonus.startGold };
+    if (bonus?.startTech && !n.research.done.includes(bonus.startTech)) {
+      n.research = { ...n.research, done: [...n.research.done, bonus.startTech] };
+    }
   }
 
   const playerName = nations[PLAYER_ID]!.name;

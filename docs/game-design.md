@@ -597,10 +597,14 @@ gold. `createGame` takes a scripted-faction path (no random capitals).
 **Playable faction roster (v0.22).** A single data-driven roster of **12 Baltic
 realms** (`data/factions.ts`: Sweden, Denmark, Novgorod, Lithuania, Prussia,
 Livonia, Poland, Curonia, Estonia, Finland, Gotland, Samogitia), each with an
-identity (name, colour, flavour) and a **signature national trait** — its
-current gameplay difference, drawn from the existing five-trait system (a yield
-lean or cheaper armies), with richer per-faction bonuses able to hang off the
-same table later. The **"Play as" picker now appears for random games too**, not
+identity (name, colour, flavour), a **signature national trait** (a yield lean or
+cheaper armies, from the five-trait system) **and a unique opening bonus** (v0.28):
+a distinct edge applied once at game start — a free Age-of-Founding tech (Novgorod
+Writing, Poland Agriculture, Prussia Pottery, Finland Warcraft), extra treasury
+(Gotland +55, Denmark +45, Curonia +40, Livonia +35) or extra regiments (Sweden,
+Lithuania, Estonia, Samogitia). Applied in both createGame paths; shown in the
+picker. Kept to creation-time effects so nothing couples to the live economy/
+combat loops. The **"Play as" picker now appears for random games too**, not
 just scripted maps: a random game offers the whole roster, the Baltic map its
 **ten seated realms** (Finland, Estonia and Gotland joined the original seven).
 Realms join by **name**, so a people plays with the same identity and trait in a

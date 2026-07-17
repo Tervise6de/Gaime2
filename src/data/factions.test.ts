@@ -72,3 +72,35 @@ describe("faction identity on the scripted Baltic map", () => {
     expect(p.trait).toBe(factionByName("Lithuania")!.trait);
   });
 });
+
+import { TECHS } from "@/data/techs";
+import { armySize } from "@/systems/state";
+
+describe("faction opening bonuses", () => {
+  it("every faction has a distinct bonus, and free techs are Age-of-Founding", () => {
+    for (const f of FACTIONS) {
+      expect(f.bonus.label.length).toBeGreaterThan(0);
+      expect(f.bonus.detail.length).toBeGreaterThan(0);
+      if (f.bonus.startTech) expect(TECHS[f.bonus.startTech].era).toBe(0); // researchable at turn 1
+    }
+  });
+
+  it("applies a gold bonus at game start", () => {
+    const g = createGame({ seed: 4, playerFaction: "Gotland" }); // +55 gold
+    // Base opening treasury is 60; Gotland's Hansa heart adds 55.
+    expect(playerNation(g).stocks.gold).toBe(60 + 55);
+  });
+
+  it("applies a free opening tech", () => {
+    const g = createGame({ seed: 4, playerFaction: "Novgorod" }); // Writing
+    expect(playerNation(g).research.done).toContain("writing");
+  });
+
+  it("applies extra starting regiments to the capital army", () => {
+    const plain = createGame({ seed: 4, playerFaction: "Denmark" }); // gold bonus, no units
+    const viking = createGame({ seed: 4, playerFaction: "Sweden" }); // +1 infantry
+    const armyOf = (g: typeof plain) => g.armies.find((a) => a.ownerId === PLAYER_ID)!;
+    expect(armySize(armyOf(viking).units)).toBeGreaterThan(armySize(armyOf(plain).units));
+    expect(armyOf(viking).units.infantry).toBe(2); // base 1 + bonus 1
+  });
+});

@@ -232,7 +232,9 @@ export function buildNewGameForm(): NewGameForm {
       playAsBlurb.textContent = playAsSel.value === "" ? "A realm is picked for you from the seed." : "";
       return;
     }
-    playAsBlurb.textContent = `${def.blurb} Trait — ${TRAITS[def.trait].label}: ${TRAITS[def.trait].blurb}`;
+    playAsBlurb.textContent =
+      `${def.blurb}  ·  Trait — ${TRAITS[def.trait].label}: ${TRAITS[def.trait].blurb}` +
+      `  ·  Bonus — ${def.bonus.label}: ${def.bonus.detail}`;
   }
   playAsSel.addEventListener("change", updatePlayAsBlurb);
 
