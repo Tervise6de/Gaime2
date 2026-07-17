@@ -588,13 +588,24 @@ floating landmasses. Islands (Gotland, Saaremaa, Sicily) were re-authored with
 proper multi-vertex outlines instead of triangles.
 
 **Historical homelands + play-as (v0.16).** Each scripted map declares its
-starting **factions** — the real powers, each owning its home regions (Baltic:
-Sweden, Novgorod, Livonia, Lithuania, Prussia, Poland, Denmark; Europe:
-England, Norway, Castile, France, Germany, Italy, Poland, Hungary, Rus). Every
+starting **factions** — the real powers, each owning its home regions. Every
 region belongs to exactly one realm (guard-tested). New-game setup gains a
 CK3-style **"Play as"** picker — choose your realm (or Random); the rest are AI,
 all seated on their own ground, the human's realm re-coloured to the player
 gold. `createGame` takes a scripted-faction path (no random capitals).
+
+**Playable faction roster (v0.22).** A single data-driven roster of **12 Baltic
+realms** (`data/factions.ts`: Sweden, Denmark, Novgorod, Lithuania, Prussia,
+Livonia, Poland, Curonia, Estonia, Finland, Gotland, Samogitia), each with an
+identity (name, colour, flavour) and a **signature national trait** — its
+current gameplay difference, drawn from the existing five-trait system (a yield
+lean or cheaper armies), with richer per-faction bonuses able to hang off the
+same table later. The **"Play as" picker now appears for random games too**, not
+just scripted maps: a random game offers the whole roster, the Baltic map its
+**ten seated realms** (Finland, Estonia and Gotland joined the original seven).
+Realms join by **name**, so a people plays with the same identity and trait in a
+random world or on the Baltic map. The player always plays *some* named realm
+(Random seed-picks one); rivals are distinct realms from the roster.
 
 **Original plan (for reference).** The current renderer wraps the region
 sites in a *generated organic island*. A real Baltic map is a different shape:

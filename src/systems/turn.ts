@@ -18,6 +18,7 @@ import { BUILDINGS, type BuildingId } from "@/data/buildings";
 import { UNITS, type UnitType } from "@/data/units";
 import { ARCHETYPES } from "@/data/personalities";
 import { TRAIT_IDS, type TraitId } from "@/data/traits";
+import { FACTIONS, factionByName } from "@/data/factions";
 import { TECHS, type TechId } from "@/data/techs";
 import { generateMap, type MapGenOptions } from "@/systems/mapgen";
 import { scriptedMap } from "@/data/maps/types";
@@ -76,31 +77,6 @@ const BARBARIAN_NATION: Nation = {
   bankrupt: false,
 };
 
-// Rival powers of the medieval Baltic rim (~900 AD onward, the "Age of
-// Founding" this game opens in): a mix of pagan tribal confederations, Rus
-// republics and Christian kingdoms. Colours are well-spaced hues, kept clear
-// of the player's gold and the tribes' brown. Bigger maps seat more of them.
-const RIVAL_NAMES = [
-  "Lithuania",
-  "Novgorod",
-  "Denmark",
-  "Prussia",
-  "Livonia",
-  "Poland",
-  "Sweden",
-  "Curonia",
-];
-const RIVAL_COLORS = [
-  "#5b8bd0", // Lithuania — steel blue
-  "#b06ec0", // Novgorod — violet
-  "#d0796e", // Denmark — terracotta
-  "#6cae7a", // Prussia — green
-  "#4fb0a0", // Livonia — teal
-  "#d64f7d", // Poland — rose
-  "#8f86d8", // Sweden — indigo
-  "#cf954a", // Curonia — amber
-];
-
 const STARTING_STOCKS: ResourceStocks = { gold: 60, food: 20, materials: 15, knowledge: 0 };
 /** How many regions each nation begins with (capital + neighbours). */
 const START_REGIONS = 3;
@@ -133,14 +109,20 @@ export function createGame(options: NewGameOptions): GameState {
   // and neighbours (~3 regions each), so a small map silently seats fewer rivals
   // rather than cramming capitals on top of one another.
   const mapCap = Math.max(2, Math.floor(regions.length / 3));
-  const rivalCount = Math.max(0, Math.min(options.rivals ?? RIVAL_COUNT, RIVAL_COLORS.length, mapCap - 1));
+  const rivalCount = Math.max(0, Math.min(options.rivals ?? RIVAL_COUNT, FACTIONS.length - 1, mapCap - 1));
 
-  // Player is nation 0, barbarians nation 1, rivals 2..n. Index === id.
+  // Pick the realms: the human's chosen faction (or one from the seed), then
+  // distinct rival factions from the roster. Same seed + choice → same line-up.
+  const playerDef = factionByName(options.playerFaction) ?? FACTIONS[options.seed % FACTIONS.length]!;
+  const rivalDefs = shuffled(FACTIONS.filter((f) => f.name !== playerDef.name), rng).slice(0, rivalCount);
+
+  // Player is nation 0, barbarians nation 1, rivals 2..n. Index === id. Each
+  // realm carries its faction's signature trait (a scenario may pin the player's).
   const nations: Nation[] = [
     {
       id: PLAYER_ID,
-      name: "Your Realm",
-      color: "#d8a24a",
+      name: playerDef.name,
+      color: "#d8a24a", // player gold — "mine" reads at a glance regardless of realm
       isPlayer: true,
       isBarbarian: false,
       alive: true,
@@ -150,15 +132,17 @@ export function createGame(options: NewGameOptions): GameState {
       wonders: 0,
       famine: false,
       bankrupt: false,
+      trait: options.playerTrait ?? playerDef.trait,
     },
     { ...BARBARIAN_NATION, stocks: zeroStocks(), research: emptyResearch(), wonders: 0 },
   ];
   const personalities = shuffled(ARCHETYPES, rng);
   for (let i = 0; i < rivalCount; i++) {
+    const def = rivalDefs[i]!;
     nations.push({
       id: 2 + i,
-      name: RIVAL_NAMES[i]!,
-      color: RIVAL_COLORS[i]!,
+      name: def.name,
+      color: def.color,
       isPlayer: false,
       isBarbarian: false,
       alive: true,
@@ -169,6 +153,7 @@ export function createGame(options: NewGameOptions): GameState {
       wonders: 0,
       famine: false,
       bankrupt: false,
+      trait: def.trait,
     });
   }
 
@@ -213,22 +198,7 @@ export function createGame(options: NewGameOptions): GameState {
     return { ...r, ownerId: BARBARIAN_ID, fortification: fort };
   });
 
-  // Draw a distinct national trait for each non-barbarian nation (player +
-  // rivals), for opening variety. Done last so existing seeded map/capital
-  // layouts are unaffected by the added RNG draws. A scenario may pin the
-  // player's trait; rivals then draw from the remaining pool.
-  const forced = options.playerTrait;
-  const traitPool = shuffled(forced ? TRAIT_IDS.filter((t) => t !== forced) : TRAIT_IDS, rng);
-  let traitIdx = 0;
-  for (const n of nations) {
-    if (n.isBarbarian) continue;
-    if (n.isPlayer && forced) {
-      n.trait = forced;
-      continue;
-    }
-    n.trait = traitPool[traitIdx % traitPool.length];
-    traitIdx += 1;
-  }
+  // (National traits come from each realm's faction, set at creation above.)
 
   const playerCapitalName = regions[capitals[0]!]!.name;
 
@@ -248,7 +218,7 @@ export function createGame(options: NewGameOptions): GameState {
     difficulty: options.difficulty ?? "normal",
     outcome: "playing",
     log: [
-      `Turn 1 — your realm rises around ${playerCapitalName}; ` +
+      `Turn 1 — ${playerDef.name} rises around ${playerCapitalName} under your rule; ` +
         `${rivalCount} rival power${rivalCount === 1 ? "" : "s"} contest the land (seed ${options.seed}).`,
     ],
     scoreHistory: {},
@@ -340,13 +310,17 @@ function createScriptedGame(map: ScriptedMap, regions: Region[], options: NewGam
     return { ...r, ownerId: BARBARIAN_ID, fortification: fort };
   });
 
-  // Opening national traits for each realm.
+  // National traits come from each realm's faction (a scenario may pin the
+  // player's); a realm not in the roster falls back to a seeded draw.
   const traitPool = shuffled(TRAIT_IDS, rng);
   let traitIdx = 0;
   for (const n of nations) {
     if (n.isBarbarian) continue;
-    n.trait = traitPool[traitIdx % traitPool.length];
-    traitIdx += 1;
+    const factionTrait = factionByName(n.name)?.trait;
+    n.trait =
+      n.isPlayer && options.playerTrait
+        ? options.playerTrait
+        : factionTrait ?? traitPool[traitIdx++ % traitPool.length];
   }
 
   const playerName = nations[PLAYER_ID]!.name;

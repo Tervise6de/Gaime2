@@ -112,15 +112,20 @@ export const BALTIC_MAP: ScriptedMap = {
     { name: "Visby", x: 0.43, y: 0.56, terrain: "coast" },
     { name: "Arensburg", x: 0.60, y: 0.49, terrain: "coast" },
   ],
-  // Historical realms of the Baltic rim, each on its home ground. Every region
-  // belongs to exactly one. (Region indices match the order above.)
+  // Historical realms of the Baltic rim, each on its home ground. Ten seated
+  // realms (of the full roster in `data/factions.ts`); every region belongs to
+  // exactly one. Colours mirror the roster. (Region indices match the order above.)
   factions: [
-    // Sweden — the Swedish heartland, its Finnish sphere, and Gotland.
-    { name: "Sweden", color: "#5b8bd0", capital: 0, regions: [0, 1, 2, 3, 4, 5, 6, 26] },
-    // Novgorod — Karelia and the Rus north-east.
-    { name: "Novgorod", color: "#b06ec0", capital: 11, regions: [7, 11, 12, 15] },
-    // Livonia — Estonia, the Livonian coast and Ösel.
-    { name: "Livonia", color: "#4fb0a0", capital: 13, regions: [8, 9, 10, 13, 14, 27] },
+    // Sweden — the Swedish heartland.
+    { name: "Sweden", color: "#5b8bd0", capital: 0, regions: [0, 1, 2, 3, 4] },
+    // Finland — Åbo, Tavastia and the Karelian marches.
+    { name: "Finland", color: "#9ec96b", capital: 6, regions: [5, 6, 7] },
+    // Estonia — Reval, Dorpat and the northern tribes.
+    { name: "Estonia", color: "#6fc2d8", capital: 8, regions: [8, 9, 10] },
+    // Novgorod — Pskov and the Rus north-east.
+    { name: "Novgorod", color: "#b06ec0", capital: 11, regions: [11, 12, 15] },
+    // Livonia — Riga and the Livonian coast.
+    { name: "Livonia", color: "#4fb0a0", capital: 13, regions: [13, 14] },
     // Lithuania — the pagan grand duchy.
     { name: "Lithuania", color: "#6cae7a", capital: 16, regions: [16, 17] },
     // Prussia — the Baltic tribes of the southern shore.
@@ -129,5 +134,7 @@ export const BALTIC_MAP: ScriptedMap = {
     { name: "Poland", color: "#d64f7d", capital: 20, regions: [20, 21, 22, 23] },
     // Denmark — Jutland and the isles.
     { name: "Denmark", color: "#d0796e", capital: 24, regions: [24, 25] },
+    // Gotland — Visby's Hansa and Ösel, the island realms.
+    { name: "Gotland", color: "#9aa4b2", capital: 26, regions: [26, 27] },
   ],
 };

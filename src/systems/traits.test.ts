@@ -3,6 +3,7 @@ import { createGame } from "@/systems/turn";
 import { nationYieldMult, regionProduction } from "@/systems/economy";
 import { unitCost } from "@/systems/military";
 import { traitYield, traitUnitCostMult, TRAIT_IDS, TRAITS } from "@/data/traits";
+import { factionByName } from "@/data/factions";
 import { UNITS } from "@/data/units";
 import { PLAYER_ID, emptyResearch, type Nation, type Region } from "@/systems/state";
 
@@ -109,10 +110,15 @@ describe("trait draw", () => {
     expect(a.nations.map((n) => n.trait)).toEqual(b.nations.map((n) => n.trait));
   });
 
-  it("gives distinct traits when nations fit within the pool", () => {
-    const s = createGame({ seed: 7, rivals: 3 }); // 4 non-barb nations, 5 traits
-    const drawn = s.nations.filter((n) => !n.isBarbarian).map((n) => n.trait);
-    expect(new Set(drawn).size).toBe(drawn.length);
+  it("draws each realm's trait from its faction's signature trait", () => {
+    // Traits are now a faction identity (data/factions.ts), not a per-game draw,
+    // so realms may share a trait — but each must match its faction's.
+    const s = createGame({ seed: 7, rivals: 3 });
+    for (const n of s.nations) {
+      if (n.isBarbarian) continue;
+      const faction = factionByName(n.name);
+      if (faction) expect(n.trait).toBe(faction.trait);
+    }
   });
 
   it("varies traits across seeds (opening variety)", () => {
