@@ -32,6 +32,8 @@ export interface UnitDef {
   moves: number;
   /** The unit type this one gets a counter bonus against, if any. */
   counters: UnitType | null;
+  /** Fires in the opening volley before melee (ranged, siege bombardment). */
+  volley: boolean;
   /** Fortification levels this unit strips when attacking (siege). */
   siegePower: number;
   /** Strategic resource access required to raise this unit. */
@@ -51,6 +53,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     defense: 4,
     moves: 1,
     counters: "cavalry",
+    volley: false,
     siegePower: 0,
     requires: null,
     requiresTech: null,
@@ -65,6 +68,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     defense: 5,
     moves: 1,
     counters: "militia",
+    volley: false,
     siegePower: 0,
     requires: null,
     requiresTech: null,
@@ -79,6 +83,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     defense: 2,
     moves: 1,
     counters: "infantry",
+    volley: true,
     siegePower: 0,
     requires: null,
     requiresTech: "bronze_working",
@@ -93,6 +98,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     defense: 4,
     moves: 2,
     counters: "ranged",
+    volley: false,
     siegePower: 0,
     requires: "horses",
     requiresTech: "horseback",
@@ -107,6 +113,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     defense: 2,
     moves: 1,
     counters: null,
+    volley: true,
     siegePower: 2,
     requires: "iron",
     requiresTech: "engineering",

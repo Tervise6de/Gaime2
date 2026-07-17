@@ -166,14 +166,22 @@ knowledge_out  = buildings + specialists
 - **Cost:** gold + materials (some need a strategic resource) to raise; gold
   **upkeep** each turn — armies are an ongoing economic drag, not a one-time buy.
 - **Movement:** along the adjacency graph, limited moves/turn (cavalry more).
-- **Combat (abstract, no tactical grid):**
+- **Combat (abstract, no tactical grid) — phased (v2, `systems/combat.ts`):**
+  A fight resolves as an **opening volley** then up to `MAX_COMBAT_ROUNDS` of
+  **melee attrition**, all from the seeded RNG (deterministic, unit-tested):
   ```
-  effective_strength = Σ(unit_strength × counter_modifier × terrain_mod × morale)
-  defender gets: fortification_mod + terrain_defense + garrison
-  outcome = f(attacker_strength, defender_strength, randomness)
-  → casualties on both sides scaled by ratio; loser retreats or region is captured
+  volley:  ranged + siege fire first; siege also strips fortification.
+  melee:   each round, atk_power = Σ(strength × counter_mod) × jitter
+                        def_power = same × terrain_defense × (1 + eff_fort·FORT) × jitter
+           each side sheds a share of its stack scaled by the power ratio; the
+           round's loser always sheds ≥1 regiment so the fight converges.
+  outcome: defender wiped → captured; attacker wiped → repelled; neither → held.
   ```
-  Terrain and fortification make *where* you fight as important as *what* you bring.
+  Every fight yields a `BattleReport` — the phase-by-phase blow-by-blow the UI
+  replays (Options → Gameplay → "Show combat report"). Terrain and fortification
+  make *where* you fight as important as *what* you bring; the counter loop
+  (Militia > Cavalry > Ranged > Infantry > Militia, Siege vs. forts) makes
+  composition matter.
 
 ### 3.5 Diplomacy
 
@@ -615,21 +623,24 @@ not opaque. Add **rival-to-rival relations** (who likes/hates whom) and show
 just you-vs-each. Casus-belli-lite: declaring war with a *reason* (reclaim a
 lost region, ally's call) costs less opinion than naked aggression.
 
-### 9.2 Combat model + unit roles (needs the most care)
-Today combat is a single opposed-strength roll per attack. Planned redesign
-(to be specced before building), aiming for readable depth, not tactics micro:
-- **Unit roles that matter at the decision point.** Infantry (line/hold),
-  Ranged (soften, weak in melee), Cavalry (fast, flanks, strong on open plains,
-  poor in forest/siege), Siege (strips fortification, weak in the field),
-  Militia (cheap fodder). A light **counter loop** so composition is a choice.
-- **Terrain & fortification** already feed defence; make their effect explicit
-  in the combat preview (per-unit, not just a single %).
-- **A combat report** (see 9.3-adjacent): the fight resolves into a surfaced
-  card — attacker vs defender, per-side casualties in soldiers, terrain/fort
-  modifiers, outcome — instead of one log line. This is cheap and high-impact.
-- Open question to resolve in the spec: do multiple armies **combine** into one
-  battle (CK3 stacks) or attack **sequentially** (current)? Likely: allow
-  pre-battle **merge at a staging region**, keep resolution single-battle.
+### 9.2 Combat model + unit roles — SHIPPED v2 (`systems/combat.ts`)
+Combat is now **phased**: an opening volley (ranged + siege fire first; siege
+strips fortification) then up to `MAX_COMBAT_ROUNDS` of melee attrition, with the
+round's loser always shedding ≥1 regiment so fights converge. Outcomes are
+`captured` / `repelled` / `held`. Delivered:
+- **Unit roles at the decision point.** Ranged and Siege carry the volley
+  (`volley: true` in `data/units.ts`); the counter loop
+  (Militia > Cavalry > Ranged > Infantry > Militia, Siege vs. forts) makes
+  composition a real choice. Terrain defence and fortification (net of siege)
+  weight the melee each round.
+- **A combat report.** Every fight yields a `BattleReport` (phase-by-phase
+  casualties, forces, terrain/fort, outcome) which the UI replays as a modal —
+  the player's own attacks pop it immediately; AI attacks on the player are
+  listed in the end-turn report to open on click. Toggle in Options → Gameplay.
+- Still open (future): explicit **per-unit combat preview** (today the preview
+  is a single win-chance %), and whether multiple armies **combine** into one
+  battle vs. attack **sequentially** (current) — likely a pre-battle merge at a
+  staging region with single-battle resolution.
 
 ### 9.3 Map lenses (Civ-style overlays)
 Toggleable map overlays so the board is readable at a glance without clicking
@@ -673,10 +684,12 @@ Each victory shows a dedicated progress readout and a "closest rival on this
 path" warning, so no one wins or loses a path invisibly.
 
 ### 9.7 Suggested build sequence
-1. **Combat report** (9.2 report slice) — cheap, high drama, immediate.
-2. **Map lenses** (9.3) — makes the wider Baltic board readable.
-3. **Diplomacy opinion** (9.1) — the CK3 pillar.
-4. **Real Baltic map** (9.0 scripted-map mode) — the setting made literal.
+1. ✅ **Real Baltic map** (9.0 scripted-map mode) — shipped: scripted Baltic +
+   Europe geography, historical homelands, Play-as picker.
+2. ✅ **Combat v2 + report** (9.2) — shipped: phased volley/melee, unit volley
+   roles, replayable battle report.
+3. **Map lenses** (9.3) — makes the wider Baltic board readable.
+4. **Diplomacy opinion** (9.1) — the CK3 pillar.
 5. **Region focus + buildings** (9.4) and **research tree** (9.5) — the Civ depth.
 6. **Victory-type pass** (9.6) — once focus/culture exist to hang a path on.
 Each remains a playable, testable slice, per the M1–M6 discipline above.

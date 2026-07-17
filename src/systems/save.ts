@@ -34,7 +34,10 @@ interface SaveEnvelope {
 
 /** Serialise a game to a JSON string. */
 export function serializeGame(state: GameState, savedAt: number): string {
-  const envelope: SaveEnvelope = { version: SAVE_VERSION, savedAt, state };
+  // `battles` is a transient, per-turn UI cache (combat reports the player has
+  // already seen) — never persist it, so a reloaded save starts battle-clean.
+  const { battles: _battles, ...persisted } = state;
+  const envelope: SaveEnvelope = { version: SAVE_VERSION, savedAt, state: persisted };
   return JSON.stringify(envelope);
 }
 

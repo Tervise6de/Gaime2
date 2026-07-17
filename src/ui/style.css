@@ -2099,6 +2099,161 @@ body {
   margin-top: 12px;
 }
 
+/* Battles fought this turn — links into the full combat report. */
+.hud-battle-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-size: 13px;
+  padding: 7px 10px;
+  margin-top: 5px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--panel-border);
+  border-left: 3px solid currentcolor;
+  color: var(--text, #e8ecf2);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.hud-battle-link:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.hud-battle-link.good {
+  border-left-color: #6cae7a;
+}
+
+.hud-battle-link.bad {
+  border-left-color: #e8776b;
+}
+
+/* --- Combat report (a battle replayed blow-by-blow) ------------------------ */
+.hud-battle-panel {
+  width: min(500px, 95vw);
+}
+
+.hud-battle-forces {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 6px 0 14px;
+}
+
+.hud-battle-side {
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--panel-border);
+}
+
+.hud-battle-side.you {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.hud-battle-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted, #9aa4b2);
+  margin-bottom: 4px;
+}
+
+.hud-battle-side.you .hud-battle-name {
+  color: var(--accent);
+}
+
+.hud-battle-comp {
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+
+.hud-battle-comp .muted {
+  color: var(--muted, #9aa4b2);
+}
+
+.hud-battle-phases {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.hud-battle-phase {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 12.5px;
+}
+
+.hud-battle-phase-label {
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.hud-battle-phase-note {
+  color: var(--muted, #9aa4b2);
+}
+
+.hud-battle-phase-cas {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hud-battle-phase-cas .atk {
+  color: #e8776b;
+}
+
+.hud-battle-phase-cas .def {
+  color: #6cae7a;
+}
+
+.hud-battle-outcome {
+  text-align: center;
+  font-size: 14.5px;
+  font-weight: 600;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.hud-battle-outcome.win {
+  color: #6cae7a;
+  background: color-mix(in srgb, #6cae7a 14%, transparent);
+  border: 1px solid color-mix(in srgb, #6cae7a 45%, transparent);
+}
+
+.hud-battle-outcome.lose {
+  color: #e8776b;
+  background: color-mix(in srgb, #e8776b 14%, transparent);
+  border: 1px solid color-mix(in srgb, #e8776b 45%, transparent);
+}
+
+.hud-battle-totals {
+  margin: 0 0 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 520px) {
+  .hud-battle-forces {
+    grid-template-columns: 1fr;
+  }
+
+  .hud-battle-phase {
+    grid-template-columns: auto 1fr;
+  }
+
+  .hud-battle-phase-cas {
+    grid-column: 1 / -1;
+  }
+}
+
 .hud-techtree-head {
   display: flex;
   align-items: center;

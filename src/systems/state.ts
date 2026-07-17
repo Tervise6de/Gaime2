@@ -14,6 +14,7 @@
 import type { BuildingId } from "@/data/buildings";
 import type { ResourceYield, StrategicResource, TerrainId } from "@/data/terrain";
 import type { UnitType } from "@/data/units";
+import type { BattleReport } from "@/systems/combat";
 import type { TechId } from "@/data/techs";
 import type { TraitId } from "@/data/traits";
 
@@ -87,6 +88,16 @@ export const FORT_PER_LEVEL = 0.2;
 export const COMBAT_VARIANCE = 0.15;
 /** Fraction of the losing side's army destroyed in a decisive fight. */
 export const CASUALTY_SCALE = 0.6;
+/** Phased-battle tuning (combat v2). A fight opens with a volley (ranged +
+    siege first strike), then up to MAX rounds of melee attrition. */
+export const MAX_COMBAT_ROUNDS = 5;
+/** Fraction of the enemy a full opening volley can remove (scaled by its
+    ranged/siege power vs the enemy's size). */
+export const VOLLEY_LETHALITY = 0.22;
+/** Base per-round melee lethality, split between the sides by their power. */
+export const ROUND_LETHALITY = 0.5;
+/** Ceiling on how much of a side one melee round can remove. */
+export const MAX_ROUND_LOSS = 0.55;
 /** Unrest added to a region the turn it is conquered (foreign population). */
 export const CONQUEST_UNREST = 30;
 /** Regions you can hold before overexpansion unrest kicks in. */
@@ -355,6 +366,13 @@ export interface GameState {
    * equal length (dead nations keep being sampled) so turns line up by index.
    */
   scoreHistory?: Record<number, number[]>;
+  /**
+   * Battles fought since the last turn resolved (transient): each End turn
+   * clears the list, then armies/AI append reports as fights happen, so the UI
+   * can surface a combat report for the player's battles. Not part of the
+   * persistent game — dropped on save/load.
+   */
+  battles?: BattleReport[];
   /**
    * A decision awaiting the player's input, raised by a choice event. Purely
    * serialisable data (no functions); the effect of each option is looked up by

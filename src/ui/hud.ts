@@ -28,7 +28,10 @@ import {
   setReduceMotion,
   isTurnReport,
   setTurnReport,
+  isCombatReport,
+  setCombatReport,
 } from "@/ui/settings";
+import type { BattleReport } from "@/systems/combat";
 import { cbSafe } from "@/data/palette";
 import { OCEAN } from "@/data/mapstyle";
 import { badgeArt, BRANCH_ART, crestSvg, eventVignette, MOMENT_ART, safeColor, TERRAIN_ART, TREATY_ART } from "@/data/art";
@@ -173,6 +176,8 @@ export interface Hud {
    * Options; quiet turns and turns with a pending decision skip it).
    */
   showTurnReport(turn: number, summary: TurnSummary | null, state: GameState): void;
+  /** Replay a battle blow-by-blow (a player-involved fight). */
+  showBattleReport(report: BattleReport): void;
 }
 
 const RESOURCE_META: Record<ResourceKey, { label: string; icon: string; tip: string }> = {
@@ -1069,6 +1074,14 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
         "After End turn, review what changed before play continues. Quiet turns never pause.",
       ),
     );
+    panel.append(
+      checkboxRow(
+        "Show combat report after a battle",
+        isCombatReport,
+        (v) => setCombatReport(v),
+        "Replay each of your battles blow-by-blow — volley, melee rounds, and the outcome.",
+      ),
+    );
 
     // Accessibility ----------------------------------------------------------
     panel.append(sectionHeading("Accessibility"));
@@ -1642,9 +1655,123 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     btns.append(cont);
     panel.append(btns);
 
+    // Battles this turn involving the player — each opens the full report.
+    const battles = (state.battles ?? []).filter((b) => b.attackerIsPlayer || b.defenderIsPlayer);
+    if (battles.length) {
+      const box = el("div", "hud-report-alerts");
+      box.append(heading("Battles"));
+      for (const b of battles) {
+        const you = b.attackerIsPlayer;
+        const foe = you ? b.defenderName : b.attackerName;
+        const won = you ? b.outcome === "captured" : b.outcome !== "captured";
+        const row = btn("", "hud-battle-link " + (won ? "good" : "bad"), () => showBattleReport(b));
+        row.innerHTML =
+          `${glyphHtml("attack", "⚔")} ${escapeHtml(b.regionName)} — ` +
+          `${you ? "you attacked" : "you defended against"} ${escapeHtml(foe)} · ` +
+          `<b>${battleVerdict(b, you)}</b>`;
+        box.append(row);
+      }
+      panel.append(box);
+    }
+
     reportOverlay.append(panel);
     reportOverlay.style.display = "flex";
     cont.focus(); // Enter/Space continue immediately
+  }
+
+  // --- Combat report: a battle replayed blow-by-blow -------------------------
+  const battleOverlay = el("div", "hud-techtree-overlay");
+  battleOverlay.style.display = "none";
+  battleOverlay.addEventListener("click", (ev) => {
+    if (ev.target === battleOverlay) closeBattle();
+  });
+  root.append(battleOverlay);
+
+  function forceLine(units: Record<UnitType, number>): string {
+    const parts: string[] = [];
+    for (const t of UNIT_TYPES) if (units[t] > 0) parts.push(`${unitIconHtml(t, UNITS[t].short + " ")}${soldiersCompact(units[t])}`);
+    return parts.join(" ") || "—";
+  }
+
+  function showBattleReport(report: BattleReport): void {
+    battleOverlay.innerHTML = "";
+    const panel = el("div", "hud-techtree-panel hud-battle-panel");
+    const head = el("div", "hud-techtree-head");
+    const title = el("h2", "hud-techtree-title");
+    title.textContent = `Battle of ${report.regionName}`;
+    head.append(title, closeButton(closeBattle));
+    panel.append(head);
+
+    // Setting line: terrain, fort (and how far siege battered it down).
+    const setting = el("p", "hud-hint hud-prod-summary");
+    setting.innerHTML =
+      `${escapeHtml(report.terrainName)} · ${glyphHtml("shield", "🛡")} defence ×${report.terrainDefense}` +
+      (report.fortification > 0
+        ? ` · fort ${report.fortification}${report.effectiveFort < report.fortification ? ` → ${report.effectiveFort} (siege)` : ""}`
+        : "");
+    panel.append(setting);
+
+    // The two forces, side by side.
+    const forces = el("div", "hud-battle-forces");
+    const side = (name: string, isYou: boolean, units: Record<UnitType, number>, role: string): HTMLElement => {
+      const col = el("div", "hud-battle-side" + (isYou ? " you" : ""));
+      const nm = el("div", "hud-battle-name");
+      nm.textContent = `${role}: ${name}`;
+      const comp = el("div", "hud-battle-comp");
+      comp.innerHTML = `${forceLine(units)} <span class="muted">(${soldiersDisplay(sumUnits(units))})</span>`;
+      col.append(nm, comp);
+      return col;
+    };
+    forces.append(
+      side(report.attackerName, report.attackerIsPlayer, report.attackerStart, "Attacker"),
+      side(report.defenderName, report.defenderIsPlayer, report.defenderStart, "Defender"),
+    );
+    panel.append(forces);
+
+    // Phase-by-phase casualties.
+    const phases = el("div", "hud-battle-phases");
+    for (const ph of report.phases) {
+      const row = el("div", "hud-battle-phase");
+      const label = el("div", "hud-battle-phase-label");
+      label.textContent = ph.kind === "volley" ? "Volley" : `Round ${ph.round}`;
+      const note = el("div", "hud-battle-phase-note");
+      note.textContent = ph.note;
+      const cas = el("div", "hud-battle-phase-cas");
+      const a = sumUnits(ph.attackerLosses);
+      const d = sumUnits(ph.defenderLosses);
+      cas.innerHTML =
+        `<span class="atk">−${soldiersCompact(a)}</span> / <span class="def">−${soldiersCompact(d)}</span>`;
+      cas.title = "Attacker losses / defender losses this phase.";
+      row.append(label, note, cas);
+      phases.append(row);
+    }
+    panel.append(phases);
+
+    // Outcome banner + casualty totals.
+    const you = report.attackerIsPlayer;
+    const won = you ? report.outcome === "captured" : report.outcome !== "captured";
+    const banner = el("div", "hud-battle-outcome " + (won ? "win" : "lose"));
+    banner.textContent = `${battleVerdict(report, you)} — ${report.decisive}`;
+    panel.append(banner);
+
+    const totals = el("p", "hud-hint hud-battle-totals");
+    totals.innerHTML =
+      `Losses — ${escapeHtml(report.attackerName)}: <b>${soldiersDisplay(sumUnits(report.attackerLosses))}</b>` +
+      ` · ${escapeHtml(report.defenderName)}: <b>${soldiersDisplay(sumUnits(report.defenderLosses))}</b> soldiers.`;
+    panel.append(totals);
+
+    const btns = el("div", "hud-end-btns");
+    const cont = btn("Close ▶", "hud-end-btn primary", closeBattle);
+    btns.append(cont);
+    panel.append(btns);
+
+    battleOverlay.append(panel);
+    battleOverlay.style.display = "flex";
+    cont.focus();
+  }
+  function closeBattle(): void {
+    battleOverlay.style.display = "none";
+    battleOverlay.innerHTML = "";
   }
 
   // --- Keyboard shortcuts for the overlays ----------------------------------
@@ -1715,6 +1842,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       closeProduction();
       closeArmies();
       closeAttack();
+      closeBattle();
       setScreen(null);
       legendPanel.style.display = "none";
       if (hints.style.display !== "none") dismissHints();
@@ -1979,7 +2107,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     }
   }
 
-  return { update, toast: flashToast, openOptions, openRecords, mapTip, openRegionScreen, showTurnReport };
+  return { update, toast: flashToast, openOptions, openRecords, mapTip, openRegionScreen, showTurnReport, showBattleReport };
 }
 
 function renderRegion(
@@ -3156,6 +3284,33 @@ function composition(army: Army): string {
   const parts: string[] = [];
   for (const t of UNIT_TYPES) if (army.units[t] > 0) parts.push(`${soldiersCompact(army.units[t])} ${UNITS[t].short}`);
   return parts.join(", ") || "—";
+}
+
+/** Total regiments across all unit types in a loss/composition record. */
+function sumUnits(units: Record<UnitType, number>): number {
+  let s = 0;
+  for (const t of UNIT_TYPES) s += units[t];
+  return s;
+}
+
+/**
+ * One-line battle verdict from the viewer's seat. `youAttacked` marks which
+ * side the player was on, so a held region reads as a win for the defender and
+ * a stalled assault for the attacker.
+ */
+function battleVerdict(report: BattleReport, youAttacked: boolean): string {
+  if (youAttacked) {
+    return report.outcome === "captured"
+      ? "Victory — region taken"
+      : report.outcome === "repelled"
+        ? "Defeat — army destroyed"
+        : "Repulsed — the assault stalled";
+  }
+  return report.outcome === "captured"
+    ? "Defeat — region lost"
+    : report.outcome === "repelled"
+      ? "Victory — attackers destroyed"
+      : "Held — the line stood";
 }
 
 /** The army line with unit icons: "3,000 soldiers — [⚒]2k [🗡]1k". Text fallback intact. */

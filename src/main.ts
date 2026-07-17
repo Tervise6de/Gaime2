@@ -25,7 +25,7 @@ import { createHud } from "@/ui/hud";
 import { showMainMenu } from "@/ui/title";
 import { runTutorial, hasSeenTutorial } from "@/ui/tutorial";
 import { play, outcomeCue, armAmbientOnGesture } from "@/ui/audio";
-import { applyDisplaySettings, isColourblind, isReduceMotion } from "@/ui/settings";
+import { applyDisplaySettings, isColourblind, isReduceMotion, isCombatReport } from "@/ui/settings";
 import { recordGameEnd } from "@/ui/profile";
 import { ACHIEVEMENTS } from "@/data/achievements";
 import "@/ui/style.css";
@@ -151,6 +151,7 @@ function main(): void {
       );
       if (!army) return;
       const before = state;
+      const battlesBefore = before.battles?.length ?? 0;
       state = moveArmy(state, army.id, regionId);
       const moved = state.armies.find((a) => a.id === army.id);
       // Stay on the fight's outcome region: the captured target, or the army's
@@ -161,6 +162,7 @@ function main(): void {
       for (const after of state.regions) {
         if (before.regions[after.id]?.ownerId !== after.ownerId) renderer.pulseCapture(after.id);
       }
+      maybeShowBattle(battlesBefore);
     },
     onDeclareWar(targetId) {
       state = declareWar(state, PLAYER_ID, targetId);
@@ -236,11 +238,13 @@ function main(): void {
     if (moveArmyId !== null && regionId !== null) {
       const army = state.armies.find((a) => a.id === moveArmyId);
       if (army && reachableRegions(state, army).includes(regionId)) {
+        const battlesBefore = state.battles?.length ?? 0;
         state = moveArmy(state, moveArmyId, regionId);
         const moved = state.armies.find((a) => a.id === moveArmyId);
         selectedRegion = moved ? moved.regionId : regionId;
         moveArmyId = moved && moved.movesLeft > 0 ? moved.id : null;
         commit();
+        maybeShowBattle(battlesBefore);
         return;
       }
     }
@@ -337,6 +341,20 @@ function main(): void {
   function commit(): void {
     sync();
     saveToLocal(state, nowStamp(), "auto");
+  }
+
+  /**
+   * Replay the fight the player just fought, if a new battle was recorded and
+   * the combat-report option is on. `battlesBefore` is the battle count before
+   * the move, so relocations and undefended captures (which record nothing) are
+   * skipped, as are purely-AI fights (never player-involved).
+   */
+  function maybeShowBattle(battlesBefore: number): void {
+    if (!isCombatReport()) return;
+    const battles = state.battles ?? [];
+    if (battles.length <= battlesBefore) return;
+    const b = battles[battles.length - 1];
+    if (b && (b.attackerIsPlayer || b.defenderIsPlayer)) hud.showBattleReport(b);
   }
 
   function sync(): void {

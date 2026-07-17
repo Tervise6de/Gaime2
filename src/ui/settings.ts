@@ -69,6 +69,26 @@ export function setTurnReport(v: boolean): boolean {
   return v;
 }
 
+const COMBAT_REPORT_KEY = "gaime2:combatReport";
+
+/** Combat report: replay a battle blow-by-blow when you attack. On by default. */
+export function isCombatReport(): boolean {
+  try {
+    return localStorage.getItem(COMBAT_REPORT_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+export function setCombatReport(v: boolean): boolean {
+  try {
+    localStorage.setItem(COMBAT_REPORT_KEY, v ? "1" : "0");
+  } catch {
+    /* storage unavailable — preference just won't persist */
+  }
+  return v;
+}
+
 /**
  * Reflect the current display preferences onto the document root so CSS can key
  * off them (`:root[data-colourblind="1"]`, `:root[data-reduce-motion="1"]`).

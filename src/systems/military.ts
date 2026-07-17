@@ -192,14 +192,14 @@ export function moveArmy(
 
   // Attacking a rival nation's territory is an act of war.
   let working = state;
-  const defenderNation = enemyAtTarget?.ownerId ?? target.ownerId;
+  const defenderOwnerId = enemyAtTarget?.ownerId ?? target.ownerId;
   if (
-    defenderNation !== null &&
-    defenderNation !== BARBARIAN_ID &&
-    defenderNation !== owner &&
-    !atWar(working, owner, defenderNation)
+    defenderOwnerId !== null &&
+    defenderOwnerId !== BARBARIAN_ID &&
+    defenderOwnerId !== owner &&
+    !atWar(working, owner, defenderOwnerId)
   ) {
-    working = declareWar(working, owner, defenderNation);
+    working = declareWar(working, owner, defenderOwnerId);
   }
   state = working;
 
@@ -220,7 +220,9 @@ export function moveArmy(
   const rngState = rng.seed;
 
   const log: string[] = [];
-  const atkName = state.nations.find((n) => n.id === owner)?.name ?? "Army";
+  const attackerNation = state.nations.find((n) => n.id === owner);
+  const defenderNation = state.nations.find((n) => n.id === enemyAtTarget.ownerId);
+  const atkName = attackerNation?.name ?? "Army";
   const myLoss = armySize(result.attackerLosses);
   const theirLoss = armySize(result.defenderLosses);
   log.push(
@@ -228,6 +230,22 @@ export function moveArmy(
       (result.captured ? ` — ${target.name} captured!` : ".") +
       ` (losses ${soldiersDisplay(myLoss)} vs ${soldiersDisplay(theirLoss)} soldiers)`,
   );
+
+  // Enrich the battle report with the names the resolver couldn't know, and
+  // record it (transiently) so the UI can replay player-involved fights.
+  const report = {
+    ...result.report,
+    regionName: target.name,
+    terrainName: TERRAIN[target.terrain].name,
+    attackerName: attackerNation?.isPlayer ? "Your realm" : atkName,
+    defenderName: defenderNation?.isBarbarian
+      ? "Free Tribes"
+      : defenderNation?.isPlayer
+        ? "Your realm"
+        : (defenderNation?.name ?? "the garrison"),
+    attackerIsPlayer: !!attackerNation?.isPlayer,
+    defenderIsPlayer: !!defenderNation?.isPlayer,
+  };
 
   // Update both armies with survivors; drop empty stacks.
   let armies = state.armies
@@ -238,7 +256,13 @@ export function moveArmy(
     })
     .filter((a) => armySize(a.units) > 0);
 
-  let next: GameState = { ...state, armies, rngState, log: appendLog(state, log) };
+  let next: GameState = {
+    ...state,
+    armies,
+    rngState,
+    log: appendLog(state, log),
+    battles: [...(state.battles ?? []), report],
+  };
 
   if (result.captured) {
     // Attacker advances into the captured region and takes ownership.

@@ -20,9 +20,12 @@
 import { COUNTER_BONUS, UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
 import type { Rng } from "@/systems/rng";
 import {
-  CASUALTY_SCALE,
   COMBAT_VARIANCE,
   FORT_PER_LEVEL,
+  MAX_COMBAT_ROUNDS,
+  MAX_ROUND_LOSS,
+  ROUND_LETHALITY,
+  VOLLEY_LETHALITY,
   armySize,
 } from "@/systems/state";
 
@@ -115,6 +118,42 @@ export function previewCombat(
   return { attack, defense, winChance: winChance(attack, defense), undefended: false };
 }
 
+/** One resolved phase of a battle (an opening volley, or a melee round). */
+export interface BattlePhase {
+  kind: "volley" | "melee";
+  /** 0 for the volley, 1-based for melee rounds. */
+  round: number;
+  attackerLosses: UnitCounts;
+  defenderLosses: UnitCounts;
+  /** Short human note ("Ranged volley softens the line", "Walls hold"). */
+  note: string;
+}
+
+/** The full blow-by-blow of a fight, for the combat-report UI. Region/nation
+    names are filled in by the caller (military.ts), which has the state. */
+export interface BattleReport {
+  regionName: string;
+  terrainName: string;
+  attackerName: string;
+  defenderName: string;
+  attackerIsPlayer: boolean;
+  defenderIsPlayer: boolean;
+  terrainDefense: number;
+  fortification: number;
+  /** Fortification remaining after the attacker's siege stripped it. */
+  effectiveFort: number;
+  attackerStart: UnitCounts;
+  defenderStart: UnitCounts;
+  attackerLosses: UnitCounts;
+  defenderLosses: UnitCounts;
+  attackerRemaining: UnitCounts;
+  defenderRemaining: UnitCounts;
+  phases: BattlePhase[];
+  outcome: "captured" | "repelled" | "held";
+  /** One-line summary of why it went the way it did. */
+  decisive: string;
+}
+
 export interface CombatResult {
   attackerLosses: UnitCounts;
   defenderLosses: UnitCounts;
@@ -123,6 +162,8 @@ export interface CombatResult {
   attackerWins: boolean;
   /** Defender wiped out → region can be captured. */
   captured: boolean;
+  /** Blow-by-blow (names/region filled by the caller). */
+  report: BattleReport;
 }
 
 export interface CombatContext {
@@ -130,14 +171,64 @@ export interface CombatContext {
   fortification: number;
 }
 
+/** Opening-volley firepower: ranged attack + siege bombardment. */
+function volleyPower(units: UnitCounts, opponent: UnitCounts): number {
+  const oppTotal = armySize(opponent) || 1;
+  let p = 0;
+  for (const t of UNIT_TYPES) {
+    const def = UNITS[t];
+    if (!def.volley || !units[t]) continue;
+    let mod = 1;
+    if (def.counters) mod += COUNTER_BONUS * (opponent[def.counters] / oppTotal);
+    p += units[t] * def.attack * mod;
+  }
+  return p;
+}
+
+/**
+ * Resolve a battle as an opening volley (ranged + siege first strike) followed
+ * by up to MAX_COMBAT_ROUNDS of melee attrition. Each melee round both sides
+ * take casualties scaled by effective strength (counters, terrain, remaining
+ * fort); the round's loser always sheds at least one regiment, so small fights
+ * still decide. A wiped defender is captured; a wiped attacker is repelled;
+ * survivors on both sides after the round cap means the defender held.
+ * Deterministic — every roll comes from `rng`.
+ */
 export function resolveCombat(
   attacker: UnitCounts,
   defender: UnitCounts,
   ctx: CombatContext,
   rng: Rng,
 ): CombatResult {
-  // Undefended region: walk in.
+  const attackerStart = { ...attacker };
+  const defenderStart = { ...defender };
+  const blank = (): BattleReport => ({
+    regionName: "",
+    terrainName: "",
+    attackerName: "",
+    defenderName: "",
+    attackerIsPlayer: false,
+    defenderIsPlayer: false,
+    terrainDefense: ctx.terrainDefense,
+    fortification: ctx.fortification,
+    effectiveFort: 0,
+    attackerStart,
+    defenderStart,
+    attackerLosses: zero(),
+    defenderLosses: zero(),
+    attackerRemaining: { ...attacker },
+    defenderRemaining: { ...defender },
+    phases: [],
+    outcome: "held",
+    decisive: "",
+  });
+
+  // Undefended region: walk in unopposed.
   if (armySize(defender) === 0) {
+    const report = blank();
+    report.effectiveFort = ctx.fortification;
+    report.outcome = "captured";
+    report.decisive = "Undefended — the army marched in unopposed.";
     return {
       attackerLosses: zero(),
       defenderLosses: zero(),
@@ -145,42 +236,116 @@ export function resolveCombat(
       defenderRemaining: zero(),
       attackerWins: true,
       captured: true,
+      report,
     };
   }
 
-  const { attack: atk, defense: def } = combatStrengths(attacker, defender, ctx);
+  const effFort = Math.max(0, ctx.fortification - siegePower(attacker));
+  let atk: UnitCounts = { ...attacker };
+  let def: UnitCounts = { ...defender };
+  const phases: BattlePhase[] = [];
+  const jitter = (): number => 1 + (rng.next() * 2 - 1) * COMBAT_VARIANCE;
 
-  const ratio = atk / (atk + def || 1);
-  const swing = (rng.next() * 2 - 1) * COMBAT_VARIANCE;
-  const effRatio = clamp(ratio + swing, 0, 1);
-  const attackerWins = effRatio >= 0.5;
+  // --- Opening volley: ranged + siege fire before the lines meet ---
+  const aVolley = volleyPower(atk, def);
+  const dVolley = volleyPower(def, atk);
+  if (aVolley > 0 || dVolley > 0) {
+    const defHit = volleyLosses(def, aVolley, rng);
+    const atkHit = volleyLosses(atk, dVolley, rng);
+    atk = subtract(atk, atkHit);
+    def = subtract(def, defHit);
+    let note = "Arrows and stones fly before the lines close.";
+    if (aVolley > dVolley * 1.5) note = "Your volley tears into their line before the clash.";
+    else if (dVolley > aVolley * 1.5) note = "Their volley thins your ranks on the approach.";
+    if (siegePower(attacker) > 0 && ctx.fortification > 0) {
+      note += effFort < ctx.fortification ? " Siege engines batter the walls." : "";
+    }
+    phases.push({ kind: "volley", round: 0, attackerLosses: atkHit, defenderLosses: defHit, note });
+  }
 
-  // Lopsidedness in [0,1]: 0 at a coin-flip, 1 at total dominance.
-  const edge = Math.abs(effRatio - 0.5) * 2;
-  const loserFrac = clamp(CASUALTY_SCALE + 0.4 * edge, 0, 1);
-  const winnerFrac = clamp(CASUALTY_SCALE * (1 - edge) * 0.6, 0, 1);
+  // --- Melee rounds ---
+  let outcome: BattleReport["outcome"] = "held";
+  for (let round = 1; round <= MAX_COMBAT_ROUNDS; round++) {
+    if (armySize(atk) === 0) { outcome = "repelled"; break; }
+    if (armySize(def) === 0) { outcome = "captured"; break; }
 
-  const attackerFrac = attackerWins ? winnerFrac : loserFrac;
-  const defenderFrac = attackerWins ? loserFrac : winnerFrac;
+    const atkPow = sideStrength(atk, def, "attack") * jitter();
+    const defPow =
+      sideStrength(def, atk, "defense") * ctx.terrainDefense * (1 + effFort * FORT_PER_LEVEL) * jitter();
+    const total = atkPow + defPow || 1;
+    const defFrac = clamp((ROUND_LETHALITY * atkPow) / total, 0, MAX_ROUND_LOSS);
+    const atkFrac = clamp((ROUND_LETHALITY * defPow) / total, 0, MAX_ROUND_LOSS);
 
-  const attackerLosses = scaleLosses(attacker, attackerFrac);
-  const defenderLosses = scaleLosses(defender, defenderFrac);
-  const attackerRemaining = subtract(attacker, attackerLosses);
-  const defenderRemaining = subtract(defender, defenderLosses);
+    // The round's loser always sheds at least one regiment, so the fight
+    // converges even between tiny, evenly-matched stacks. The defender "holds"
+    // the round when at least as strong, and it's the attacker who's thrown back.
+    const defenderHeldRound = defPow >= atkPow;
+    const defHit = scaleLosses(def, defFrac, !defenderHeldRound);
+    const atkHit = scaleLosses(atk, atkFrac, defenderHeldRound);
+    atk = subtract(atk, atkHit);
+    def = subtract(def, defHit);
+    phases.push({
+      kind: "melee",
+      round,
+      attackerLosses: atkHit,
+      defenderLosses: defHit,
+      note: defenderHeldRound ? "The assault is thrown back." : "The defenders give ground.",
+    });
+
+    if (armySize(def) === 0) { outcome = "captured"; break; }
+    if (armySize(atk) === 0) { outcome = "repelled"; break; }
+  }
+
+  const attackerLosses = subtract(attackerStart, atk);
+  const defenderLosses = subtract(defenderStart, def);
+  const attackerWins = outcome === "captured";
+
+  const report = blank();
+  report.effectiveFort = effFort;
+  report.attackerLosses = attackerLosses;
+  report.defenderLosses = defenderLosses;
+  report.attackerRemaining = { ...atk };
+  report.defenderRemaining = { ...def };
+  report.phases = phases;
+  report.outcome = outcome;
+  report.decisive =
+    outcome === "captured"
+      ? "The defenders broke and the region fell."
+      : outcome === "repelled"
+        ? "The attacking army was destroyed."
+        : ctx.fortification > 0 && effFort > 0
+          ? "The walls held; the assault stalled and fell back."
+          : "Neither side could break the other; the attack fell back.";
 
   return {
     attackerLosses,
     defenderLosses,
-    attackerRemaining,
-    defenderRemaining,
+    attackerRemaining: { ...atk },
+    defenderRemaining: { ...def },
     attackerWins,
-    captured: attackerWins && armySize(defenderRemaining) === 0,
+    captured: attackerWins && armySize(def) === 0,
+    report,
   };
 }
 
-function scaleLosses(units: UnitCounts, frac: number): UnitCounts {
+/** Casualties an opening volley of `power` inflicts on `units`. */
+function volleyLosses(units: UnitCounts, power: number, rng: Rng): UnitCounts {
+  if (power <= 0) return zero();
+  const size = armySize(units) || 1;
+  const frac = clamp((VOLLEY_LETHALITY * power) / (size * 5), 0, MAX_ROUND_LOSS) * (1 + (rng.next() * 2 - 1) * COMBAT_VARIANCE);
+  return scaleLosses(units, clamp(frac, 0, MAX_ROUND_LOSS), false);
+}
+
+/** Remove `frac` of each unit type; `atLeastOne` forces ≥1 total casualty. */
+function scaleLosses(units: UnitCounts, frac: number, atLeastOne: boolean): UnitCounts {
   const out = zero();
   for (const t of UNIT_TYPES) out[t] = Math.min(units[t], Math.round(units[t] * frac));
+  if (atLeastOne && armySize(out) === 0 && armySize(units) > 0) {
+    // Shed one regiment of the most numerous surviving type.
+    let best: UnitType | null = null;
+    for (const t of UNIT_TYPES) if (units[t] > 0 && (best === null || units[t] > units[best])) best = t;
+    if (best) out[best] = 1;
+  }
   return out;
 }
 

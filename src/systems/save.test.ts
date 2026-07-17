@@ -7,7 +7,10 @@ describe("save / load", () => {
     let g = createGame({ seed: 12345, rivals: 2, difficulty: "hard" });
     for (let i = 0; i < 12; i++) g = resolveTurn(g);
     const restored = deserializeGame(serializeGame(g, 0));
-    expect(restored).toEqual(g);
+    // `battles` is a transient per-turn UI cache and is deliberately not
+    // persisted; everything durable must round-trip identically.
+    const { battles: _b, ...durable } = g;
+    expect(restored).toEqual(durable);
   });
 
   it("a restored game continues deterministically", () => {
