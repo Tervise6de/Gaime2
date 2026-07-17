@@ -283,12 +283,31 @@ anywhere in rendering):
   click or the ⛶ button refits. Mid-gesture frames blit the cached layers
   through a delta transform; the crisp rebuild lands when input settles.
   Hit-testing runs through the same camera, so taps always match pixels.
+- **Marker tooltips**: every map glyph (fortification shield, capital crest,
+  population chip, resource/unrest/construction icons, army badges) registers
+  a hit circle each frame; hovering one floats a plain-language HUD tip, so
+  the marker vocabulary is self-teaching (the legend stays for reference).
+- **Legible water**: deterministic sea-life silhouettes (whale, fish
+  schools, a serpent) scatter in open water so the ocean unmistakably reads
+  as ocean; realm nameplates draw *outside* the land clip and clamp to the
+  viewport, so coastal realm names are never cut by the sea.
 
 The M1 node+edge fallback served its purpose during development and has been
 retired — the island territory view is the game's sole renderer. Political
 emphasis is tiered: every realm carries a loud rim (band + crisp two-tone
 edge), and the player's realm is unmistakably loudest (stronger wash, wider
 double band, full-strength edge) so "mine" reads at a glance.
+
+**Pacing (turn report).** Turn resolution is instant, which made eventful
+turns easy to miss. After each non-quiet turn an optional modal (on by
+default; Options → Gameplay) replays the outcome at reading speed — the
+summary diff plus standing dangers — and holds Enter/Space, so mashing the
+end-turn key pauses at each report instead of skipping history. Quiet turns,
+pending decisions and decided games never pause.
+
+**Region screen.** The compact right-rail inspector stays for quick glances,
+but the Capital rail button and the inspector's ⛶ open the same region as a
+wide two-column modal — the readable view for detailed management.
 
 ---
 

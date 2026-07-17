@@ -20,7 +20,14 @@ import { garrisonCalm } from "@/systems/stability";
 import { runTutorial } from "@/ui/tutorial";
 import { confirmAction } from "@/ui/confirm";
 import { isMuted, setMuted, play, isAmbientEnabled, setAmbientEnabled, getVolume, setVolume } from "@/ui/audio";
-import { isColourblind, setColourblind, isReduceMotion, setReduceMotion } from "@/ui/settings";
+import {
+  isColourblind,
+  setColourblind,
+  isReduceMotion,
+  setReduceMotion,
+  isTurnReport,
+  setTurnReport,
+} from "@/ui/settings";
 import { cbSafe } from "@/data/palette";
 import { OCEAN } from "@/data/mapstyle";
 import { badgeArt, BRANCH_ART, crestSvg, eventVignette, MOMENT_ART, safeColor, TERRAIN_ART, TREATY_ART } from "@/data/art";
@@ -148,6 +155,13 @@ export interface Hud {
   openOptions(): void;
   /** Open the Records overlay (also reachable from the main menu). */
   openRecords(): void;
+  /** Show/hide the map-marker tooltip (renderer hover reports). */
+  mapTip(tip: { text: string; x: number; y: number } | null): void;
+  /**
+   * Pause after a resolved turn with a digest of what changed (optional via
+   * Options; quiet turns and turns with a pending decision skip it).
+   */
+  showTurnReport(turn: number, summary: TurnSummary | null, state: GameState): void;
 }
 
 const RESOURCE_META: Record<ResourceKey, { label: string; icon: string; tip: string }> = {
@@ -354,13 +368,17 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     toggleDrawer("research"),
   );
   researchRail.btn.classList.add("hud-railbtn-research");
-  // One-click orientation: jump to your capital (shown only while you hold it).
+  // Capital: highlight the seat of power on the map *and* open the full-size
+  // region screen — the compact inspector is too cramped for your most
+  // important province (shown only while you still hold it).
   const capitalBtn = iconBtn("crown", "👑", "Capital", "hud-railbtn hud-railbtn-capital", () => {
     const player = lastState?.nations.find((n) => n.isPlayer);
     const cap = player?.capitalRegionId;
-    if (cap !== undefined && lastState?.regions[cap]?.ownerId === PLAYER_ID) callbacks.onSelectRegion(cap);
+    if (cap === undefined || lastState?.regions[cap]?.ownerId !== PLAYER_ID) return;
+    callbacks.onSelectRegion(cap);
+    openRegionScreen(cap);
   });
-  capitalBtn.title = "Select and highlight your seat of power on the map.";
+  capitalBtn.title = "Open your capital full-screen and highlight it on the map.";
   rail.append(diploRail.btn, researchRail.btn, capitalBtn);
   leftStack.append(rail);
 
@@ -582,10 +600,18 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
   // --- Right panel: the region inspector, contextual -------------------------
   // Shown only while a region is selected; ✕ (or clicking the ocean) deselects.
+  // ⛶ opens the same region in the full-size screen for comfortable reading.
   const rightPanel = el("div", "hud-panel hud-right");
   rightPanel.style.display = "none";
   const rightHead = el("div", "hud-drawer-head");
-  rightHead.append(heading("Region"), closeButton(() => callbacks.onSelectRegion(null)));
+  const expandBtn = btn("⛶", "hud-techtree-close hud-expand", () => {
+    if (lastSelected !== null) openRegionScreen(lastSelected);
+  });
+  expandBtn.title = "Open this region full-screen.";
+  expandBtn.setAttribute("aria-label", "Open this region full-screen");
+  const rightHeadBtns = el("div", "hud-head-btns");
+  rightHeadBtns.append(expandBtn, closeButton(() => callbacks.onSelectRegion(null)));
+  rightHead.append(heading("Region"), rightHeadBtns);
   rightPanel.append(rightHead);
   const regionBody = el("div", "hud-region-body");
   rightPanel.append(regionBody);
@@ -712,6 +738,29 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     }
   }
 
+  // --- Map-marker tooltip -----------------------------------------------------
+  // The renderer reports which marker the pointer rests on (shield, crest, pop
+  // chip, army badge…); we float a plain-language chip beside the cursor,
+  // flipping it inward when it would leave the viewport.
+  const mapTipEl = el("div", "hud-maptip");
+  mapTipEl.style.display = "none";
+  root.append(mapTipEl);
+  function mapTip(tip: { text: string; x: number; y: number } | null): void {
+    if (!tip) {
+      mapTipEl.style.display = "none";
+      return;
+    }
+    mapTipEl.textContent = tip.text;
+    mapTipEl.style.display = "block";
+    const pad = 14;
+    let x = tip.x + pad;
+    let y = tip.y + pad;
+    if (x + mapTipEl.offsetWidth > window.innerWidth - 8) x = tip.x - mapTipEl.offsetWidth - pad;
+    if (y + mapTipEl.offsetHeight > window.innerHeight - 8) y = tip.y - mapTipEl.offsetHeight - pad;
+    mapTipEl.style.left = `${Math.max(8, x)}px`;
+    mapTipEl.style.top = `${Math.max(8, y)}px`;
+  }
+
   // --- Transient toast (save/load feedback) ---------------------------------
   const toast = el("div", "hud-toast");
   toast.style.display = "none";
@@ -822,6 +871,8 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   });
   root.append(standingsOverlay);
   let lastState: GameState | null = null;
+  // The currently-inspected region, so ⛶ can promote it to the full screen.
+  let lastSelected: number | null = null;
 
   function renderStandingsOverlay(): void {
     if (!lastState) return;
@@ -915,6 +966,17 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     panel.append(volRow);
     panel.append(
       checkboxRow("Ambient music bed", isAmbientEnabled, (v) => setAmbientEnabled(v), "A soft, sparse motif — off by default."),
+    );
+
+    // Gameplay -----------------------------------------------------------------
+    panel.append(sectionHeading("Gameplay"));
+    panel.append(
+      checkboxRow(
+        "Pause after each turn with a report",
+        isTurnReport,
+        (v) => setTurnReport(v),
+        "After End turn, review what changed before play continues. Quiet turns never pause.",
+      ),
     );
 
     // Accessibility ----------------------------------------------------------
@@ -1074,6 +1136,121 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     choiceOverlay.append(panel);
   }
 
+  // --- Region screen (the big readable view of one province) -----------------
+  // The Capital button and the inspector's ⛶ both land here: the same content
+  // as the compact right-rail inspector, rendered in a wide two-column modal.
+  const regionOverlay = el("div", "hud-techtree-overlay");
+  regionOverlay.style.display = "none";
+  regionOverlay.addEventListener("click", (ev) => {
+    if (ev.target === regionOverlay) closeRegionScreen();
+  });
+  root.append(regionOverlay);
+  let regionScreenId: number | null = null;
+
+  function renderRegionScreen(): void {
+    if (regionScreenId === null || !lastState) return;
+    const region = lastState.regions[regionScreenId];
+    if (!region) {
+      closeRegionScreen(); // the subject vanished (new game / import)
+      return;
+    }
+    regionOverlay.innerHTML = "";
+    const panel = el("div", "hud-techtree-panel hud-capital-panel");
+    const head = el("div", "hud-techtree-head");
+    const title = el("h2", "hud-techtree-title");
+    const isCapital = lastState.nations.some(
+      (n) => n.isPlayer && n.capitalRegionId === region.id && region.ownerId === PLAYER_ID,
+    );
+    title.textContent = isCapital ? "Your capital" : "Region overview";
+    head.append(title, closeButton(closeRegionScreen));
+    panel.append(head);
+    const body = el("div", "hud-region-body hud-capital-body");
+    // Starting a move needs the map — hand over and get out of the way.
+    renderRegion(body, lastState, regionScreenId, null, {
+      ...callbacks,
+      onBeginMove(armyId) {
+        closeRegionScreen();
+        callbacks.onBeginMove(armyId);
+      },
+    });
+    panel.append(body);
+    regionOverlay.append(panel);
+  }
+  function openRegionScreen(regionId: number): void {
+    regionScreenId = regionId;
+    renderRegionScreen();
+    regionOverlay.style.display = "flex";
+  }
+  function closeRegionScreen(): void {
+    regionScreenId = null;
+    regionOverlay.style.display = "none";
+    regionOverlay.innerHTML = "";
+  }
+
+  // --- Turn report (the "what just happened" pause) ---------------------------
+  // Turn resolution is instant; this modal replays the outcome at reading
+  // speed — the summary diff plus any standing dangers — before play moves on.
+  // Optional (Options → Gameplay), and skipped for quiet turns, pending
+  // decisions (their modal owns the screen) and decided games (end screen).
+  const reportOverlay = el("div", "hud-techtree-overlay");
+  reportOverlay.style.display = "none";
+  reportOverlay.addEventListener("click", (ev) => {
+    if (ev.target === reportOverlay) closeTurnReport();
+  });
+  root.append(reportOverlay);
+
+  function closeTurnReport(): void {
+    reportOverlay.style.display = "none";
+    reportOverlay.innerHTML = "";
+  }
+
+  function showTurnReport(turn: number, summary: TurnSummary | null, state: GameState): void {
+    if (!isTurnReport() || !summary || summary.quiet) return;
+    if (state.pendingChoice || state.outcome !== "playing") return;
+    reportOverlay.innerHTML = "";
+    const panel = el("div", "hud-techtree-panel hud-report-panel");
+    const head = el("div", "hud-techtree-head");
+    const title = el("h2", "hud-techtree-title");
+    title.textContent = `Turn ${turn} resolved`;
+    head.append(title, closeButton(closeTurnReport));
+    panel.append(head);
+
+    const list = el("div", "hud-report-list");
+    for (const [tone, text] of summaryItems(summary)) {
+      const row = el("div", "hud-summary-row " + tone);
+      row.innerHTML = text; // glyph HTML + pre-escaped names (see summaryItems)
+      list.append(row);
+    }
+    panel.append(list);
+
+    // Standing dangers the one-turn diff can't carry (active revolts, a rival
+    // nearing victory) — the "should I react?" read, front and centre.
+    const standing = deriveAlerts(state, null);
+    if (standing.length) {
+      const box = el("div", "hud-report-alerts");
+      for (const a of standing) {
+        const row = el("div", "hud-notif-row " + a.severity);
+        row.textContent = a.text;
+        box.append(row);
+      }
+      panel.append(box);
+    }
+
+    const hint = el("p", "hud-hint hud-report-hint");
+    hint.textContent =
+      "The full story is in Events & log (N). Turn this pause off in Options → Gameplay.";
+    panel.append(hint);
+
+    const btns = el("div", "hud-end-btns");
+    const cont = btn(`Continue to turn ${state.turn} ▶`, "hud-end-btn primary", closeTurnReport);
+    btns.append(cont);
+    panel.append(btns);
+
+    reportOverlay.append(panel);
+    reportOverlay.style.display = "flex";
+    cont.focus(); // Enter/Space continue immediately
+  }
+
   // --- Keyboard shortcuts for the overlays ----------------------------------
   // L toggles the map legend, H toggles the getting-started tips, Esc closes
   // whatever's open. Ignore while typing in a form control so the tax/seed
@@ -1092,6 +1269,13 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
         ev.preventDefault();
         callbacks.onResolveChoice(opt.id);
       }
+      return;
+    }
+    // The turn report owns Enter/Space while up (= Continue), so mashing the
+    // end-turn key pauses at each report instead of skipping past it.
+    if (reportOverlay.style.display !== "none" && (ev.key === "Enter" || ev.key === " ")) {
+      ev.preventDefault();
+      closeTurnReport();
       return;
     }
     const key = ev.key.toLowerCase();
@@ -1121,6 +1305,8 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       closeRecords();
       closeGameMenu();
       closeTopMenu();
+      closeTurnReport();
+      closeRegionScreen();
       setDrawer(null);
       legendPanel.style.display = "none";
       if (hints.style.display !== "none") dismissHints();
@@ -1141,6 +1327,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     const player = playerNation(state);
     lastPlayer = player;
     lastState = state;
+    lastSelected = selectedRegionId;
 
     // Rail badges: offers awaiting your answer; a research choice waiting.
     // The capital jump shows only while you still hold your seat.
@@ -1158,6 +1345,8 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     }
     // Keep an open standings overlay live as turns resolve.
     if (standingsOverlay.style.display !== "none") renderStandingsOverlay();
+    // Keep the big region screen in sync (queueing a building re-renders it).
+    if (regionOverlay.style.display !== "none") renderRegionScreen();
     // A pending decision blocks play until resolved — show its modal.
     if (state.pendingChoice) {
       currentChoice = state.pendingChoice;
@@ -1268,7 +1457,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     }
   }
 
-  return { update, toast: flashToast, openOptions, openRecords };
+  return { update, toast: flashToast, openOptions, openRecords, mapTip, showTurnReport };
 }
 
 function renderRegion(
@@ -1910,20 +2099,15 @@ function setBadge(badge: HTMLElement, count: number): void {
   badge.style.display = count > 0 ? "inline-flex" : "none";
 }
 
-/** Render the "last turn" summary of strategic changes, or hide it. */
-function renderSummary(box: HTMLElement, summary: TurnSummary | null): void {
-  if (!summary) {
-    box.style.display = "none";
-    return;
-  }
-  box.style.display = "block";
-  box.innerHTML = "";
-  box.append(heading("Last turn"));
-
+/**
+ * The digest rows for a turn summary, as [tone, html] pairs — shared by the
+ * log hub's "Last turn" box and the turn-report modal. The html mixes fixed
+ * glyph markup with names pre-escaped here (they can come from imported saves).
+ */
+function summaryItems(summary: TurnSummary): Array<[string, string]> {
   const items: Array<[string, string]> = [];
   const g = summary.goldDelta;
   items.push([g >= 0 ? "good" : "bad", `${g >= 0 ? "+" : ""}${fmt(g)}g treasury`]);
-  // Region/nation names can come from an imported save — escape each before HTML.
   const names = (xs: string[]): string => xs.map(escapeHtml).join(", ");
   if (summary.regionsGained.length) items.push(["good", `Gained ${names(summary.regionsGained)}`]);
   if (summary.regionsLost.length) items.push(["bad", `Lost ${names(summary.regionsLost)}`]);
@@ -1934,9 +2118,19 @@ function renderSummary(box: HTMLElement, summary: TurnSummary | null): void {
   if (summary.famine) items.push(["bad", `${glyphHtml("warning", "⚠")} Famine`]);
   if (summary.bankrupt) items.push(["bad", `${glyphHtml("warning", "⚠")} Bankruptcy`]);
   if (summary.quiet) items.push(["muted", "A quiet turn."]);
+  return items;
+}
 
-  // Item texts mix fixed glyph HTML with pre-escaped names (see `names`).
-  for (const [tone, text] of items) {
+/** Render the "last turn" summary of strategic changes, or hide it. */
+function renderSummary(box: HTMLElement, summary: TurnSummary | null): void {
+  if (!summary) {
+    box.style.display = "none";
+    return;
+  }
+  box.style.display = "block";
+  box.innerHTML = "";
+  box.append(heading("Last turn"));
+  for (const [tone, text] of summaryItems(summary)) {
     const row = el("div", "hud-summary-row " + tone);
     row.innerHTML = text;
     box.append(row);

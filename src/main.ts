@@ -206,6 +206,9 @@ function main(): void {
     },
   });
 
+  // Map-marker hovers (shield, crest, pop chip…) surface as a HUD tooltip.
+  renderer.onMarkerHover((tip) => hud.mapTip(tip));
+
   renderer.onRegionClick((regionId) => {
     if (moveArmyId !== null && regionId !== null) {
       const army = state.armies.find((a) => a.id === moveArmyId);
@@ -276,6 +279,9 @@ function main(): void {
     lastSummary = summarizeTurn(before, state);
     moveArmyId = null;
     commit();
+    // Pause with a readable digest before play moves on (optional via Options;
+    // quiet turns, pending decisions and decided games skip it).
+    hud.showTurnReport(before.turn, lastSummary, state);
     // Cosmetic: ripple every region that changed hands this turn (gated inside the
     // renderer by reduce-motion). Uses ids, not the summary's names.
     for (const after of state.regions) {

@@ -307,6 +307,13 @@ body {
   font-size: 12px;
 }
 
+/* Sibling header buttons (⛶ expand beside ✕ on the region inspector). */
+.hud-head-btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* Notification feed rows (the alert chips, in list form). */
 .hud-notif-row {
   padding: 6px 8px;
@@ -1490,6 +1497,71 @@ body {
   opacity: 0.7;
 }
 
+/* --- Region screen (Capital button / inspector ⛶) --------------------------- */
+/* The inspector's content, promoted to a wide modal: two balanced columns of
+   the same cards, each card kept whole so nothing tears across the fold. */
+.hud-capital-panel {
+  width: min(760px, 94vw);
+  max-height: 86vh;
+}
+
+.hud-capital-body {
+  column-count: 2;
+  column-gap: 30px;
+}
+
+.hud-capital-body > * {
+  break-inside: avoid;
+}
+
+.hud-capital-body .hud-region-title {
+  font-size: 17px;
+}
+
+.hud-capital-body .hud-region-meta {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  .hud-capital-body {
+    column-count: 1;
+  }
+}
+
+/* --- Turn report (the optional pause after End turn) ------------------------ */
+.hud-report-panel {
+  width: min(440px, 94vw);
+}
+
+.hud-report-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.hud-report-list .hud-summary-row {
+  font-size: 13.5px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 3px solid currentcolor;
+}
+
+.hud-report-alerts {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.hud-report-alerts .hud-notif-row {
+  font-size: 13px;
+}
+
+.hud-report-hint {
+  margin-top: 12px;
+}
+
 .hud-techtree-head {
   display: flex;
   align-items: center;
@@ -1834,6 +1906,22 @@ body {
   border: 1px solid var(--panel-border);
   border-radius: 10px;
   backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+
+/* --- Map-marker tooltip (renderer hover → plain-language chip) -------------- */
+.hud-maptip {
+  position: fixed;
+  z-index: 46;
+  max-width: 260px;
+  padding: 8px 11px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--fg);
+  background: var(--panel-grad);
+  border: 1px solid rgba(214, 224, 240, 0.24);
+  border-radius: 8px;
+  box-shadow: var(--panel-shadow);
   pointer-events: none;
 }
 

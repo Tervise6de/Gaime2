@@ -22,6 +22,7 @@
  */
 
 import { TERRAIN, type TerrainId } from "@/data/terrain";
+import { BUILDINGS } from "@/data/buildings";
 import { GLYPH_ART, RESOURCE_ART, TERRAIN_ART, TERRAIN_MOTIF, crestSvg } from "@/data/art";
 import { cbSafe } from "@/data/palette";
 import {
@@ -42,6 +43,7 @@ import {
   type Region,
 } from "@/systems/state";
 import { atWar } from "@/systems/diplomacy";
+import { regionCapacity } from "@/systems/population";
 import { computeVoronoiCells, pointInPolygon, type Point, type VoronoiCell } from "@/systems/voronoi";
 import {
   hashFloat,
@@ -83,6 +85,11 @@ export interface Renderer {
   /** Flash a capture ripple at a region that just changed hands. */
   pulseCapture(regionId: number): void;
   onRegionClick(handler: (regionId: number | null) => void): void;
+  /**
+   * Hovering a map marker (population chip, crest, status icons, army badge)
+   * reports a plain-language tip at viewport coordinates; null = hover ended.
+   */
+  onMarkerHover(handler: (tip: { text: string; x: number; y: number } | null) => void): void;
   /** Zoom about the viewport centre (e.g. 1.25 in, 0.8 out). */
   zoomBy(factor: number): void;
   /** Reset the camera to the fitted full-map view. */
@@ -102,6 +109,29 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   let colourblind = false;
   let reduceMotion = false;
   let clickHandler: (regionId: number | null) => void = () => {};
+
+  // Marker hover: each frame the marker pass registers small hit circles with
+  // a plain-language tip; pointer moves (with no button down) look them up.
+  interface MarkerHit {
+    x: number;
+    y: number;
+    r: number;
+    text: string;
+  }
+  let markerHits: MarkerHit[] = [];
+  let hoverHandler: (tip: { text: string; x: number; y: number } | null) => void = () => {};
+  let lastHoverText: string | null = null;
+
+  function reportHover(hit: MarkerHit | null, clientX: number, clientY: number): void {
+    canvas.style.cursor = hit ? "help" : "grab";
+    if (hit) {
+      hoverHandler({ text: hit.text, x: clientX, y: clientY });
+      lastHoverText = hit.text;
+    } else if (lastHoverText !== null) {
+      hoverHandler(null);
+      lastHoverText = null;
+    }
+  }
 
   // Transient capture ripples: a battle-flash → owner-colour ring at a region that
   // changed hands. Purely cosmetic; aged by a frame tick so no wall-clock is used.
@@ -423,7 +453,84 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       g.strokeStyle = OCEAN.isletEdge;
       g.stroke();
     }
+
+    // Sea life: a few deterministic silhouettes (whale, fish school, serpent)
+    // in open water, clear of the coast — the ocean reads as living sea.
+    if (shape) {
+      let placed = 0;
+      for (let t = 0; t < 160 && placed < OCEAN.seaLifeCount; t++) {
+        const nx = hashFloat(s.seed, 606, t, 1) * 1.3 - 0.15;
+        const ny = hashFloat(s.seed, 606, t, 2) * 1.3 - 0.15;
+        // The point and a ring around it must all be water (keeps a coast gap).
+        const clear = [
+          [0, 0],
+          [0.055, 0],
+          [-0.055, 0],
+          [0, 0.055],
+          [0, -0.055],
+        ].every(([dx, dy]) => !pointInIsland(shape!, nx + dx!, ny + dy!));
+        if (!clear) continue;
+        const p = projectXY(nx, ny);
+        if (p.x < 40 || p.x > w - 40 || p.y < 80 || p.y > h - 40) continue;
+        drawSeaCreature(g, hashFloat(s.seed, 606, t, 3), p.x, p.y);
+        placed++;
+      }
+    }
     return cv;
+  }
+
+  /** One small hand-drawn sea creature; `k` picks the species and its lean. */
+  function drawSeaCreature(g: CanvasRenderingContext2D, k: number, x: number, y: number): void {
+    g.strokeStyle = OCEAN.seaLifeInk;
+    g.fillStyle = OCEAN.seaLifeFill;
+    g.lineWidth = 1.6;
+    g.lineJoin = "round";
+    g.lineCap = "round";
+    const flip = k > 0.5 ? -1 : 1;
+    if (k < 0.34) {
+      // Whale: rounded back, tail fluke, a two-jet spout.
+      g.beginPath();
+      g.moveTo(x - 16 * flip, y + 3);
+      g.quadraticCurveTo(x, y - 12, x + 14 * flip, y + 2);
+      g.quadraticCurveTo(x, y + 6, x - 16 * flip, y + 3);
+      g.closePath();
+      g.fill();
+      g.stroke();
+      g.beginPath();
+      g.moveTo(x + 14 * flip, y + 1);
+      g.lineTo(x + 21 * flip, y - 5);
+      g.moveTo(x + 14 * flip, y + 1);
+      g.lineTo(x + 22 * flip, y + 4);
+      g.stroke();
+      g.beginPath();
+      g.moveTo(x - 10 * flip, y - 8);
+      g.lineTo(x - 12 * flip, y - 13);
+      g.moveTo(x - 10 * flip, y - 8);
+      g.lineTo(x - 7 * flip, y - 13);
+      g.stroke();
+    } else if (k < 0.67) {
+      // Fish school: three little chevrons swimming in line.
+      for (let i = 0; i < 3; i++) {
+        const fx = x + (i - 1) * 13 * flip;
+        const fy = y + (i % 2 === 0 ? 0 : 5);
+        g.beginPath();
+        g.moveTo(fx - 5 * flip, fy - 3);
+        g.quadraticCurveTo(fx + 5 * flip, fy, fx - 5 * flip, fy + 3);
+        g.stroke();
+      }
+    } else {
+      // Sea serpent: two humps and a small head above the waterline.
+      g.beginPath();
+      g.arc(x - 10 * flip, y, 6, Math.PI, 0);
+      g.stroke();
+      g.beginPath();
+      g.arc(x + 4 * flip, y, 6, Math.PI, 0);
+      g.stroke();
+      g.beginPath();
+      g.arc(x + 15 * flip, y - 4, 2.4, 0, Math.PI * 2);
+      g.fill();
+      g.stroke();
+    }
   }
 
   /**
@@ -721,10 +828,14 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       strokePolylines(fronts);
     }
 
+    g.restore();
+
     // 5) Realm nameplates: each living nation's name floats over its lands —
     //    the fastest answer to "who is where". Anchored to the owned region
     //    nearest the realm's centroid, so it stays on the realm even when the
-    //    territory is disjoint. The player's plate reads "YOU".
+    //    territory is disjoint. Drawn OUTSIDE the land clip (a coastal plate
+    //    may overhang the water — it must never be cut) and clamped on-canvas.
+    //    The player's plate reads "YOU".
     const plate = g as CanvasRenderingContext2D & { letterSpacing?: string };
     for (const nation of s.nations) {
       if (nation.isBarbarian || !nation.alive) continue;
@@ -755,19 +866,20 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       g.font = `800 ${size}px system-ui, sans-serif`;
       g.textAlign = "center";
       g.textBaseline = "middle";
-      const y = anchor.y - 44;
+      const half = g.measureText(label).width / 2;
+      const x = Math.min(canvas.clientWidth - half - 10, Math.max(half + 10, anchor.x));
+      const y = Math.max(58, anchor.y - 44);
       g.lineWidth = 4;
       g.lineJoin = "round";
       g.strokeStyle = POLITICAL.nameplateHalo;
-      g.strokeText(label, anchor.x, y);
+      g.strokeText(label, x, y);
       g.globalAlpha = POLITICAL.nameplateAlpha;
       g.fillStyle = ownerColor(nation.id);
-      g.fillText(label, anchor.x, y);
+      g.fillText(label, x, y);
       g.globalAlpha = 1;
       if ("letterSpacing" in plate) plate.letterSpacing = "0px";
     }
 
-    g.restore();
     return cv;
   }
 
@@ -1115,6 +1227,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
    * Takes the projection to paint from (live or, mid-gesture, the stale one).
    */
   function paintVoronoi(s: GameState, proj: Projection): void {
+    markerHits = []; // the marker passes below re-register this frame's tips
     context.drawImage(ensureOcean(s, proj), 0, 0, canvas.clientWidth, canvas.clientHeight);
     context.drawImage(ensureTerrain(s, proj), 0, 0, canvas.clientWidth, canvas.clientHeight);
     context.drawImage(ensurePolitical(s, proj), 0, 0, canvas.clientWidth, canvas.clientHeight);
@@ -1175,12 +1288,25 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     context.fill();
     context.fillStyle = "#f2f5fa";
     context.fillText(popText, p.x, p.y + 0.5);
+    markerHits.push({
+      x: p.x,
+      y: p.y,
+      r: Math.max(11, popW / 2),
+      text: `Population ${popText} of ${Math.round(regionCapacity(region))} — grows with food surplus, works the land.`,
+    });
 
     // Capital crest docked left of the population chip — the seat reads first.
     if (capitals.has(region.id)) {
       const cx = p.x - popW / 2 - 13;
       const cy = p.y;
       const owner = region.ownerId;
+      const ownerNation = state?.nations.find((n) => n.id === owner);
+      markerHits.push({
+        x: cx,
+        y: cy,
+        r: 11.5,
+        text: `Capital of ${ownerNation?.isPlayer ? "your realm" : (ownerNation?.name ?? "a realm")} — its seat of power.`,
+      });
       const crestArt = owner === null ? null : crestSvg(owner, ownerColor(owner));
       iconChip(cx, cy, 10.5);
       context.beginPath();
@@ -1213,64 +1339,89 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     context.fillText(region.name, p.x, p.y + NODE_RADIUS + 4);
     if ("letterSpacing" in label) label.letterSpacing = "0px";
 
-    // Status row: one slot per active signal, centred under the name.
-    const slots: ((x: number, y: number) => void)[] = [];
+    // Status row: one slot per active signal, centred under the name. Each
+    // slot draws its icon and registers its hover tip.
+    const slots: { tip: string; draw(x: number, y: number): void }[] = [];
     if (region.resource) {
-      slots.push((x, y) => {
-        iconChip(x, y, 8.5);
-        const art = RESOURCE_ART[region.resource!];
-        if (!drawIcon(context, `res:${region.resource}`, art, MAP_ICON_COLOR, x, y, 12)) {
-          context.font = "11px system-ui, sans-serif";
-          context.fillStyle = MAP_ICON_COLOR;
-          context.textAlign = "center";
-          context.textBaseline = "middle";
-          context.fillText(RESOURCE_ICON[region.resource!] ?? "?", x, y);
-        }
+      const tip =
+        region.resource === "iron"
+          ? "Iron deposit — a strategic resource; advanced units (Ranged, Siege) need iron."
+          : "Horses — a strategic resource; Cavalry needs horses.";
+      slots.push({
+        tip,
+        draw: (x, y) => {
+          iconChip(x, y, 8.5);
+          const art = RESOURCE_ART[region.resource!];
+          if (!drawIcon(context, `res:${region.resource}`, art, MAP_ICON_COLOR, x, y, 12)) {
+            context.font = "11px system-ui, sans-serif";
+            context.fillStyle = MAP_ICON_COLOR;
+            context.textAlign = "center";
+            context.textBaseline = "middle";
+            context.fillText(RESOURCE_ICON[region.resource!] ?? "?", x, y);
+          }
+        },
       });
     }
     if (region.fortification > 0) {
-      slots.push((x, y) => {
-        iconChip(x, y, 8.5);
-        context.font = "600 9.5px system-ui, sans-serif";
-        context.textAlign = "center";
-        context.textBaseline = "middle";
-        if (drawIcon(context, "glyph:shield", GLYPH_ART.shield, MAP_ICON_COLOR, x - 3.5, y, 10)) {
-          context.fillStyle = MAP_ICON_COLOR;
-          context.fillText(String(region.fortification), x + 4.5, y);
-        } else {
-          context.fillStyle = MAP_ICON_COLOR; // the digit must not inherit stale ink
-          context.fillText(`🛡${region.fortification}`, x, y);
-        }
+      slots.push({
+        tip: `Fortification level ${region.fortification} — defenders here are much harder to dislodge; siege units strip it.`,
+        draw: (x, y) => {
+          iconChip(x, y, 8.5);
+          context.font = "600 9.5px system-ui, sans-serif";
+          context.textAlign = "center";
+          context.textBaseline = "middle";
+          if (drawIcon(context, "glyph:shield", GLYPH_ART.shield, MAP_ICON_COLOR, x - 3.5, y, 10)) {
+            context.fillStyle = MAP_ICON_COLOR;
+            context.fillText(String(region.fortification), x + 4.5, y);
+          } else {
+            context.fillStyle = MAP_ICON_COLOR; // the digit must not inherit stale ink
+            context.fillText(`🛡${region.fortification}`, x, y);
+          }
+        },
       });
     }
     if (region.construction) {
-      slots.push((x, y) => {
-        iconChip(x, y, 8.5);
-        if (!drawIcon(context, "glyph:hammer", GLYPH_ART.hammer, MAP_ICON_COLOR, x, y, 11)) {
-          context.font = "11px system-ui, sans-serif";
-          context.textAlign = "center";
-          context.textBaseline = "middle";
-          context.fillText("🔨", x, y);
-        }
+      const def = BUILDINGS[region.construction.building];
+      slots.push({
+        tip: `Under construction: ${def.name} (${Math.floor(region.construction.progress)}/${def.cost} materials).`,
+        draw: (x, y) => {
+          iconChip(x, y, 8.5);
+          if (!drawIcon(context, "glyph:hammer", GLYPH_ART.hammer, MAP_ICON_COLOR, x, y, 11)) {
+            context.font = "11px system-ui, sans-serif";
+            context.textAlign = "center";
+            context.textBaseline = "middle";
+            context.fillText("🔨", x, y);
+          }
+        },
       });
     }
     const dot = unrestDot(region.unrest);
     if (dot) {
-      slots.push((x, y) => {
-        context.beginPath();
-        context.arc(x, y, 4.5, 0, Math.PI * 2);
-        context.fillStyle = dot;
-        context.fill();
-        context.lineWidth = 1;
-        context.strokeStyle = "rgba(13, 15, 20, 0.6)";
-        context.stroke();
+      slots.push({
+        tip:
+          region.unrest >= UNREST_REVOLT
+            ? `Unrest ${Math.round(region.unrest)} — REVOLT: the region produces nothing and may secede. Garrison it or cut taxes.`
+            : `Unrest ${Math.round(region.unrest)} — restless: production suffers. Ease taxes, garrison, or build calming structures.`,
+        draw: (x, y) => {
+          context.beginPath();
+          context.arc(x, y, 4.5, 0, Math.PI * 2);
+          context.fillStyle = dot;
+          context.fill();
+          context.lineWidth = 1;
+          context.strokeStyle = "rgba(13, 15, 20, 0.6)";
+          context.stroke();
+        },
       });
     }
     if (slots.length > 0) {
       const gap = 19;
       const rowY = p.y + NODE_RADIUS + 25;
       const x0 = p.x - ((slots.length - 1) * gap) / 2;
-      slots.forEach((draw, i) => draw(x0 + i * gap, rowY));
+      slots.forEach((slot, i) => {
+        const x = x0 + i * gap;
+        slot.draw(x, rowY);
+        markerHits.push({ x, y: rowY, r: 9.5, text: slot.tip });
+      });
     }
   }
 
@@ -1298,6 +1449,15 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       context.textAlign = "center";
       context.textBaseline = "middle";
       context.fillText(String(size), bx, by);
+
+      const ownerNation = s.nations.find((n) => n.id === army.ownerId);
+      const who = ownerNation?.isPlayer ? "Your" : ownerNation?.isBarbarian ? "Barbarian" : `${ownerNation?.name ?? "Rival"}'s`;
+      markerHits.push({
+        x: bx,
+        y: by,
+        r: 11,
+        text: `${who} army — ${size} unit${size === 1 ? "" : "s"} stationed in ${region.name}.`,
+      });
     }
   }
 
@@ -1373,6 +1533,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   }
 
   function onPointerDown(ev: PointerEvent): void {
+    reportHover(null, 0, 0); // a press ends any hover tip
+    canvas.style.cursor = "grabbing";
     canvas.setPointerCapture(ev.pointerId);
     pointers.set(ev.pointerId, localXY(ev));
     if (pointers.size === 1) {
@@ -1387,6 +1549,21 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   }
 
   function onPointerMove(ev: PointerEvent): void {
+    // No button down → pure hover: look up the marker tips under the cursor.
+    if (pointers.size === 0) {
+      const p = localXY(ev);
+      let hit: MarkerHit | null = null;
+      for (const h of markerHits) {
+        const dx = p.x - h.x;
+        const dy = p.y - h.y;
+        if (dx * dx + dy * dy <= (h.r + 2) * (h.r + 2)) {
+          hit = h;
+          break;
+        }
+      }
+      reportHover(hit, ev.clientX, ev.clientY);
+      return;
+    }
     const prev = pointers.get(ev.pointerId);
     if (!prev) return;
     const now = localXY(ev);
@@ -1418,7 +1595,14 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     pointers.delete(ev.pointerId);
     // A clean tap (no pan, no pinch) selects; everything else was navigation.
     if (wasLast && !pressMoved && !wasPinch) clickHandler(hitTest(pos.x, pos.y));
-    if (pointers.size === 0) wasPinch = false;
+    if (pointers.size === 0) {
+      wasPinch = false;
+      canvas.style.cursor = "grab";
+    }
+  }
+
+  function onPointerLeave(): void {
+    reportHover(null, 0, 0);
   }
 
   function onWheel(ev: WheelEvent): void {
@@ -1443,10 +1627,12 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       running = true;
       resize();
       window.addEventListener("resize", resize);
+      canvas.style.cursor = "grab";
       canvas.addEventListener("pointerdown", onPointerDown);
       canvas.addEventListener("pointermove", onPointerMove);
       canvas.addEventListener("pointerup", onPointerUp);
       canvas.addEventListener("pointercancel", onPointerUp);
+      canvas.addEventListener("pointerleave", onPointerLeave);
       canvas.addEventListener("wheel", onWheel, { passive: false });
       canvas.addEventListener("dblclick", onDblClick);
       frame = window.requestAnimationFrame(render);
@@ -1459,6 +1645,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerup", onPointerUp);
       canvas.removeEventListener("pointercancel", onPointerUp);
+      canvas.removeEventListener("pointerleave", onPointerLeave);
       canvas.removeEventListener("wheel", onWheel);
       canvas.removeEventListener("dblclick", onDblClick);
     },
@@ -1485,6 +1672,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     },
     onRegionClick(handler: (regionId: number | null) => void): void {
       clickHandler = handler;
+    },
+    onMarkerHover(handler: (tip: { text: string; x: number; y: number } | null) => void): void {
+      hoverHandler = handler;
     },
     zoomBy(factor: number): void {
       setZoom(cam.s * factor, canvas.clientWidth / 2, canvas.clientHeight / 2);

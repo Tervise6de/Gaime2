@@ -8,6 +8,7 @@
 
 const COLOURBLIND_KEY = "gaime2:colourblind";
 const REDUCE_MOTION_KEY = "gaime2:reduceMotion";
+const TURN_REPORT_KEY = "gaime2:turnReport";
 
 function readBool(key: string): boolean {
   try {
@@ -44,6 +45,27 @@ export function isReduceMotion(): boolean {
 export function setReduceMotion(v: boolean): boolean {
   writeBool(REDUCE_MOTION_KEY, v);
   applyDisplaySettings();
+  return v;
+}
+
+/**
+ * Turn report: pause after each End turn with a digest of what changed, so
+ * play stays followable. On by default; quiet turns never show one.
+ */
+export function isTurnReport(): boolean {
+  try {
+    return localStorage.getItem(TURN_REPORT_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+export function setTurnReport(v: boolean): boolean {
+  try {
+    localStorage.setItem(TURN_REPORT_KEY, v ? "1" : "0");
+  } catch {
+    /* storage unavailable — preference just won't persist */
+  }
   return v;
 }
 

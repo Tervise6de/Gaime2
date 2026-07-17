@@ -146,6 +146,10 @@ export const OCEAN = {
   /** Tiny wave flecks scattered across the open water (count at 1600×900). */
   fleck: "rgba(168, 203, 232, 0.11)",
   fleckCount: 260,
+  /** Sea life: deterministic whale/fish/serpent silhouettes in open water. */
+  seaLifeCount: 7,
+  seaLifeInk: "rgba(170, 208, 236, 0.45)",
+  seaLifeFill: "rgba(150, 190, 222, 0.24)",
   /** Land underlay colour and its drop shadow (under the terrain fills). */
   landBase: "#1b222c",
   shadow: "rgba(0, 0, 0, 0.55)",
