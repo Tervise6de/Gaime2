@@ -703,7 +703,20 @@ One focus per region is the whole trade-off.
 The **AI specialises its provinces too** (v0.29): each rival assigns a focus by
 terrain (plains→Farmland, coast→Market, hills/mountains→Workshops, forest→Academy;
 a martial realm musters Garrisons on its rough ground), kept stable once set.
-- Still open: focus-specific **buildings**; an optional **build queue** on Grand maps.
+
+**Focus capstones — SHIPPED (v0.32).** Each specialised focus unlocks one
+signature building — its payoff — gated behind BOTH the matching focus and an
+Age-of-Crowns tech: **Manor** (Farmland + Feudalism: +4 food, +1 gold, +8 pop),
+**Charter Fair** (Market + Guilds: +7 gold), **Foundry** (Workshops + Engineering:
++6 materials), **Athenaeum** (Academy + Philosophy: +6 knowledge, −3 unrest), and
+**Citadel** (Garrison + Castles: +3 fortification, −8 unrest). The build menu hides
+the four that don't match a province's focus and reveals its one capstone the
+moment you specialise it (then tech-locks like anything else); the focus picker
+names the capstone each focus unlocks, so the reward is legible at the decision.
+`buildingFocusOk` / `focusCapstone` (data/buildings.ts) are the shared gate used
+by the sim, UI, advisor and AI — and the **AI raises its provinces' capstones**
+too, once the tech lands. Changing focus never removes one already built.
+- Still open: an optional **build queue** on Grand maps.
 
 ### 9.5 Research, ages & game length — SHIPPED v1 (v0.25)
 - **Era-gated research** — every tech carries an `era` (0-based age, `data/eras.ts`);

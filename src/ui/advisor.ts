@@ -8,7 +8,7 @@
  * and jumps to the offending place on click.
  */
 
-import { BUILDINGS, BUILDING_IDS, type BuildingId } from "@/data/buildings";
+import { BUILDINGS, BUILDING_IDS, buildingFocusOk, type BuildingId } from "@/data/buildings";
 import { isBuildingUnlockedFor, researchFrontier } from "@/systems/tech";
 import { eraIndexForTurn } from "@/data/eras";
 import { PLAYER_ID, playerNation, type GameState } from "@/systems/state";
@@ -69,6 +69,7 @@ export function buildOptions(state: GameState, regionId: number): BuildingId[] {
   return BUILDING_IDS.filter((id) => {
     const def = BUILDINGS[id];
     if (def.requiresTerrain && def.requiresTerrain !== region.terrain) return false;
+    if (!buildingFocusOk(region.focus, id)) return false;
     if (region.buildings.includes(id)) return false;
     return isBuildingUnlockedFor(done, id);
   });

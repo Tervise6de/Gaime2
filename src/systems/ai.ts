@@ -16,7 +16,7 @@
  */
 
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
-import { BUILDINGS, type BuildingId } from "@/data/buildings";
+import { BUILDINGS, buildingFocusOk, focusCapstone, type BuildingId } from "@/data/buildings";
 import type { TraitId } from "@/data/traits";
 import { TERRAIN, type TerrainId } from "@/data/terrain";
 import type { FocusId } from "@/data/focuses";
@@ -246,7 +246,7 @@ const TRAIT_BUILD_PRIORITY: Record<TraitId, BuildingId[]> = {
 };
 
 export function chooseBuilding(
-  region: { unrest: number; buildings: BuildingId[]; terrain: TerrainId },
+  region: { unrest: number; buildings: BuildingId[]; terrain: TerrainId; focus?: FocusId },
   done: TechId[],
   wonders: number,
   canStartWonder: boolean,
@@ -256,12 +256,19 @@ export function chooseBuilding(
   const unlocked = (b: BuildingId) => isBuildingUnlockedFor(done, b);
   const fits = (b: BuildingId) => {
     const t = BUILDINGS[b].requiresTerrain;
-    return !t || region.terrain === t;
+    if (t && region.terrain !== t) return false;
+    return buildingFocusOk(region.focus, b);
   };
   if (region.unrest > 35 && !has("temple")) return "temple";
   // Chase a Great Works victory — but only one wonder at a time (national project).
   if (canStartWonder && unlocked("wonder") && !has("wonder") && wonders < WONDER_GOAL) {
     return "wonder";
+  }
+  // Build this province's focus capstone as soon as it's available — the payoff
+  // for having specialised it (a martial garrison raises its Citadel, etc.).
+  if (region.focus) {
+    const cap = focusCapstone(region.focus);
+    if (cap && unlocked(cap) && !has(cap) && fits(cap)) return cap;
   }
   // Trait-preferred buildings first, then the generalist order.
   const order = [...new Set([...(trait ? TRAIT_BUILD_PRIORITY[trait] : []), ...BASE_BUILD_ORDER])];

@@ -16,6 +16,7 @@
 
 import type { ResourceYield, TerrainId } from "@/data/terrain";
 import type { TechId } from "@/data/techs";
+import type { FocusId } from "@/data/focuses";
 
 export type BuildingId =
   | "farm"
@@ -39,7 +40,13 @@ export type BuildingId =
   | "watchtower"
   | "courthouse"
   | "printing_house"
-  | "cathedral";
+  | "cathedral"
+  // Focus capstones — each needs the matching region focus (see requiresFocus).
+  | "manor"
+  | "charter_fair"
+  | "foundry"
+  | "athenaeum"
+  | "citadel";
 
 export interface BuildingDef {
   id: BuildingId;
@@ -58,6 +65,12 @@ export interface BuildingDef {
   requiresTech?: TechId;
   /** Terrain the region must have — hidden entirely elsewhere (not just locked). */
   requiresTerrain?: TerrainId;
+  /**
+   * Region focus the province must be set to — a *focus capstone*, the payoff
+   * for committing a region to a specialisation. Only offered where the region's
+   * `focus` matches; changing focus doesn't remove one already built.
+   */
+  requiresFocus?: FocusId;
   /** A Great Work — counts toward the economic victory. */
   isWonder?: boolean;
   /** One-line description for the build menu. */
@@ -285,9 +298,84 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     requiresTech: "theology",
     blurb: "+2 knowledge, +1 gold, -10 unrest — a seat of faith. (Theology)",
   },
+
+  // --- Focus capstones -------------------------------------------------------
+  // Each needs BOTH the matching region focus and an Age-of-Crowns tech — the
+  // reward for committing a province to a specialisation and researching into it.
+  manor: {
+    id: "manor",
+    name: "Manor",
+    cost: 28,
+    yield: { food: 4, gold: 1 },
+    popCapacity: 8,
+    unrest: 0,
+    requiresTech: "feudalism",
+    requiresFocus: "farmland",
+    blurb: "+4 food, +1 gold, +8 population — a great manorial estate. Farmland focus. (Feudalism)",
+  },
+  charter_fair: {
+    id: "charter_fair",
+    name: "Charter Fair",
+    cost: 30,
+    yield: { gold: 7 },
+    popCapacity: 0,
+    unrest: 0,
+    requiresTech: "guilds",
+    requiresFocus: "market",
+    blurb: "+7 gold — a chartered fair that draws merchants for leagues. Market focus. (Guilds)",
+  },
+  foundry: {
+    id: "foundry",
+    name: "Foundry",
+    cost: 30,
+    yield: { materials: 6, gold: 1 },
+    popCapacity: 0,
+    unrest: 0,
+    requiresTech: "engineering",
+    requiresFocus: "workshop",
+    blurb: "+6 materials, +1 gold — furnaces and casting works. Workshops focus. (Engineering)",
+  },
+  athenaeum: {
+    id: "athenaeum",
+    name: "Athenaeum",
+    cost: 30,
+    yield: { knowledge: 6 },
+    popCapacity: 0,
+    unrest: 3,
+    requiresTech: "philosophy",
+    requiresFocus: "academy",
+    blurb: "+6 knowledge, -3 unrest — a great house of learning. Academy focus. (Philosophy)",
+  },
+  citadel: {
+    id: "citadel",
+    name: "Citadel",
+    cost: 32,
+    yield: {},
+    popCapacity: 0,
+    unrest: 8,
+    fortification: 3,
+    requiresTech: "castles",
+    requiresFocus: "garrison",
+    blurb: "+3 fortification, -8 unrest — an impregnable stronghold. Garrison focus. (Castles)",
+  },
 };
 
 export const BUILDING_IDS = Object.keys(BUILDINGS) as BuildingId[];
+
+/**
+ * Whether a region's current focus permits this building. A building with no
+ * `requiresFocus` builds anywhere; a focus capstone only where the region's
+ * `focus` matches. Pure — the shared gate used by the sim, UI, advisor and AI.
+ */
+export function buildingFocusOk(regionFocus: FocusId | undefined, building: BuildingId): boolean {
+  const req = BUILDINGS[building].requiresFocus;
+  return !req || req === regionFocus;
+}
+
+/** The focus-capstone building a given focus unlocks, if any (for hints / AI). */
+export function focusCapstone(focus: FocusId): BuildingId | undefined {
+  return BUILDING_IDS.find((b) => BUILDINGS[b].requiresFocus === focus);
+}
 
 /** Materials invested into a region's queued building each turn (if funded). */
 export const BUILD_RATE = 6;

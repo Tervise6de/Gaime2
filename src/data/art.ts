@@ -275,6 +275,26 @@ export const BUILDING_ART: Record<BuildingId, string | null> = {
   cathedral: ico(
     '<path d="M3.9 8.6L12 3.9l8.1 4.7z"/><path d="M5.8 8.6v7.6M12 8.6v7.6M18.2 8.6v7.6"/><path d="M4.4 16.2h15.2M3.2 19.5h17.6"/><path d="M12 2v3M10.6 3.3h2.8"/>',
   ),
+  // Manor hall (reuses the guildhall read).
+  manor: ico(
+    '<path d="M4.9 19.5V9.2L12 4.6l7.1 4.6v10.3z"/><path d="M12 10.3l2.7 1v2c0 1.8-1.1 3.1-2.7 3.6-1.6-.5-2.7-1.8-2.7-3.6v-2z"/><path d="M3.4 19.5h17.2"/>',
+  ),
+  // Great market awning (reuses the market read).
+  charter_fair: ico(
+    '<path d="M4.1 4.5h15.8l1.3 3.3a2.65 2.65 0 01-5.3.2 2.65 2.65 0 01-5.3 0 2.65 2.65 0 01-5.3-.2z"/><path d="M5.6 10.8v8.7h12.8v-8.7"/><path d="M10 19.5v-4.8h4v4.8"/>',
+  ),
+  // Forge shed with a hammer (reuses the workshop read).
+  foundry: ico(
+    '<path d="M4 10.6L12 4.6l8 6"/><path d="M5.6 10.6v8.9M18.4 10.6v8.9M3.4 19.5h17.2"/><path d="M9.4 16.8l3.2-3.2M12 12l2.3 2.3 1.5-1.5L13.5 10.5z"/>',
+  ),
+  // Domed hall of learning (reuses the university read).
+  athenaeum: ico(
+    '<path d="M6.4 9.6a5.6 5.6 0 0111.2 0z"/><path d="M12 2.8v1.4M4.9 9.6h14.2"/><path d="M6.6 12.4v7.1M12 12.4v7.1M17.4 12.4v7.1M4.6 12.4h14.8M3.4 19.5h17.2"/>',
+  ),
+  // Great crenellated stronghold (reuses the fortress read).
+  citadel: ico(
+    '<path d="M6.4 19.5V8h2.1V6.1h2.2V8h2.6V6.1h2.2V8h2.1v11.5z"/><path d="M10.4 19.5v-3.7h3.2v3.7"/><path d="M4.6 19.5h14.8"/>',
+  ),
 };
 
 // ---------------------------------------------------------------------------

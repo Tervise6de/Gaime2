@@ -10,7 +10,7 @@
  */
 
 import { TECHS, TECH_IDS, type TechId, type TechBranch } from "@/data/techs";
-import type { BuildingId } from "@/data/buildings";
+import { BUILDINGS, type BuildingId } from "@/data/buildings";
 import type { UnitType } from "@/data/units";
 import type { ResourceYield } from "@/data/terrain";
 import type { Nation, Research } from "@/systems/state";
@@ -42,7 +42,11 @@ export function isBuildingUnlocked(nation: Nation, building: BuildingId): boolea
 }
 
 export function isBuildingUnlockedFor(done: TechId[], building: BuildingId): boolean {
-  // Find the tech that unlocks this building, if any.
+  // A building's own requiresTech must be met (lets focus capstones share a tech
+  // that already lists a different building as its unlockBuilding).
+  const own = BUILDINGS[building].requiresTech;
+  if (own && !done.includes(own)) return false;
+  // …and the tech that lists this building as its unlock, if any (legacy link).
   const req = TECH_IDS.find((t) => TECHS[t].unlockBuilding === building);
   return !req || done.includes(req);
 }

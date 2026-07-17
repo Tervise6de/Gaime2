@@ -12,7 +12,7 @@
  * highlighting via the parent.
  */
 
-import { BUILDINGS, BUILDING_IDS, BUILD_RATE, type BuildingId } from "@/data/buildings";
+import { BUILDINGS, BUILDING_IDS, BUILD_RATE, buildingFocusOk, focusCapstone, type BuildingId } from "@/data/buildings";
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
 import { TERRAIN, TERRAIN_IDS } from "@/data/terrain";
 import { regionProduction, nationalProduction, nationYieldMult, yieldFactors, singleModifierMult, unrestPenalty } from "@/systems/economy";
@@ -2378,7 +2378,11 @@ function focusSection(region: Region, callbacks: HudCallbacks): HTMLElement {
   sel.title = "Specialise this province — a cheap identity that biases its output.";
   sel.addEventListener("change", () => callbacks.onSetFocus(region.id, sel.value as FocusId));
   const blurb = el("p", "hud-hint hud-focus-blurb");
-  blurb.textContent = FOCUSES[current].blurb;
+  const capstone = focusCapstone(current);
+  const cap = capstone ? BUILDINGS[capstone] : undefined;
+  blurb.textContent = cap
+    ? `${FOCUSES[current].blurb} Unlocks the ${cap.name}${cap.requiresTech ? ` (with ${cap.requiresTech.replace(/_/g, " ")})` : ""}.`
+    : FOCUSES[current].blurb;
   wrap.append(regionSubhead("Focus"), sel, blurb);
   return wrap;
 }
@@ -2761,6 +2765,10 @@ function renderBuildSection(region: Region, done: TechId[], callbacks: HudCallba
     // Terrain-bound buildings (Harbor) are hidden off-terrain, not shown locked —
     // a lock invites research, but no tech makes plains into coast.
     if (def.requiresTerrain && def.requiresTerrain !== region.terrain) continue;
+    // Focus capstones are hidden unless the region carries the matching focus —
+    // the capstone appears the moment you specialise the province (then tech-locks
+    // like any other), so the menu stays uncluttered by the other four.
+    if (!buildingFocusOk(region.focus, id)) continue;
     const already = region.buildings.includes(id);
     const unlocked = isBuildingUnlockedFor(done, id);
     const btn = document.createElement("button");

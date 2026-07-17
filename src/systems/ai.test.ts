@@ -188,6 +188,17 @@ describe("trait-aware AI openings", () => {
     expect(chooseBuilding(empty(), [], 0, false, "martial")).toBe("workshop");
   });
 
+  it("raises a province's focus capstone as soon as its tech lands", () => {
+    const farmland = { unrest: 0, buildings: [] as BuildingId[], terrain: "plains" as const, focus: "farmland" as const };
+    // With Feudalism, the specialised province builds its Manor ahead of generics.
+    expect(chooseBuilding(farmland, ["feudalism"], 0, false)).toBe("manor");
+    // Without the tech the capstone is locked, so it falls back to the order.
+    expect(chooseBuilding(farmland, [], 0, false)).not.toBe("manor");
+    // A garrison on rough ground raises its Citadel once Castles is in.
+    const garrison = { unrest: 0, buildings: [] as BuildingId[], terrain: "hills" as const, focus: "garrison" as const };
+    expect(chooseBuilding(garrison, ["castles"], 0, false)).toBe("citadel");
+  });
+
   it("falls back to the generalist order with no trait", () => {
     expect(chooseBuilding(empty(), [], 0, false)).toBe("market");
   });

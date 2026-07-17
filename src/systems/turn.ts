@@ -14,7 +14,7 @@
  * `resolveTurn` is called. Purity: `resolveTurn` never mutates its input.
  */
 
-import { BUILDINGS, type BuildingId } from "@/data/buildings";
+import { BUILDINGS, buildingFocusOk, type BuildingId } from "@/data/buildings";
 import { UNITS, type UnitType } from "@/data/units";
 import { ARCHETYPES } from "@/data/personalities";
 import { TRAIT_IDS, type TraitId } from "@/data/traits";
@@ -489,6 +489,7 @@ export function canQueueBuilding(
   if (!isBuildingUnlockedFor(done, building)) return false;
   const terrain = BUILDINGS[building].requiresTerrain;
   if (terrain && region.terrain !== terrain) return false;
+  if (!buildingFocusOk(region.focus, building)) return false;
   return true;
 }
 
@@ -503,6 +504,7 @@ export function queueBuilding(
   if (!region || region.ownerId !== ownerId || region.buildings.includes(building)) return state;
   const terrain = BUILDINGS[building].requiresTerrain;
   if (terrain && region.terrain !== terrain) return state;
+  if (!buildingFocusOk(region.focus, building)) return state;
   const owner = state.nations.find((n) => n.id === ownerId);
   if (!owner || !isBuildingUnlockedFor(owner.research.done, building)) return state;
   const regions = state.regions.map((r) =>

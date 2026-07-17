@@ -7,11 +7,13 @@ import {
   focusCalm,
   focusUnitCostMult,
 } from "@/data/focuses";
+import { BUILDINGS, buildingFocusOk, focusCapstone } from "@/data/buildings";
 import { regionProduction, nationYieldMult } from "@/systems/economy";
 import { regionCapacity } from "@/systems/population";
 import { unrestTarget } from "@/systems/stability";
 import { unitCost } from "@/systems/military";
-import { createGame, setRegionFocus } from "@/systems/turn";
+import { isBuildingUnlockedFor } from "@/systems/tech";
+import { createGame, setRegionFocus, canQueueBuilding } from "@/systems/turn";
 import { PLAYER_ID, emptyResearch, type Nation, type Region } from "@/systems/state";
 import type { FocusId } from "@/data/focuses";
 
@@ -93,5 +95,53 @@ describe("setRegionFocus", () => {
   it("persists deterministically (focus is durable game state)", () => {
     const g = setRegionFocus(createGame({ seed: 9 }), createGame({ seed: 9 }).nations[PLAYER_ID]!.capitalRegionId!, "academy");
     expect(g.regions.find((r) => r.focus === "academy")).toBeDefined();
+  });
+});
+
+describe("focus-capstone buildings", () => {
+  it("buildingFocusOk: unrestricted buildings build anywhere; capstones only on their focus", () => {
+    expect(buildingFocusOk(undefined, "farm")).toBe(true); // no focus requirement
+    expect(buildingFocusOk("garrison", "farm")).toBe(true);
+    expect(buildingFocusOk("farmland", "manor")).toBe(true); // matching focus
+    expect(buildingFocusOk("market", "manor")).toBe(false); // wrong focus
+    expect(buildingFocusOk(undefined, "manor")).toBe(false); // unspecialised
+  });
+
+  it("focusCapstone maps each specialisation to its signature building (balanced has none)", () => {
+    expect(focusCapstone("farmland")).toBe("manor");
+    expect(focusCapstone("market")).toBe("charter_fair");
+    expect(focusCapstone("workshop")).toBe("foundry");
+    expect(focusCapstone("academy")).toBe("athenaeum");
+    expect(focusCapstone("garrison")).toBe("citadel");
+    expect(focusCapstone("balanced")).toBeUndefined();
+  });
+
+  it("every specialised focus has a capstone gated by that focus and a tech", () => {
+    for (const f of FOCUS_IDS) {
+      const cap = focusCapstone(f);
+      if (f === "balanced") {
+        expect(cap).toBeUndefined();
+        continue;
+      }
+      expect(cap).toBeTruthy();
+      expect(BUILDINGS[cap!].requiresFocus).toBe(f);
+      expect(BUILDINGS[cap!].requiresTech).toBeTruthy();
+    }
+  });
+
+  it("isBuildingUnlockedFor honours a capstone's own requiresTech", () => {
+    expect(isBuildingUnlockedFor([], "manor")).toBe(false);
+    expect(isBuildingUnlockedFor(["feudalism"], "manor")).toBe(true);
+  });
+
+  it("canQueueBuilding gates a capstone on BOTH the focus and the tech", () => {
+    // Right focus + tech → allowed.
+    expect(canQueueBuilding(plains("farmland"), "manor", ["feudalism"])).toBe(true);
+    // Wrong focus, even with the tech → refused.
+    expect(canQueueBuilding(plains("market"), "manor", ["feudalism"])).toBe(false);
+    // Right focus, missing tech → refused.
+    expect(canQueueBuilding(plains("farmland"), "manor", [])).toBe(false);
+    // An ordinary building ignores focus entirely.
+    expect(canQueueBuilding(plains("garrison"), "farm", [])).toBe(true);
   });
 });
