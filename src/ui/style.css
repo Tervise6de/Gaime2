@@ -197,6 +197,66 @@ body {
   height: 16px;
 }
 
+/* --- Top-bar nav buttons: Diplomacy / Research / Production / Army / Politics
+   (the old left rail, promoted into the bar). Icon over a small caption, with a
+   corner badge for pending business. */
+.hud-navwrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hud-navbtn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 54px;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.hud-navbtn:hover {
+  border-color: rgba(230, 200, 116, 0.55);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.hud-navbtn.active {
+  border-color: var(--accent);
+  background: rgba(244, 210, 122, 0.14);
+}
+
+.hud-navbtn.attention {
+  border-color: var(--accent);
+  animation: hud-attn 2.2s ease-in-out infinite;
+}
+
+.hud-navbtn .ico,
+.hud-navbtn .ico-svg svg {
+  width: 16px;
+  height: 16px;
+}
+
+.hud-navbtn .hud-railbadge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
 /* --- End-turn advisor: chips for whatever still wants orders --------------- */
 .hud-advisor {
   display: flex;
@@ -557,6 +617,57 @@ body {
 
 .hud-actions .hud-hint {
   margin: 0;
+}
+
+/* Compact tax read-out that opens the Politics page (fiscal moved off End turn). */
+.hud-taxjump {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.hud-taxjump:hover {
+  border-color: rgba(230, 200, 116, 0.55);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.hud-taxjump .ico,
+.hud-taxjump .ico-svg svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Politics page: fiscal policy + the victory race, in one governance modal. */
+.hud-politics-panel {
+  width: min(460px, 94vw);
+  max-height: 84vh;
+  overflow-y: auto;
+}
+
+.hud-politics-panel .hud-tax-row {
+  margin: 4px 0 8px;
+}
+
+.hud-politics-panel .hud-victory {
+  display: block;
+  font-size: 14px;
+  line-height: 2.1;
+}
+
+.hud-politics-panel .hud-victory .ico-svg svg {
+  width: 15px;
+  height: 15px;
+  vertical-align: -3px;
 }
 
 .hud-gamemenu-btn {

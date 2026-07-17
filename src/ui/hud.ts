@@ -299,36 +299,22 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   // turn the condition holds.
   const crisisEl = el("div", "hud-crisis");
   crisisEl.style.display = "none";
-  const victoryEl = el("div", "hud-victory");
+  // Victory progress no longer rides the top bar (it moved to the Politics
+  // page); the element is created here and re-parented there, still refreshed
+  // every turn by update().
+  const victoryEl = el("div", "hud-victory hud-victory-politics");
   victoryEl.title = "Progress toward each victory: leading realm's territory share (domination at "
     + `${Math.round(DOMINATION_FRACTION * 100)}%), Great Works, and the turn ${TURN_LIMIT} prestige deadline.`;
-  barCenter.append(crisisEl, victoryEl);
+  barCenter.append(crisisEl);
   topBar.append(barCenter);
 
   const barRight = el("div", "hud-topbar-right");
-  // Labelled quick buttons — the everyday panels one click from anywhere.
-  const quickBtn = (
-    glyph: Parameters<typeof iconBtn>[0],
-    fb: string,
-    label: string,
-    title: string,
-    run: () => void,
-  ): HTMLButtonElement => {
-    const b = iconBtn(glyph, fb, label, "hud-topbtn", run);
-    b.title = title;
-    return b;
-  };
-  barRight.append(
-    quickBtn("legend", "❔", "Legend", "Decode the map markers. Shortcut: L", () => {
-      legendPanel.style.display = legendPanel.style.display === "none" ? "block" : "none";
-    }),
-    quickBtn("help", "💡", "Help", "Reopen the getting-started tips. Shortcut: H", () => showHints()),
-    quickBtn("standings", "📊", "Standing", "See how you rank against every rival. Shortcut: S", () => toggleStandings()),
-    quickBtn("options", "🎛", "Game", "New game, save slots, import & export.", () => openGameMenu()),
-  );
+  // The everyday panels (Diplomacy · Research · Production · Army · Politics)
+  // are inserted here as first-class nav buttons further down — once their open
+  // handlers exist. The ☰ menu (below) keeps the rarer, less-frequent panels.
 
-  // ☰ menu — standings, help, tutorial, legend, records and options all live
-  // behind one toggle, so the strip itself stays pure information.
+  // ☰ menu — legend, help, standing, tutorial, records, game admin and options
+  // all live behind one toggle, so the bar itself stays lean.
   const menuWrap = el("div", "hud-menu-wrap");
   const menuToggle = document.createElement("button");
   menuToggle.className = "hud-legend-toggle hud-menu-toggle";
@@ -345,12 +331,18 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       closeTopMenu();
       run();
     });
-  // Legend / Help / Standing / Game are first-class buttons on the bar now;
-  // the ☰ keeps the rarer panels.
+  // The nav buttons now hold Diplomacy/Research/Production/Army/Politics; the ☰
+  // gathers the reference & system panels so the bar stays uncluttered.
   topMenu.append(
+    menuItem("legend", "❔", "Legend", () => {
+      legendPanel.style.display = legendPanel.style.display === "none" ? "block" : "none";
+    }),
+    menuItem("help", "💡", "Help", () => showHints()),
+    menuItem("standings", "📊", "Standing", () => toggleStandings()),
     menuItem("tutorial", "🎓", "Tutorial", () => runTutorial()),
     menuItem("records", "🏅", "Records", () => openRecords()),
     menuItem("options", "⚙", "Options", () => openOptions()),
+    menuItem("crown", "🎲", "Game — new / save", () => openGameMenu()),
   );
   menuToggle.addEventListener("click", (ev) => {
     ev.stopPropagation();
@@ -385,12 +377,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   legendPanel.insertBefore(legendWorld, legendPanel.children[1] ?? null);
   root.append(legendPanel);
 
-  // --- Left rail: compact entry points instead of always-open panels ---------
-  // Diplomacy and Notifications open drawers on demand; the badge counts keep
-  // pending business visible while the panels stay out of the map's way.
-  const leftStack = el("div", "hud-leftstack");
-  const rail = el("div", "hud-rail");
-
+  // --- Top-bar nav buttons: the everyday panels, one click from anywhere ------
+  // Diplomacy · Research · Production · Army · Politics — each a labelled button
+  // with a badge for pending business (a waiting tech, idle builds, ready
+  // armies, incoming offers). They sit in the top bar's right cluster.
   interface RailEntry {
     btn: HTMLButtonElement;
     badge: HTMLElement;
@@ -402,7 +392,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     title: string,
     onClick: () => void,
   ): RailEntry {
-    const btn = iconBtn(glyph, fb, label, "hud-railbtn", onClick);
+    const btn = iconBtn(glyph, fb, label, "hud-navbtn", onClick);
     btn.title = title;
     const badge = el("span", "hud-railbadge");
     badge.style.display = "none";
@@ -413,14 +403,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const diploRail = railBtn("flag", "⚑", "Diplomacy", "Relations, treaties and offers. Shortcut: D", () =>
     toggleScreen("diplo"),
   );
-  // Research lives beside Diplomacy — same screen pattern, badge when a
-  // technology choice is waiting.
   const researchRail = railBtn("book", "📖", "Research", "Technology and research. Shortcut: R", () =>
     toggleScreen("research"),
   );
   researchRail.btn.classList.add("hud-railbtn-research");
-  // Production: the whole realm's construction at a glance — what every
-  // region is building and which slots sit idle (badge = idle count).
   const productionRail = railBtn(
     "hammer",
     "🔨",
@@ -428,7 +414,6 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     "Every region's construction — and the idle ones. Shortcut: B",
     () => openProduction(),
   );
-  // Armies: every stack on one screen — strength, readiness, a Move order.
   const armiesRail = railBtn(
     "attack",
     "⚔",
@@ -436,21 +421,18 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     "All your armies — strength, readiness, and move orders. Shortcut: A",
     () => openArmies(),
   );
-  // Capital: highlight the seat of power on the map *and* open the full-size
-  // region screen — the compact inspector is too cramped for your most
-  // important province (shown only while you still hold it).
-  const capitalBtn = iconBtn("crown", "👑", "Capital", "hud-railbtn hud-railbtn-capital", () => {
-    const player = lastState?.nations.find((n) => n.isPlayer);
-    const cap = player?.capitalRegionId;
-    if (cap === undefined || lastState?.regions[cap]?.ownerId !== PLAYER_ID) return;
-    callbacks.onSelectRegion(cap);
-    openRegionScreen(cap);
-  });
-  capitalBtn.title = "Open your capital full-screen and highlight it on the map.";
-  rail.append(diploRail.btn, researchRail.btn, productionRail.btn, armiesRail.btn, capitalBtn);
-  leftStack.append(rail);
-
-  root.append(leftStack);
+  // Politics: taxes, fiscal policy and the victory race — the realm's governance
+  // page (tax used to sit by End turn; victory used to ride the top bar).
+  const politicsRail = railBtn(
+    "crown",
+    "⚖",
+    "Politics",
+    "Taxes, fiscal policy and victory progress. Shortcut: P",
+    () => openPolitics(),
+  );
+  const navWrap = el("div", "hud-navwrap");
+  navWrap.append(diploRail.btn, researchRail.btn, productionRail.btn, armiesRail.btn, politicsRail.btn);
+  barRight.insertBefore(navWrap, menuWrap);
 
   // --- Diplomacy & Research: big centred screens ------------------------------
   // Every rail tab opens the same way — a readable modal in the middle of the
@@ -502,13 +484,13 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const researchBody = el("div", "hud-research-body");
   researchScreen.body.append(researchBody);
 
-  // --- Bottom-left: the per-turn levers that must stay in reach --------------
-  // Tax sits beside End turn deliberately: it is the one global policy you
-  // review every turn, so the cluster reads as "set policy → commit". The
-  // heading separates the lever from the button so they don't blur together.
+  // --- Bottom-left: commit the turn, and what still wants orders -------------
+  // Fiscal policy (tax) now lives on the Politics page (P); this cluster keeps
+  // only the one-line tax read-out that opens it, the advisor, and End turn.
   const actions = el("div", "hud-panel hud-actions");
-  const fiscalHead = heading("Fiscal policy");
-  fiscalHead.classList.add("hud-actions-head");
+
+  // Fiscal controls — created here but parented into the Politics page below.
+  // update() writes to them by reference regardless of where they're mounted.
   const taxRow = el("div", "hud-tax-row");
   const taxLabel = el("span", "hud-tax-label");
   const taxInput = document.createElement("input");
@@ -527,6 +509,11 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   // every region's unrest — so "more gold" is never a free lunch on screen.
   const taxUnrestLine = el("p", "hud-hint hud-tax-unrest");
 
+  // A compact tax read-out that opens Politics — the lever stays visible and
+  // one click away without crowding the commit button.
+  const taxJump = btn("Tax —", "hud-taxjump", () => openPolitics());
+  taxJump.title = "Open Politics (P) to set taxes and review the victory race.";
+
   const endTurnBtn = document.createElement("button");
   endTurnBtn.className = "hud-endturn";
   endTurnBtn.textContent = "End turn ▶";
@@ -538,9 +525,40 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const advisorBox = el("div", "hud-advisor");
   advisorBox.style.display = "none";
 
-  // Admin (new game / saves / backup) lives behind the top bar's Game button.
-  actions.append(fiscalHead, taxRow, upkeepLine, taxUnrestLine, advisorBox, endTurnBtn);
+  actions.append(taxJump, advisorBox, endTurnBtn);
   root.append(actions);
+
+  // --- Politics page: taxes, fiscal policy and the victory race --------------
+  // Governance in one place: the tax lever (moved off the End-turn cluster) and
+  // the victory progress (moved off the top bar).
+  const politicsOverlay = el("div", "hud-techtree-overlay");
+  politicsOverlay.style.display = "none";
+  politicsOverlay.addEventListener("click", (ev) => {
+    if (ev.target === politicsOverlay) closePolitics();
+  });
+  root.append(politicsOverlay);
+  const politicsPanel = el("div", "hud-techtree-panel hud-politics-panel");
+  const politicsHead = el("div", "hud-techtree-head");
+  const politicsTitle = el("h2", "hud-techtree-title");
+  politicsTitle.textContent = "Politics";
+  politicsHead.append(politicsTitle, closeButton(() => closePolitics()));
+  politicsPanel.append(politicsHead);
+  politicsPanel.append(sectionHeading("Fiscal policy"));
+  const taxHint = el("p", "hud-hint");
+  taxHint.textContent =
+    "Set the realm-wide tax rate. Higher tax fills the treasury but stokes unrest across every region.";
+  politicsPanel.append(taxHint, taxRow, upkeepLine, taxUnrestLine);
+  politicsPanel.append(sectionHeading("Victory race"));
+  politicsPanel.append(victoryEl);
+  politicsOverlay.append(politicsPanel);
+
+  function openPolitics(): void {
+    politicsOverlay.style.display = "flex";
+    politicsPanel.scrollTop = 0;
+  }
+  function closePolitics(): void {
+    politicsOverlay.style.display = "none";
+  }
 
   // --- Game menu overlay: the administrative controls, out of the way --------
   const gameMenuOverlay = el("div", "hud-techtree-overlay");
@@ -1829,6 +1847,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       ev.preventDefault();
       if (armiesOverlay.style.display === "none") openArmies();
       else closeArmies();
+    } else if (key === "p") {
+      ev.preventDefault();
+      if (politicsOverlay.style.display === "none") openPolitics();
+      else closePolitics();
     } else if (ev.key === "Escape") {
       if (lastMoveArmy !== null) callbacks.onCancelMove(); // abort picking a destination
       closeTechTree();
@@ -1843,6 +1865,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       closeArmies();
       closeAttack();
       closeBattle();
+      closePolitics();
       setScreen(null);
       legendPanel.style.display = "none";
       if (hints.style.display !== "none") dismissHints();
@@ -1919,15 +1942,11 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     if (armiesOverlay.style.display !== "none") renderArmies();
 
     // Rail badges: offers awaiting your answer; a research choice waiting.
-    // The capital jump shows only while you still hold your seat.
     setBadge(diploRail.badge, state.offers.filter((o) => o.to === PLAYER_ID).length);
     const mustChoose =
       !player.research.current && researchFrontier(player.research.done).length > 0;
     setBadge(researchRail.badge, mustChoose ? 1 : 0);
     researchRail.btn.classList.toggle("attention", mustChoose);
-    const capId = player.capitalRegionId;
-    capitalBtn.style.display =
-      capId !== undefined && state.regions[capId]?.ownerId === PLAYER_ID ? "" : "none";
     // Keep an open tech tree in sync with the latest research state.
     if (techOverlay.style.display !== "none") {
       renderTechTree(techOverlay, player, callbacks, closeTechTree);
@@ -2021,6 +2040,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
     taxInput.value = String(Math.round(player.taxRate * 100));
     taxLabel.textContent = `Tax ${Math.round(player.taxRate * 100)}%`;
+    taxJump.innerHTML = `${glyphHtml("crown", "⚖")} Tax ${Math.round(player.taxRate * 100)}% · Politics ▸`;
     upkeepLine.textContent = `Army upkeep: ${fmt(upkeep)}g/turn.`;
     // The unrest side of the tax lever, with real numbers: the steady state
     // this policy drifts regions toward (before local calming effects).
