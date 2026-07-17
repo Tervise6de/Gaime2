@@ -185,8 +185,10 @@ body {
 }
 
 /* --- Production overview ---------------------------------------------------- */
-.hud-production-panel {
-  width: min(560px, 94vw);
+/* Compound selectors: the base .hud-techtree-panel width rule sits later in
+   this file, so per-screen widths need the extra specificity to win. */
+.hud-techtree-panel.hud-production-panel {
+  width: min(640px, 94vw);
 }
 
 .hud-prod-summary {
@@ -309,7 +311,33 @@ body {
 }
 
 /* Armies overview rows share the production chrome. */
-.hud-armies-panel {
+.hud-techtree-panel.hud-armies-panel {
+  width: min(620px, 94vw);
+}
+
+/* Diplomacy & Research as big centred screens (same chrome as every tab). */
+.hud-techtree-panel.hud-diplo-panel {
+  width: min(720px, 94vw);
+}
+
+/* Rival cards flow into two readable columns on wide screens. */
+.hud-diplo-panel .hud-diplo-body {
+  column-count: 2;
+  column-gap: 24px;
+}
+
+.hud-diplo-panel .hud-diplo-body > * {
+  break-inside: avoid;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 720px) {
+  .hud-diplo-panel .hud-diplo-body {
+    column-count: 1;
+  }
+}
+
+.hud-techtree-panel.hud-research-panel {
   width: min(560px, 94vw);
 }
 

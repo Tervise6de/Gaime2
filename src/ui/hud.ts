@@ -386,12 +386,12 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   }
 
   const diploRail = railBtn("flag", "⚑", "Diplomacy", "Relations, treaties and offers. Shortcut: D", () =>
-    toggleDrawer("diplo"),
+    toggleScreen("diplo"),
   );
-  // Research lives beside Diplomacy — same drawer pattern, badge when a
+  // Research lives beside Diplomacy — same screen pattern, badge when a
   // technology choice is waiting.
   const researchRail = railBtn("book", "📖", "Research", "Technology and research. Shortcut: R", () =>
-    toggleDrawer("research"),
+    toggleScreen("research"),
   );
   researchRail.btn.classList.add("hud-railbtn-research");
   // Production: the whole realm's construction at a glance — what every
@@ -425,45 +425,57 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   rail.append(diploRail.btn, researchRail.btn, productionRail.btn, armiesRail.btn, capitalBtn);
   leftStack.append(rail);
 
-  // --- Drawers (one open at a time, sharing the left stack) ------------------
-  interface Drawer {
-    root: HTMLElement;
-    body: HTMLElement;
-  }
-  function buildDrawer(title: string, className: string): Drawer {
-    const drawerRoot = el("div", `hud-panel hud-drawer ${className}`);
-    drawerRoot.style.display = "none";
-    const head = el("div", "hud-drawer-head");
-    head.append(heading(title), closeButton(() => setDrawer(null)));
-    const body = el("div", "hud-drawer-body");
-    drawerRoot.append(head, body);
-    return { root: drawerRoot, body };
-  }
-  const diploDrawer = buildDrawer("Diplomacy", "hud-drawer-diplo");
-  const researchDrawer = buildDrawer("Research", "hud-drawer-research");
-  leftStack.append(diploDrawer.root, researchDrawer.root);
   root.append(leftStack);
 
-  type DrawerId = "diplo" | "research";
-  let openDrawer: DrawerId | null = null;
-  function setDrawer(id: DrawerId | null): void {
-    openDrawer = id;
-    diploDrawer.root.style.display = id === "diplo" ? "block" : "none";
-    researchDrawer.root.style.display = id === "research" ? "block" : "none";
+  // --- Diplomacy & Research: big centred screens ------------------------------
+  // Every rail tab opens the same way — a readable modal in the middle of the
+  // screen (the old left-side drawers were cramped and could hide behind the
+  // actions cluster). The bodies persist, so update() keeps them live.
+  interface Screen {
+    overlay: HTMLElement;
+    panel: HTMLElement;
+    body: HTMLElement;
+  }
+  function buildScreen(title: string, panelClass: string, onClose: () => void): Screen {
+    const overlay = el("div", "hud-techtree-overlay");
+    overlay.style.display = "none";
+    overlay.addEventListener("click", (ev) => {
+      if (ev.target === overlay) onClose();
+    });
+    const panel = el("div", `hud-techtree-panel ${panelClass}`);
+    const head = el("div", "hud-techtree-head");
+    const h = el("h2", "hud-techtree-title");
+    h.textContent = title;
+    head.append(h, closeButton(onClose));
+    const body = el("div", "hud-screen-body");
+    panel.append(head, body);
+    overlay.append(panel);
+    root.append(overlay);
+    return { overlay, panel, body };
+  }
+  const diploScreen = buildScreen("Diplomacy", "hud-diplo-panel", () => setScreen(null));
+  const researchScreen = buildScreen("Research", "hud-research-panel", () => setScreen(null));
+
+  type ScreenId = "diplo" | "research";
+  let openScreenId: ScreenId | null = null;
+  function setScreen(id: ScreenId | null): void {
+    openScreenId = id;
+    diploScreen.overlay.style.display = id === "diplo" ? "flex" : "none";
+    researchScreen.overlay.style.display = id === "research" ? "flex" : "none";
     diploRail.btn.classList.toggle("active", id === "diplo");
     researchRail.btn.classList.toggle("active", id === "research");
-    // A freshly opened drawer always starts at its top.
-    if (id === "diplo") diploDrawer.root.scrollTop = 0;
-    if (id === "research") researchDrawer.root.scrollTop = 0;
+    // A freshly opened screen always starts at its top.
+    if (id === "diplo") diploScreen.panel.scrollTop = 0;
+    if (id === "research") researchScreen.panel.scrollTop = 0;
   }
-  function toggleDrawer(id: DrawerId): void {
-    setDrawer(openDrawer === id ? null : id);
+  function toggleScreen(id: ScreenId): void {
+    setScreen(openScreenId === id ? null : id);
   }
 
   const diploBody = el("div", "hud-diplo-body");
-  diploDrawer.body.append(diploBody);
+  diploScreen.body.append(diploBody);
   const researchBody = el("div", "hud-research-body");
-  researchDrawer.body.append(researchBody);
+  researchScreen.body.append(researchBody);
 
   // --- Bottom-left: the per-turn levers that must stay in reach --------------
   // Tax sits beside End turn deliberately: it is the one global policy you
@@ -1551,10 +1563,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       toggleStandings();
     } else if (key === "d") {
       ev.preventDefault();
-      toggleDrawer("diplo");
+      toggleScreen("diplo");
     } else if (key === "r") {
       ev.preventDefault();
-      toggleDrawer("research");
+      toggleScreen("research");
     } else if (key === "n") {
       ev.preventDefault();
       toggleLog();
@@ -1578,7 +1590,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       closeRegionScreen();
       closeProduction();
       closeArmies();
-      setDrawer(null);
+      setScreen(null);
       legendPanel.style.display = "none";
       if (hints.style.display !== "none") dismissHints();
     }
@@ -1629,7 +1641,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
             ? glyphHtml("hammer", "🔨")
             : glyphHtml("flag", "⚑");
       const chip = btn("", "hud-advice-chip " + item.kind, () => {
-        if (item.kind === "research") setDrawer("research");
+        if (item.kind === "research") setScreen("research");
         else if (item.kind === "build") openProduction();
         else openArmies();
       });
