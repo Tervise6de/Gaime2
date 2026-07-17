@@ -464,6 +464,10 @@ export const EVENT_VIGNETTE: Record<string, string | null> = {
   works: medallion(
     '<path d="M6.6 8.2l4.3 4.3-2.4 2.4-4.3-4.3a1.7 1.7 0 012.4-2.4z"/><path d="M10.4 12.9l3-3M12.4 15.4h7.2v3.2h-7.2z"/>',
   ),
+  // Chapel with a cross — faith, preachers, relics and heresy.
+  faith: medallion(
+    '<path d="M8 18.5v-6.2l4-3 4 3v6.2z"/><path d="M12 9.3v-3.1M10.6 7.4h2.8"/><path d="M11 18.5v-3.3h2v3.3"/><path d="M6.5 18.5h11"/>',
+  ),
 };
 
 /** Event id → vignette theme (see systems/events.ts for the roster). */
@@ -495,6 +499,10 @@ const EVENT_THEME: Record<string, keyof typeof EVENT_VIGNETTE> = {
   monopoly_charter: "trade",
   settling_season: "harvest",
   public_works: "works",
+  // Faith events (systems/events.ts faith block).
+  wandering_preacher: "faith",
+  saints_relic: "faith",
+  heresy: "faith",
 };
 
 /** Vignette for a concrete event id, or null (caller renders no art). */

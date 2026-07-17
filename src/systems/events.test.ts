@@ -536,3 +536,58 @@ describe("balancing setback events", () => {
     throw new Error("border_raid never fired across 400 seeds");
   });
 });
+
+describe("faith events", () => {
+  it("the wandering preacher wins a nearby province to your faith", () => {
+    let s = pendingChoiceState("wandering_preacher");
+    s = { ...s, nations: s.nations.map((n) => (n.id === PLAYER_ID ? { ...n, stocks: { ...n.stocks, gold: 100 } } : n)) };
+    const before = s.regions.filter((r) => r.faith === PLAYER_ID).length;
+    const after = resolveChoice(s, "send");
+    expect(after.regions.filter((r) => r.faith === PLAYER_ID).length).toBe(before + 1);
+    expect(after.pendingChoice).toBeUndefined();
+  });
+
+  it("declining the preacher converts no one", () => {
+    const s = pendingChoiceState("wandering_preacher");
+    const before = s.regions.filter((r) => r.faith === PLAYER_ID).length;
+    const after = resolveChoice(s, "stay");
+    expect(after.regions.filter((r) => r.faith === PLAYER_ID).length).toBe(before);
+  });
+
+  it("a saint's relic firms your faith in a province you rule but had not converted", () => {
+    const base = createGame({ seed: 12345, rivals: 2 });
+    const pr = base.regions.find((r) => r.ownerId === PLAYER_ID)!;
+    // Occupied-but-unconverted: the player rules it, but its people hold rival 2's faith.
+    const s = { ...base, regions: base.regions.map((r) => (r.id === pr.id ? { ...r, faith: 2 } : r)) };
+    for (let i = 1; i <= 800; i++) {
+      const next = fireEvent(s, PLAYER_ID, createRng(i));
+      if (next.log.some((l) => l.includes("saint's relic"))) {
+        expect(next.regions[pr.id]!.faith).toBe(PLAYER_ID); // won back to your faith
+        return;
+      }
+    }
+    throw new Error("saints_relic never fired across 800 seeds");
+  });
+
+  it("heresy takes a faithful border province from your faith", () => {
+    const base = createGame({ seed: 12345, rivals: 2 });
+    const r0 = base.regions.find((r) => r.ownerId === PLAYER_ID && r.adjacency.length > 0)!;
+    // Seed a heretic neighbour (rival 2's faith) so a heresy seam exists.
+    const s = {
+      ...base,
+      regions: base.regions.map((r) =>
+        r.id === r0.id ? { ...r, faith: PLAYER_ID } : r.id === r0.adjacency[0] ? { ...r, faith: 2 } : r,
+      ),
+    };
+    const before = s.regions.filter((r) => r.faith === PLAYER_ID).length;
+    for (let i = 1; i <= 1000; i++) {
+      const next = fireEvent(s, PLAYER_ID, createRng(i));
+      if (next.log.some((l) => l.includes("Heresy spreads"))) {
+        // One province that held your faith has slipped away.
+        expect(next.regions.filter((r) => r.faith === PLAYER_ID).length).toBe(before - 1);
+        return;
+      }
+    }
+    throw new Error("heresy never fired across 1000 seeds");
+  });
+});

@@ -431,8 +431,13 @@ is large without hand-authored content:
 - **Branching tech tree:** you can't unlock everything, so tech order becomes a
   build identity (rush military tech vs. economy vs. diplomacy tools).
 - **Bounded random events** for texture: good harvest, plague, ore discovery,
-  migration wave, local uprising, wandering mercenaries for hire. **Low variance
-  by design** — events add color and small adaptations, never coin-flip the game.
+  migration wave, local uprising, wandering mercenaries for hire, and — tying the
+  religious layer (§9.6) into the event stream (v0.34) — a **wandering preacher**
+  who wins a nearby province to your faith, a **saint's relic** that firms a
+  wavering province, and **heresy** that slips a border province to a rival creed.
+  Many events are player **decisions** (the AI auto-resolves its own). **Low
+  variance by design** — events add color and small adaptations, never coin-flip
+  the game.
 - **Multiple victory paths** (choose your own goal each game):
   1. **Domination** — control ≥ ~60% of regions, or eliminate all rivals.
   2. **Economic / Great Works** — build a set of prestige projects (or reach a
