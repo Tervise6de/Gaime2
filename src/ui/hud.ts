@@ -1470,6 +1470,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     worldRow("Regions", String(state.regions.length));
     worldRow("Age", `${era.name} · ${yearForTurn(state.turn)} AD`, era.blurb);
     if (player.trait) worldRow("Trait", TRAITS[player.trait].label, TRAITS[player.trait].blurb);
+    worldRow("Build", `v${typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev"}`);
 
     renderVictoryProgress(victoryEl, state);
 

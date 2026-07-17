@@ -25,6 +25,11 @@ skip ahead. Each milestone must leave the game runnable and testable.
   content so balancing is editing tables, not code.
 - **Tests:** systems are unit-tested with Vitest (`npm test`). Keep them green.
 
+## Releases
+- **Bump `package.json` minor version with every user-visible batch pushed to
+  main.** The title screen and the legend's "This world" card display it —
+  a stale number means the bump was forgotten.
+
 ## Commands
 - `npm run dev` — dev server at http://localhost:5173
 - `npm test` — unit suite
