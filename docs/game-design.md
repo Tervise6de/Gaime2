@@ -559,7 +559,21 @@ kingdoms). Regions carry real Baltic toponyms (Riga, Reval, Dorpat, Danzig,
 Novgorod, Visby, …). Neutral holders are **Free Tribes**. Map sizes widened
 (Small 18 / Medium 30 / Large 40 / Grand 48; default Medium) and up to 6 rivals.
 
-**Planned — a real geographic map.** The current renderer wraps the region
+**Shipped (v0.15) — real geographic maps.** A scripted-map format
+(`data/maps/*`) supplies authored coastlines (land-around-sea, as separate
+blobs) + fixed real regions; `mapgen` derives movement adjacency from the
+Voronoi of those sites (capped so cross-water hops are short straits, not
+sea-spanning teleports); the renderer clips its cells to the authored coast
+instead of a generated island. Two maps ship — **The Baltic** (Sweden,
+Finland, Livonia/Rus, Prussia/Poland, Denmark, Gotland, Ösel) and **Europe**
+(the continent + Iberia/Italy peninsulas, with Britain, Ireland and
+Scandinavia across the seas) — chosen from a **World** picker (Random /
+Baltic / Europe) in new-game setup. A guard test asserts every region sits on
+land and each graph is connected. *Remaining refinement:* factions still start
+in geographically-random regions (Denmark may open in Sweden's spot); a future
+pass can let a scripted map pin each power's historical homeland/capital.
+
+**Original plan (for reference).** The current renderer wraps the region
 sites in a *generated organic island*. A real Baltic map is a different shape:
 **land around a central sea**, with the Gulf of Finland, Gulf of Riga and the
 islands (Gotland, Ösel/Saaremaa). Plan:

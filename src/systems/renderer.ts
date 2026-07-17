@@ -46,6 +46,7 @@ import { atWar } from "@/systems/diplomacy";
 import { regionCapacity } from "@/systems/population";
 import { popCompact, popDisplay, soldiersCompact, soldiersDisplay } from "@/systems/format";
 import { computeVoronoiCells, pointInPolygon, type Point, type VoronoiCell } from "@/systems/voronoi";
+import { scriptedMap } from "@/data/maps/types";
 import {
   hashFloat,
   islandArchetype,
@@ -354,8 +355,17 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       const sites = s.regions.map((r) => ({ x: r.x, y: r.y }));
       cells = computeVoronoiCells(sites, ISLAND_BOUNDS);
       organic = organicCells(cells, s.seed);
-      archetype = islandArchetype(s.regions.length, s.seed);
-      shape = islandShape(sites, s.seed, archetype);
+      // Scripted maps supply their own coastline (real geography); procedural
+      // realms generate an organic island around the sites.
+      const smap = scriptedMap(s.mapId);
+      if (smap) {
+        archetype = "large"; // tight framing — the authored land fills [0,1]
+        const toPoly = (poly: [number, number][]): Point[] => poly.map((v) => ({ x: v[0], y: v[1] }));
+        shape = { blobs: smap.land.map(toPoly), islets: (smap.islets ?? []).map(toPoly) };
+      } else {
+        archetype = islandArchetype(s.regions.length, s.seed);
+        shape = islandShape(sites, s.seed, archetype);
+      }
       projSig = ""; // both projections derive from the cells — force rebuilds
       baseProjSig = "";
     }

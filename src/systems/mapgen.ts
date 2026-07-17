@@ -14,6 +14,9 @@
 
 import { createRng, type Rng } from "@/systems/rng";
 import { TERRAIN, terrainFromRoll } from "@/data/terrain";
+import { computeVoronoiCells } from "@/systems/voronoi";
+import { ISLAND_BOUNDS } from "@/systems/island";
+import { scriptedMap } from "@/data/maps/types";
 import type { Region } from "@/systems/state";
 
 /** Chance a region whose terrain supports a strategic resource actually has one. */
@@ -168,13 +171,69 @@ export interface GeneratedMap {
   regions: Region[];
 }
 
+/** Longest Voronoi-neighbour link (normalised) kept as adjacency on a scripted
+    map — caps cross-water hops to short straits, not sea-spanning teleports. */
+const SCRIPTED_ADJ_MAX = 0.24;
+
+/**
+ * Adjacency for a fixed set of sites, read from their Voronoi neighbours (so it
+ * matches the borders the renderer draws), dropping links longer than `maxDist`,
+ * then repaired to a connected graph.
+ */
+function voronoiAdjacency(sites: Site[], maxDist: number): number[][] {
+  const cells = computeVoronoiCells(sites, ISLAND_BOUNDS);
+  const adj: Set<number>[] = sites.map(() => new Set<number>());
+  cells.forEach((cell, i) => {
+    for (const nb of cell.neighbor) {
+      if (nb < 0 || nb === i) continue;
+      if (Math.sqrt(dist2(sites[i]!, sites[nb]!)) > maxDist) continue;
+      adj[i]!.add(nb);
+      adj[nb]!.add(i);
+    }
+  });
+  const arr = adj.map((s) => [...s]);
+  ensureConnected(sites, arr, (i, j) => {
+    if (!arr[i]!.includes(j)) arr[i]!.push(j);
+    if (!arr[j]!.includes(i)) arr[j]!.push(i);
+  });
+  return arr;
+}
+
+/** Build the region graph for a scripted (real-geography) map. Populations are
+    still seeded for per-game variety; positions/names/terrain are authored. */
+function generateScriptedMap(mapId: string, seed: number): GeneratedMap {
+  const map = scriptedMap(mapId)!;
+  const rng = createRng(seed);
+  const sites: Site[] = map.regions.map((r) => ({ x: r.x, y: r.y }));
+  const adjacency = voronoiAdjacency(sites, SCRIPTED_ADJ_MAX);
+  const regions: Region[] = map.regions.map((r, i) => ({
+    id: i,
+    name: r.name,
+    terrain: r.terrain,
+    ownerId: null,
+    population: rng.int(3, 7),
+    unrest: 0,
+    fortification: 0,
+    resource: r.resource ?? null,
+    buildings: [],
+    construction: null,
+    adjacency: adjacency[i]!.slice().sort((a, b) => a - b),
+    x: r.x,
+    y: r.y,
+  }));
+  return { regions };
+}
+
 /**
  * Generate the region graph for a seed. Pure: same seed → identical map.
+ * A `mapId` selects a scripted real-geography map instead of procedural scatter.
  */
 export function generateMap(
   seed: number,
   options: MapGenOptions = DEFAULT_MAP_OPTIONS,
+  mapId?: string,
 ): GeneratedMap {
+  if (mapId && scriptedMap(mapId)) return generateScriptedMap(mapId, seed);
   const rng = createRng(seed);
   const count = Math.min(options.regionCount, REGION_NAMES.length);
 

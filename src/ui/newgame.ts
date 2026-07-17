@@ -27,6 +27,8 @@ export interface NewGameConfig {
   rivals: number;
   /** Map generation options (region count etc.); omitted = engine default. */
   map?: MapGenOptions;
+  /** Scripted real-geography map ("baltic"/"europe"); absent = random realm. */
+  mapId?: string;
   /** Scenario twist: force the player's opening trait. */
   playerTrait?: TraitId;
 }
@@ -45,6 +47,7 @@ interface NewGamePrefs {
   difficulty?: string;
   rivals?: string;
   mapSize?: string;
+  world?: string;
 }
 
 const NEWGAME_PREFS_KEY = "gaime2:newgame-prefs";
@@ -147,6 +150,24 @@ export function buildNewGameForm(): NewGameForm {
   mapSizeSeg.root.title =
     "World size: fewer regions play tight and quick; more regions give room to expand.";
 
+  // World: a random realm, or a real-geography map. A real map fixes its own
+  // size and shape, so the World-size field is hidden while one is selected.
+  const worldSeg = segmented(
+    [
+      ["", "Random"],
+      ["baltic", "Baltic"],
+      ["europe", "Europe"],
+    ],
+    prefs.world ?? "",
+    "",
+    () => {
+      dropToCustom();
+      syncWorld();
+    },
+  );
+  worldSeg.root.title =
+    "Random realm (procedural, seeded) or a real-geography map — the Baltic or Europe.";
+
   // Scenarios: hand-set openings. Picking one fills the config below (and may pin
   // an opening trait); editing the config by hand drops back to "Custom".
   let scenarioTrait: TraitId | undefined;
@@ -179,18 +200,32 @@ export function buildNewGameForm(): NewGameForm {
     }
   }
 
+  const sizeField = field("World size", mapSizeSeg.root);
+  /** Hide the size field while a fixed real-geography map is selected. */
+  function syncWorld(): void {
+    sizeField.style.display = worldSeg.get() ? "none" : "";
+  }
+  syncWorld();
+
   return {
     rows: [
       field("Scenario", scenarioSel),
       scenarioBlurb,
       field("World seed", seedRow),
+      field("World", worldSeg.root),
       field("Difficulty", difficultySeg.root),
       field("Rivals", rivalsSeg.root),
-      field("World size", mapSizeSeg.root),
+      sizeField,
     ],
     readConfig(): NewGameConfig {
       const raw = seedInput.value.trim();
-      saveNewGamePrefs({ difficulty: difficultySeg.get(), rivals: rivalsSeg.get(), mapSize: mapSizeSeg.get() });
+      const world = worldSeg.get();
+      saveNewGamePrefs({
+        difficulty: difficultySeg.get(),
+        rivals: rivalsSeg.get(),
+        mapSize: mapSizeSeg.get(),
+        world,
+      });
       const rivals = Number(rivalsSeg.get()) || 2;
       const regionCount = Number(mapSizeSeg.get()) || DEFAULT_MAP_OPTIONS.regionCount;
       return {
@@ -199,6 +234,7 @@ export function buildNewGameForm(): NewGameForm {
         difficulty: (difficultySeg.get() || "normal") as Difficulty,
         rivals,
         map: { ...DEFAULT_MAP_OPTIONS, regionCount },
+        mapId: world || undefined,
         playerTrait: scenarioTrait,
       };
     },

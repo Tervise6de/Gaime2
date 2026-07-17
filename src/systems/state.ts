@@ -316,6 +316,8 @@ export interface DiplomaticOffer {
 export interface GameState {
   /** The seed the whole game derives from (map generation). */
   seed: number;
+  /** Scripted-map id (e.g. "baltic", "europe"); absent = procedural realm. */
+  mapId?: string;
   /** Advancing RNG state for combat/AI/events — keeps resolution deterministic. */
   rngState: number;
   /** Turns elapsed; starts at 1. */

@@ -113,11 +113,13 @@ export interface NewGameOptions {
   difficulty?: Difficulty;
   /** Scenario twist: force the player's opening trait (else drawn from the pool). */
   playerTrait?: TraitId;
+  /** Scripted real-geography map id ("baltic"/"europe"); absent = procedural. */
+  mapId?: string;
 }
 
 /** Build a fresh game from a seed. Pure: same seed → identical starting state. */
 export function createGame(options: NewGameOptions): GameState {
-  const { regions } = generateMap(options.seed, options.map);
+  const { regions } = generateMap(options.seed, options.map, options.mapId);
   const rng = createRng((options.seed ^ 0x9e3779b9) >>> 0);
   // Cap rivals by the roster and by the map: every realm needs room for a capital
   // and neighbours (~3 regions each), so a small map silently seats fewer rivals
@@ -224,6 +226,7 @@ export function createGame(options: NewGameOptions): GameState {
 
   const game: GameState = {
     seed: options.seed,
+    mapId: options.mapId,
     rngState: rng.seed,
     turn: 1,
     nations,
