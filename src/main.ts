@@ -3,7 +3,9 @@ import {
   createGame,
   resolveTurn,
   setTaxRate,
-  queueBuilding,
+  enqueueBuilding,
+  removeQueuedBuilding,
+  clearBuildQueue,
   cancelConstruction,
   setRegionFocus,
   chooseResearch,
@@ -123,8 +125,17 @@ function main(): void {
       }
     },
     onQueueBuilding(regionId, building) {
-      state = queueBuilding(state, regionId, building);
+      // Start it now if the slot is idle, else append to the region's build queue.
+      state = enqueueBuilding(state, regionId, building);
       play("build");
+      commit();
+    },
+    onRemoveQueuedBuilding(regionId, index) {
+      state = removeQueuedBuilding(state, regionId, index);
+      commit();
+    },
+    onClearBuildQueue(regionId) {
+      state = clearBuildQueue(state, regionId);
       commit();
     },
     onCancelConstruction(regionId) {

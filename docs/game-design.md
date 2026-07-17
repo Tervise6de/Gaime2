@@ -340,11 +340,12 @@ people at ×1,000 (`systems/format.ts`) — "4,300 / 10,000" population,
 combat and merge log lines speak in soldiers too) — so the world reads as
 populated without touching the simulation's numbers.
 
-**Nothing idle, ever (advisor + production overview).** Deliberate design:
-one construction slot per region and NO build queues — each build is a
-per-turn decision, kept legible instead of automated away. Two aids carry
-that: the end-turn advisor (chips above End turn listing unchosen research,
-idle build slots and armies with moves left — each a jump, never a hard
+**Nothing idle, ever (advisor + production overview).** One construction slot
+builds at a time per region, but you may now **queue** the builds that follow
+(§9.4, v0.36) so a province's plan isn't lost between turns; the end-turn advisor
+still flags a genuinely *idle* slot (nothing building and nothing queued). Two aids
+carry that legibility: the end-turn advisor (chips above End turn listing unchosen
+research, idle build slots and armies with moves left — each a jump, never a hard
 block; `ui/advisor.ts`, pure and unit-tested) and the Production overview
 (B / rail button, badge = idle count): every region's project, bar and ETA
 on one screen, with a quick-build picker on idle rows.
@@ -723,7 +724,16 @@ names the capstone each focus unlocks, so the reward is legible at the decision.
 `buildingFocusOk` / `focusCapstone` (data/buildings.ts) are the shared gate used
 by the sim, UI, advisor and AI — and the **AI raises its provinces' capstones**
 too, once the tech lands. Changing focus never removes one already built.
-- Still open: an optional **build queue** on Grand maps.
+
+**Build queue — SHIPPED (v0.36).** A province's construction is no longer strictly
+one-at-a-time: `region.buildQueue` holds an ordered list of buildings to raise after
+the current one, and when a build completes `startQueuedBuildings` (pure, in `turn.ts`)
+auto-starts the next still-valid entry — dropping any that became invalid (already built,
+tech/terrain/focus no longer met). One click on a building **starts it if the slot is idle,
+else appends it to the queue** (`enqueueBuilding`); the region panel lists the queue under
+the current job, each entry removable, with a Clear. So you can plan a whole province's
+build order and leave it. Player-only QoL (the AI still builds reactively); deterministic;
+rides through save/load as an optional field. **§9.4 is now complete.**
 
 ### 9.5 Research, ages & game length — SHIPPED v1 (v0.25)
 - **Era-gated research** — every tech carries an `era` (0-based age, `data/eras.ts`);

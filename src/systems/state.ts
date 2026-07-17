@@ -221,6 +221,13 @@ export interface Region {
   faith?: number;
   /** What's under construction here, if anything. */
   construction: ConstructionOrder | null;
+  /**
+   * Buildings queued to build after the current one, in order. When a
+   * construction completes, the next still-valid entry auto-starts (turn.ts
+   * `startQueuedBuildings`). A player quality-of-life lever so you can line up a
+   * province's build order and leave it. Optional/absent = no queue (legacy saves).
+   */
+  buildQueue?: BuildingId[];
   /** Ids of adjacent regions (the pure logic graph). */
   adjacency: number[];
   /**

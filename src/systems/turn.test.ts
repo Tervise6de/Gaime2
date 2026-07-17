@@ -6,6 +6,11 @@ import {
   queueBuilding,
   cancelConstruction,
   canQueueBuilding,
+  canEnqueueBuilding,
+  enqueueBuilding,
+  removeQueuedBuilding,
+  clearBuildQueue,
+  startQueuedBuildings,
   applySecession,
   applyTradeIncome,
 } from "@/systems/turn";
@@ -369,6 +374,72 @@ describe("construction", () => {
     const turns = Math.ceil(BUILDINGS.market.cost / 6) + 3;
     for (let i = 0; i < turns; i++) s = resolveTurn(s);
     expect(s.regions[id]!.buildings).toContain("market");
+  });
+
+  describe("build queue", () => {
+    it("enqueueBuilding starts the first build immediately, then queues the rest", () => {
+      const g = createGame({ seed: 1 });
+      const id = ownedId(g);
+      let s = enqueueBuilding(g, id, "market");
+      expect(s.regions[id]!.construction).toEqual({ building: "market", progress: 0 });
+      expect(s.regions[id]!.buildQueue ?? []).toEqual([]);
+      s = enqueueBuilding(s, id, "workshop");
+      s = enqueueBuilding(s, id, "library");
+      expect(s.regions[id]!.construction!.building).toBe("market"); // unchanged
+      expect(s.regions[id]!.buildQueue).toEqual(["workshop", "library"]);
+    });
+
+    it("refuses to queue a duplicate, the in-progress job, or an already-built building", () => {
+      const g = createGame({ seed: 1 });
+      const id = ownedId(g);
+      let s = enqueueBuilding(g, id, "market"); // now building market
+      s = enqueueBuilding(s, id, "market"); // same as current job → no-op queue
+      expect(s.regions[id]!.buildQueue ?? []).toEqual([]);
+      s = enqueueBuilding(s, id, "workshop");
+      s = enqueueBuilding(s, id, "workshop"); // dedup
+      expect(s.regions[id]!.buildQueue).toEqual(["workshop"]);
+      // Already-built is rejected by the gate.
+      const built = { ...g.regions[id]!, buildings: ["library" as const] };
+      expect(canEnqueueBuilding(built, "library")).toBe(false);
+    });
+
+    it("removeQueuedBuilding and clearBuildQueue edit the queue, current job intact", () => {
+      const g = createGame({ seed: 1 });
+      const id = ownedId(g);
+      let s = enqueueBuilding(g, id, "market");
+      s = enqueueBuilding(s, id, "workshop");
+      s = enqueueBuilding(s, id, "library");
+      s = removeQueuedBuilding(s, id, 0); // drop workshop
+      expect(s.regions[id]!.buildQueue).toEqual(["library"]);
+      s = clearBuildQueue(s, id);
+      expect(s.regions[id]!.buildQueue).toBeUndefined();
+      expect(s.regions[id]!.construction!.building).toBe("market"); // untouched
+    });
+
+    it("auto-starts the next queued build when the current one completes (real pipeline)", () => {
+      let s = setTaxRate(createGame({ seed: 1, rivals: 0 }), 0);
+      const id = ownedId(s);
+      s = enqueueBuilding(s, id, "market");
+      s = enqueueBuilding(s, id, "workshop");
+      const turns = Math.ceil(BUILDINGS.market.cost / 6) + 2;
+      for (let i = 0; i < turns; i++) s = resolveTurn(s);
+      expect(s.regions[id]!.buildings).toContain("market");
+      // Workshop has left the queue and is now the active construction.
+      expect(s.regions[id]!.buildQueue ?? []).toEqual([]);
+      expect(s.regions[id]!.construction?.building).toBe("workshop");
+    });
+
+    it("startQueuedBuildings skips a now-invalid entry and drops it", () => {
+      const g = createGame({ seed: 1 });
+      const id = ownedId(g);
+      // Region idle, queue holds an already-built market then a valid workshop.
+      const regions = g.regions.map((r) =>
+        r.id === id ? { ...r, buildings: ["market" as const], construction: null, buildQueue: ["market" as const, "workshop" as const] } : r,
+      );
+      const next = startQueuedBuildings(regions, PLAYER_ID, []);
+      expect(next[id]!.construction?.building).toBe("workshop"); // market skipped as built
+      expect(next[id]!.buildQueue ?? []).toEqual([]);
+    });
   });
 
   it("a completed market increases national gold output", () => {

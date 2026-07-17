@@ -1714,6 +1714,83 @@ body {
   background: rgba(232, 119, 107, 0.2);
 }
 
+/* --- Build queue (the plan after the current job) ------------------------- */
+.hud-build-queue {
+  margin: 10px 0 4px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed var(--panel-border);
+}
+
+.hud-build-queue-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.hud-build-queue-clear {
+  font-size: 10.5px;
+  padding: 2px 8px;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.hud-build-queue-clear:hover {
+  background: rgba(232, 119, 107, 0.2);
+}
+
+.hud-build-queue-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  line-height: 1.9;
+}
+
+.hud-build-queue-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hud-build-queue-ord {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+}
+
+.hud-build-queue-rm {
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 6px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.hud-build-queue-rm:hover {
+  color: var(--fg);
+  background: rgba(232, 119, 107, 0.2);
+}
+
 /* --- Military ------------------------------------------------------------- */
 .hud-military {
   margin-top: 12px;

@@ -58,6 +58,8 @@ export function deriveAdvice(state: GameState): Advice[] {
 export function regionCanStartBuild(state: GameState, regionId: number): boolean {
   const region = state.regions[regionId];
   if (!region || region.ownerId !== PLAYER_ID || region.construction) return false;
+  // A queued region isn't idle — it auto-starts its next build next turn.
+  if (region.buildQueue?.length) return false;
   return buildOptions(state, regionId).length > 0;
 }
 

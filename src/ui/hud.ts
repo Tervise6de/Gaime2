@@ -114,6 +114,10 @@ export interface HudCallbacks {
   /** Load a game from an uploaded save-file's JSON text. */
   onImport(json: string): void;
   onQueueBuilding(regionId: number, building: BuildingId): void;
+  /** Remove the building at `index` from a region's build queue. */
+  onRemoveQueuedBuilding(regionId: number, index: number): void;
+  /** Empty a region's build queue (the current construction keeps running). */
+  onClearBuildQueue(regionId: number): void;
   onCancelConstruction(regionId: number): void;
   /** Assign a region's specialisation focus (or "balanced" to clear it). */
   onSetFocus(regionId: number, focus: FocusId): void;
@@ -2734,22 +2738,23 @@ function renderBuildSection(region: Region, done: TechId[], callbacks: HudCallba
   const section = el("div", "hud-build");
   section.append(heading("Construction"));
 
-  if (region.construction) {
-    const def = BUILDINGS[region.construction.building];
-    const remaining = def.cost - region.construction.progress;
+  const order = region.construction;
+  if (order) {
+    const def = BUILDINGS[order.building];
+    const remaining = def.cost - order.progress;
     // Best-case pace: BUILD_RATE materials flow into a site per turn while the
     // stockpile lasts — so the estimate is a floor, not a promise.
     const eta = Math.max(1, Math.ceil(remaining / BUILD_RATE));
     const wrap = el("div", "hud-build-progress");
     wrap.append(
       line(
-        `Building ${def.name} — ${fmt(region.construction.progress)}/${def.cost} materials · ~${eta} turn${eta === 1 ? "" : "s"} left`,
+        `Building ${def.name} — ${fmt(order.progress)}/${def.cost} materials · ~${eta} turn${eta === 1 ? "" : "s"} left`,
         "hud-build-progress-label",
       ),
     );
     const bar = el("div", "hud-build-bar");
     const fill = el("div", "hud-build-fill");
-    fill.style.width = `${(region.construction.progress / def.cost) * 100}%`;
+    fill.style.width = `${(order.progress / def.cost) * 100}%`;
     bar.append(fill);
     const cancel = document.createElement("button");
     cancel.className = "hud-build-cancel";
@@ -2757,13 +2762,8 @@ function renderBuildSection(region: Region, done: TechId[], callbacks: HudCallba
     cancel.addEventListener("click", () => callbacks.onCancelConstruction(region.id));
     wrap.append(bar, cancel);
     section.append(wrap);
-    section.append(
-      line(
-        `Construction advances by up to ${BUILD_RATE} materials each End turn, drawn from your stockpile — it is never instant.`,
-        "hud-hint",
-      ),
-    );
-    return section;
+    // The build queue that follows the current job (if any).
+    if (region.buildQueue?.length) section.append(renderBuildQueue(region, callbacks));
   }
 
   const menu = el("div", "hud-build-menu");
@@ -2777,29 +2777,74 @@ function renderBuildSection(region: Region, done: TechId[], callbacks: HudCallba
     // like any other), so the menu stays uncluttered by the other four.
     if (!buildingFocusOk(region.focus, id)) continue;
     const already = region.buildings.includes(id);
+    const isCurrent = order?.building === id;
+    const isQueued = (region.buildQueue ?? []).includes(id);
     const unlocked = isBuildingUnlockedFor(done, id);
+    const addable = !already && !isCurrent && !isQueued && unlocked;
     const btn = document.createElement("button");
     btn.className = "hud-build-btn";
-    btn.disabled = already || !unlocked;
-    btn.title = unlocked ? def.blurb : `Locked — research ${def.requiresTech?.replace(/_/g, " ")}.`;
+    btn.disabled = !addable;
     const eta = Math.max(1, Math.ceil(def.cost / BUILD_RATE));
-    if (!already && unlocked) {
-      btn.title = `${def.blurb}\n\nCosts ${def.cost} materials over ~${eta} turn${eta === 1 ? "" : "s"} (up to ${BUILD_RATE}/turn from your stockpile).`;
-    }
+    btn.title = !unlocked
+      ? `Locked — research ${def.requiresTech?.replace(/_/g, " ")}.`
+      : addable
+        ? `${def.blurb}\n\nCosts ${def.cost} materials over ~${eta} turn${eta === 1 ? "" : "s"} (up to ${BUILD_RATE}/turn). ${order ? "Adds to the build queue." : "Starts now."}`
+        : def.blurb;
     const costLabel = already
       ? "built"
-      : !unlocked
-        ? glyphHtml("lock", "🔒")
-        : `${def.cost}${resourceIconHtml("materials", "⛏")} · ${eta}t`;
+      : isCurrent
+        ? "building…"
+        : isQueued
+          ? "queued"
+          : !unlocked
+            ? glyphHtml("lock", "🔒")
+            : `${def.cost}${resourceIconHtml("materials", "⛏")} · ${eta}t`;
     btn.innerHTML =
       `<span class="hud-build-name">${buildingIconHtml(id, "")}${def.name}</span>` +
       `<span class="hud-build-cost">${costLabel}</span>`;
-    if (!already && unlocked) btn.addEventListener("click", () => callbacks.onQueueBuilding(region.id, id));
+    if (addable) btn.addEventListener("click", () => callbacks.onQueueBuilding(region.id, id));
     menu.append(btn);
   }
   section.append(menu);
-  section.append(line("One project per region; it builds a little each End turn.", "hud-hint"));
+  section.append(
+    line(
+      order
+        ? "Click a building to queue it after the current one — the queue builds in order."
+        : "One project builds at a time; start one, then queue more to plan the province.",
+      "hud-hint",
+    ),
+  );
   return section;
+}
+
+/** The ordered build queue beneath the current construction — each entry removable. */
+function renderBuildQueue(region: Region, callbacks: HudCallbacks): HTMLElement {
+  const queue = region.buildQueue ?? [];
+  const wrap = el("div", "hud-build-queue");
+  const head = el("div", "hud-build-queue-head");
+  const title = el("span", "hud-build-queue-title");
+  title.textContent = `Up next (${queue.length})`;
+  const clear = document.createElement("button");
+  clear.className = "hud-build-queue-clear";
+  clear.textContent = "Clear";
+  clear.title = "Empty the build queue (the current build keeps going).";
+  clear.addEventListener("click", () => callbacks.onClearBuildQueue(region.id));
+  head.append(title, clear);
+  wrap.append(head);
+  queue.forEach((id, i) => {
+    const def = BUILDINGS[id];
+    const row = el("div", "hud-build-queue-row");
+    const name = el("span", "hud-build-queue-name");
+    name.innerHTML = `<span class="hud-build-queue-ord">${i + 1}</span>${buildingIconHtml(id, "")}${escapeHtml(def.name)}`;
+    const rm = document.createElement("button");
+    rm.className = "hud-build-queue-rm";
+    rm.textContent = "✕";
+    rm.title = `Remove ${def.name} from the queue`;
+    rm.addEventListener("click", () => callbacks.onRemoveQueuedBuilding(region.id, i));
+    row.append(name, rm);
+    wrap.append(row);
+  });
+  return wrap;
 }
 
 /**

@@ -514,6 +514,91 @@ export function queueBuilding(
   return { ...state, regions };
 }
 
+/**
+ * Whether `building` may be *added* to a region's plan (owned, unlocked, right
+ * terrain/focus, not already built, not the current job, not already queued).
+ * The gate shared by `enqueueBuilding` and the build-queue UI. Pure.
+ */
+export function canEnqueueBuilding(
+  region: Region,
+  building: BuildingId,
+  done: TechId[] = [],
+): boolean {
+  if (region.buildings.includes(building)) return false;
+  if (region.construction?.building === building) return false;
+  if ((region.buildQueue ?? []).includes(building)) return false;
+  if (!isBuildingUnlockedFor(done, building)) return false;
+  const terrain = BUILDINGS[building].requiresTerrain;
+  if (terrain && region.terrain !== terrain) return false;
+  return buildingFocusOk(region.focus, building);
+}
+
+/**
+ * Enqueue a building for a region: start it now if the slot is idle, else append
+ * it to the region's build queue. The player QoL entry point (one click plans a
+ * whole build order). Pure; no-op on an invalid add.
+ */
+export function enqueueBuilding(
+  state: GameState,
+  regionId: number,
+  building: BuildingId,
+  ownerId = PLAYER_ID,
+): GameState {
+  const region = state.regions[regionId];
+  if (!region || region.ownerId !== ownerId) return state;
+  const owner = state.nations.find((n) => n.id === ownerId);
+  if (!owner || !canEnqueueBuilding(region, building, owner.research.done)) return state;
+  if (!region.construction) return queueBuilding(state, regionId, building, ownerId);
+  const regions = state.regions.map((r) =>
+    r.id === regionId ? { ...r, buildQueue: [...(r.buildQueue ?? []), building] } : r,
+  );
+  return { ...state, regions };
+}
+
+/** Remove the queued building at `index` from a region's build queue. Pure. */
+export function removeQueuedBuilding(
+  state: GameState,
+  regionId: number,
+  index: number,
+  ownerId = PLAYER_ID,
+): GameState {
+  const region = state.regions[regionId];
+  if (!region || region.ownerId !== ownerId || !region.buildQueue?.length) return state;
+  const buildQueue = region.buildQueue.filter((_, i) => i !== index);
+  const regions = state.regions.map((r) =>
+    r.id === regionId ? { ...r, buildQueue: buildQueue.length ? buildQueue : undefined } : r,
+  );
+  return { ...state, regions };
+}
+
+/** Empty a region's build queue (leaves the current construction running). Pure. */
+export function clearBuildQueue(state: GameState, regionId: number, ownerId = PLAYER_ID): GameState {
+  const region = state.regions[regionId];
+  if (!region || region.ownerId !== ownerId || !region.buildQueue?.length) return state;
+  const regions = state.regions.map((r) => (r.id === regionId ? { ...r, buildQueue: undefined } : r));
+  return { ...state, regions };
+}
+
+/**
+ * For each of `nationId`'s regions whose construction slot is idle but has a
+ * queue, start the next still-valid entry (dropping any that became invalid —
+ * already built, tech/terrain/focus no longer met). Pure; called each turn after
+ * construction advances so a completed build flows straight into the next.
+ */
+export function startQueuedBuildings(regions: Region[], nationId: number, done: TechId[]): Region[] {
+  return regions.map((region) => {
+    if (region.ownerId !== nationId || region.construction || !region.buildQueue?.length) return region;
+    const queue = [...region.buildQueue];
+    while (queue.length) {
+      const next = queue.shift()!;
+      if (canEnqueueBuilding({ ...region, buildQueue: undefined }, next, done)) {
+        return { ...region, construction: { building: next, progress: 0 }, buildQueue: queue.length ? queue : undefined };
+      }
+    }
+    return { ...region, buildQueue: undefined };
+  });
+}
+
 /** Select the player's (or a nation's) current research. Age-gated. Pure. */
 export function chooseResearch(state: GameState, tech: TechId, nationId = PLAYER_ID): GameState {
   const era = eraIndexForTurn(state.turn);
@@ -596,7 +681,8 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
   // Construction (this nation's regions only); may complete wonders.
   const built = advanceConstruction(state.regions, stocks.materials, nationId);
   stocks.materials = round1(stocks.materials - built.materialsSpent);
-  let regions = built.regions;
+  // A completed build pulls the next still-valid entry off the region's queue.
+  let regions = startQueuedBuildings(built.regions, nationId, research.done);
   const wondersBuilt = built.completed.filter((c) => BUILDINGS[c.building].isWonder).length;
 
   // Food balance → famine.
