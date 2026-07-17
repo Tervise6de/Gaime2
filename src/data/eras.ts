@@ -12,6 +12,8 @@
 export const BASE_YEAR = 900;
 
 export interface Era {
+  /** Ordinal (0-based) — techs reference this to gate research by age. */
+  index: number;
   /** First turn of the era (eras are contiguous and ordered). */
   fromTurn: number;
   name: string;
@@ -19,13 +21,17 @@ export interface Era {
   blurb: string;
 }
 
-/** The ages of the world, in order. Turn ranges cover the 150-turn game. */
+/**
+ * The ages of the world, in order. Turn ranges span the ~220-turn game so a
+ * full campaign is a long arc through every age (research is era-gated — you
+ * cannot pull a tech forward before its age dawns; see `data/techs.ts`).
+ */
 export const ERAS: readonly Era[] = [
-  { fromTurn: 1, name: "Age of Founding", blurb: "Petty realms rise from scattered halls; every border is still a suggestion." },
-  { fromTurn: 26, name: "Age of Banners", blurb: "Levies march under fresh-sewn banners; the first rivalries harden." },
-  { fromTurn: 61, name: "Age of Crowns", blurb: "Kings are crowned and courts intrigue; wars are fought for legitimacy." },
-  { fromTurn: 101, name: "Age of Conquest", blurb: "The strong swallow the weak; the map is redrawn by campaign seasons." },
-  { fromTurn: 136, name: "Age of Legacy", blurb: "The chronicles close; what stands now is what history will remember." },
+  { index: 0, fromTurn: 1, name: "Age of Founding", blurb: "Petty realms rise from scattered halls; every border is still a suggestion." },
+  { index: 1, fromTurn: 45, name: "Age of Banners", blurb: "Levies march under fresh-sewn banners; the first rivalries harden." },
+  { index: 2, fromTurn: 90, name: "Age of Crowns", blurb: "Kings are crowned and courts intrigue; wars are fought for legitimacy." },
+  { index: 3, fromTurn: 140, name: "Age of Conquest", blurb: "The strong swallow the weak; the map is redrawn by campaign seasons." },
+  { index: 4, fromTurn: 185, name: "Age of Legacy", blurb: "The chronicles close; what stands now is what history will remember." },
 ] as const;
 
 /** The calendar year for a turn (turn 1 → BASE_YEAR, one year per turn). */
@@ -41,4 +47,14 @@ export function eraForTurn(turn: number): Era {
     else break;
   }
   return era;
+}
+
+/** The 0-based index of the age a turn falls in — the research gate (0..ERAS-1). */
+export function eraIndexForTurn(turn: number): number {
+  return eraForTurn(turn).index;
+}
+
+/** The era an ordinal names (clamped), for naming a tech's required age. */
+export function eraByIndex(index: number): Era {
+  return ERAS[Math.max(0, Math.min(ERAS.length - 1, index))]!;
 }

@@ -10,6 +10,7 @@
 
 import { BUILDINGS, BUILDING_IDS, type BuildingId } from "@/data/buildings";
 import { isBuildingUnlockedFor, researchFrontier } from "@/systems/tech";
+import { eraIndexForTurn } from "@/data/eras";
 import { PLAYER_ID, playerNation, type GameState } from "@/systems/state";
 
 export interface Advice {
@@ -25,8 +26,8 @@ export function deriveAdvice(state: GameState): Advice[] {
   const advice: Advice[] = [];
   const player = playerNation(state);
 
-  // Research idle — and there is something to pick.
-  if (!player.research.current && researchFrontier(player.research.done).length > 0) {
+  // Research idle — and there is an age-appropriate tech to pick.
+  if (!player.research.current && researchFrontier(player.research.done, eraIndexForTurn(state.turn)).length > 0) {
     advice.push({ kind: "research", label: "No research chosen", regionIds: [] });
   }
 

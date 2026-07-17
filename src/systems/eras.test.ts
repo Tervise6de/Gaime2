@@ -22,14 +22,14 @@ describe("world ages", () => {
 
   it("resolves the correct era at boundaries", () => {
     expect(eraForTurn(1).name).toBe("Age of Founding");
-    expect(eraForTurn(25).name).toBe("Age of Founding");
-    expect(eraForTurn(26).name).toBe("Age of Banners");
-    expect(eraForTurn(60).name).toBe("Age of Banners");
-    expect(eraForTurn(61).name).toBe("Age of Crowns");
-    expect(eraForTurn(100).name).toBe("Age of Crowns");
-    expect(eraForTurn(101).name).toBe("Age of Conquest");
-    expect(eraForTurn(135).name).toBe("Age of Conquest");
-    expect(eraForTurn(136).name).toBe("Age of Legacy");
+    expect(eraForTurn(44).name).toBe("Age of Founding");
+    expect(eraForTurn(45).name).toBe("Age of Banners");
+    expect(eraForTurn(89).name).toBe("Age of Banners");
+    expect(eraForTurn(90).name).toBe("Age of Crowns");
+    expect(eraForTurn(139).name).toBe("Age of Crowns");
+    expect(eraForTurn(140).name).toBe("Age of Conquest");
+    expect(eraForTurn(184).name).toBe("Age of Conquest");
+    expect(eraForTurn(185).name).toBe("Age of Legacy");
     expect(eraForTurn(9999).name).toBe("Age of Legacy");
   });
 

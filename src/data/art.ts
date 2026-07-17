@@ -243,6 +243,38 @@ export const BUILDING_ART: Record<BuildingId, string | null> = {
   wonder: ico(
     '<path d="M10.8 14.3L12 4.6l1.2 9.7z"/><path d="M9.2 16.9h5.6M8 19.5h8"/><path d="M5.3 7.8c-.6 3.6.3 6.7 2.4 9.3M18.7 7.8c.6 3.6-.3 6.7-2.4 9.3"/><path d="M5.3 7.8l1.9.5M18.7 7.8l-1.9.5"/>',
   ).replaceAll("currentColor", "#e6c874"),
+  // Barn with a grain silo (reuses the farm read).
+  granary: ico(
+    '<path d="M4.5 19.5v-8.5L12 5.3l7.5 5.7v8.5z"/><path d="M9.8 19.5v-5.3h4.4v5.3"/><path d="M3.4 19.5h17.2"/>',
+  ),
+  // Crenellated keep — a martial muster.
+  barracks: ico(
+    '<path d="M6.4 19.5V8h2.1V6.1h2.2V8h2.6V6.1h2.2V8h2.1v11.5z"/><path d="M10.4 19.5v-3.7h3.2v3.7"/><path d="M4.6 19.5h14.8"/>',
+  ),
+  // Anchor + light (reuses the harbor read).
+  lighthouse: ico(
+    '<circle cx="12" cy="5.2" r="1.9"/><path d="M12 7.1v12.4"/><path d="M12 19.5c-4.3 0-7.2-2.4-7.8-5.7l2.6 1.1M12 19.5c4.3 0 7.2-2.4 7.8-5.7l-2.6 1.1"/><path d="M8.9 10h6.2"/>',
+  ),
+  // Pediment on columns (reuses the temple read).
+  monastery: ico(
+    '<path d="M3.9 8.6L12 3.9l8.1 4.7z"/><path d="M5.8 8.6v7.6M12 8.6v7.6M18.2 8.6v7.6"/><path d="M4.4 16.2h15.2M3.2 19.5h17.6"/>',
+  ),
+  // Watch keep.
+  watchtower: ico(
+    '<path d="M6.4 19.5V8h2.1V6.1h2.2V8h2.6V6.1h2.2V8h2.1v11.5z"/><path d="M10.4 19.5v-3.7h3.2v3.7"/><path d="M4.6 19.5h14.8"/>',
+  ),
+  // Tiered civic hall (reuses the forum read).
+  courthouse: ico(
+    '<path d="M4 18.5a8 8 0 0116 0"/><path d="M6.7 18.5a5.3 5.3 0 0110.6 0M9.4 18.5a2.6 2.6 0 015.2 0"/><path d="M3 18.5h18"/>',
+  ),
+  // Bookshelf (reuses the library read).
+  printing_house: ico(
+    '<rect x="5" y="4" width="14" height="15.5" rx="1.2"/><path d="M5 9.7h14M5 14.6h14"/><path d="M8.4 4.6v4M11.4 5.4v3.2M15.6 10.4v3.6M9.2 15.3v3.5"/>',
+  ),
+  // Pediment with a cross (temple read).
+  cathedral: ico(
+    '<path d="M3.9 8.6L12 3.9l8.1 4.7z"/><path d="M5.8 8.6v7.6M12 8.6v7.6M18.2 8.6v7.6"/><path d="M4.4 16.2h15.2M3.2 19.5h17.6"/><path d="M12 2v3M10.6 3.3h2.8"/>',
+  ),
 };
 
 // ---------------------------------------------------------------------------

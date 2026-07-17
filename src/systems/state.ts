@@ -144,8 +144,9 @@ export const TRADE_INCOME_MAX = 5;
 export const DOMINATION_FRACTION = 0.6;
 /** Great Works needed for an economic victory. */
 export const WONDER_GOAL = 5;
-/** The game ends at this turn on a prestige-score tiebreak. */
-export const TURN_LIMIT = 150;
+/** The game ends at this turn on a prestige-score tiebreak. A full campaign is
+    a long arc through all five ages (research is era-gated, data/eras.ts). */
+export const TURN_LIMIT = 220;
 /** Per-turn probability a bounded random event fires for the player. */
 export const EVENT_CHANCE = 0.16;
 

@@ -87,3 +87,43 @@ describe("selectTech", () => {
     expect(ok.current).toBe("writing");
   });
 });
+
+import { eraLockedTechs } from "@/systems/tech";
+import type { TechId } from "@/data/techs";
+
+describe("era-gated research", () => {
+  const done: TechId[] = ["agriculture"];
+
+  it("only offers age-appropriate techs on the frontier", () => {
+    // Agriculture done → Irrigation's prereq is met, but it belongs to a later age.
+    expect(researchFrontier(done, 0)).not.toContain("irrigation"); // Age of Founding
+    expect(researchFrontier(done, 1)).toContain("irrigation"); // Age of Banners
+  });
+
+  it("lists prereq-met-but-age-locked techs separately", () => {
+    const locked = eraLockedTechs(done, 0);
+    expect(locked).toContain("irrigation");
+    expect(locked).not.toContain("agriculture"); // already done
+  });
+
+  it("canResearch and selectTech respect the age gate", () => {
+    expect(canResearch(done, "irrigation", 0)).toBe(false);
+    expect(canResearch(done, "irrigation", 1)).toBe(true);
+    // selectTech refuses an out-of-age pick, keeps a valid one.
+    const r = { current: null, progress: 0, done };
+    expect(selectTech(r, "irrigation", 0).current).toBeNull();
+    expect(selectTech(r, "irrigation", 1).current).toBe("irrigation");
+  });
+
+  it("omitting the era ignores the gate (prereqs only)", () => {
+    expect(researchFrontier(done).includes("irrigation")).toBe(true);
+  });
+
+  it("every tech's prerequisites belong to an equal or earlier age", () => {
+    for (const id of Object.keys(TECHS) as (keyof typeof TECHS)[]) {
+      for (const req of TECHS[id].requires) {
+        expect(TECHS[req].era).toBeLessThanOrEqual(TECHS[id].era);
+      }
+    }
+  });
+});

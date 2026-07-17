@@ -2791,6 +2791,47 @@ body {
   opacity: 0.42;
 }
 
+/* Prereqs met but the age hasn't dawned — visible, hatched, not yet clickable. */
+.hud-tt-node.agelocked {
+  opacity: 0.72;
+  border-style: dashed;
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 255, 255, 0.03),
+    rgba(255, 255, 255, 0.03) 5px,
+    transparent 5px,
+    transparent 10px
+  );
+  cursor: not-allowed;
+}
+
+/* "Awaiting the next age" list in the research drawer. */
+.hud-tech-locked {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--panel-border);
+}
+
+.hud-tech-locked-head {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.hud-tech-locked-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  opacity: 0.75;
+  padding: 2px 0;
+}
+
+.hud-tech-locked-row .muted {
+  color: var(--muted);
+}
+
 .hud-techtree-legend {
   margin-top: 14px;
   font-size: 11px;

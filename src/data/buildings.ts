@@ -31,7 +31,15 @@ export type BuildingId =
   | "guildhall"
   | "forum"
   | "fortress"
-  | "wonder";
+  | "wonder"
+  | "granary"
+  | "barracks"
+  | "lighthouse"
+  | "monastery"
+  | "watchtower"
+  | "courthouse"
+  | "printing_house"
+  | "cathedral";
 
 export interface BuildingDef {
   id: BuildingId;
@@ -194,6 +202,88 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     requiresTech: "architecture",
     isWonder: true,
     blurb: "A prestige project. Build enough to win an economic victory. (Architecture)",
+  },
+  granary: {
+    id: "granary",
+    name: "Granary",
+    cost: 14,
+    yield: { food: 2 },
+    popCapacity: 4,
+    unrest: 0,
+    requiresTech: "pottery",
+    blurb: "+2 food, +4 population capacity. (Pottery)",
+  },
+  barracks: {
+    id: "barracks",
+    name: "Barracks",
+    cost: 16,
+    yield: {},
+    popCapacity: 0,
+    unrest: 8,
+    requiresTech: "warcraft",
+    blurb: "-8 unrest — a drilled garrison keeps a martial town in order. (Warcraft)",
+  },
+  lighthouse: {
+    id: "lighthouse",
+    name: "Lighthouse",
+    cost: 20,
+    yield: { gold: 3, food: 1 },
+    popCapacity: 2,
+    unrest: 0,
+    requiresTech: "cartography",
+    requiresTerrain: "coast",
+    blurb: "+3 gold, +1 food, +2 population. Coast only. (Cartography)",
+  },
+  monastery: {
+    id: "monastery",
+    name: "Monastery",
+    cost: 20,
+    yield: { knowledge: 3 },
+    popCapacity: 0,
+    unrest: 6,
+    requiresTech: "scholasticism",
+    blurb: "+3 knowledge, -6 unrest — scholars and quiet order. (Scholasticism)",
+  },
+  watchtower: {
+    id: "watchtower",
+    name: "Watchtower",
+    cost: 18,
+    yield: {},
+    popCapacity: 0,
+    unrest: 3,
+    fortification: 1,
+    requiresTech: "castles",
+    blurb: "+1 fortification, -3 unrest — a watched, defended march. (Castles)",
+  },
+  courthouse: {
+    id: "courthouse",
+    name: "Courthouse",
+    cost: 24,
+    yield: {},
+    popCapacity: 0,
+    unrest: 14,
+    requiresTech: "common_law",
+    blurb: "-14 unrest — the king's law tames a restless province. (Common Law)",
+  },
+  printing_house: {
+    id: "printing_house",
+    name: "Printing House",
+    cost: 26,
+    yield: { knowledge: 6 },
+    popCapacity: 0,
+    unrest: 0,
+    requiresTech: "printing",
+    blurb: "+6 knowledge per turn — the press multiplies learning. (Printing)",
+  },
+  cathedral: {
+    id: "cathedral",
+    name: "Cathedral",
+    cost: 34,
+    yield: { knowledge: 2, gold: 1 },
+    popCapacity: 0,
+    unrest: 10,
+    requiresTech: "theology",
+    blurb: "+2 knowledge, +1 gold, -10 unrest — a seat of faith. (Theology)",
   },
 };
 

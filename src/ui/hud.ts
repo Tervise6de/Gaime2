@@ -71,6 +71,7 @@ import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
 import type { TurnSummary } from "@/systems/summary";
 import { deriveAlerts, type Alert } from "@/ui/alerts";
 import { researchFrontier, isBuildingUnlockedFor } from "@/systems/tech";
+import { eraIndexForTurn, eraByIndex } from "@/data/eras";
 import { ARCHETYPE_LABEL } from "@/data/personalities";
 import { eraForTurn, yearForTurn } from "@/data/eras";
 import { TRAITS } from "@/data/traits";
@@ -1019,7 +1020,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
   function openTechTree(): void {
     if (!lastPlayer) return;
-    renderTechTree(techOverlay, lastPlayer, callbacks, closeTechTree);
+    renderTechTree(techOverlay, lastPlayer, eraIndexForTurn(lastState?.turn ?? 1), callbacks, closeTechTree);
     techOverlay.style.display = "flex";
   }
   function closeTechTree(): void {
@@ -2000,12 +2001,12 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     // Rail badges: offers awaiting your answer; a research choice waiting.
     setBadge(diploRail.badge, state.offers.filter((o) => o.to === PLAYER_ID).length);
     const mustChoose =
-      !player.research.current && researchFrontier(player.research.done).length > 0;
+      !player.research.current && researchFrontier(player.research.done, eraIndexForTurn(state.turn)).length > 0;
     setBadge(researchRail.badge, mustChoose ? 1 : 0);
     researchRail.btn.classList.toggle("attention", mustChoose);
     // Keep an open tech tree in sync with the latest research state.
     if (techOverlay.style.display !== "none") {
-      renderTechTree(techOverlay, player, callbacks, closeTechTree);
+      renderTechTree(techOverlay, player, eraIndexForTurn(state.turn), callbacks, closeTechTree);
     }
     // Keep an open standings overlay live as turns resolve.
     if (standingsOverlay.style.display !== "none") renderStandingsOverlay();
@@ -2130,7 +2131,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       renderAttack(selectedRegionId);
     }
     renderDiplomacy(diploBody, state, callbacks);
-    renderResearch(researchBody, player, flow.knowledge, callbacks, openTechTree);
+    renderResearch(researchBody, player, flow.knowledge, eraIndexForTurn(state.turn), callbacks, openTechTree);
 
     if (state.outcome === "playing") {
       endDismissed = false; // re-arm the recap for the next decided game
@@ -3326,12 +3327,13 @@ function renderResearch(
   container: HTMLElement,
   player: Nation,
   knowledgeFlow: number,
+  era: number,
   callbacks: HudCallbacks,
   onOpenTree: () => void,
 ): void {
   container.innerHTML = "";
   const research = player.research;
-  const frontier = researchFrontier(research.done);
+  const frontier = researchFrontier(research.done, era);
   const mustChoose = !research.current && frontier.length > 0;
   const countText = `${research.done.length}/${Object.keys(TECHS).length} techs · ${player.wonders}/${WONDER_GOAL} wonders`;
 
@@ -3391,6 +3393,24 @@ function renderResearch(
     menu.append(b);
   }
   container.append(menu);
+
+  // The road ahead: a preview of the next age's techs, so the player sees what
+  // dawns when the age turns (and why they can't be picked yet).
+  const nextEraTechs = TECH_IDS.filter((t) => TECHS[t].era === era + 1 && !research.done.includes(t));
+  if (nextEraTechs.length) {
+    const nextEra = eraByIndex(era + 1);
+    const box = el("div", "hud-tech-locked");
+    const head = el("p", "hud-tech-locked-head");
+    head.innerHTML = `${glyphHtml("lock", "🔒")} Awaiting the ${escapeHtml(nextEra.name)}`;
+    box.append(head);
+    for (const id of nextEraTechs.slice(0, 6)) {
+      const def = TECHS[id];
+      const row = el("div", "hud-tech-locked-row");
+      row.innerHTML = `<span>${escapeHtml(def.name)}</span><span class="muted">${escapeHtml(def.blurb)}</span>`;
+      box.append(row);
+    }
+    container.append(box);
+  }
 }
 
 const TECH_BRANCHES: TechBranch[] = ["economy", "military", "civics", "wonders"];
@@ -3404,6 +3424,7 @@ const TECH_BRANCHES: TechBranch[] = ["economy", "military", "civics", "wonders"]
 function renderTechTree(
   container: HTMLElement,
   player: Nation,
+  era: number,
   callbacks: HudCallbacks,
   onClose: () => void,
 ): void {
@@ -3435,16 +3456,23 @@ function renderTechTree(
       const isDone = done.has(id);
       const isCurrent = current === id;
       const unlocked = def.requires.every((r) => done.has(r));
-      const available = !isDone && !isCurrent && unlocked;
-      const state = isDone ? "done" : isCurrent ? "current" : available ? "available" : "locked";
+      const ageReached = def.era <= era;
+      const available = !isDone && !isCurrent && unlocked && ageReached;
+      // A tech of a future age reads as age-locked (whether or not its prereqs
+      // are met), so the whole tree is legible by age at a glance.
+      const ageLocked = !isDone && !isCurrent && !ageReached;
+      const state = isDone ? "done" : isCurrent ? "current" : available ? "available" : ageLocked ? "agelocked" : "locked";
 
       const node = el("div", "hud-tt-node " + state);
       node.style.borderColor = BRANCH_COLOR[branch];
       const missing = def.requires.filter((r) => !done.has(r)).map((r) => TECHS[r].name);
-      node.title = def.blurb + (missing.length ? ` (needs ${missing.join(", ")})` : "");
+      node.title =
+        def.blurb +
+        (missing.length ? ` (needs ${missing.join(", ")})` : "") +
+        (ageLocked ? ` — awaits the ${eraByIndex(def.era).name}` : "");
       node.innerHTML =
-        `<span class="hud-tt-name">${isDone ? "✓ " : ""}${def.name}</span>` +
-        `<span class="hud-tt-meta">T${def.tier} · ${def.cost}${resourceIconHtml("knowledge", "📖")} · ${iconHtml(BRANCH_ART[def.branch], "")}</span>`;
+        `<span class="hud-tt-name">${isDone ? "✓ " : ""}${ageLocked ? "🔒 " : ""}${def.name}</span>` +
+        `<span class="hud-tt-meta">${eraByIndex(def.era).name.replace("Age of ", "")} · ${def.cost}${resourceIconHtml("knowledge", "📖")} · ${iconHtml(BRANCH_ART[def.branch], "")}</span>`;
       if (available) {
         node.addEventListener("click", () => {
           callbacks.onChooseResearch(id);
@@ -3458,7 +3486,7 @@ function renderTechTree(
   }
   panel.append(grid);
   panel.append(
-    line("✓ researched · glowing = in progress · bright = available · dim = locked", "hud-techtree-legend"),
+    line("✓ researched · glowing = in progress · bright = available · 🔒 = awaits its age · dim = locked", "hud-techtree-legend"),
   );
   container.append(panel);
 }

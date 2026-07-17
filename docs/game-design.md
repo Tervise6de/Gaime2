@@ -682,21 +682,21 @@ One focus per region is the whole trade-off.
   (granary, watchtower, guild, monastery); an optional **build queue** on Grand
   maps. AI does not yet set focuses (player tool for now).
 
-### 9.5 Research, ages & game length (bigger, era-realistic)
-Today: pick one of the frontier, flat; a ~15-node tree; 150-turn games. Planned
-(one big pillar):
-- **Era-gated research** — every tech belongs to an **age** (`data/eras.ts`); you
-  cannot research a tech before its age has dawned, so progression is historically
-  plausible (no crossbows in the Age of Founding). The frontier only offers
-  age-appropriate techs; reaching the next age unlocks its branch.
-- **A bigger tree + more content** — more techs spread across the ages, and the
-  **units / buildings** they unlock, so a full game is a longer arc of meaningful
-  choices (not everything researchable by turn 40).
-- **Longer games** — raise the turn limit to **~220** (a game "usually" runs 200+
-  turns), with era pacing tuned so the ages actually span the game.
-- **A tree with a destination** — present the tree by era, show **what each tech
-  unlocks** at the choice point, mark a **recommended** next tech, and let players
-  **queue** a short path.
+### 9.5 Research, ages & game length — SHIPPED v1 (v0.25)
+- **Era-gated research** — every tech carries an `era` (0-based age, `data/eras.ts`);
+  `researchFrontier(done, era)` / `canResearch` / `selectTech` refuse a tech before
+  its age has dawned, for both the player and the AI. No siege engines in the Age
+  of Founding. `eraLockedTechs` surfaces the road ahead.
+- **A bigger tree** — **30 techs across the five ages** (was ~16) with **8 new
+  buildings** (granary, barracks, lighthouse, monastery, watchtower, courthouse,
+  printing house, cathedral), so a full game is a long arc of choices.
+- **Longer games** — turn limit **150 → 220**, eras re-spaced to span it
+  (Founding 1, Banners 45, Crowns 90, Conquest 140, Legacy 185).
+- **A tree that reads by age** — the tech-tree overlay labels every node with its
+  age and marks future-age techs 🔒; the research drawer previews "Awaiting the
+  {next age}".
+- Still open: a **recommended** next tech and **queueing** a path; new **unit
+  types** (deferred — they ripple through `emptyUnits`/`armySize` widely).
 
 ### 9.6 Victory types (plan the win conditions)
 Today: domination (territory), Great Works (wonders), prestige (score at the

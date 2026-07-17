@@ -20,6 +20,7 @@ import { ARCHETYPES } from "@/data/personalities";
 import { TRAIT_IDS, type TraitId } from "@/data/traits";
 import { FACTIONS, factionByName } from "@/data/factions";
 import type { FocusId } from "@/data/focuses";
+import { eraIndexForTurn } from "@/data/eras";
 import { TECHS, type TechId } from "@/data/techs";
 import { generateMap, type MapGenOptions } from "@/systems/mapgen";
 import { scriptedMap } from "@/data/maps/types";
@@ -480,10 +481,11 @@ export function queueBuilding(
   return { ...state, regions };
 }
 
-/** Select the player's (or a nation's) current research. Pure. */
+/** Select the player's (or a nation's) current research. Age-gated. Pure. */
 export function chooseResearch(state: GameState, tech: TechId, nationId = PLAYER_ID): GameState {
+  const era = eraIndexForTurn(state.turn);
   const nations = state.nations.map((n) =>
-    n.id === nationId ? { ...n, research: selectTech(n.research, tech) } : n,
+    n.id === nationId ? { ...n, research: selectTech(n.research, tech, era) } : n,
   );
   return { ...state, nations };
 }

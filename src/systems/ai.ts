@@ -45,6 +45,7 @@ import {
   wouldJoinWar,
 } from "@/systems/diplomacy";
 import { researchFrontier, selectTech, isBuildingUnlockedFor } from "@/systems/tech";
+import { eraIndexForTurn } from "@/data/eras";
 import { TECHS, type TechId, type TechBranch } from "@/data/techs";
 import type { Rng } from "@/systems/rng";
 import {
@@ -92,7 +93,7 @@ function manageEconomy(state: GameState, nationId: number): GameState {
 
   // Research: keep a tech in progress, chosen by personality branch.
   if (!nation.research.current) {
-    const pick = pickTech(nation.research.done, nation);
+    const pick = pickTech(nation.research.done, nation, eraIndexForTurn(s.turn));
     if (pick) s = chooseTech(s, nationId, pick);
   }
 
@@ -183,8 +184,8 @@ export function preferredTechBranch(nation: Nation): TechBranch {
   }
 }
 
-function pickTech(done: TechId[], nation: Nation): TechId | null {
-  const frontier = researchFrontier(done);
+function pickTech(done: TechId[], nation: Nation, era: number): TechId | null {
+  const frontier = researchFrontier(done, era);
   if (!frontier.length) return null;
   // Prefer the trait-driven branch, then the personality branch, then anything.
   const traitBranch = preferredTechBranch(nation);
@@ -235,8 +236,9 @@ export function chooseBuilding(
 }
 
 function chooseTech(state: GameState, nationId: number, tech: TechId): GameState {
+  const era = eraIndexForTurn(state.turn);
   const nations = state.nations.map((n) =>
-    n.id === nationId ? { ...n, research: selectTech(n.research, tech) } : n,
+    n.id === nationId ? { ...n, research: selectTech(n.research, tech, era) } : n,
   );
   return { ...state, nations };
 }

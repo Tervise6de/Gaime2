@@ -57,17 +57,32 @@ export function isUnitUnlockedFor(done: TechId[], unit: UnitType): boolean {
   return !req || done.includes(req);
 }
 
-/** Techs available to research now: prerequisites met, not already done. */
-export function researchFrontier(done: TechId[]): TechId[] {
+/**
+ * Techs available to research now: prerequisites met, not already done, and —
+ * when `era` (the current 0-based age index) is given — not gated to a later
+ * age. Omitting `era` ignores the age gate (used where only prereqs matter).
+ */
+export function researchFrontier(done: TechId[], era?: number): TechId[] {
   const set = new Set(done);
   return TECH_IDS.filter(
-    (id) => !set.has(id) && TECHS[id].requires.every((r) => set.has(r)),
+    (id) =>
+      !set.has(id) &&
+      TECHS[id].requires.every((r) => set.has(r)) &&
+      (era === undefined || TECHS[id].era <= era),
   );
 }
 
-/** Whether a tech can be selected for research right now. */
-export function canResearch(done: TechId[], tech: TechId): boolean {
-  return researchFrontier(done).includes(tech);
+/** Techs whose prerequisites are met but whose age has not yet dawned (locked). */
+export function eraLockedTechs(done: TechId[], era: number): TechId[] {
+  const set = new Set(done);
+  return TECH_IDS.filter(
+    (id) => !set.has(id) && TECHS[id].requires.every((r) => set.has(r)) && TECHS[id].era > era,
+  );
+}
+
+/** Whether a tech can be selected for research right now (prereqs + age gate). */
+export function canResearch(done: TechId[], tech: TechId, era?: number): boolean {
+  return researchFrontier(done, era).includes(tech);
 }
 
 export interface ResearchStep {
@@ -97,9 +112,9 @@ export function advanceResearch(research: Research, knowledge: number): Research
   return { research: { ...research, progress: round1(progress) }, completed: null };
 }
 
-/** Select a tech to research (keeps banked progress). */
-export function selectTech(research: Research, tech: TechId): Research {
-  if (!canResearch(research.done, tech)) return research;
+/** Select a tech to research (keeps banked progress). Age-gated when `era` given. */
+export function selectTech(research: Research, tech: TechId, era?: number): Research {
+  if (!canResearch(research.done, tech, era)) return research;
   return { ...research, current: tech };
 }
 
