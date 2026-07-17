@@ -670,6 +670,92 @@ body {
   vertical-align: -3px;
 }
 
+/* --- Map lenses: the CIV5-style view-filter strip, floated bottom-centre ---- */
+.hud-lensbar {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  max-width: calc(100vw - 540px);
+  flex-wrap: wrap;
+  justify-content: center;
+  background: var(--panel-grad);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  box-shadow: var(--panel-shadow);
+  pointer-events: auto;
+}
+
+.hud-lens-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 6px 0 2px;
+}
+
+.hud-lens-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.hud-lens-btn:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.hud-lens-btn.active {
+  border-color: var(--accent);
+  background: rgba(244, 210, 122, 0.16);
+}
+
+.hud-lens-btn .ico-svg svg,
+.hud-lens-btn .ico {
+  width: 15px;
+  height: 15px;
+}
+
+.hud-lens-scale {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 6px;
+  margin-left: 2px;
+  border-left: 1px solid var(--panel-border);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.hud-lens-ramp {
+  display: inline-block;
+  width: 84px;
+  height: 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+@media (max-width: 1100px) {
+  .hud-lensbar {
+    max-width: calc(100vw - 40px);
+  }
+}
+
 .hud-gamemenu-btn {
   padding: 7px 12px;
   font-size: 12px;

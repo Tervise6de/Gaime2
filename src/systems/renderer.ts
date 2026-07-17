@@ -64,6 +64,8 @@ export const WAR_EDGE_COLOR = "rgba(232, 119, 107, 0.6)";
 const CELL_EDGE_COLOR = "rgba(13, 15, 20, 0.38)";
 /** Marker layout radius: the footprint each region's marker stack occupies. */
 const NODE_RADIUS = 26;
+/** Fill opacity for map-lens heat (strong enough to read over terrain). */
+const LENS_ALPHA = 0.82;
 const SELECT_COLOR = "#f4d27a";
 const HIGHLIGHT_COLOR = "#63c7d6";
 const NEUTRAL_OWNER = "rgba(0,0,0,0.35)";
@@ -80,6 +82,12 @@ export interface Renderer {
   setSelected(regionId: number | null): void;
   /** Regions to highlight as move/attack targets. */
   setHighlights(regionIds: number[]): void;
+  /**
+   * Map-lens overlay: a per-region-id array of fill colours that recolours the
+   * board by a metric (population, income, unrest), or null for the political
+   * default. Baked into the political layer, so it reads at any zoom.
+   */
+  setLens(colors: (string | null)[] | null): void;
   /** Remap owner colours to the colour-blind-safe palette (or back). */
   setColourblind(on: boolean): void;
   /** Suppress cosmetic motion (capture ripples) when true. */
@@ -261,6 +269,10 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   // Political ink layer — rebuilt only when ownership, wars or palette change.
   let politicalLayer: HTMLCanvasElement | null = null;
   let politicalSig = "";
+  // Active map lens: per-region-id fill colours (or null = political default).
+  // Baked into the political layer; its signature triggers the rebake.
+  let lensColors: (string | null)[] | null = null;
+  let lensSig = "";
   // Composite of ocean+terrain+political: the per-frame cost is ONE blit, not
   // three. Recomposited (three offscreen blits, no re-drawing) when any part
   // rebuilds.
@@ -777,7 +789,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         if (!a.isBarbarian && !b.isBarbarian && atWar(s, a.id, b.id)) wars += `${a.id}:${b.id},`;
       }
     }
-    return `${layerBaseSig()}|${acc}|${wars}|${colourblind ? 1 : 0}`;
+    return `${layerBaseSig()}|${acc}|${wars}|${colourblind ? 1 : 0}|L${lensSig}`;
   }
 
   /**
@@ -827,6 +839,33 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     g.clip(proj.land);
     g.lineJoin = "round";
     g.lineCap = "round";
+
+    // Map lens active: recolour every region by its metric heat, then thin dark
+    // separators between all regions (owner-agnostic — each is its own cell).
+    // The owner washes/rims/war-fronts are skipped so the heat reads cleanly.
+    if (lensColors) {
+      s.regions.forEach((region, i) => {
+        const c = lensColors![region.id] ?? POLITICAL.neutralWash;
+        g.globalAlpha = LENS_ALPHA;
+        g.fillStyle = c;
+        g.fill(proj.paths[i]!);
+      });
+      g.globalAlpha = 1;
+      const seps: Point[][] = [];
+      for (let i = 0; i < s.regions.length; i++) {
+        const cell = organic[i]!;
+        for (let k = 0; k < cell.neighbor.length; k++) {
+          const j = cell.neighbor[k]!;
+          if (j < 0 || j < i) continue; // each shared edge once
+          seps.push(proj.edgesPx[i]![k]!);
+        }
+      }
+      g.strokeStyle = POLITICAL.core;
+      g.lineWidth = POLITICAL.coreWidth;
+      strokePolylines(seps);
+      g.restore();
+      return cv;
+    }
 
     const playerId = s.nations.find((n) => n.isPlayer)?.id ?? -1;
 
@@ -1913,6 +1952,13 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     },
     setHighlights(regionIds: number[]): void {
       highlights = new Set(regionIds);
+      needsPaint = true;
+    },
+    setLens(colors: (string | null)[] | null): void {
+      const sig = colors ? colors.map((c) => c ?? "-").join(",") : "";
+      if (sig === lensSig) return; // unchanged — skip the rebake
+      lensColors = colors;
+      lensSig = sig;
       needsPaint = true;
     },
     setColourblind(on: boolean): void {

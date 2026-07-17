@@ -642,13 +642,15 @@ round's loser always shedding ≥1 regiment so fights converge. Outcomes are
   battle vs. attack **sequentially** (current) — likely a pre-battle merge at a
   staging region with single-battle resolution.
 
-### 9.3 Map lenses (Civ-style overlays)
-Toggleable map overlays so the board is readable at a glance without clicking
-each region: **Unrest lens** (heat over your regions), **Military lens** (which
-armies still have moves; enemy strength near your borders), **Political lens**
-(relations coloured — allies green, enemies red), **Development lens** (what
-each region produces / is building). One hotkey cycles; the active lens tints
-the cached political layer. Complements the existing advisor chips.
+### 9.3 Map lenses (Civ-style overlays) — SHIPPED (`ui/lenses.ts`)
+Toggleable map filters so the board is readable at a glance without clicking
+each region. A floated lens strip (bottom-centre) offers **Political** (owners,
+the default), **Population**, **Gold / Materials / Food income**, and **Unrest**
+— each recolours every region by a normalised heat ramp with a low→high scale
+legend; `M` cycles them. Colours are computed pure in `ui/lenses.ts` and baked
+into the renderer's political layer (`setLens`), so the heat reads at any zoom.
+Later, optionally: a **Military lens** (army moves / border threat) and a
+**Political-relations lens** (allies green, enemies red).
 
 ### 9.4 Region development & focus (the Civ city layer)
 Today: one build slot, a short shared building list. Planned depth without
@@ -688,7 +690,8 @@ path" warning, so no one wins or loses a path invisibly.
    Europe geography, historical homelands, Play-as picker.
 2. ✅ **Combat v2 + report** (9.2) — shipped: phased volley/melee, unit volley
    roles, replayable battle report.
-3. **Map lenses** (9.3) — makes the wider Baltic board readable.
+3. ✅ **HUD overhaul + map lenses** (9.3) — shipped: top-bar nav, Politics page,
+   redesigned region panel, and CIV5-style population/income/unrest map filters.
 4. **Diplomacy opinion** (9.1) — the CK3 pillar.
 5. **Region focus + buildings** (9.4) and **research tree** (9.5) — the Civ depth.
 6. **Victory-type pass** (9.6) — once focus/culture exist to hang a path on.

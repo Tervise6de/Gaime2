@@ -26,6 +26,7 @@ import { showMainMenu } from "@/ui/title";
 import { runTutorial, hasSeenTutorial } from "@/ui/tutorial";
 import { play, outcomeCue, armAmbientOnGesture } from "@/ui/audio";
 import { applyDisplaySettings, isColourblind, isReduceMotion, isCombatReport } from "@/ui/settings";
+import { lensColorsFor, type LensId } from "@/ui/lenses";
 import { recordGameEnd } from "@/ui/profile";
 import { ACHIEVEMENTS } from "@/data/achievements";
 import "@/ui/style.css";
@@ -50,6 +51,7 @@ function main(): void {
   let selectedRegion: number | null = null;
   let moveArmyId: number | null = null;
   let lastSummary: TurnSummary | null = null;
+  let activeLens: LensId = "none";
 
   // First-ever session: the coached tour is the primary onboarding, so retire the
   // legacy first-run hints box (still on 💡 Help) *before* the HUD reads the flag.
@@ -229,6 +231,10 @@ function main(): void {
     onSetReduceMotion(on) {
       renderer.setReduceMotion(on);
     },
+    onLensChange(lens) {
+      activeLens = lens;
+      refreshLens();
+    },
   });
 
   // Map-marker hovers (shield, crest, pop chip…) surface as a HUD tooltip.
@@ -361,7 +367,13 @@ function main(): void {
     renderer.setState(state);
     renderer.setSelected(selectedRegion);
     renderer.setHighlights(highlights());
+    refreshLens(); // keep the active map lens' heat in step with the state
     hud.update(state, selectedRegion, moveArmyId, lastSummary);
+  }
+
+  /** Recolour the map for the active lens (null clears it → political default). */
+  function refreshLens(): void {
+    renderer.setLens(lensColorsFor(state, activeLens));
   }
 
   function highlights(): number[] {

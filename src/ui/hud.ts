@@ -32,6 +32,7 @@ import {
   setCombatReport,
 } from "@/ui/settings";
 import type { BattleReport } from "@/systems/combat";
+import { LENSES, lensGradient, type LensId } from "@/ui/lenses";
 import { cbSafe } from "@/data/palette";
 import { OCEAN } from "@/data/mapstyle";
 import { badgeArt, BRANCH_ART, crestSvg, eventVignette, MOMENT_ART, safeColor, TERRAIN_ART, TREATY_ART } from "@/data/art";
@@ -139,6 +140,8 @@ export interface HudCallbacks {
   onSetColourblind(on: boolean): void;
   /** Reduce-motion toggled — the parent tells the renderer to suppress motion. */
   onSetReduceMotion(on: boolean): void;
+  /** Map lens changed — the parent recolours the board by the chosen metric. */
+  onLensChange(lens: LensId): void;
 }
 
 const BRANCH_COLOR: Record<string, string> = {
@@ -558,6 +561,53 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   }
   function closePolitics(): void {
     politicsOverlay.style.display = "none";
+  }
+
+  // --- Map lenses: recolour the board by a metric (CIV5-style overlays) ------
+  // A compact strip of view buttons floats at the bottom of the map; the active
+  // lens is echoed by main.ts into the renderer, which bakes the heat in.
+  let activeLens: LensId = "none";
+  const lensBar = el("div", "hud-lensbar");
+  const lensLabel = el("span", "hud-lens-title");
+  lensLabel.textContent = "Map";
+  lensBar.append(lensLabel);
+  const lensBtns = new Map<LensId, HTMLButtonElement>();
+  for (const lens of LENSES) {
+    const b = document.createElement("button");
+    b.className = "hud-lens-btn";
+    // Resource lenses use the resource icon; the rest use a map glyph.
+    const isResource = lens.id === "gold" || lens.id === "materials" || lens.id === "food";
+    const icon = isResource
+      ? resourceIconHtml(lens.id as "gold" | "materials" | "food", lens.fallback)
+      : glyphHtml(lens.glyph as Parameters<typeof glyphHtml>[0], lens.fallback);
+    b.innerHTML = `${icon}<span class="ico-label">${escapeHtml(lens.label)}</span>`;
+    b.title = lens.hint;
+    b.addEventListener("click", () => setLens(lens.id));
+    lensBtns.set(lens.id, b);
+    lensBar.append(b);
+  }
+  const lensScale = el("div", "hud-lens-scale");
+  lensScale.style.display = "none";
+  lensScale.innerHTML = `<span>low</span><i class="hud-lens-ramp"></i><span>high</span>`;
+  lensBar.append(lensScale);
+  root.append(lensBar);
+  lensBtns.get("none")?.classList.add("active"); // political is the default view
+
+  function setLens(id: LensId): void {
+    activeLens = id;
+    for (const [lid, b] of lensBtns) b.classList.toggle("active", lid === id);
+    const grad = lensGradient(id);
+    lensScale.style.display = grad ? "flex" : "none";
+    if (grad) {
+      const ramp = lensScale.querySelector<HTMLElement>(".hud-lens-ramp");
+      if (ramp) ramp.style.background = grad;
+    }
+    callbacks.onLensChange(id);
+  }
+  /** Step to the next lens (keyboard M) — cycles Political → … → Unrest → back. */
+  function cycleLens(): void {
+    const i = LENSES.findIndex((l) => l.id === activeLens);
+    setLens(LENSES[(i + 1) % LENSES.length]!.id);
   }
 
   // --- Game menu overlay: the administrative controls, out of the way --------
@@ -1851,6 +1901,9 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       ev.preventDefault();
       if (politicsOverlay.style.display === "none") openPolitics();
       else closePolitics();
+    } else if (key === "m") {
+      ev.preventDefault();
+      cycleLens();
     } else if (ev.key === "Escape") {
       if (lastMoveArmy !== null) callbacks.onCancelMove(); // abort picking a destination
       closeTechTree();
