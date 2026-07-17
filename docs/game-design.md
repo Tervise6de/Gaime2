@@ -698,18 +698,16 @@ One focus per region is the whole trade-off.
 - Still open: a **recommended** next tech and **queueing** a path; new **unit
   types** (deferred — they ripple through `emptyUnits`/`armySize` widely).
 
-### 9.6 Victory types (plan the win conditions)
-Today: domination (territory), Great Works (wonders), prestige (score at the
-turn limit). Planned — make each a real, legible race with its own progress and
-flavour fitting the setting:
-- **Domination / Conquest** — hold X% of the land, or eliminate all rivals.
-- **Great Works** — complete N wonders (cathedrals, universities, great halls).
-- **Prestige** — highest score at the turn limit (the timed default).
-- **Faith / Culture (new, tentative)** — a Christianisation/cultural-sway path
-  fitting the Northern-Crusades setting: convert or culturally dominate a
-  threshold of regions. To be specced with the region-focus work.
-Each victory shows a dedicated progress readout and a "closest rival on this
-path" warning, so no one wins or loses a path invisibly.
+### 9.6 Victory types — SHIPPED v1 (v0.26)
+The three paths (Domination / Great Works / Prestige) are now a **legible race**.
+`victoryRaces()` (pure, in `systems/victory.ts`) reports, per path, *your* standing
+and the **leading rival's**, each 0..1 toward the win, plus an `alarm` when a rival
+is dangerously close. The Politics page renders all three as paired bars — you (gold)
+vs the top rival (red) — with the goal, live values, and a "⚠ {rival} is closing on
+this victory" warning. No path is won or lost invisibly.
+- Still open: a **Faith / Culture** path fitting the Northern-Crusades setting
+  (convert/culturally-dominate a threshold of regions) — to spec alongside the
+  region-focus layer.
 
 ### 9.7 Suggested build sequence
 1. ✅ **Real Baltic map** (9.0 scripted-map mode) — shipped: scripted Baltic +

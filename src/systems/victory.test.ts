@@ -133,3 +133,33 @@ describe("victoryProgress", () => {
     expect(victoryProgress(g, PLAYER_ID).fraction).toBe(1);
   });
 });
+
+import { victoryRaces } from "@/systems/victory";
+
+describe("victoryRaces (the legible three-path readout)", () => {
+  it("reports all three paths with you and the leading rival", () => {
+    const races = victoryRaces(createGame({ seed: 3, rivals: 3 }));
+    expect(races.map((r) => r.kind)).toEqual(["domination", "great works", "prestige"]);
+    for (const r of races) {
+      expect(r.you.fraction).toBeGreaterThanOrEqual(0);
+      expect(r.you.fraction).toBeLessThanOrEqual(1);
+      expect(r.rival).not.toBeNull(); // rivals exist in this game
+    }
+  });
+
+  it("raises the great-works fraction as the player builds wonders", () => {
+    const g = createGame({ seed: 3, rivals: 2 });
+    const before = victoryRaces(g).find((r) => r.kind === "great works")!.you.fraction;
+    g.nations[PLAYER_ID]!.wonders = WONDER_GOAL - 1;
+    const after = victoryRaces(g).find((r) => r.kind === "great works")!.you.fraction;
+    expect(after).toBeGreaterThan(before);
+  });
+
+  it("flags an alarm when a rival is one wonder from winning", () => {
+    const g = createGame({ seed: 3, rivals: 2 });
+    g.nations[2]!.wonders = WONDER_GOAL - 1;
+    const gw = victoryRaces(g).find((r) => r.kind === "great works")!;
+    expect(gw.alarm).toBe(true);
+    expect(gw.rival?.value).toContain(`${WONDER_GOAL - 1}`);
+  });
+});

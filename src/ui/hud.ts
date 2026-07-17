@@ -66,7 +66,7 @@ import {
   unitCost,
 } from "@/systems/military";
 import { getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, nationPower, hasTrade, tradeIncome, opinionReasons, foreignRelations, TRIBUTE_DEMAND } from "@/systems/diplomacy";
-import { nationScore, victoryProgress, endGameSummary } from "@/systems/victory";
+import { nationScore, victoryProgress, victoryRaces, endGameSummary } from "@/systems/victory";
 import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
 import type { TurnSummary } from "@/systems/summary";
 import { deriveAlerts, type Alert } from "@/ui/alerts";
@@ -2860,36 +2860,48 @@ function buildLegend(): HTMLElement {
  * The domination math mirrors `checkVictory` exactly. Flags a rival nearing it.
  */
 function renderVictoryProgress(elm: HTMLElement, state: GameState): void {
-  const total = state.regions.filter((r) => r.ownerId !== null).length || 1;
-  let leader: Nation | null = null;
-  let leaderRegions = -1;
-  for (const n of state.nations) {
-    if (n.isBarbarian || !n.alive) continue;
-    const held = state.regions.filter((r) => r.ownerId === n.id).length;
-    if (held > leaderRegions) {
-      leaderRegions = held;
-      leader = n;
+  elm.innerHTML = "";
+  const races = victoryRaces(state);
+  elm.classList.toggle("threat", races.some((r) => r.alarm));
+
+  for (const race of races) {
+    const card = el("div", "hud-vrace" + (race.alarm ? " alarm" : ""));
+    const head = el("div", "hud-vrace-head");
+    const title = el("span", "hud-vrace-title");
+    title.innerHTML = `${glyphHtml("victory", "🏆")} ${escapeHtml(race.title)}`;
+    const goal = el("span", "hud-vrace-goal");
+    goal.textContent = race.goal;
+    head.append(title, goal);
+    card.append(head);
+
+    // Your progress bar.
+    card.append(vraceBar("You", race.you.value, race.you.fraction, true));
+    // The leading rival's, if any.
+    if (race.rival) {
+      card.append(vraceBar(race.rival.name, race.rival.value, race.rival.fraction, false));
     }
+    if (race.alarm && race.rival) {
+      const warn = el("p", "hud-vrace-warn");
+      warn.innerHTML = `${glyphHtml("warning", "⚠")} ${escapeHtml(race.rival.name)} is closing on this victory.`;
+      card.append(warn);
+    }
+    elm.append(card);
   }
-  const share = Math.max(0, leaderRegions) / total;
-  const towardGoal = Math.min(100, Math.round((share / DOMINATION_FRACTION) * 100));
-  const leaderName = leader ? (leader.isPlayer ? "You" : leader.name) : "—";
-  const player = playerNation(state);
-  // Nation names can come from an imported save — escape before HTML interpolation.
-  elm.innerHTML =
-    `${glyphHtml("victory", "🏆")} ${escapeHtml(leaderName)} ${leader?.isPlayer ? "lead" : "leads"} · ` +
-    `${towardGoal}% to domination  ·  ` +
-    `${glyphHtml("star", "⭐")} ${player.wonders}/${WONDER_GOAL}  ·  ` +
-    `${glyphHtml("hourglass", "⏳")} ${state.turn}/${TURN_LIMIT}`;
-  elm.title =
-    "The victory race — three ways the game ends:\n" +
-    `· Domination: hold ${Math.round(DOMINATION_FRACTION * 100)}% of all claimed land. ` +
-    `${escapeHtml(leaderName)} ${leader?.isPlayer ? "hold" : "holds"} the most (${leaderRegions} of ${total} regions — ` +
-    `${towardGoal}% of the way there). Every realm starts with land, so this never reads zero.\n` +
-    `· Great Works: complete ${WONDER_GOAL} (you: ${player.wonders}).\n` +
-    `· Prestige: highest score when turn ${TURN_LIMIT} ends.`;
-  const rivalNearing = !!leader && !leader.isPlayer && share >= DOMINATION_FRACTION - 0.12;
-  elm.classList.toggle("threat", rivalNearing);
+}
+
+/** One labelled progress bar inside a victory race (you = accent, rival = red). */
+function vraceBar(name: string, value: string, fraction: number, isYou: boolean): HTMLElement {
+  const row = el("div", "hud-vrace-row" + (isYou ? " you" : ""));
+  const lab = el("span", "hud-vrace-name");
+  lab.textContent = name;
+  const bar = el("div", "hud-vrace-bar");
+  const fill = el("div", "hud-vrace-fill");
+  fill.style.width = `${Math.round(Math.max(0, Math.min(1, fraction)) * 100)}%`;
+  bar.append(fill);
+  const val = el("span", "hud-vrace-val");
+  val.textContent = value;
+  row.append(lab, bar, val);
+  return row;
 }
 
 /**

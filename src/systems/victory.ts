@@ -62,6 +62,79 @@ export function victoryProgress(state: GameState, id: number): VictoryProgress {
   return { kind: "domination", label: `${Math.round(domShare * 100)}%⬢`, fraction: domFraction };
 }
 
+/** One victory path as a legible race: your standing vs the leading rival's. */
+export interface VictoryRace {
+  kind: "domination" | "great works" | "prestige";
+  title: string;
+  /** What winning this path takes. */
+  goal: string;
+  you: { value: string; fraction: number };
+  /** The rival nearest to winning this path (null if no living rival). */
+  rival: { name: string; value: string; fraction: number } | null;
+  /** A rival is dangerously close to this win — surface a warning. */
+  alarm: boolean;
+}
+
+/**
+ * The three victory paths as side-by-side races (you vs the leading rival on
+ * each), for the Politics readout. Pure; fractions are 0..1 toward the win.
+ */
+export function victoryRaces(state: GameState): VictoryRace[] {
+  const living = state.nations.filter((n) => !n.isBarbarian && n.alive);
+  const rivals = living.filter((n) => !n.isPlayer);
+  const total = state.regions.filter((r) => r.ownerId !== null).length || 1;
+  const player = state.nations[PLAYER_ID];
+  const held = (id: number): number => state.regions.filter((r) => r.ownerId === id).length;
+  const topRival = (val: (n: (typeof rivals)[number]) => number): { n: (typeof rivals)[number]; v: number } | null => {
+    let best: { n: (typeof rivals)[number]; v: number } | null = null;
+    for (const n of rivals) {
+      const v = val(n);
+      if (!best || v > best.v) best = { n, v };
+    }
+    return best;
+  };
+
+  const domShare = (id: number): number => held(id) / total;
+  const pDom = domShare(PLAYER_ID);
+  const rDom = topRival((n) => domShare(n.id));
+
+  const pW = player?.wonders ?? 0;
+  const rW = topRival((n) => n.wonders);
+
+  const pScore = nationScore(state, PLAYER_ID);
+  const rScore = topRival((n) => nationScore(state, n.id));
+  const maxScore = Math.max(pScore, rScore?.v ?? 0, 1);
+
+  return [
+    {
+      kind: "domination",
+      title: "Domination",
+      goal: `Hold ${Math.round(DOMINATION_FRACTION * 100)}% of the land`,
+      you: { value: `${Math.round(pDom * 100)}%`, fraction: Math.min(1, pDom / DOMINATION_FRACTION) },
+      rival: rDom
+        ? { name: rDom.n.name, value: `${Math.round(rDom.v * 100)}%`, fraction: Math.min(1, rDom.v / DOMINATION_FRACTION) }
+        : null,
+      alarm: !!rDom && rDom.v >= DOMINATION_FRACTION - 0.12,
+    },
+    {
+      kind: "great works",
+      title: "Great Works",
+      goal: `Complete ${WONDER_GOAL} wonders`,
+      you: { value: `${pW}/${WONDER_GOAL}`, fraction: Math.min(1, pW / WONDER_GOAL) },
+      rival: rW ? { name: rW.n.name, value: `${rW.v}/${WONDER_GOAL}`, fraction: Math.min(1, rW.v / WONDER_GOAL) } : null,
+      alarm: !!rW && rW.v > 0 && rW.v >= WONDER_GOAL - 1,
+    },
+    {
+      kind: "prestige",
+      title: `Prestige · turn ${state.turn}/${TURN_LIMIT}`,
+      goal: `Lead in score when turn ${TURN_LIMIT} ends`,
+      you: { value: `${pScore}`, fraction: pScore / maxScore },
+      rival: rScore ? { name: rScore.n.name, value: `${rScore.v}`, fraction: rScore.v / maxScore } : null,
+      alarm: !!rScore && rScore.v > pScore && state.turn >= TURN_LIMIT - 25,
+    },
+  ];
+}
+
 export interface VictoryCheck {
   outcome: "victory" | "defeat";
   kind: string;
