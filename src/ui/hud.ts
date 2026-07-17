@@ -2156,10 +2156,10 @@ function renderRegion(
   const meta = el("p", "hud-region-meta");
   // Nation names can come from an imported save — escape every name that lands
   // in this innerHTML (terrain names are data-table constants but escaping is harmless).
+  // Population gets its own bar below; the meta line stays a terse identity strip.
   const bits = [
     escapeHtml(terrain.name),
     escapeHtml(ownerName),
-    `pop ${popDisplay(region.population)} / ${popDisplay(regionCapacity(region))}`,
   ];
   // The held capital of its owner (crown falls with the seat, as on the map).
   const capitalOf = state.nations.find(
@@ -2198,11 +2198,103 @@ function renderRegion(
   stats.append(defStat, unrestStat, garrisonStat);
   container.append(stats);
 
+  // Population, its own bar — a legible read of "how full is this province?".
+  container.append(populationBlock(region));
+
   if (owned) {
     renderOwnedRegion(container, state, region, moveArmyId, callbacks);
   } else {
     renderEnemyRegion(container, state, region, openAttack);
   }
+}
+
+/** Population vs. its sustainable cap, as a labelled bar (shown for any region). */
+function populationBlock(region: Region): HTMLElement {
+  const cap = regionCapacity(region);
+  const frac = cap > 0 ? Math.min(1, region.population / cap) : 0;
+  const wrap = el("div", "hud-popblock");
+  wrap.title =
+    `Population: ${popDisplay(region.population)} of a sustainable ${popDisplay(cap)}. ` +
+    "A food surplus grows it toward the cap; farms, harbours and aqueducts raise the cap.";
+  const label = el("div", "hud-popblock-label");
+  label.innerHTML =
+    `Population <span class="hud-popblock-val">${popDisplay(region.population)} / ${popDisplay(cap)}</span>`;
+  const bar = el("div", "hud-popbar");
+  const fill = el("div", "hud-popbar-fill");
+  fill.style.width = `${Math.round(frac * 100)}%`;
+  // Near the cap reads amber (growth stalling); comfortable headroom reads green.
+  fill.style.background = frac >= 0.98 ? "#e0b74a" : "#6fae7f";
+  bar.append(fill);
+  wrap.append(label, bar);
+  return wrap;
+}
+
+/** A small uppercase divider inside the region panel ("Income / turn"). */
+function regionSubhead(text: string): HTMLElement {
+  const h = el("div", "hud-region-subhead");
+  h.textContent = text;
+  return h;
+}
+
+/** One building's effect, compact ("+3 food · +4 cap"). */
+function buildingEffect(def: (typeof BUILDINGS)[BuildingId]): string {
+  const parts: string[] = [];
+  for (const [k, v] of Object.entries(def.yield)) if (v) parts.push(`+${v} ${k}`);
+  if (def.popCapacity) parts.push(`+${def.popCapacity} cap`);
+  if (def.unrest) parts.push(`−${def.unrest} unrest`);
+  if (def.fortification) parts.push(`+${def.fortification} fort`);
+  return parts.join(" · ") || "prestige";
+}
+
+/**
+ * The collapsible Buildings tab: every building this region has raised, with
+ * its effect, and the region's fortification level. Duplicates (should they
+ * ever occur) collapse to a ×N count — a light stand-in for building levels.
+ * Collapsed by default so the panel stays short until you want the detail.
+ */
+function buildingsSection(region: Region): HTMLElement {
+  const details = document.createElement("details");
+  details.className = "hud-buildings";
+  const summary = document.createElement("summary");
+  summary.className = "hud-buildings-summary";
+  const n = region.buildings.length;
+  summary.innerHTML =
+    `${glyphHtml("hammer", "🔨")} Buildings <span class="hud-buildings-count">${n}</span>`;
+  details.append(summary);
+
+  const list = el("div", "hud-buildings-list");
+  if (n === 0) {
+    const empty = el("p", "hud-hint");
+    empty.style.margin = "0";
+    empty.textContent = "No buildings yet — queue one below.";
+    list.append(empty);
+  } else {
+    const counts = new Map<BuildingId, number>();
+    for (const b of region.buildings) counts.set(b, (counts.get(b) ?? 0) + 1);
+    for (const [id, count] of counts) {
+      const def = BUILDINGS[id];
+      const row = el("div", "hud-building-row");
+      const name = el("span", "hud-building-name");
+      name.innerHTML =
+        `${buildingIconHtml(id, "▪")}${escapeHtml(def.name)}${count > 1 ? ` ×${count}` : ""}`;
+      const eff = el("span", "hud-building-eff");
+      eff.textContent = buildingEffect(def);
+      row.append(name, eff);
+      list.append(row);
+    }
+  }
+  // Fortification is a defensive "level" the region carries — show it here too.
+  if (region.fortification > 0) {
+    const row = el("div", "hud-building-row");
+    const name = el("span", "hud-building-name");
+    name.innerHTML = `${glyphHtml("shield", "🛡")}Fortification`;
+    const eff = el("span", "hud-building-eff");
+    eff.textContent = `level ${region.fortification}`;
+    row.append(name, eff);
+    list.append(row);
+  }
+  details.append(list);
+  return details;
 }
 
 /**
@@ -2304,13 +2396,15 @@ function renderOwnedRegion(
   }
 
   // Production breakdown — each row's tooltip attributes the yield to the tech,
-  // trait and modifier multipliers folded into this region's output.
+  // trait and modifier multipliers folded into this region's output. Icon +
+  // name + value, so the income reads at a glance.
+  container.append(regionSubhead("Income / turn"));
   const table = el("div", "hud-region-flows");
   for (const key of RESOURCE_KEYS) {
     const row = el("div", "hud-region-flow");
     row.title = flowTooltip(key, player, region);
-    const k = el("span", "");
-    k.textContent = RESOURCE_META[key].label;
+    const k = el("span", "hud-region-flow-name");
+    k.innerHTML = `${resourceIconHtml(key, RESOURCE_META[key].icon)}${RESOURCE_META[key].label}`;
     const v = el("span", "hud-region-flow-val");
     const value = flow[key];
     v.textContent = `${value >= 0 ? "+" : ""}${fmt(value)}`;
@@ -2320,11 +2414,9 @@ function renderOwnedRegion(
   }
   container.append(table);
 
-  if (region.buildings.length) {
-    const built = el("p", "hud-region-built");
-    built.textContent = "Built: " + region.buildings.map((b) => BUILDINGS[b].name).join(", ");
-    container.append(built);
-  }
+  // Buildings: a collapsed-by-default tab listing what's built and each one's
+  // effect (its "level" of benefit), plus the region's fortification level.
+  container.append(buildingsSection(region));
 
   // Army in the region.
   const army = armyAt(state, region.id, PLAYER_ID);

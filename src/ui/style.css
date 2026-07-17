@@ -834,8 +834,8 @@ body {
 .hud-right {
   right: 12px;
   top: 66px;
-  width: 282px;
-  max-height: calc(100vh - 320px);
+  width: 324px;
+  max-height: calc(100vh - 250px);
   overflow-y: auto;
 }
 
@@ -1203,7 +1203,23 @@ body {
 .hud-region-flow {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   font-size: 13px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.hud-region-flow-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.hud-region-flow-name .ico-svg svg,
+.hud-region-flow-name .ico {
+  width: 15px;
+  height: 15px;
 }
 
 .hud-region-flow-val {
@@ -1214,6 +1230,137 @@ body {
 
 .hud-region-flow-val.negative {
   color: var(--negative);
+}
+
+/* Small uppercase divider inside the region panel ("Income / turn"). */
+.hud-region-subhead {
+  margin: 12px 0 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Population vs. cap, as a labelled bar. */
+.hud-popblock {
+  margin: 2px 0 10px;
+}
+
+.hud-popblock-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.hud-popblock-val {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.hud-popbar {
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.hud-popbar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.2s ease;
+}
+
+/* Collapsible Buildings tab: built structures + their effects, and fort level. */
+.hud-buildings {
+  margin: 12px 0 4px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+}
+
+.hud-buildings-summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.hud-buildings-summary::-webkit-details-marker {
+  display: none;
+}
+
+.hud-buildings-summary::after {
+  content: "▸";
+  margin-left: auto;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+.hud-buildings[open] .hud-buildings-summary::after {
+  transform: rotate(90deg);
+}
+
+.hud-buildings-summary .ico-svg svg,
+.hud-buildings-summary .ico {
+  width: 15px;
+  height: 15px;
+}
+
+.hud-buildings-count {
+  min-width: 18px;
+  height: 17px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-buildings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 11px 10px;
+}
+
+.hud-building-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.hud-building-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.hud-building-name .ico-svg svg,
+.hud-building-name .ico {
+  width: 14px;
+  height: 14px;
+}
+
+.hud-building-eff {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 /* --- Unrest bar ----------------------------------------------------------- */
