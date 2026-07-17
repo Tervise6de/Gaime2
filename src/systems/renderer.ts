@@ -44,7 +44,7 @@ import {
 } from "@/systems/state";
 import { atWar } from "@/systems/diplomacy";
 import { regionCapacity } from "@/systems/population";
-import { popCompact, popDisplay } from "@/systems/format";
+import { popCompact, popDisplay, soldiersCompact, soldiersDisplay } from "@/systems/format";
 import { computeVoronoiCells, pointInPolygon, type Point, type VoronoiCell } from "@/systems/voronoi";
 import {
   hashFloat,
@@ -1586,21 +1586,34 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       const by = p.y + NODE_RADIUS - 4;
       // YOUR armies must be findable at a glance: bigger badge, gold outer
       // ring, a tiny banner pennant on top. Rivals keep the plain badge.
+      // Sized as a pill so soldier counts ("3k", "12k") always fit.
       const r = mine ? 12 : 10;
+      const label = soldiersCompact(size);
+      context.font = `700 ${mine ? 12 : 11}px system-ui, sans-serif`;
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      const halfW = Math.max(r, context.measureText(label).width / 2 + 6);
 
-      context.beginPath();
-      context.arc(bx, by, r, 0, Math.PI * 2);
+      const pill = (grow: number): void => {
+        context.beginPath();
+        if (typeof context.roundRect === "function") {
+          context.roundRect(bx - halfW - grow, by - r - grow, (halfW + grow) * 2, (r + grow) * 2, r + grow);
+        } else {
+          context.arc(bx, by, r + grow, 0, Math.PI * 2);
+        }
+      };
+      pill(0);
       context.fillStyle = ownerColor(army.ownerId);
       context.fill();
       // Light ring lifts the badge off the map (a dark ring sank into tints).
       context.lineWidth = 1.5;
       context.strokeStyle = "rgba(238, 242, 248, 0.85)";
+      pill(0);
       context.stroke();
       if (mine) {
-        context.beginPath();
-        context.arc(bx, by, r + 2.5, 0, Math.PI * 2);
         context.lineWidth = 2.5;
         context.strokeStyle = "#f4d27a";
+        pill(2.5);
         context.stroke();
         // Banner pennant: a small gold flag poking above the badge.
         context.beginPath();
@@ -1619,10 +1632,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       }
 
       context.fillStyle = "#0d0f14";
-      context.font = `700 ${mine ? 12 : 11}px system-ui, sans-serif`;
-      context.textAlign = "center";
-      context.textBaseline = "middle";
-      context.fillText(String(size), bx, by);
+      context.fillText(label, bx, by);
 
       const who = ownerNation?.isPlayer ? "Your" : ownerNation?.isBarbarian ? "Barbarian" : `${ownerNation?.name ?? "Rival"}'s`;
       const hint = mine
@@ -1631,8 +1641,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       markerHits.push({
         x: bx,
         y: by,
-        r: r + 2,
-        text: `${who} army — ${size} unit${size === 1 ? "" : "s"} stationed in ${region.name}.${hint}`,
+        r: halfW + 3,
+        text: `${who} army — ${soldiersDisplay(size)} soldiers stationed in ${region.name}.${hint}`,
       });
     }
   }
@@ -1873,5 +1883,5 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
 /** Exposed for potential reuse/testing of the army badge count. */
 export function stackLabel(army: Army): string {
-  return String(armySize(army.units));
+  return soldiersCompact(armySize(army.units));
 }

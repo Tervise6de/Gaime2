@@ -325,10 +325,12 @@ age of the world (`data/eras.ts`: one turn = one year from 900 AD, five named
 ages across the 150-turn game). Seed, difficulty and the realm trait live in
 the map legend's "This world" card instead of crowding the bar.
 
-**Population presentation.** The sim tracks population in abstract units
-(~1–20 per region); the UI presents them as people at ×1,000
-(`systems/format.ts`) — "4,300 / 10,000" in panels, "4.3k" on the map chip —
-so the world reads as populated without touching the simulation's numbers.
+**Population & army presentation.** The sim tracks population and army
+strength in abstract units (~1–20 per region/stack); the UI presents both as
+people at ×1,000 (`systems/format.ts`) — "4,300 / 10,000" population,
+"3,000 soldiers" armies ("3k" on badges, one unit = a 1,000-strong regiment;
+combat and merge log lines speak in soldiers too) — so the world reads as
+populated without touching the simulation's numbers.
 
 **Nothing idle, ever (advisor + production overview).** Deliberate design:
 one construction slot per region and NO build queues — each build is a

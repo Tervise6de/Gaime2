@@ -23,3 +23,12 @@ export function popCompact(units: number): string {
   const k = people / 1000;
   return k < 10 ? `${(Math.round(k * 10) / 10).toString()}k` : `${Math.round(k)}k`;
 }
+
+/**
+ * Armies use the same presentation scale: one sim unit = a regiment of
+ * 1,000 soldiers. A 3-unit army reads "3,000 soldiers" (map badge: "3k"),
+ * matching the population's ×1,000 world.
+ */
+export const SOLDIERS_PER_UNIT = POP_SCALE;
+export const soldiersDisplay = popDisplay;
+export const soldiersCompact = popCompact;

@@ -17,6 +17,7 @@ import { TERRAIN, type StrategicResource } from "@/data/terrain";
 import { traitUnitCostMult } from "@/data/traits";
 import { createRng } from "@/systems/rng";
 import { resolveCombat, type UnitCounts } from "@/systems/combat";
+import { soldiersDisplay } from "@/systems/format";
 import { atWar, declareWar } from "@/systems/diplomacy";
 import {
   BARBARIAN_ID,
@@ -225,7 +226,7 @@ export function moveArmy(
   log.push(
     `${atkName} ${result.attackerWins ? "won" : "was repelled"} at ${target.name}` +
       (result.captured ? ` — ${target.name} captured!` : ".") +
-      ` (losses ${myLoss} vs ${theirLoss})`,
+      ` (losses ${soldiersDisplay(myLoss)} vs ${soldiersDisplay(theirLoss)} soldiers)`,
   );
 
   // Update both armies with survivors; drop empty stacks.
@@ -278,7 +279,8 @@ function relocateOrMerge(
     const owner = state.nations.find((n) => n.id === army.ownerId);
     const line =
       `${owner?.isPlayer ? "Your armies" : `${owner?.name ?? "A rival"}'s armies`} merged at ${where} — ` +
-      `${armySize(army.units)} + ${armySize(target.units)} = ${armySize(mergedUnits)} units.`;
+      `${soldiersDisplay(armySize(army.units))} + ${soldiersDisplay(armySize(target.units))} = ` +
+      `${soldiersDisplay(armySize(mergedUnits))} soldiers.`;
     return { ...state, armies, log: appendLog(state, [line]) };
   }
   armies = state.armies.map((a) =>

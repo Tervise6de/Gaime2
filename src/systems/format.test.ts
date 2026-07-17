@@ -17,4 +17,11 @@ describe("population display scale", () => {
     expect(popCompact(9.96)).toBe("10k"); // rounds up across the one-decimal band
     expect(popCompact(12.4)).toBe("12k");
   });
+
+  it("armies share the same scale (1 unit = a 1,000-strong regiment)", async () => {
+    const { soldiersCompact, soldiersDisplay, SOLDIERS_PER_UNIT } = await import("@/systems/format");
+    expect(SOLDIERS_PER_UNIT).toBe(1000);
+    expect(soldiersDisplay(3)).toBe("3,000");
+    expect(soldiersCompact(12)).toBe("12k");
+  });
 });

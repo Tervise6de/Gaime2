@@ -47,7 +47,7 @@ import { loadProfile, type ProfileStats } from "@/ui/profile";
 import { ACHIEVEMENTS } from "@/data/achievements";
 import { WAR_EDGE_COLOR } from "@/systems/renderer";
 import { regionCapacity } from "@/systems/population";
-import { popDisplay } from "@/systems/format";
+import { popDisplay, soldiersCompact, soldiersDisplay } from "@/systems/format";
 import { buildOptions, deriveAdvice } from "@/ui/advisor";
 import { previewCombat } from "@/systems/combat";
 import {
@@ -744,7 +744,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const hintsBody = el("ul", "hud-hints-list");
   for (const tip of [
     "Click a region to open it full-screen: queue a building (it builds a little each End turn) and raise units.",
-    "Armies are the round numbered badges on the map — the number is their size; yours wear a gold ring.",
+    "Armies are the numbered badges on the map — 3k means 3,000 soldiers; yours wear a gold ring.",
     "To move or attack: open your region → Move / Attack ▸ → click a highlighted neighbour.",
     "Research (R): pick a technology — your knowledge income advances it every End turn.",
     "Hover any map icon for a plain-language explanation; L opens the legend.",
@@ -1488,7 +1488,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       const unitCount = movingArmy ? armySize(movingArmy.units) : 0;
       moveBanner.innerHTML = "";
       const txt = el("span", "hud-move-banner-text");
-      txt.textContent = `Moving ${unitCount} unit${unitCount === 1 ? "" : "s"} — click a highlighted region to move or attack`;
+      txt.textContent = `Moving ${soldiersDisplay(unitCount)} soldiers — click a highlighted region to move or attack`;
       moveBanner.append(txt, btn("✕ Cancel", "hud-move-banner-cancel", () => callbacks.onCancelMove()));
       moveBanner.style.display = "flex";
     } else {
@@ -1889,7 +1889,7 @@ function renderEnemyRegion(container: HTMLElement, state: GameState, region: Reg
   const box = el("div", "hud-enemy");
   const t = TERRAIN[region.terrain];
   if (garrison && armySize(garrison.units) > 0) {
-    box.append(line(`Enemy garrison: ${armySize(garrison.units)} units (${composition(garrison)})`));
+    box.append(line(`Enemy garrison: ${soldiersDisplay(armySize(garrison.units))} soldiers (${composition(garrison)})`));
   } else {
     box.append(line("Undefended — an army walking in captures it."));
   }
@@ -1945,7 +1945,8 @@ function renderArmySection(
     btn.className = "hud-unit-btn";
     btn.disabled = !check.ok;
     btn.title = check.ok
-      ? `${def.attack} atk / ${def.defense} def · ${def.upkeep}g upkeep${def.requires ? ` · needs ${def.requires}` : ""}`
+      ? `Raises a 1,000-strong ${def.name} regiment (deploys next turn). ` +
+        `${def.attack} atk / ${def.defense} def · ${def.upkeep}g upkeep${def.requires ? ` · needs ${def.requires}` : ""}`
       : check.reason ?? "";
     const cost = unitCost(playerNation(state), t);
     const resourceLocked = !!def.requires && !access.has(def.requires);
@@ -1990,8 +1991,8 @@ function renderCombatOdds(state: GameState, army: Army): HTMLElement {
       const name = el("span", "hud-odds-name");
       name.textContent = target.name;
       const chip = el("span", "hud-odds-chip merge");
-      chip.textContent = `merge → ${armySize(army.units) + armySize(friendly.units)}`;
-      chip.title = `Moving here combines the two stacks into one army of ${armySize(army.units) + armySize(friendly.units)} units.`;
+      chip.textContent = `merge → ${soldiersCompact(armySize(army.units) + armySize(friendly.units))}`;
+      chip.title = `Moving here combines the two stacks into one army of ${soldiersDisplay(armySize(army.units) + armySize(friendly.units))} soldiers.`;
       row.append(name, chip);
       rows.push(row);
       continue;
@@ -2167,7 +2168,7 @@ function buildLegend(): HTMLElement {
   row(glyphHtml("hammer", "🔨", "hud-legend-ico"), "Building under construction (status row under the name)");
   row(glyphHtml("shield", "🛡", "hud-legend-ico"), "Fortification level (harder to capture; siege strips it)");
   row(glyphHtml("crown", "👑", "hud-legend-ico"), "Capital — the crest beside the population chip");
-  row('<span class="hud-legend-badge">3</span>', "Army — unit count on the owner's colour; yours wears a gold ring");
+  row('<span class="hud-legend-badge">3k</span>', "Army — soldier count (thousands) on the owner's colour; yours wears a gold ring");
 
   section("Territory");
   row(line("#d8a24a"), "Your realm — gold wash, the widest and brightest rim, named YOU");
@@ -2811,21 +2812,21 @@ function closeButton(onClick: () => void): HTMLButtonElement {
 
 function composition(army: Army): string {
   const parts: string[] = [];
-  for (const t of UNIT_TYPES) if (army.units[t] > 0) parts.push(`${army.units[t]} ${UNITS[t].short}`);
+  for (const t of UNIT_TYPES) if (army.units[t] > 0) parts.push(`${soldiersCompact(army.units[t])} ${UNITS[t].short}`);
   return parts.join(", ") || "—";
 }
 
-/** The army line with unit icons: "3 units — [⚒]2 [🗡]1". Text fallback intact. */
+/** The army line with unit icons: "3,000 soldiers — [⚒]2k [🗡]1k". Text fallback intact. */
 function compositionLine(army: Army): HTMLElement {
   const p = el("p", "hud-army-comp");
-  p.append(document.createTextNode(`${armySize(army.units)} units — `));
+  p.append(document.createTextNode(`${soldiersDisplay(armySize(army.units))} soldiers — `));
   let any = false;
   for (const t of UNIT_TYPES) {
     if (army.units[t] <= 0) continue;
     any = true;
     const chip = el("span", "hud-comp-chip");
-    chip.title = UNITS[t].name;
-    chip.innerHTML = `${unitIconHtml(t, UNITS[t].short + " ")}${army.units[t]}`;
+    chip.title = `${UNITS[t].name} — ${soldiersDisplay(army.units[t])} soldiers`;
+    chip.innerHTML = `${unitIconHtml(t, UNITS[t].short + " ")}${soldiersCompact(army.units[t])}`;
     p.append(chip);
   }
   if (!any) p.append(document.createTextNode("—"));

@@ -149,10 +149,10 @@ describe("moveArmy", () => {
     expect(next.rngState).not.toBe(g.rngState);
   });
 
-  it("logs both sides' casualties after a defended battle", () => {
+  it("logs both sides' casualties after a defended battle (in soldiers)", () => {
     const g = battlefield({ infantry: 8, ranged: 4 }, { militia: 3, infantry: 1 });
     const next = moveArmy(g, 0, 1);
-    expect(next.log.some((l) => /\(losses \d+ vs \d+\)/.test(l))).toBe(true);
+    expect(next.log.some((l) => /\(losses [\d,]+ vs [\d,]+ soldiers\)/.test(l))).toBe(true);
   });
 
   it("refuses to move without moves left or across a non-edge", () => {
@@ -184,7 +184,9 @@ describe("moveArmy", () => {
     expect(armySize(merged.units)).toBe(5);
     expect(merged.units.infantry).toBe(2);
     expect(merged.units.militia).toBe(3);
-    expect(next.log.some((l) => l.includes("merged") && l.includes("2 + 3 = 5"))).toBe(true);
+    expect(
+      next.log.some((l) => l.includes("merged") && l.includes("2,000 + 3,000 = 5,000 soldiers")),
+    ).toBe(true);
   });
 });
 
