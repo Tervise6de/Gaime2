@@ -469,6 +469,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
   function openGameMenu(): void {
     refreshSlotLabels(); // slot turn markers reflect the latest saves on open
+    newGameForm.refreshSeed(); // every visit shows a fresh, real seed
     gameMenuOverlay.style.display = "flex";
   }
   function closeGameMenu(): void {
@@ -484,7 +485,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const newGameRow = el("div", "hud-newgame");
   const newGameBtn = document.createElement("button");
   newGameBtn.className = "hud-newgame-btn primary";
-  newGameBtn.textContent = "New game";
+  newGameBtn.textContent = "Start new game ▶";
   function startNewGame(): void {
     closeGameMenu(); // straight into the fresh realm
     callbacks.onNewGame(newGameForm.readConfig());

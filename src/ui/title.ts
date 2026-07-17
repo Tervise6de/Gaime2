@@ -64,23 +64,38 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
     version.textContent =
       `v${typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev"} · GAIME Studio`;
 
+    // Two screens sharing the column: the main list, and the New-game setup
+    // that *replaces* it (Start game ▶ / ← Back) — never both at once.
     const menu = document.createElement("div");
     menu.className = "title-menu";
 
     const primary = menuBtn(hooks.hasSave ? "Continue your reign" : "Begin your reign", "primary");
     primary.addEventListener("click", dismiss);
 
-    // New game: expands the shared setup form inline, then starts + closes.
     const newGameBtn = menuBtn("New game");
+    const optionsBtn = menuBtn("Options");
+    optionsBtn.addEventListener("click", () => hooks.onOpenOptions());
+    const recordsBtn = menuBtn("Records");
+    recordsBtn.addEventListener("click", () => hooks.onOpenRecords());
+    menu.append(primary, newGameBtn, optionsBtn, recordsBtn);
+
     const setup = document.createElement("div");
     setup.className = "title-setup";
     setup.style.display = "none";
+    const setupHead = document.createElement("div");
+    setupHead.className = "title-setup-head";
+    setupHead.textContent = "New game";
     const form = buildNewGameForm();
-    const startBtn = menuBtn("Start", "primary title-start");
+    const startBtn = menuBtn("Start game ▶", "primary title-start");
     // Guard against discarding a live game with a mis-click: the first Start
     // arms an inline confirm (no separate dialog — that would sit under this
     // opaque overlay), the second starts. Fresh boots start immediately.
     let armed = false;
+    function disarmStart(): void {
+      armed = false;
+      startBtn.textContent = "Start game ▶";
+      startBtn.classList.remove("armed");
+    }
     startBtn.addEventListener("click", () => {
       if (hooks.liveGameTurn !== null && !armed) {
         armed = true;
@@ -91,25 +106,29 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
       hooks.onNewGame(form.readConfig());
       dismiss();
     });
-    setup.append(...form.rows, startBtn);
-    newGameBtn.addEventListener("click", () => {
-      const open = setup.style.display !== "none";
-      setup.style.display = open ? "none" : "block";
-      newGameBtn.classList.toggle("open", !open);
-    });
-
-    const optionsBtn = menuBtn("Options");
-    optionsBtn.addEventListener("click", () => hooks.onOpenOptions());
-    const recordsBtn = menuBtn("Records");
-    recordsBtn.addEventListener("click", () => hooks.onOpenRecords());
-
-    menu.append(primary, newGameBtn, setup, optionsBtn, recordsBtn);
+    const backBtn = menuBtn("← Back");
+    backBtn.addEventListener("click", () => showSetup(false));
+    setup.append(setupHead, ...form.rows, startBtn, backBtn);
+    newGameBtn.addEventListener("click", () => showSetup(true));
 
     const hint = document.createElement("p");
     hint.className = "title-hint";
     hint.textContent = "Esc to continue";
 
-    overlay.append(art, studio, wordmark, tagline, menu, hint, version);
+    function showSetup(open: boolean): void {
+      menu.style.display = open ? "none" : "flex";
+      setup.style.display = open ? "flex" : "none";
+      hint.textContent = open ? "Esc to go back" : "Esc to continue";
+      if (open) {
+        form.refreshSeed(); // every visit to the setup gets a fresh, real seed
+        disarmStart();
+        startBtn.focus();
+      } else {
+        newGameBtn.focus();
+      }
+    }
+
+    overlay.append(art, studio, wordmark, tagline, menu, setup, hint, version);
     // Mount inside #hud so the HUD's own overlays (Options/Records, z 250 while
     // the menu is up) share this stacking context and can render above the menu
     // — #hud is position:fixed, which traps its children's z-index otherwise.
@@ -139,7 +158,9 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
       const typing = target && (target.tagName === "INPUT" || target.tagName === "SELECT");
       if (ev.key === "Escape" && !typing) {
         ev.preventDefault();
-        dismiss();
+        // In the setup screen, Esc steps back to the menu; from the menu it continues.
+        if (setup.style.display !== "none") showSetup(false);
+        else dismiss();
       } else if (ev.key === "Tab") {
         // Focus trap: keep Tab inside the overlay so it can never reach (and
         // Enter-activate) the live HUD controls hidden behind this opaque menu.

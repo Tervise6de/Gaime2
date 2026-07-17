@@ -326,14 +326,15 @@ function main(): void {
     return army ? reachableRegions(state, army) : [];
   }
 
-  renderer.start();
   sync();
 
   // If the ambient bed was left on last session, start it on the first gesture.
   armAmbientOnGesture();
 
   // Main menu first; the coached tour (first-ever session only) follows it
-  // so the two never stack.
+  // so the two never stack. The render loop starts only once the menu closes —
+  // painting the map behind the opaque splash would just burn frames and make
+  // the menu itself stutter.
   void showMainMenu({
     hasSave: hasLocalSave("auto"),
     // A loaded, still-playable game past turn 1 is worth a discard confirm.
@@ -342,6 +343,7 @@ function main(): void {
     onOpenOptions: () => hud.openOptions(),
     onOpenRecords: () => hud.openRecords(),
   }).then(() => {
+    renderer.start();
     if (firstEver) window.setTimeout(runTutorial, 400);
   });
 

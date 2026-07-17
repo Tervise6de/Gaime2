@@ -209,6 +209,11 @@ body {
   overflow-y: auto;
 }
 
+/* The setup form's labelled fields, stacked inside the Game menu panel. */
+.hud-gamemenu-panel .hud-field {
+  margin: 0 0 10px;
+}
+
 /* A small uppercase heading inside the actions cluster (fiscal policy). */
 .hud-actions-head {
   margin: 0 0 -3px;
@@ -502,11 +507,82 @@ body {
 .hud-seed {
   flex: 1;
   min-width: 0;
-  padding: 8px;
+  padding: 9px 10px;
+  font-size: 13px;
   color: var(--fg);
-  background: rgba(0, 0, 0, 0.25);
+  background: #141a24;
   border: 1px solid var(--panel-border);
-  border-radius: 6px;
+  border-radius: 7px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Seed field + the dice that rolls a fresh one. */
+.hud-seed-row {
+  display: flex;
+  gap: 6px;
+}
+
+.hud-seed-new {
+  flex: 0 0 auto;
+  padding: 0 12px;
+  font-size: 15px;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--panel-border);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+
+.hud-seed-new:hover,
+.hud-seed-new:focus-visible {
+  border-color: rgba(230, 200, 116, 0.55);
+}
+
+/* A labelled setup field: small-caps label over its control. */
+.hud-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.hud-field-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Segmented choice row — every option visible and readable at once. */
+.hud-seg {
+  display: flex;
+  gap: 4px;
+}
+
+.hud-seg-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--panel-border);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.hud-seg-btn:hover,
+.hud-seg-btn:focus-visible {
+  border-color: rgba(230, 200, 116, 0.55);
+}
+
+.hud-seg-btn.active {
+  color: #10131a;
+  background: var(--gold-grad);
+  border-color: #efd694;
 }
 
 .hud-newgame-btn {
@@ -535,22 +611,35 @@ body {
   background: var(--accent);
 }
 
+/* Dropdowns: solid dark chip, readable 13px text, custom chevron (the native
+   arrow is unstyleable and near-invisible on dark themes). */
 .hud-select {
+  appearance: none;
+  -webkit-appearance: none;
   flex: 1;
   min-width: 0;
-  padding: 7px 6px;
+  padding: 9px 30px 9px 10px;
   color: var(--fg);
-  background: rgba(0, 0, 0, 0.25);
+  background:
+    url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23c9d2e0' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E")
+    no-repeat right 10px center,
+    #141a24;
   border: 1px solid var(--panel-border);
-  border-radius: 6px;
-  font-size: 12px;
+  border-radius: 7px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+
+.hud-select:hover,
+.hud-select:focus-visible {
+  border-color: rgba(230, 200, 116, 0.55);
 }
 
 /* The Save/Load slot picker sits inline with the buttons — keep its label readable. */
 .hud-slot {
   flex: 0 0 auto;
-  min-width: 92px;
-  padding-right: 4px;
+  min-width: 118px;
 }
 
 /* --- Region readout ------------------------------------------------------- */
@@ -2515,11 +2604,28 @@ a:focus-visible,
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* Safe centring: the auto margins on the first/last flow children centre the
+     block when it fits and collapse when it doesn't — so a tall screen (the
+     New-game setup on a short viewport) scrolls instead of clipping. */
+  justify-content: flex-start;
+  overflow-y: auto;
+  padding: 24px 16px;
   gap: 10px;
   background: radial-gradient(ellipse at 50% 40%, #171d29, #0b0e14 75%);
   opacity: 1;
   transition: opacity 0.45s ease;
+}
+
+.title-overlay > * {
+  flex-shrink: 0; /* children scroll rather than squash */
+}
+
+.title-art {
+  margin-top: auto;
+}
+
+.title-hint {
+  margin-bottom: auto;
 }
 
 .title-overlay.leaving {
@@ -2571,9 +2677,10 @@ a:focus-visible,
   color: rgba(230, 200, 116, 0.65);
 }
 
-/* Version + studio stamp, tucked into the splash corner. */
+/* Version + studio stamp, tucked into the splash corner (fixed so it stays
+   put when the overlay scrolls). */
 .title-version {
-  position: absolute;
+  position: fixed;
   right: 16px;
   bottom: 12px;
   margin: 0;
@@ -2705,39 +2812,35 @@ a:focus-visible,
   border-color: #e6c874;
 }
 
-/* Inline new-game setup (the shared form, restyled for the menu column). */
+/* New-game setup screen — replaces the menu list while open. */
 .title-setup {
-  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(400px, 92vw);
+  margin-top: 24px;
+  padding: 16px;
   background: rgba(17, 21, 28, 0.9);
   border: 1px solid rgba(230, 200, 116, 0.2);
-  border-radius: 8px;
+  border-radius: 10px;
 }
 
-.title-setup .hud-newgame {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
-.title-setup .hud-select,
-.title-setup .hud-seed {
-  flex: 1 1 45%;
-  min-width: 0;
-}
-
-.title-setup .hud-scenario {
-  flex-basis: 100%;
+.title-setup-head {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(230, 200, 116, 0.8);
 }
 
 .title-setup .hud-scenario-blurb {
-  margin: 0 0 8px;
+  margin: -6px 0 0;
   font-size: 12px;
 }
 
 .title-setup .title-start {
   width: 100%;
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 /* While the menu is up, only the Options/Records overlays it opens should rise

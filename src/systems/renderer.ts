@@ -123,7 +123,10 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   let lastHoverText: string | null = null;
 
   function reportHover(hit: MarkerHit | null, clientX: number, clientY: number): void {
-    canvas.style.cursor = hit ? "help" : "grab";
+    // Style writes invalidate layout — only touch the cursor when it changes
+    // (this runs on every pointermove).
+    const cursor = hit ? "help" : "grab";
+    if (canvas.style.cursor !== cursor) canvas.style.cursor = cursor;
     if (hit) {
       hoverHandler({ text: hit.text, x: clientX, y: clientY });
       lastHoverText = hit.text;
@@ -250,6 +253,17 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   // Political ink layer — rebuilt only when ownership, wars or palette change.
   let politicalLayer: HTMLCanvasElement | null = null;
   let politicalSig = "";
+  // Composite of ocean+terrain+political: the per-frame cost is ONE blit, not
+  // three. Recomposited (three offscreen blits, no re-drawing) when any part
+  // rebuilds.
+  let staticLayer: HTMLCanvasElement | null = null;
+  let staticSig = "";
+
+  // Dirty flag: the loop paints only when something can have changed — state,
+  // selection, palette, camera input, ripples in flight, a resize. An idle map
+  // costs nothing per frame (and stops forcing the browser to recomposite the
+  // blurred HUD panels above the canvas every frame).
+  let needsPaint = true;
 
   function ensureProjection(s: GameState): Projection {
     ensureCells(s);
@@ -1142,10 +1156,20 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     canvas.height = Math.max(1, Math.floor(clientHeight * dpr));
     context.setTransform(dpr, 0, 0, dpr, 0, 0);
     clampCam(); // a shrunken viewport must not leave the pan out of bounds
+    needsPaint = true; // setting canvas.width cleared the bitmap
   }
 
   function render(): void {
     if (!running) return;
+    // Idle skip: camera settled into the built layers, nothing animating and
+    // no repaint requested — keep the last frame on screen and do no work.
+    const camUnsettled = state !== null && camKey() !== camBuiltKey;
+    if (!needsPaint && !camUnsettled && ripples.length === 0) {
+      tick += 1;
+      frame = window.requestAnimationFrame(render);
+      return;
+    }
+    needsPaint = false;
     // Base water fill: overscroll slack and zoomed-out views expose canvas
     // beyond the cached layers — it must always read as sea, never as void.
     context.fillStyle = OCEAN.outer;
@@ -1221,16 +1245,36 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     return capitals;
   }
 
+  /** Ocean+terrain+political folded into one canvas so a frame is one blit. */
+  function ensureStatic(s: GameState, proj: Projection): HTMLCanvasElement {
+    const ocean = ensureOcean(s, proj);
+    const terrain = ensureTerrain(s, proj);
+    const political = ensurePolitical(s, proj);
+    const sig = `${oceanSig}||${terrainSig}||${politicalSig}`;
+    if (staticLayer && sig === staticSig) return staticLayer;
+    staticSig = sig;
+    if (!staticLayer) staticLayer = document.createElement("canvas");
+    if (staticLayer.width !== ocean.width || staticLayer.height !== ocean.height) {
+      staticLayer.width = ocean.width;
+      staticLayer.height = ocean.height;
+    }
+    const g = staticLayer.getContext("2d")!;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, staticLayer.width, staticLayer.height);
+    g.drawImage(ocean, 0, 0);
+    g.drawImage(terrain, 0, 0);
+    g.drawImage(political, 0, 0);
+    return staticLayer;
+  }
+
   /**
-   * The island territory view: blit the cached ocean, terrain and political
-   * layers, then the per-frame dynamics — selection, highlights, markers.
+   * The island territory view: blit the cached static composite, then the
+   * per-frame dynamics — selection, highlights, markers.
    * Takes the projection to paint from (live or, mid-gesture, the stale one).
    */
   function paintVoronoi(s: GameState, proj: Projection): void {
     markerHits = []; // the marker passes below re-register this frame's tips
-    context.drawImage(ensureOcean(s, proj), 0, 0, canvas.clientWidth, canvas.clientHeight);
-    context.drawImage(ensureTerrain(s, proj), 0, 0, canvas.clientWidth, canvas.clientHeight);
-    context.drawImage(ensurePolitical(s, proj), 0, 0, canvas.clientWidth, canvas.clientHeight);
+    context.drawImage(ensureStatic(s, proj), 0, 0, canvas.clientWidth, canvas.clientHeight);
     const capitals = capitalSet(s);
 
     context.save();
@@ -1652,23 +1696,29 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     setState(next: GameState): void {
       state = next;
       archetype = islandArchetype(next.regions.length, next.seed);
+      needsPaint = true;
     },
     setSelected(regionId: number | null): void {
       selected = regionId;
+      needsPaint = true;
     },
     setHighlights(regionIds: number[]): void {
       highlights = new Set(regionIds);
+      needsPaint = true;
     },
     setColourblind(on: boolean): void {
       colourblind = on;
+      needsPaint = true;
     },
     setReduceMotion(on: boolean): void {
       reduceMotion = on;
       if (on) ripples = []; // drop any in-flight motion
+      needsPaint = true;
     },
     pulseCapture(regionId: number): void {
       if (reduceMotion) return;
       ripples.push({ regionId, color: ownerColor(state?.regions[regionId]?.ownerId ?? null), born: tick });
+      needsPaint = true;
     },
     onRegionClick(handler: (regionId: number | null) => void): void {
       clickHandler = handler;

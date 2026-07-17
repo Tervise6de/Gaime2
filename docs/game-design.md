@@ -272,8 +272,11 @@ anywhere in rendering):
   realm's outer border/coast, a crisp owner-coloured edge per side (two-tone
   frontiers), a dark centreline, and loud red war fronts.
 - **Caching discipline**: ocean, terrain and political ink are pre-rendered
-  offscreen layers, rebuilt only when map/canvas size/ownership/wars/palette
-  change; the steady-state frame is three blits + selection + markers.
+  offscreen layers (rebuilt only when map/canvas size/ownership/wars/palette
+  change) and folded into one static composite, so a painted frame is a single
+  blit + selection + markers. A dirty flag skips idle frames entirely — a
+  still map costs nothing per frame — and the render loop doesn't start until
+  the title menu closes.
 - **Tuning**: every knob (framing margins, coast pads/roughness, texture
   densities, political widths/alphas, ocean palette) lives in
   `data/mapstyle.ts` — balancing the look is editing that table, not code.
