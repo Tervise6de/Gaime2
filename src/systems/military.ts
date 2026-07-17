@@ -350,6 +350,9 @@ function captureRegion(state: GameState, regionId: number, ownerId: number): Gam
     return {
       ...r,
       ownerId,
+      // Remember the displaced owner (for the reclaim casus belli), unless the
+      // region was unowned or we're just re-taking our own land.
+      priorOwnerId: wasForeign ? r.ownerId : r.priorOwnerId,
       unrest: wasForeign ? Math.min(UNREST_MAX, r.unrest + CONQUEST_UNREST) : r.unrest,
     };
   });

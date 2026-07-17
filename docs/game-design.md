@@ -636,10 +636,17 @@ lands −5/turn"). Each card also shows **rival-to-rival foreign relations**
 reads as a political map, not just you-vs-each. The `relations` scalar the AI
 acts on is unchanged, so balance is untouched.
 
-**Still open (9.1 remainder):** casus-belli-lite — declaring war with a *reason*
-(reclaim a lost region, ally's call) costing less standing with third parties
-than naked aggression (needs a reputation term); and a "kept the peace N turns"
-goodwill modifier (needs treaty-start tracking).
+**Casus belli — SHIPPED (v0.27).** `casusBelli(state, a, b)` picks the strongest
+war justification: answering an **ally's call**, **reclaiming** land the target
+took (tracked via `region.priorOwnerId`, set on conquest), a standing **border
+dispute**, or — failing all — **naked aggression**. `declareWar` now applies a
+third-party **reputation** cost: an unjustified war sours the declarer's standing
+with *every other* realm (−7 naked, −3 border; a justified war none), logged as
+"Your wars of aggression" in the opinion breakdown, so coalitions form against
+aggressors. The player's declare-war confirm states the cause and its cost.
+
+**Still open (9.1 remainder):** a "kept the peace N turns" goodwill modifier
+(needs treaty-start tracking).
 
 ### 9.2 Combat model + unit roles — SHIPPED v2 (`systems/combat.ts`)
 Combat is now **phased**: an opening volley (ranged + siege fire first; siege

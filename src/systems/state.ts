@@ -213,6 +213,12 @@ export interface Region {
    * secedes to the barbarians. Absent/0 = calm or freshly settled (legacy saves).
    */
   revoltTurns?: number;
+  /**
+   * The nation that owned this region immediately before the current owner (set
+   * on conquest). Powers the "reclaim" casus belli — taking back a lost region
+   * is a justified war. Absent = never changed hands.
+   */
+  priorOwnerId?: number | null;
   /** Layout position for the renderer, in world units [0, 1]. */
   x: number;
   y: number;

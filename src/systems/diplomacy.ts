@@ -58,6 +58,7 @@ export const OPINION_LABEL: Record<string, string> = {
   alliance: "Our alliance",
   gift: "Gifts given",
   trade: "Our trade route",
+  aggression: "Your wars of aggression",
 };
 
 /**
@@ -204,13 +205,63 @@ export function sharedBorders(state: GameState, a: number, b: number): number {
   return count;
 }
 
+// --- casus belli: how justified a war is ------------------------------------
+
+export type CasusBelli = "ally_call" | "reclaim" | "border" | "none";
+
+export interface CasusBelliInfo {
+  id: CasusBelli;
+  label: string;
+  /** A justified war draws no third-party censure. */
+  justified: boolean;
+  /** Standing lost with every *other* realm when war is declared on this pretext. */
+  thirdPartyPenalty: number;
+}
+
+export const CASUS_BELLI: Record<CasusBelli, CasusBelliInfo> = {
+  ally_call: { id: "ally_call", label: "Answering an ally's war", justified: true, thirdPartyPenalty: 0 },
+  reclaim: { id: "reclaim", label: "Reclaiming lost land", justified: true, thirdPartyPenalty: 0 },
+  border: { id: "border", label: "A border dispute", justified: false, thirdPartyPenalty: 3 },
+  none: { id: "none", label: "Naked aggression", justified: false, thirdPartyPenalty: 7 },
+};
+
+/**
+ * The strongest war justification `a` holds against `b` right now: answering an
+ * ally already at war with b, reclaiming land b took from a, a standing border
+ * dispute, or — failing all — naked aggression. Pure.
+ */
+export function casusBelli(state: GameState, a: number, b: number): CasusBelli {
+  const allies = state.nations.filter(
+    (n) => !n.isBarbarian && n.alive && n.id !== a && getTreaty(state, a, n.id) === "alliance",
+  );
+  if (allies.some((ally) => atWar(state, ally.id, b))) return "ally_call";
+  if (state.regions.some((r) => r.ownerId === b && r.priorOwnerId === a)) return "reclaim";
+  if (sharedBorders(state, a, b) > 0) return "border";
+  return "none";
+}
+
 // --- actions ----------------------------------------------------------------
 
-export function declareWar(state: GameState, a: number, b: number): GameState {
+/**
+ * Declare war. Beyond the direct relation hit, an *unjustified* war costs the
+ * declarer standing with every other realm (a light reputation term, so naked
+ * aggression draws coalitions while a justified war — ally's call, reclaiming
+ * lost land — does not). The casus belli is auto-detected unless passed.
+ */
+export function declareWar(state: GameState, a: number, b: number, cb?: CasusBelli): GameState {
+  const reason = cb ?? casusBelli(state, a, b);
   let next = setTreaty(state, a, b, "war");
   next = recordOpinion(next, a, b, -RELATION_WAR_HIT, "war");
   next = severTrade(next, a, b); // war ends commerce
-  return { ...next, log: [...next.log, `${name(next, a)} declared war on ${name(next, b)}!`].slice(-50) };
+  const penalty = CASUS_BELLI[reason].thirdPartyPenalty;
+  if (penalty > 0) {
+    for (const c of next.nations) {
+      if (c.isBarbarian || !c.alive || c.id === a || c.id === b) continue;
+      next = recordOpinion(next, a, c.id, -penalty, "aggression");
+    }
+  }
+  const note = CASUS_BELLI[reason].justified ? ` (${CASUS_BELLI[reason].label.toLowerCase()})` : "";
+  return { ...next, log: [...next.log, `${name(next, a)} declared war on ${name(next, b)}${note}!`].slice(-50) };
 }
 
 // --- trade routes (economic diplomacy) --------------------------------------

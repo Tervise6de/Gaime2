@@ -32,6 +32,8 @@ import {
   decayOpinions,
   opinionReasons,
   foreignRelations,
+  casusBelli,
+  CASUS_BELLI,
 } from "@/systems/diplomacy";
 import { createGame } from "@/systems/turn";
 import {
@@ -504,5 +506,44 @@ describe("opinion log — the 'why' behind relations", () => {
     expect(fr.wars).toContain(RIVAL_B);
     g = setPact(g, PLAYER_ID, RIVAL_A, "alliance");
     expect(foreignRelations(g, RIVAL_A).allies).toContain(PLAYER_ID);
+  });
+});
+
+describe("casus belli — how justified a war is", () => {
+  it("answering an ally already at war is a just cause (ally_call)", () => {
+    let g = setPact(game(), PLAYER_ID, RIVAL_A, "alliance");
+    g = setTreaty(g, RIVAL_A, RIVAL_B, "war");
+    expect(casusBelli(g, PLAYER_ID, RIVAL_B)).toBe("ally_call");
+  });
+
+  it("reclaiming land the target took from you is a just cause (reclaim)", () => {
+    const base = game();
+    const g = {
+      ...base,
+      regions: base.regions.map((r, i) =>
+        i === 0 ? { ...r, ownerId: RIVAL_A, priorOwnerId: PLAYER_ID } : r,
+      ),
+    };
+    expect(casusBelli(g, PLAYER_ID, RIVAL_A)).toBe("reclaim");
+  });
+
+  it("orders the pretexts: justified draw no censure, naked aggression the most", () => {
+    expect(CASUS_BELLI.ally_call.justified).toBe(true);
+    expect(CASUS_BELLI.reclaim.justified).toBe(true);
+    expect(CASUS_BELLI.none.justified).toBe(false);
+    expect(CASUS_BELLI.none.thirdPartyPenalty).toBeGreaterThan(CASUS_BELLI.border.thirdPartyPenalty);
+    expect(CASUS_BELLI.ally_call.thirdPartyPenalty).toBe(0);
+  });
+
+  it("an unjustified war sours the declarer's standing with third parties", () => {
+    const before = getRelation(game(), PLAYER_ID, RIVAL_B);
+    const g = declareWar(game(), PLAYER_ID, RIVAL_A, "none"); // naked aggression
+    expect(getRelation(g, PLAYER_ID, RIVAL_B)).toBeLessThan(before);
+  });
+
+  it("a justified war draws no third-party censure", () => {
+    const before = getRelation(game(), PLAYER_ID, RIVAL_B);
+    const g = declareWar(game(), PLAYER_ID, RIVAL_A, "reclaim");
+    expect(getRelation(g, PLAYER_ID, RIVAL_B)).toBe(before); // unchanged
   });
 });

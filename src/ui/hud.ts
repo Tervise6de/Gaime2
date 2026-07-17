@@ -65,7 +65,7 @@ import {
   totalUpkeep,
   unitCost,
 } from "@/systems/military";
-import { getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, nationPower, hasTrade, tradeIncome, opinionReasons, foreignRelations, TRIBUTE_DEMAND } from "@/systems/diplomacy";
+import { getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, nationPower, hasTrade, tradeIncome, opinionReasons, foreignRelations, casusBelli, CASUS_BELLI, TRIBUTE_DEMAND } from "@/systems/diplomacy";
 import { nationScore, victoryProgress, victoryRaces, endGameSummary } from "@/systems/victory";
 import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
 import type { TurnSummary } from "@/systems/summary";
@@ -3267,9 +3267,13 @@ function renderDiplomacy(
     } else {
       actions.append(
         btn("Declare war", "hud-diplo-btn war", () => {
+          const cb = CASUS_BELLI[casusBelli(state, PLAYER_ID, rival.id)];
+          const justification = cb.justified
+            ? `You have a just cause — ${cb.label.toLowerCase()} — so other realms won't hold this war against you.`
+            : `You have no just cause (${cb.label.toLowerCase()}): every other realm's opinion of you will sour.`;
           void confirmAction({
             title: `Declare war on ${rival.name}?`,
-            body: "War severs any trade route and treaty between you, and can't be called off this turn. Your rivals will take note.",
+            body: `War severs any trade route and treaty between you, and can't be called off this turn. ${justification}`,
             confirmLabel: "Declare war",
             danger: true,
           }).then((ok) => {
