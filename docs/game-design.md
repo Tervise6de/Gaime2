@@ -689,9 +689,10 @@ the region panel, one focus each: **Farmland** (+food, +pop cap), **Market town*
 effects plug into the existing hooks (economy yields, population cap, stability,
 unit cost) via `focus*` helpers; `setRegionFocus()` is owner-gated and durable.
 One focus per region is the whole trade-off.
-- Still open: focus-specific **buildings** and a couple more building identities
-  (granary, watchtower, guild, monastery); an optional **build queue** on Grand
-  maps. AI does not yet set focuses (player tool for now).
+The **AI specialises its provinces too** (v0.29): each rival assigns a focus by
+terrain (plains→Farmland, coast→Market, hills/mountains→Workshops, forest→Academy;
+a martial realm musters Garrisons on its rough ground), kept stable once set.
+- Still open: focus-specific **buildings**; an optional **build queue** on Grand maps.
 
 ### 9.5 Research, ages & game length — SHIPPED v1 (v0.25)
 - **Era-gated research** — every tech carries an `era` (0-based age, `data/eras.ts`);

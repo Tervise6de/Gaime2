@@ -998,3 +998,30 @@ describe("secessionRiskRegion (AI defends against revolt)", () => {
     expect(secessionRiskRegion(s, RIVAL)).toBe(1);
   });
 });
+
+describe("AI region focus", () => {
+  it("specialises its provinces by terrain over a few turns", () => {
+    let s = createGame({ seed: 31, rivals: 3 });
+    for (let i = 0; i < 3; i++) s = resolveTurn(s);
+    const rivalRegions = s.regions.filter((r) => r.ownerId !== null && r.ownerId !== 0 && r.ownerId !== 1);
+    expect(rivalRegions.length).toBeGreaterThan(0);
+    // Most provinces are specialised (a few freshly-conquered ones may lag a turn).
+    const focused = rivalRegions.filter((r) => r.focus);
+    expect(focused.length).toBeGreaterThan(rivalRegions.length * 0.7);
+    const valid = ["balanced", "farmland", "market", "workshop", "academy", "garrison"];
+    for (const r of focused) expect(valid).toContain(r.focus);
+    // Plains always lean Farmland (never a Garrison), whoever holds them.
+    for (const r of rivalRegions) if (r.terrain === "plains" && r.focus) expect(r.focus).toBe("farmland");
+  });
+
+  it("keeps a focus once assigned (no thrash across turns)", () => {
+    let s = createGame({ seed: 8, rivals: 2 });
+    s = resolveTurn(s);
+    const before = new Map(s.regions.filter((r) => r.focus).map((r) => [r.id, r.focus]));
+    s = resolveTurn(s);
+    for (const [id, focus] of before) {
+      const r = s.regions[id];
+      if (r && r.ownerId !== null && r.ownerId !== 1) expect(r.focus).toBe(focus);
+    }
+  });
+});

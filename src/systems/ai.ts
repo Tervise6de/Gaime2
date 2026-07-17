@@ -19,6 +19,7 @@ import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
 import { BUILDINGS, type BuildingId } from "@/data/buildings";
 import type { TraitId } from "@/data/traits";
 import { TERRAIN, type TerrainId } from "@/data/terrain";
+import type { FocusId } from "@/data/focuses";
 import { sideStrength, type UnitCounts } from "@/systems/combat";
 import {
   canRaiseUnit,
@@ -128,7 +129,40 @@ function manageEconomy(state: GameState, nationId: number): GameState {
       if (choice === "wonder") wonderInProgress = true;
     }
   }
+
+  // Specialise idle provinces so rivals play the focus system too. A region
+  // keeps its focus once set (assigned by terrain, with a martial realm mustering
+  // on its rough ground), so this is stable, not thrash.
+  s = assignAiFocus(s, nationId, nation.trait);
   return s;
+}
+
+/** Terrain a province leans toward when an AI specialises it. */
+const TERRAIN_FOCUS: Record<TerrainId, FocusId> = {
+  plains: "farmland", // food + growth
+  coast: "market", // trade + gold
+  hills: "workshop", // materials
+  mountains: "workshop", // materials
+  forest: "academy", // knowledge
+};
+
+/**
+ * Give each of a nation's un-specialised provinces a sensible focus by terrain
+ * (a martial realm turns its rough hills/mountains into muster Garrisons instead
+ * of workshops). Once set, a region keeps its focus. Pure and deterministic.
+ */
+function assignAiFocus(state: GameState, nationId: number, trait: TraitId | undefined): GameState {
+  let changed = false;
+  const regions = state.regions.map((r) => {
+    if (r.ownerId !== nationId || r.focus) return r;
+    changed = true;
+    const focus =
+      trait === "martial" && (r.terrain === "hills" || r.terrain === "mountains")
+        ? "garrison"
+        : TERRAIN_FOCUS[r.terrain];
+    return { ...r, focus };
+  });
+  return changed ? { ...state, regions } : state;
 }
 
 /** A province at/above this unrest is trending toward revolt (below the revolt line). */
