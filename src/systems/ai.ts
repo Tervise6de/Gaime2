@@ -233,15 +233,17 @@ function pickTech(done: TechId[], nation: Nation, era: number): TechId | null {
 
 /** Base build order when a nation's trait expresses no preference. */
 const BASE_BUILD_ORDER: BuildingId[] = [
-  "market", "harbor", "bank", "guildhall", "workshop", "mine", "university", "forum", "farm", "aqueduct", "library", "temple", "fortress",
+  "market", "harbor", "bank", "guildhall", "workshop", "mine", "university", "forum", "farm", "aqueduct", "library", "temple", "monastery", "cathedral", "fortress",
 ];
 
-/** Buildings a trait rushes first, so rivals open along their strength. */
+/** Buildings a trait rushes first, so rivals open along their strength. A
+    scholarly realm doubles as the church-builder (monasteries and cathedrals are
+    seats of learning), so it presses the religious race as well as the tech one. */
 const TRAIT_BUILD_PRIORITY: Record<TraitId, BuildingId[]> = {
   fertile: ["farm", "aqueduct"],
   industrious: ["workshop", "mine", "guildhall"],
   mercantile: ["market", "harbor", "bank", "guildhall"],
-  scholarly: ["library", "university", "forum"],
+  scholarly: ["library", "monastery", "university", "cathedral", "forum"],
   martial: ["fortress", "workshop"],
 };
 

@@ -2238,6 +2238,13 @@ function renderRegion(
     );
   }
   if (region.focus) bits.push(`${FOCUSES[region.focus].icon} ${escapeHtml(FOCUSES[region.focus].label)}`);
+  // Faith — shown when it differs from the ruler (the telling cases: a province
+  // occupied but not yet converted, or one whose people you've won to your faith).
+  if (region.faith !== undefined && region.faith !== region.ownerId) {
+    const holder = state.nations.find((n) => n.id === region.faith);
+    const faithName = region.faith === PLAYER_ID ? "your faith" : `${escapeHtml(holder?.name ?? "pagan")}’s faith`;
+    bits.push(`🛐 ${faithName}`);
+  }
   meta.innerHTML = bits.join(" · ");
   container.append(title, meta);
 

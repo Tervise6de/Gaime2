@@ -741,16 +741,30 @@ too, once the tech lands. Changing focus never removes one already built.
 - Still open: new **unit types** (deferred — they ripple through
   `emptyUnits`/`armySize` widely).
 
-### 9.6 Victory types — SHIPPED v1 (v0.26)
-The three paths (Domination / Great Works / Prestige) are now a **legible race**.
+### 9.6 Victory types — SHIPPED v2 (v0.26, faith v0.33)
+The paths (Domination / Great Works / **Faith** / Prestige) are a **legible race**.
 `victoryRaces()` (pure, in `systems/victory.ts`) reports, per path, *your* standing
 and the **leading rival's**, each 0..1 toward the win, plus an `alarm` when a rival
-is dangerously close. The Politics page renders all three as paired bars — you (gold)
+is dangerously close. The Politics page renders all four as paired bars — you (gold)
 vs the top rival (red) — with the goal, live values, and a "⚠ {rival} is closing on
 this victory" warning. No path is won or lost invisibly.
-- Still open: a **Faith / Culture** path fitting the Northern-Crusades setting
-  (convert/culturally-dominate a threshold of regions) — to spec alongside the
-  region-focus layer.
+
+**Faith — SHIPPED (v0.33), fitting the Northern Crusades.** Every settled province
+holds a **faith** (`region.faith`, `systems/faith.ts`) — *not* the same as who rules
+it. Influence is summed per realm each turn: **inertia** (the standing faith resists,
+so conquest occupies but never instantly converts), the **ruler's** promotion at home,
+and **holy sites** — temples (2), monasteries (3), cathedrals (5) — that radiate to
+their region in full and to *neighbours* at half, so a border cathedral converts
+across the frontier. A province flips to whoever leads its current faith by a clear
+margin. The upshot: taking land is not enough — you must plant churches to win hearts,
+and a missionary realm can hold the faith of lands it does not rule (and convert pagan
+frontier). Hold **60% of the settled world's faith** and you win. Wired into
+`checkVictory` and the four-way race; the **Faith map lens** tints every province by
+the faith that holds it (pagan land muted), the region panel flags a province whose
+faith differs from its ruler, and scholarly AI realms press the religious race by
+building monasteries and cathedrals. Pure and deterministic (no RNG).
+- Still open (future): shared-religion *blocs* (crusader realms cooperating) and a
+  distinct **culture** axis; today faith is per-realm, the cleaner single-winner model.
 
 ### 9.7 Suggested build sequence
 1. ✅ **Real Baltic map** (9.0 scripted-map mode) — shipped: scripted Baltic +

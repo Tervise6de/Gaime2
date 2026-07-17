@@ -27,6 +27,7 @@ import { scriptedMap } from "@/data/maps/types";
 import type { ScriptedMap } from "@/data/maps/types";
 import { nationalProduction, round1 } from "@/systems/economy";
 import { advanceConstruction } from "@/systems/construction";
+import { stepFaith, seedFaith } from "@/systems/faith";
 import { nextPopulation } from "@/systems/population";
 import { nextUnrest } from "@/systems/stability";
 import { armyMoves, totalUpkeep } from "@/systems/military";
@@ -234,7 +235,7 @@ export function createGame(options: NewGameOptions): GameState {
     rngState: rng.seed,
     turn: 1,
     nations,
-    regions: laidOut,
+    regions: seedFaith(laidOut),
     armies,
     nextArmyId,
     relations: {},
@@ -363,7 +364,7 @@ function createScriptedGame(map: ScriptedMap, regions: Region[], options: NewGam
     rngState: rng.seed,
     turn: 1,
     nations,
-    regions: laidOut,
+    regions: seedFaith(laidOut),
     armies,
     nextArmyId,
     relations: {},
@@ -729,7 +730,11 @@ export function resolveTurn(state: GameState): GameState {
   // 5. Refresh army moves for the coming turn.
   s = { ...s, armies: s.armies.map((a) => ({ ...a, movesLeft: armyMoves(a.units) })) };
 
-  // 6. Outcome: elimination, then domination / great works / turn-limit score.
+  // 5.5. Faith spreads: churches and rulers convert provinces (occupation alone
+  // does not), so the religious map shifts before the victory check reads it.
+  s = stepFaith(s);
+
+  // 6. Outcome: elimination, then domination / great works / faith / turn score.
   s = updateOutcome(s);
 
   // 7. Sample every nation's prestige score for the end-game graph.

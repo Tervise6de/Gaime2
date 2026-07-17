@@ -61,6 +61,12 @@ export interface BuildingDef {
   unrest: number;
   /** Fortification levels added to the region on completion (one-time). */
   fortification?: number;
+  /**
+   * How strongly this building projects its owner's faith (systems/faith.ts) —
+   * the holy sites of a religious campaign. 0/undefined = secular. Radiates to the
+   * region and, at a fraction, its neighbours, so churches convert across borders.
+   */
+  faith?: number;
   /** Tech that must be researched before this can be built. */
   requiresTech?: TechId;
   /** Terrain the region must have — hidden entirely elsewhere (not just locked). */
@@ -142,7 +148,8 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     yield: {},
     popCapacity: 0,
     unrest: 12,
-    blurb: "-12 unrest — keeps a heavily-taxed region in order.",
+    faith: 2,
+    blurb: "-12 unrest, and preaches your faith locally — keeps a taxed region in order.",
   },
   aqueduct: {
     id: "aqueduct",
@@ -255,7 +262,8 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     popCapacity: 0,
     unrest: 6,
     requiresTech: "scholasticism",
-    blurb: "+3 knowledge, -6 unrest — scholars and quiet order. (Scholasticism)",
+    faith: 3,
+    blurb: "+3 knowledge, -6 unrest, and spreads your faith — scholars and quiet order. (Scholasticism)",
   },
   watchtower: {
     id: "watchtower",
@@ -296,7 +304,8 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     popCapacity: 0,
     unrest: 10,
     requiresTech: "theology",
-    blurb: "+2 knowledge, +1 gold, -10 unrest — a seat of faith. (Theology)",
+    faith: 5,
+    blurb: "+2 knowledge, +1 gold, -10 unrest, and projects your faith far — a seat of faith. (Theology)",
   },
 
   // --- Focus capstones -------------------------------------------------------

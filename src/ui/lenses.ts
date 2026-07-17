@@ -11,7 +11,9 @@
 import type { GameState, Region } from "@/systems/state";
 import { regionProduction, nationYieldMult } from "@/systems/economy";
 
-export type LensId = "none" | "population" | "gold" | "materials" | "food" | "unrest";
+/** Heat lenses colour by a normalised scalar; "faith" is categorical (see below). */
+type HeatLens = "population" | "gold" | "materials" | "food" | "unrest";
+export type LensId = "none" | HeatLens | "faith";
 
 export interface LensDef {
   id: LensId;
@@ -31,10 +33,11 @@ export const LENSES: LensDef[] = [
   { id: "materials", label: "Materials", glyph: "materials", fallback: "⛏", hint: "Materials produced per turn." },
   { id: "food", label: "Food", glyph: "food", fallback: "🌾", hint: "Food produced per turn." },
   { id: "unrest", label: "Unrest", glyph: "warning", fallback: "🔥", hint: "How restless each region is (red = revolt risk)." },
+  { id: "faith", label: "Faith", glyph: "faith", fallback: "🛐", hint: "Whose faith each province holds — win by converting the world." },
 ];
 
 /** Low → high colour ramp for each heat lens (dark, receding low; bright high). */
-const RAMPS: Record<Exclude<LensId, "none">, string[]> = {
+const RAMPS: Record<HeatLens, string[]> = {
   population: ["#26332e", "#3f8f6a", "#63d29a"],
   gold: ["#332b18", "#b08b32", "#f0cf63"],
   materials: ["#2f2b26", "#9c6a3e", "#d99a5f"],
@@ -42,14 +45,18 @@ const RAMPS: Record<Exclude<LensId, "none">, string[]> = {
   unrest: ["#33503c", "#d7a53f", "#e8776b"],
 };
 
-/** CSS gradient for a lens's ramp (low → high), for the picker's scale legend. */
+/** Muted neutral for pagan / unconverted land under the faith lens. */
+const PAGAN_COLOR = "#3a3f45";
+
+/** CSS gradient for a lens's ramp (low → high), for the picker's scale legend.
+    Categorical lenses (Political, Faith) have no ramp — the map colours speak. */
 export function lensGradient(id: LensId): string | null {
-  if (id === "none") return null;
+  if (id === "none" || id === "faith") return null;
   return `linear-gradient(90deg, ${RAMPS[id].join(", ")})`;
 }
 
 /** The raw metric value for a region under a given lens. */
-function metric(state: GameState, region: Region, id: Exclude<LensId, "none">): number {
+function metric(state: GameState, region: Region, id: HeatLens): number {
   if (id === "population") return region.population;
   if (id === "unrest") return region.unrest;
   // Income lenses: use the region owner's tax + yield multipliers where owned,
@@ -99,6 +106,18 @@ function rampColor(ramp: string[], t: number): string {
  */
 export function lensColorsFor(state: GameState, id: LensId): (string | null)[] | null {
   if (id === "none") return null;
+  // Faith is categorical: tint each province by the *faith* that holds it (its
+  // realm's colour), pagan land muted — so an occupied-but-unconverted frontier
+  // reads as the old faith's colour, not the conqueror's. Not a heat ramp.
+  if (id === "faith") {
+    const colorOf = (nid: number): string =>
+      state.nations.find((n) => n.id === nid)?.color ?? PAGAN_COLOR;
+    const out: (string | null)[] = [];
+    for (const r of state.regions) {
+      out[r.id] = r.faith !== undefined ? colorOf(r.faith) : PAGAN_COLOR;
+    }
+    return out;
+  }
   const ramp = RAMPS[id];
   const vals: number[] = [];
   let min = Infinity;

@@ -12,11 +12,13 @@
 
 import {
   DOMINATION_FRACTION,
+  FAITH_VICTORY_FRACTION,
   PLAYER_ID,
   TURN_LIMIT,
   WONDER_GOAL,
   type GameState,
 } from "@/systems/state";
+import { faithFraction } from "@/systems/faith";
 
 /** Prestige score — territory, tech, wonders, treasury and population. */
 export function nationScore(state: GameState, id: number): number {
@@ -35,8 +37,8 @@ export function nationScore(state: GameState, id: number): number {
 
 export interface VictoryProgress {
   /** The path this nation is closest to completing. */
-  kind: "domination" | "great works";
-  /** A compact label, e.g. "42%⬢" (territory share) or "2/4★" (wonders). */
+  kind: "domination" | "great works" | "faith";
+  /** A compact label, e.g. "42%⬢" (territory), "2/4★" (wonders) or "55%🛐" (faith). */
   label: string;
   /** How far toward that win, 0..1 (1 = would trigger it). */
   fraction: number;
@@ -44,8 +46,10 @@ export interface VictoryProgress {
 
 /**
  * The victory path a nation is nearest to winning, as a 0..1 threat gauge for
- * the standings. Compares its territory share (toward domination) against its
- * wonders (toward Great Works) and reports whichever is closer. Pure.
+ * the standings. Compares its territory share (domination), wonders (Great Works)
+ * and faith share (religious) and reports whichever is closest. Faith only wins
+ * the gauge when it clearly leads territory — early on faith tracks ownership, so
+ * a bare tie would drown out the domination read. Pure.
  */
 export function victoryProgress(state: GameState, id: number): VictoryProgress {
   const nation = state.nations.find((n) => n.id === id);
@@ -55,7 +59,12 @@ export function victoryProgress(state: GameState, id: number): VictoryProgress {
   const domFraction = Math.min(1, domShare / DOMINATION_FRACTION);
   const wonders = nation?.wonders ?? 0;
   const wonderFraction = Math.min(1, wonders / WONDER_GOAL);
+  const faithShare = faithFraction(state, id);
+  const faithFrac = Math.min(1, faithShare / FAITH_VICTORY_FRACTION);
 
+  if (faithFrac > domFraction && faithFrac >= wonderFraction) {
+    return { kind: "faith", label: `${Math.round(faithShare * 100)}%🛐`, fraction: faithFrac };
+  }
   if (wonderFraction >= domFraction && wonders > 0) {
     return { kind: "great works", label: `${wonders}/${WONDER_GOAL}★`, fraction: wonderFraction };
   }
@@ -64,7 +73,7 @@ export function victoryProgress(state: GameState, id: number): VictoryProgress {
 
 /** One victory path as a legible race: your standing vs the leading rival's. */
 export interface VictoryRace {
-  kind: "domination" | "great works" | "prestige";
+  kind: "domination" | "great works" | "faith" | "prestige";
   title: string;
   /** What winning this path takes. */
   goal: string;
@@ -101,6 +110,9 @@ export function victoryRaces(state: GameState): VictoryRace[] {
   const pW = player?.wonders ?? 0;
   const rW = topRival((n) => n.wonders);
 
+  const pFaith = faithFraction(state, PLAYER_ID);
+  const rFaith = topRival((n) => faithFraction(state, n.id));
+
   const pScore = nationScore(state, PLAYER_ID);
   const rScore = topRival((n) => nationScore(state, n.id));
   const maxScore = Math.max(pScore, rScore?.v ?? 0, 1);
@@ -123,6 +135,16 @@ export function victoryRaces(state: GameState): VictoryRace[] {
       you: { value: `${pW}/${WONDER_GOAL}`, fraction: Math.min(1, pW / WONDER_GOAL) },
       rival: rW ? { name: rW.n.name, value: `${rW.v}/${WONDER_GOAL}`, fraction: Math.min(1, rW.v / WONDER_GOAL) } : null,
       alarm: !!rW && rW.v > 0 && rW.v >= WONDER_GOAL - 1,
+    },
+    {
+      kind: "faith",
+      title: "Faith",
+      goal: `Hold ${Math.round(FAITH_VICTORY_FRACTION * 100)}% of the world in your faith`,
+      you: { value: `${Math.round(pFaith * 100)}%`, fraction: Math.min(1, pFaith / FAITH_VICTORY_FRACTION) },
+      rival: rFaith
+        ? { name: rFaith.n.name, value: `${Math.round(rFaith.v * 100)}%`, fraction: Math.min(1, rFaith.v / FAITH_VICTORY_FRACTION) }
+        : null,
+      alarm: !!rFaith && rFaith.v >= FAITH_VICTORY_FRACTION - 0.12,
     },
     {
       kind: "prestige",
@@ -155,6 +177,9 @@ export function checkVictory(state: GameState): VictoryCheck | null {
     }
     if (n.wonders >= WONDER_GOAL) {
       return decide(n.id, "great works");
+    }
+    if (faithFraction(state, n.id) >= FAITH_VICTORY_FRACTION) {
+      return decide(n.id, "faith");
     }
   }
 
