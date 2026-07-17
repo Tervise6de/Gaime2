@@ -261,13 +261,22 @@ describe("kept-the-peace goodwill", () => {
     expect(keptPeaceGoodwill(later, RIVAL_A, RIVAL_B)).toBe(PEACE_GOODWILL_PER_STEP);
   });
 
-  it("driftRelations lifts a cold peace toward the goodwill floor over the long run", () => {
-    const cold = setRelation(game(), RIVAL_A, RIVAL_B, -20);
+  it("driftRelations warms an amicable peace toward the goodwill floor over the long run", () => {
+    // Goodwill only warms an already-amicable (rel ≥ 0) peace — it never rescues a
+    // souring one, so start from a mildly positive standing.
+    const warm = setRelation(game(), RIVAL_A, RIVAL_B, 4);
     // Early game: no goodwill accrued, so only the usual drift/border pressures act.
-    const early = getRelation(driftRelations({ ...cold, turn: 3 }), RIVAL_A, RIVAL_B);
-    // After a long peace the floor sits well above −20, so relations are lifted.
-    const long = getRelation(driftRelations({ ...cold, turn: 120 }), RIVAL_A, RIVAL_B);
+    const early = getRelation(driftRelations({ ...warm, turn: 3 }), RIVAL_A, RIVAL_B);
+    // After a long peace the floor sits well above the start, so relations are lifted.
+    const long = getRelation(driftRelations({ ...warm, turn: 120 }), RIVAL_A, RIVAL_B);
     expect(long).toBeGreaterThan(early);
+  });
+
+  it("does NOT rescue a souring relationship — border rivals can still reach war", () => {
+    // A deeply negative standing is left to border friction; goodwill stays out of it.
+    const sour = setRelation(game(), RIVAL_A, RIVAL_B, -30);
+    const after = getRelation(driftRelations({ ...sour, turn: 200 }), RIVAL_A, RIVAL_B);
+    expect(after).toBeLessThan(0); // still hostile despite a long nominal "peace"
   });
 
   it("never drags relations already above the floor upward (it is a floor, not a magnet)", () => {

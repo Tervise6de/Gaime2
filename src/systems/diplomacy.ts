@@ -693,10 +693,11 @@ export function driftRelations(state: GameState): GameState {
 
       // Kept-the-peace goodwill: an unbroken peace slowly lifts relations toward
       // a warm floor (never past it) — neighbours who never draw swords come to
-      // trust one another over the long run. Only while not at war (the clamp
-      // below governs war); the floor grows the longer the peace has held. A zero
-      // floor is a no-op, so short peaces leave grudges to decay on their own.
-      if (treaty !== "war") {
+      // trust one another over the long run. It only *warms an already-amicable*
+      // peace (rel ≥ 0); it never rescues a souring relationship, so border
+      // friction can still drive committed rivals to war (the AI's war trigger is
+      // deep hostility). A zero floor / war is a no-op.
+      if (treaty !== "war" && rel >= 0) {
         const floor = keptPeaceGoodwill(state, a, b);
         if (floor > 0 && rel < floor) rel = Math.min(floor, rel + PEACE_GOODWILL_CLIMB);
       }

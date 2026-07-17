@@ -658,11 +658,13 @@ aggressors. The player's declare-war confirm states the cause and its cost.
 `state.peaceSince` tracks the turn each pair's current peace began (set when a war
 ends, cleared when one is declared; absent = peace since the founding). Every full
 10 turns of peace raises a goodwill **floor** by +5, capped at +25 (`keptPeaceGoodwill`);
-`driftRelations` lifts relations toward that floor (+4/turn, enough to overcome
-drift-to-neutral and all but the longest-frontier border friction) and holds them
-there — long-time
-neighbours who never draw swords come to trust one another, mending old grudges
-over the long run. It never pushes past the floor (trust, not vassalage) and a
+`driftRelations` lifts relations toward that floor (+4/turn) — but **only warms an
+already-amicable peace** (rel ≥ 0). It never rescues a *souring* relationship, so
+border friction can still drive committed rivals below the AI's war trigger (deep
+hostility) and into war — goodwill must stay out of a deteriorating relationship,
+or the world never fights (fixed v0.35). Long-time
+neighbours who never draw swords come to trust one another. It never pushes past
+the floor (trust, not vassalage) and a
 zero floor is a no-op, so short peaces leave grudges to decay on their own. The
 opinion breakdown shows it as a standing "Kept the peace (N turns)" level. The AI
 benefits automatically — the lifted `relations` scalar makes enduring-peace
