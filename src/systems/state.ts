@@ -383,6 +383,14 @@ export interface GameState {
   /** Pairwise treaty status, keyed by pairKey(a,b). Missing = peace. */
   treaties: Record<string, TreatyStatus>;
   /**
+   * The turn each pair's current unbroken peace began, keyed by pairKey(a,b).
+   * Set when a war ends (makePeace) and cleared when war is declared; absent
+   * means the two have been at peace since the founding (turn 1). Enduring peace
+   * accrues "kept the peace" goodwill (diplomacy.ts). Optional — legacy saves
+   * read as peace-since-founding, which is the correct default.
+   */
+  peaceSince?: Record<string, number>;
+  /**
    * Active trade routes, keyed by pairKey(a,b) → true. A route pays both partners
    * gold each turn (economic diplomacy) and is severed the moment they go to war.
    * Optional so legacy saves load as "no trades".

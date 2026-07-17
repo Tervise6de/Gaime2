@@ -34,6 +34,11 @@ import {
   foreignRelations,
   casusBelli,
   CASUS_BELLI,
+  keptPeaceTurns,
+  keptPeaceGoodwill,
+  PEACE_GOODWILL_MAX,
+  PEACE_GOODWILL_PERIOD,
+  PEACE_GOODWILL_PER_STEP,
 } from "@/systems/diplomacy";
 import { createGame } from "@/systems/turn";
 import {
@@ -228,6 +233,53 @@ describe("driftRelations", () => {
     let g = setRelation(game(), RIVAL_A, RIVAL_B, 30);
     g = driftRelations(g);
     expect(getRelation(g, RIVAL_A, RIVAL_B)).toBeLessThan(30);
+  });
+});
+
+describe("kept-the-peace goodwill", () => {
+  it("counts unbroken peace since the founding when unrecorded", () => {
+    // No peaceSince entry → peace has held since turn 1.
+    expect(keptPeaceTurns({ ...game(), turn: 1 }, RIVAL_A, RIVAL_B)).toBe(0);
+    expect(keptPeaceTurns({ ...game(), turn: 25 }, RIVAL_A, RIVAL_B)).toBe(24);
+  });
+
+  it("scales +5 per 10 turns of peace and caps at +25", () => {
+    expect(keptPeaceGoodwill({ ...game(), turn: 6 }, RIVAL_A, RIVAL_B)).toBe(0); // 5 turns → below a full period
+    expect(keptPeaceGoodwill({ ...game(), turn: 11 }, RIVAL_A, RIVAL_B)).toBe(PEACE_GOODWILL_PER_STEP); // 10 turns
+    expect(keptPeaceGoodwill({ ...game(), turn: 31 }, RIVAL_A, RIVAL_B)).toBe(15); // 30 turns
+    expect(keptPeaceGoodwill({ ...game(), turn: 300 }, RIVAL_A, RIVAL_B)).toBe(PEACE_GOODWILL_MAX); // capped
+  });
+
+  it("war stops the peace clock; making peace restarts it", () => {
+    const base = { ...game(), turn: 80 };
+    expect(keptPeaceGoodwill(base, RIVAL_A, RIVAL_B)).toBe(PEACE_GOODWILL_MAX); // long peace since founding
+    const war = declareWar(base, RIVAL_A, RIVAL_B);
+    expect(keptPeaceGoodwill(war, RIVAL_A, RIVAL_B)).toBe(0); // swords drawn → no goodwill
+    const peace = makePeace(war, RIVAL_A, RIVAL_B); // a fresh clock starts at turn 80
+    expect(keptPeaceTurns(peace, RIVAL_A, RIVAL_B)).toBe(0);
+    const later = { ...peace, turn: 80 + PEACE_GOODWILL_PERIOD }; // +10 turns of the new peace
+    expect(keptPeaceGoodwill(later, RIVAL_A, RIVAL_B)).toBe(PEACE_GOODWILL_PER_STEP);
+  });
+
+  it("driftRelations lifts a cold peace toward the goodwill floor over the long run", () => {
+    const cold = setRelation(game(), RIVAL_A, RIVAL_B, -20);
+    // Early game: no goodwill accrued, so only the usual drift/border pressures act.
+    const early = getRelation(driftRelations({ ...cold, turn: 3 }), RIVAL_A, RIVAL_B);
+    // After a long peace the floor sits well above −20, so relations are lifted.
+    const long = getRelation(driftRelations({ ...cold, turn: 120 }), RIVAL_A, RIVAL_B);
+    expect(long).toBeGreaterThan(early);
+  });
+
+  it("never drags relations already above the floor upward (it is a floor, not a magnet)", () => {
+    const warm = setRelation({ ...game(), turn: 300 }, RIVAL_A, RIVAL_B, 60); // above the +25 cap
+    // Drift-to-neutral still applies; goodwill does not hold a high relation up.
+    expect(getRelation(driftRelations(warm), RIVAL_A, RIVAL_B)).toBeLessThan(60);
+  });
+
+  it("surfaces the goodwill as a positive standing pull in the breakdown", () => {
+    const g = { ...game(), turn: 40 };
+    const reasons = opinionReasons(g, PLAYER_ID, RIVAL_A);
+    expect(reasons.some((r) => r.kind === "standing" && /kept the peace/i.test(r.label) && r.delta > 0)).toBe(true);
   });
 });
 

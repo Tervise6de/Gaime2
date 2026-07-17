@@ -107,6 +107,12 @@ export interface OpinionReason {
   kind: "event" | "standing";
   /** Turn the dealing last happened (events only). */
   turn?: number;
+  /**
+   * A standing entry whose `delta` is a settled *level* the relation is held at,
+   * not a per-turn rate (e.g. kept-the-peace goodwill). The UI omits the "/turn"
+   * suffix for these. Undefined = a per-turn pull, like border friction.
+   */
+  level?: boolean;
 }
 
 /**
@@ -124,6 +130,10 @@ export function opinionReasons(state: GameState, from: number, to: number): Opin
   const shared = sharedEnemies(state, from, to);
   if (shared > 0) out.push({ label: "We share an enemy", delta: 2 * shared, kind: "standing" });
   if (getTreaty(state, from, to) === "alliance") out.push({ label: "Our alliance holds", delta: 2, kind: "standing" });
+  const peace = keptPeaceGoodwill(state, from, to);
+  if (peace > 0) {
+    out.push({ label: `Kept the peace (${keptPeaceTurns(state, from, to)} turns)`, delta: peace, kind: "standing", level: true });
+  }
   return out;
 }
 
@@ -251,6 +261,7 @@ export function casusBelli(state: GameState, a: number, b: number): CasusBelli {
 export function declareWar(state: GameState, a: number, b: number, cb?: CasusBelli): GameState {
   const reason = cb ?? casusBelli(state, a, b);
   let next = setTreaty(state, a, b, "war");
+  next = clearPeaceSince(next, a, b); // swords drawn — the peace clock stops
   next = recordOpinion(next, a, b, -RELATION_WAR_HIT, "war");
   next = severTrade(next, a, b); // war ends commerce
   const penalty = CASUS_BELLI[reason].thirdPartyPenalty;
@@ -304,6 +315,7 @@ export function severTrade(state: GameState, a: number, b: number): GameState {
 
 export function makePeace(state: GameState, a: number, b: number): GameState {
   let next = setTreaty(state, a, b, "peace");
+  next = setPeaceSince(next, a, b, next.turn); // a fresh peace clock starts now
   next = recordOpinion(next, a, b, +10, "peace");
   // Peace lifts the war grudge, so relations can recover instead of staying pinned.
   const key = pairKey(a, b);
@@ -595,6 +607,59 @@ export function callToArms(
   return { ...state, log: [...state.log, line].slice(-50) };
 }
 
+// --- kept-the-peace goodwill: enduring peace builds trust -------------------
+
+/** Turns of unbroken peace per goodwill step, relation points per step, and the
+    ceiling. +5 per 10 turns, capped at +25 — a long peace makes trusted
+    neighbours, never vassals. */
+export const PEACE_GOODWILL_PERIOD = 10;
+export const PEACE_GOODWILL_PER_STEP = 5;
+export const PEACE_GOODWILL_MAX = 25;
+/**
+ * How fast relations climb toward the goodwill floor each turn (points/turn).
+ * Set above the combined drift-to-neutral (−1) and border friction of all but the
+ * longest shared frontiers (up to ~6 shared edges, −3/turn) so a peaceful pair
+ * actually *reaches* and *holds* at its floor rather than stalling below it. The
+ * `min(floor, …)` cap means it never overshoots, so there is no runaway warmth.
+ */
+const PEACE_GOODWILL_CLIMB = 4;
+
+/**
+ * How many turns `a` and `b` have held an unbroken peace: `turn − peaceSince`,
+ * defaulting to peace since the founding (turn 1) when unrecorded. Zero while at
+ * war — swords drawn reset the clock. Pure.
+ */
+export function keptPeaceTurns(state: GameState, a: number, b: number): number {
+  if (atWar(state, a, b)) return 0;
+  const since = state.peaceSince?.[pairKey(a, b)] ?? 1;
+  return Math.max(0, state.turn - since);
+}
+
+/**
+ * The relation floor an enduring peace guarantees between `a` and `b`: +5 for
+ * every full 10 turns of unbroken peace, capped at +25. Below this floor a long
+ * peace slowly lifts relations toward it (`driftRelations`); it never pushes past
+ * it, so peace warms cold neighbours to trust without manufacturing allies. Pure.
+ */
+export function keptPeaceGoodwill(state: GameState, a: number, b: number): number {
+  const steps = Math.floor(keptPeaceTurns(state, a, b) / PEACE_GOODWILL_PERIOD);
+  return Math.min(PEACE_GOODWILL_MAX, steps * PEACE_GOODWILL_PER_STEP);
+}
+
+/** Start a fresh peace clock for the pair (a war just ended). */
+function setPeaceSince(state: GameState, a: number, b: number, turn: number): GameState {
+  return { ...state, peaceSince: { ...(state.peaceSince ?? {}), [pairKey(a, b)]: turn } };
+}
+
+/** Stop the peace clock for the pair (war declared) — goodwill can't accrue at war. */
+function clearPeaceSince(state: GameState, a: number, b: number): GameState {
+  const key = pairKey(a, b);
+  if (state.peaceSince?.[key] === undefined) return state;
+  const peaceSince = { ...state.peaceSince };
+  delete peaceSince[key];
+  return { ...state, peaceSince };
+}
+
 // --- per-turn relations drift ----------------------------------------------
 
 /**
@@ -625,6 +690,16 @@ export function driftRelations(state: GameState): GameState {
       // power) draw closer, so coalitions against a common foe hold together
       // instead of eroding under border friction.
       rel += 2 * sharedEnemies(state, a, b, players);
+
+      // Kept-the-peace goodwill: an unbroken peace slowly lifts relations toward
+      // a warm floor (never past it) — neighbours who never draw swords come to
+      // trust one another over the long run. Only while not at war (the clamp
+      // below governs war); the floor grows the longer the peace has held. A zero
+      // floor is a no-op, so short peaces leave grudges to decay on their own.
+      if (treaty !== "war") {
+        const floor = keptPeaceGoodwill(state, a, b);
+        if (floor > 0 && rel < floor) rel = Math.min(floor, rel + PEACE_GOODWILL_CLIMB);
+      }
 
       if (treaty === "war") rel = Math.min(rel, HOSTILE_THRESHOLD);
 

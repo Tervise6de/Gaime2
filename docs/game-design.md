@@ -649,8 +649,19 @@ with *every other* realm (−7 naked, −3 border; a justified war none), logged
 "Your wars of aggression" in the opinion breakdown, so coalitions form against
 aggressors. The player's declare-war confirm states the cause and its cost.
 
-**Still open (9.1 remainder):** a "kept the peace N turns" goodwill modifier
-(needs treaty-start tracking).
+**Kept the peace — SHIPPED (v0.31).** An unbroken peace now *builds trust*.
+`state.peaceSince` tracks the turn each pair's current peace began (set when a war
+ends, cleared when one is declared; absent = peace since the founding). Every full
+10 turns of peace raises a goodwill **floor** by +5, capped at +25 (`keptPeaceGoodwill`);
+`driftRelations` lifts relations toward that floor (+4/turn, enough to overcome
+drift-to-neutral and all but the longest-frontier border friction) and holds them
+there — long-time
+neighbours who never draw swords come to trust one another, mending old grudges
+over the long run. It never pushes past the floor (trust, not vassalage) and a
+zero floor is a no-op, so short peaces leave grudges to decay on their own. The
+opinion breakdown shows it as a standing "Kept the peace (N turns)" level. The AI
+benefits automatically — the lifted `relations` scalar makes enduring-peace
+neighbours likelier to trade and ally. **§9.1 is now complete.**
 
 ### 9.2 Combat model + unit roles — SHIPPED v2 (`systems/combat.ts`)
 Combat is now **phased**: an opening volley (ranged + siege fire first; siege

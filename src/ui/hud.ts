@@ -3257,7 +3257,7 @@ function renderDiplomacy(
         const lab = el("span", "hud-diplo-why-label");
         lab.textContent = r.kind === "event" && r.turn ? `${r.label} (turn ${r.turn})` : r.label;
         const val = el("span", "hud-diplo-why-val " + (r.delta >= 0 ? "good" : "bad"));
-        val.textContent = `${r.delta > 0 ? "+" : ""}${r.delta}${r.kind === "standing" ? "/turn" : ""}`;
+        val.textContent = `${r.delta > 0 ? "+" : ""}${r.delta}${r.kind === "standing" && !r.level ? "/turn" : ""}`;
         row.append(lab, val);
         list.append(row);
       }
