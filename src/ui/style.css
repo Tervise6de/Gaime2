@@ -81,10 +81,12 @@ body {
   padding: 5px 14px;
   background: linear-gradient(180deg, rgba(17, 22, 31, 0.97), rgba(12, 16, 23, 0.92));
   border-bottom: 1px solid rgba(230, 233, 239, 0.14);
-  backdrop-filter: blur(6px);
   box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35);
-  /* The bar's backdrop-filter makes a stacking context; without a z-index its
-     ☰ dropdown would paint beneath later-added panels (the region inspector). */
+  /* The z-index keeps the bar's ☰ dropdown above later-added panels (the
+     region inspector) — and its stacking context makes that reliable.
+     Deliberately no backdrop-filter anywhere in the HUD: at these near-opaque
+     panel gradients blur is invisible, but it forces the browser to
+     re-composite on every canvas repaint and scroll frame (jank). */
   z-index: 40;
 }
 
@@ -107,33 +109,28 @@ body {
   gap: 10px;
 }
 
+/* Civ-style resource chip: icon + stock + flow on one line; the name lives
+   in the tooltip. */
 .hud-resource {
   display: flex;
-  gap: 8px;
-  align-items: center;
-  padding: 2px 8px;
+  gap: 6px;
+  align-items: baseline;
+  padding: 2px 9px;
+  border-right: 1px solid rgba(230, 233, 239, 0.08);
+}
+
+.hud-resource:last-child {
+  border-right: none;
 }
 
 .hud-resource-icon {
-  font-size: 18px;
-}
-
-.hud-resource-body {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.15;
-}
-
-.hud-resource-label {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
+  font-size: 17px;
+  align-self: center;
 }
 
 .hud-resource-stock {
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
@@ -147,18 +144,68 @@ body {
   color: var(--negative);
 }
 
-.hud-turn {
+/* Crisis chips (famine / bankruptcy) — persistent and loud. */
+.hud-crisis {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
   font-size: 12px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #ffd9d2;
+  background: rgba(160, 46, 34, 0.55);
+  border: 1px solid rgba(232, 119, 107, 0.8);
+  border-radius: 7px;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.hud-turn.famine {
-  color: var(--negative);
+/* Timed realm modifiers (golden age, plague…) as compact chips. */
+.hud-mods {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.hud-mod-chip {
+  padding: 2.5px 8px;
+  font-size: 11px;
   font-weight: 600;
+  color: #ecd9a8;
+  background: rgba(224, 183, 74, 0.14);
+  border: 1px solid rgba(224, 183, 74, 0.4);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* The grand turn readout: turn + year over the age of the world. */
+.hud-turnwrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.2;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.hud-turn-main {
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(180deg, #f2dfa8, #d8ab55);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hud-turn-era {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(230, 200, 116, 0.72);
 }
 
 /* --- Panels --------------------------------------------------------------- */
@@ -168,7 +215,6 @@ body {
   border: 1px solid var(--panel-border);
   border-radius: 12px;
   padding: 14px;
-  backdrop-filter: blur(6px);
   box-shadow: var(--panel-shadow);
 }
 
@@ -252,7 +298,6 @@ body {
   border: 1px solid var(--panel-border);
   border-radius: 10px;
   cursor: pointer;
-  backdrop-filter: blur(6px);
   box-shadow: var(--panel-shadow);
 }
 
@@ -1315,7 +1360,6 @@ body {
   border: 1px solid var(--panel-border);
   border-radius: 10px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(6px);
   z-index: 60;
 }
 
@@ -1372,6 +1416,30 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--accent);
+}
+
+/* "This world" card at the top of the legend: seed, difficulty, age, trait. */
+.hud-legend-world {
+  margin-bottom: 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.hud-legend-fact {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.hud-legend-fact-label {
+  color: var(--muted);
+}
+
+.hud-legend-fact-value {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 .hud-legend-row {
@@ -1540,6 +1608,7 @@ body {
   width: min(960px, 96vw);
   max-height: 90vh;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 18px 20px;
   background: var(--panel, #1a2029);
   border: 1px solid var(--panel-border, #2a323d);
@@ -1769,7 +1838,6 @@ body {
   font-size: 18px;
   font-weight: 700;
   border-radius: 12px;
-  backdrop-filter: blur(6px);
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -1994,7 +2062,6 @@ body {
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 10px;
-  backdrop-filter: blur(6px);
   pointer-events: none;
 }
 
@@ -2609,11 +2676,22 @@ a:focus-visible,
      New-game setup on a short viewport) scrolls instead of clipping. */
   justify-content: flex-start;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 24px 16px;
-  gap: 10px;
-  background: radial-gradient(ellipse at 50% 40%, #171d29, #0b0e14 75%);
+  background: #0b0e14; /* base; the gradient lives on the fixed ::before */
   opacity: 1;
   transition: opacity 0.45s ease;
+  gap: 10px;
+}
+
+/* The vignette on a fixed, non-scrolling pseudo-element: scrolling the menu
+   never repaints a full-screen gradient (smooth wheel on weak GPUs). */
+.title-overlay::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(ellipse at 50% 40%, #171d29, #0b0e14 75%);
 }
 
 .title-overlay > * {
@@ -2654,15 +2732,6 @@ a:focus-visible,
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-}
-
-.title-tagline {
-  font-size: 13px;
-  letter-spacing: 0.42em;
-  text-align: center;
-  padding-left: 0.42em;
-  text-transform: uppercase;
-  color: var(--muted);
 }
 
 /* Studio credit above the wordmark. */

@@ -148,26 +148,25 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
   // --- Camera: pan/zoom over the fitted base projection ----------------------
   // screen = base * s + t. At s = 1 the map fits exactly (t clamps to 0), so
-  // the full-map view stays the default; zooming unlocks panning. While a
-  // gesture is in flight the cached layers are blitted through a delta
-  // transform (cheap, slightly soft); once input settles for a few frames the
-  // projection + layers rebuild at the live camera and everything is crisp.
+  // the full-map view stays the default; zooming unlocks panning. The static
+  // layers are baked ONCE in camera-independent base space (supersampled) and
+  // drawn through the camera transform every frame — pan/zoom never rebuilds
+  // them, so gestures stay hitch-free; only the light projection (hit paths,
+  // marker anchors) follows the live camera.
   const CAM_MIN = 0.8; // zoom out past fit — the whole island with extra sea room
   const CAM_MAX = 2.75;
   /** How far (fraction of the viewport) the map may pan beyond its fitted
       bounds — so dragging always answers, even at fit zoom. */
   const PAN_SLACK = 0.22;
-  const CAM_SETTLE_FRAMES = 10;
   interface Camera {
     s: number;
     tx: number;
     ty: number;
   }
   const cam: Camera = { s: 1, tx: 0, ty: 0 };
-  let camBuiltKey = ""; // camera baked into the current projection/layers
-  let staleCam: Camera | null = null; // snapshot matching the built projection
-  let camChangedTick = -999; // tick of the last camera input
-  let camOverride: Camera | null = null; // used while blitting a stale frame
+  /** Identity camera — layers bake in base space through this override. */
+  const BASE_CAM: Camera = { s: 1, tx: 0, ty: 0 };
+  let camOverride: Camera | null = null; // set while baking base-space geometry/layers
 
   function camKey(): string {
     return `${cam.s.toFixed(3)}|${cam.tx.toFixed(1)}|${cam.ty.toFixed(1)}`;
@@ -198,14 +197,14 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     cam.ty = my - ((my - cam.ty) * s1) / s0;
     cam.s = s1;
     clampCam();
-    camChangedTick = tick;
+    needsPaint = true;
   }
 
   function panBy(dx: number, dy: number): void {
     cam.tx += dx;
     cam.ty += dy;
     clampCam();
-    camChangedTick = tick;
+    needsPaint = true;
   }
 
   /** Back to the fitted, centred full-map view. */
@@ -213,7 +212,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     cam.s = 1;
     cam.tx = 0;
     cam.ty = 0;
-    camChangedTick = tick;
+    needsPaint = true;
   }
 
   // Voronoi cells (+ their organic-border variants) and the island silhouette
@@ -244,6 +243,10 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   }
   let projection: Projection | null = null;
   let projSig = "";
+  // Base-space twin (identity camera): the static layers bake against this, so
+  // camera moves never invalidate them.
+  let baseProjection: Projection | null = null;
+  let baseProjSig = "";
 
   // Pre-rendered static layers (device-pixel offscreens, blitted per frame).
   let oceanLayer: HTMLCanvasElement | null = null;
@@ -265,13 +268,34 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   // blurred HUD panels above the canvas every frame).
   let needsPaint = true;
 
+  /** Live-camera projection: hit paths, marker anchors, dynamics. Cheap to
+      rebuild (a few thousand point transforms), so it follows every camera
+      move; the expensive pixels live in the base-space layers instead. */
   function ensureProjection(s: GameState): Projection {
     ensureCells(s);
     const sig = `${cellSig}|${canvas.clientWidth}x${canvas.clientHeight}|${camKey()}`;
     if (projection && sig === projSig) return projection;
     projSig = sig;
-    camBuiltKey = camKey();
-    staleCam = { ...cam };
+    projection = buildProjection(s);
+    return projection;
+  }
+
+  /** Base-space projection (identity camera) — what the static layers bake against. */
+  function ensureBaseProjection(s: GameState): Projection {
+    ensureCells(s);
+    const sig = `${cellSig}|${canvas.clientWidth}x${canvas.clientHeight}`;
+    if (baseProjection && sig === baseProjSig) return baseProjection;
+    baseProjSig = sig;
+    camOverride = BASE_CAM;
+    try {
+      baseProjection = buildProjection(s);
+    } finally {
+      camOverride = null;
+    }
+    return baseProjection;
+  }
+
+  function buildProjection(s: GameState): Projection {
     const px = organic.map((c) => c.poly.map((v) => projectXY(v.x, v.y)));
     const edgesPx = organic.map((c) => c.edges.map((e) => e.map((v) => projectXY(v.x, v.y))));
     const paths = px.map((poly) => {
@@ -313,11 +337,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       }
     }
 
-    projection = { px, paths, edgesPx, sites, reach, land, blobsPx, blobPaths, isletsPx, lanes };
-    oceanSig = ""; // dependent layers must rebuild against the new geometry
-    terrainSig = "";
-    politicalSig = "";
-    return projection;
+    return { px, paths, edgesPx, sites, reach, land, blobsPx, blobPaths, isletsPx, lanes };
   }
 
   function ensureCells(s: GameState): void {
@@ -335,25 +355,44 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       organic = organicCells(cells, s.seed);
       archetype = islandArchetype(s.regions.length, s.seed);
       shape = islandShape(sites, s.seed, archetype);
-      projSig = ""; // projection derives from the cells — force a rebuild
+      projSig = ""; // both projections derive from the cells — force rebuilds
+      baseProjSig = "";
     }
   }
 
   // --- Static layers ----------------------------------------------------------
+  // Layers bake in base space (identity camera) at a supersampled resolution,
+  // then draw through the camera transform each frame — so zooming to CAM_MAX
+  // stays acceptably crisp without ever re-rendering a stamp. The pixel budget
+  // caps memory on large/hi-DPI screens (soft-at-max-zoom beats jank).
+  const MAX_LAYER_PIXELS = 6_000_000;
 
-  /** (Re)build an offscreen layer canvas matching the main canvas resolution. */
+  function layerScaleNow(): number {
+    const dpr = window.devicePixelRatio || 1;
+    const area = Math.max(1, canvas.clientWidth * canvas.clientHeight);
+    return Math.max(1, Math.min(Math.max(2, dpr), Math.sqrt(MAX_LAYER_PIXELS / area)));
+  }
+
+  /** (Re)build an offscreen layer canvas at the supersampled base resolution. */
   function makeLayer(prev: HTMLCanvasElement | null): { cv: HTMLCanvasElement; g: CanvasRenderingContext2D } {
+    const scale = layerScaleNow();
+    const lw = Math.max(1, Math.round(canvas.clientWidth * scale));
+    const lh = Math.max(1, Math.round(canvas.clientHeight * scale));
     const cv = prev ?? document.createElement("canvas");
-    if (cv.width !== canvas.width || cv.height !== canvas.height) {
-      cv.width = canvas.width;
-      cv.height = canvas.height;
+    if (cv.width !== lw || cv.height !== lh) {
+      cv.width = lw;
+      cv.height = lh;
     }
     const g = cv.getContext("2d");
     if (!g) throw new Error("Unable to acquire layer context");
-    const dpr = window.devicePixelRatio || 1;
-    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.setTransform(scale, 0, 0, scale, 0, 0);
     g.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
     return { cv, g };
+  }
+
+  /** Sig fragment shared by every layer: base geometry ⊕ layer resolution. */
+  function layerBaseSig(): string {
+    return `${baseProjSig}|x${layerScaleNow().toFixed(2)}`;
   }
 
   /**
@@ -362,10 +401,11 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
    * map ⊕ canvas size.
    */
   function ensureOcean(s: GameState, proj: Projection): HTMLCanvasElement {
-    if (oceanLayer && oceanSig === projSig) return oceanLayer;
+    const sig = layerBaseSig();
+    if (oceanLayer && oceanSig === sig) return oceanLayer;
     const { cv, g } = makeLayer(oceanLayer);
     oceanLayer = cv;
-    oceanSig = projSig;
+    oceanSig = sig;
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
 
@@ -554,7 +594,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
    * icons are still decoding it re-renders next frame until complete.
    */
   function ensureTerrain(s: GameState, proj: Projection): HTMLCanvasElement {
-    if (terrainLayer && terrainSig === projSig) return terrainLayer;
+    const wantSig = layerBaseSig();
+    if (terrainLayer && terrainSig === wantSig) return terrainLayer;
     const { cv, g } = makeLayer(terrainLayer);
     terrainLayer = cv;
     let complete = true;
@@ -655,7 +696,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       g.restore();
     });
 
-    terrainSig = complete ? projSig : ""; // retry until every motif has decoded
+    terrainSig = complete ? wantSig : ""; // retry until every motif has decoded
     return cv;
   }
 
@@ -675,7 +716,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         if (!a.isBarbarian && !b.isBarbarian && atWar(s, a.id, b.id)) wars += `${a.id}:${b.id},`;
       }
     }
-    return `${projSig}|${acc}|${wars}|${colourblind ? 1 : 0}`;
+    return `${layerBaseSig()}|${acc}|${wars}|${colourblind ? 1 : 0}`;
   }
 
   /**
@@ -844,13 +885,45 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
     g.restore();
 
-    // 5) Realm nameplates: each living nation's name floats over its lands —
-    //    the fastest answer to "who is where". Anchored to the owned region
-    //    nearest the realm's centroid, so it stays on the realm even when the
-    //    territory is disjoint. Drawn OUTSIDE the land clip (a coastal plate
-    //    may overhang the water — it must never be cut) and clamped on-canvas.
-    //    The player's plate reads "YOU".
-    const plate = g as CanvasRenderingContext2D & { letterSpacing?: string };
+    // Realm nameplates are NOT baked here: they draw per frame (crisp at any
+    // zoom) with collision avoidance against region labels — see drawNameplates.
+    return cv;
+  }
+
+  /**
+   * Realm nameplates: each living nation's name floats over its lands — the
+   * fastest answer to "who is where". Anchored to the owned region nearest the
+   * realm's centroid (stays on the realm even when territory is disjoint), then
+   * nudged to the first vertical slot that overlaps no region label, no marker
+   * cluster and no already-placed plate — big names stop stamping over the
+   * map's small text. Clamped on-canvas; the player's plate reads "YOU".
+   */
+  function drawNameplates(s: GameState, proj: Projection): void {
+    interface Rect {
+      x0: number;
+      y0: number;
+      x1: number;
+      y1: number;
+    }
+    // Obstacles: per region a marker-cluster disc (pop chip, crest, status row)
+    // approximated as a rect, plus the name label rect beneath it.
+    const obstacles: Rect[] = [];
+    context.font = "600 11px system-ui, sans-serif";
+    for (const region of s.regions) {
+      const p = proj.sites[region.id]!;
+      obstacles.push({ x0: p.x - 30, y0: p.y - 14, x1: p.x + 30, y1: p.y + NODE_RADIUS + 2 });
+      const half = context.measureText(region.name).width / 2 + 3;
+      obstacles.push({
+        x0: p.x - half,
+        y0: p.y + NODE_RADIUS + 2,
+        x1: p.x + half,
+        y1: p.y + NODE_RADIUS + 36, // name + status row beneath it
+      });
+    }
+    const overlaps = (a: Rect): boolean =>
+      obstacles.some((b) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0);
+
+    const plate = context as CanvasRenderingContext2D & { letterSpacing?: string };
     for (const nation of s.nations) {
       if (nation.isBarbarian || !nation.alive) continue;
       const owned = s.regions.filter((r) => r.ownerId === nation.id);
@@ -875,26 +948,46 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         }
       }
       const label = (nation.isPlayer ? "You" : nation.name).toUpperCase();
-      const size = Math.min(24, 13 + owned.length * 1.5);
+      const size = Math.min(21, 12.5 + owned.length * 1.2);
       if ("letterSpacing" in plate) plate.letterSpacing = "2px";
-      g.font = `800 ${size}px system-ui, sans-serif`;
-      g.textAlign = "center";
-      g.textBaseline = "middle";
-      const half = g.measureText(label).width / 2;
+      context.font = `800 ${size}px system-ui, sans-serif`;
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      const half = context.measureText(label).width / 2;
       const x = Math.min(canvas.clientWidth - half - 10, Math.max(half + 10, anchor.x));
-      const y = Math.max(58, anchor.y - 44);
-      g.lineWidth = 4;
-      g.lineJoin = "round";
-      g.strokeStyle = POLITICAL.nameplateHalo;
-      g.strokeText(label, x, y);
-      g.globalAlpha = POLITICAL.nameplateAlpha;
-      g.fillStyle = ownerColor(nation.id);
-      g.fillText(label, x, y);
-      g.globalAlpha = 1;
+      // Candidate slots above the anchor first (the classic map look), then
+      // below; take the first collision-free one, else the least intrusive
+      // default. Every candidate stays clear of the top HUD strip.
+      let y = Math.max(58, anchor.y - 46);
+      let placedRect: Rect | null = null;
+      for (const dy of [-46, -74, -102, 40, 68, -46]) {
+        const cyCand = Math.max(58, anchor.y + dy);
+        const rect: Rect = {
+          x0: x - half - 6,
+          y0: cyCand - size / 2 - 3,
+          x1: x + half + 6,
+          y1: cyCand + size / 2 + 3,
+        };
+        if (!overlaps(rect)) {
+          y = cyCand;
+          placedRect = rect;
+          break;
+        }
+      }
+      if (!placedRect) {
+        placedRect = { x0: x - half - 6, y0: y - size / 2 - 3, x1: x + half + 6, y1: y + size / 2 + 3 };
+      }
+      obstacles.push(placedRect); // later plates must dodge this one too
+      context.lineWidth = 4;
+      context.lineJoin = "round";
+      context.strokeStyle = POLITICAL.nameplateHalo;
+      context.strokeText(label, x, y);
+      context.globalAlpha = POLITICAL.nameplateAlpha;
+      context.fillStyle = ownerColor(nation.id);
+      context.fillText(label, x, y);
+      context.globalAlpha = 1;
       if ("letterSpacing" in plate) plate.letterSpacing = "0px";
     }
-
-    return cv;
   }
 
   /**
@@ -1161,41 +1254,22 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
   function render(): void {
     if (!running) return;
-    // Idle skip: camera settled into the built layers, nothing animating and
-    // no repaint requested — keep the last frame on screen and do no work.
-    const camUnsettled = state !== null && camKey() !== camBuiltKey;
-    if (!needsPaint && !camUnsettled && ripples.length === 0) {
+    // Idle skip: nothing animating and no repaint requested — keep the last
+    // frame on screen and do no work at all.
+    if (!needsPaint && ripples.length === 0) {
       tick += 1;
       frame = window.requestAnimationFrame(render);
       return;
     }
     needsPaint = false;
     // Base water fill: overscroll slack and zoomed-out views expose canvas
-    // beyond the cached layers — it must always read as sea, never as void.
+    // beyond the static composite — it must always read as sea, never as void.
     context.fillStyle = OCEAN.outer;
     context.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
     if (state) {
-      const gestureLive = projection && staleCam && camKey() !== camBuiltKey && tick - camChangedTick < CAM_SETTLE_FRAMES;
-      if (gestureLive) {
-        // Mid-gesture: blit the cached frame through the delta transform —
-        // slightly soft, but instant. The crisp rebuild lands once input rests.
-        const k = cam.s / staleCam!.s;
-        const dx = cam.tx - staleCam!.tx * k;
-        const dy = cam.ty - staleCam!.ty * k;
-        const dpr = window.devicePixelRatio || 1;
-        context.save();
-        context.setTransform(dpr * k, 0, 0, dpr * k, dpr * dx, dpr * dy);
-        camOverride = staleCam;
-        paintVoronoi(state, projection!);
-        drawArmies(state);
-        drawRipples(state);
-        camOverride = null;
-        context.restore();
-      } else {
-        paintVoronoi(state, ensureProjection(state));
-        drawArmies(state);
-        drawRipples(state);
-      }
+      paintVoronoi(state, ensureProjection(state));
+      drawArmies(state);
+      drawRipples(state);
     }
     tick += 1;
     frame = window.requestAnimationFrame(render);
@@ -1245,11 +1319,24 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     return capitals;
   }
 
-  /** Ocean+terrain+political folded into one canvas so a frame is one blit. */
-  function ensureStatic(s: GameState, proj: Projection): HTMLCanvasElement {
-    const ocean = ensureOcean(s, proj);
-    const terrain = ensureTerrain(s, proj);
-    const political = ensurePolitical(s, proj);
+  /**
+   * Ocean+terrain+political folded into one canvas so a frame is one draw.
+   * Everything bakes in base space (identity camera, supersampled) — the
+   * camera transform at draw time handles pan/zoom without any rebuild.
+   */
+  function ensureStatic(s: GameState): HTMLCanvasElement {
+    const proj = ensureBaseProjection(s);
+    camOverride = BASE_CAM; // texture/grain/sea-life sampling projects in base space
+    let ocean: HTMLCanvasElement;
+    let terrain: HTMLCanvasElement;
+    let political: HTMLCanvasElement;
+    try {
+      ocean = ensureOcean(s, proj);
+      terrain = ensureTerrain(s, proj);
+      political = ensurePolitical(s, proj);
+    } finally {
+      camOverride = null;
+    }
     const sig = `${oceanSig}||${terrainSig}||${politicalSig}`;
     if (staticLayer && sig === staticSig) return staticLayer;
     staticSig = sig;
@@ -1268,13 +1355,24 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   }
 
   /**
-   * The island territory view: blit the cached static composite, then the
-   * per-frame dynamics — selection, highlights, markers.
-   * Takes the projection to paint from (live or, mid-gesture, the stale one).
+   * The island territory view: draw the cached static composite through the
+   * live camera, then the per-frame dynamics — selection, highlights, markers,
+   * realm nameplates — crisp at the current zoom.
    */
   function paintVoronoi(s: GameState, proj: Projection): void {
     markerHits = []; // the marker passes below re-register this frame's tips
-    context.drawImage(ensureStatic(s, proj), 0, 0, canvas.clientWidth, canvas.clientHeight);
+    const st = ensureStatic(s);
+    context.drawImage(
+      st,
+      0,
+      0,
+      st.width,
+      st.height,
+      cam.tx,
+      cam.ty,
+      canvas.clientWidth * cam.s,
+      canvas.clientHeight * cam.s,
+    );
     const capitals = capitalSet(s);
 
     context.save();
@@ -1305,6 +1403,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     for (const region of s.regions) {
       drawMarkers(region, proj.sites[region.id]!, capitals);
     }
+
+    // Realm nameplates last: placed to dodge the labels just drawn.
+    drawNameplates(s, proj);
   }
 
   /**
@@ -1579,7 +1680,11 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   function onPointerDown(ev: PointerEvent): void {
     reportHover(null, 0, 0); // a press ends any hover tip
     canvas.style.cursor = "grabbing";
-    canvas.setPointerCapture(ev.pointerId);
+    try {
+      canvas.setPointerCapture(ev.pointerId);
+    } catch {
+      /* synthetic/expired pointer (e.g. automation) — dragging still works */
+    }
     pointers.set(ev.pointerId, localXY(ev));
     if (pointers.size === 1) {
       pressMoved = false;

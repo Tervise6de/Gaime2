@@ -224,6 +224,9 @@ function main(): void {
     selectedRegion = regionId;
     moveArmyId = null;
     sync();
+    // A plain map click opens the region full-size (same screen as Capital);
+    // ocean clicks just deselect.
+    if (regionId !== null) hud.openRegionScreen(regionId);
   });
 
   // Keyboard: Enter / Space ends the turn (unless typing in an input, or a modal

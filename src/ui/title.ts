@@ -55,10 +55,6 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
     wordmark.className = "title-wordmark";
     wordmark.textContent = "Petty Kingdoms";
 
-    const tagline = document.createElement("p");
-    tagline.className = "title-tagline";
-    tagline.textContent = "Small realms, grand ambitions";
-
     const version = document.createElement("p");
     version.className = "title-version";
     version.textContent =
@@ -119,6 +115,7 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
       menu.style.display = open ? "none" : "flex";
       setup.style.display = open ? "flex" : "none";
       hint.textContent = open ? "Esc to go back" : "Esc to continue";
+      overlay.scrollTop = 0; // a fresh screen always starts at its top
       if (open) {
         form.refreshSeed(); // every visit to the setup gets a fresh, real seed
         disarmStart();
@@ -128,7 +125,7 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
       }
     }
 
-    overlay.append(art, studio, wordmark, tagline, menu, setup, hint, version);
+    overlay.append(art, studio, wordmark, menu, setup, hint, version);
     // Mount inside #hud so the HUD's own overlays (Options/Records, z 250 while
     // the menu is up) share this stacking context and can render above the menu
     // — #hud is position:fixed, which traps its children's z-index otherwise.

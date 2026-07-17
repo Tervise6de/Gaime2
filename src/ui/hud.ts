@@ -63,6 +63,7 @@ import type { TurnSummary } from "@/systems/summary";
 import { deriveAlerts, type Alert } from "@/ui/alerts";
 import { researchFrontier, isBuildingUnlockedFor } from "@/systems/tech";
 import { ARCHETYPE_LABEL } from "@/data/personalities";
+import { eraForTurn, yearForTurn } from "@/data/eras";
 import { TRAITS } from "@/data/traits";
 import { TECHS, TECH_IDS, type TechId, type TechBranch } from "@/data/techs";
 import { WONDER_GOAL, DOMINATION_FRACTION, TURN_LIMIT, MODIFIER_LABEL } from "@/systems/state";
@@ -157,6 +158,8 @@ export interface Hud {
   openRecords(): void;
   /** Show/hide the map-marker tooltip (renderer hover reports). */
   mapTip(tip: { text: string; x: number; y: number } | null): void;
+  /** Open the full-size region screen (map clicks land here, like the Capital button). */
+  openRegionScreen(regionId: number): void;
   /**
    * Pause after a resolved turn with a digest of what changed (optional via
    * Options; quiet turns and turns with a pending decision skip it).
@@ -190,9 +193,11 @@ const RESOURCE_META: Record<ResourceKey, { label: string; icon: string; tip: str
 export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   root.innerHTML = "";
 
-  // --- Top strip (AoE2-style): one slim full-width bar along the top edge ----
-  // Resources lead on the left, the turn/realm readout sits centred, victory
-  // progress and the ☰ menu (every low-frequency panel) close the right end.
+  // --- Top strip (Civ-style): one slim full-width bar along the top edge -----
+  // Compact icon+value(+flow) resource chips lead on the left; crisis chips,
+  // timed modifiers and victory progress sit centred; the grand turn/era
+  // readout and the ☰ menu close the right end. (Resource names live in the
+  // chip tooltips — the icons carry the identity, Civ-style.)
   const topBar = el("div", "hud-topbar");
   const barLeft = el("div", "hud-topbar-left");
   const resourceEls: Record<ResourceKey, { stock: HTMLElement; flow: HTMLElement }> =
@@ -200,15 +205,11 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   for (const key of RESOURCE_KEYS) {
     const meta = RESOURCE_META[key];
     const cell = el("div", "hud-resource");
-    cell.title = meta.tip;
+    cell.title = `${meta.label} — ${meta.tip}`;
     const icon = resourceIconEl(key, meta.icon, "hud-resource-icon");
-    const body = el("div", "hud-resource-body");
-    const label = el("span", "hud-resource-label");
-    label.textContent = meta.label;
     const stock = el("span", "hud-resource-stock");
     const flow = el("span", "hud-resource-flow");
-    body.append(label, stock, flow);
-    cell.append(icon, body);
+    cell.append(icon, stock, flow);
     barLeft.append(cell);
     resourceEls[key] = { stock, flow };
   }
@@ -266,15 +267,25 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   }
 
   const barCenter = el("div", "hud-topbar-center");
-  const turnBadge = el("div", "hud-turn");
-  barCenter.append(turnBadge);
-  topBar.append(barCenter);
-
-  const barRight = el("div", "hud-topbar-right");
+  // Crises never hide behind a digest: famine/bankruptcy chips persist every
+  // turn the condition holds. Timed realm modifiers show as compact chips.
+  const crisisEl = el("div", "hud-crisis");
+  crisisEl.style.display = "none";
+  const modsBox = el("div", "hud-mods");
+  modsBox.style.display = "none";
   const victoryEl = el("div", "hud-victory");
   victoryEl.title = "Progress toward each victory: leading realm's territory share (domination at "
     + `${Math.round(DOMINATION_FRACTION * 100)}%), Great Works, and the turn ${TURN_LIMIT} prestige deadline.`;
-  barRight.append(victoryEl);
+  barCenter.append(crisisEl, modsBox, victoryEl);
+  topBar.append(barCenter);
+
+  const barRight = el("div", "hud-topbar-right");
+  // The grand turn readout: turn, calendar year and the age of the world.
+  const turnWrap = el("div", "hud-turnwrap");
+  const turnMain = el("div", "hud-turn-main");
+  const turnEra = el("div", "hud-turn-era");
+  turnWrap.append(turnMain, turnEra);
+  barRight.append(turnWrap);
 
   // ☰ menu — standings, help, tutorial, legend, records and options all live
   // behind one toggle, so the strip itself stays pure information.
@@ -329,9 +340,12 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   alertStrip.style.display = "none";
   root.append(alertStrip);
 
-  // Map legend (hidden until toggled) — explains the node/marker vocabulary.
+  // Map legend (hidden until toggled) — explains the marker vocabulary and
+  // carries the World card (seed, difficulty, age…) filled live in update().
   const legendPanel = buildLegend();
   legendPanel.style.display = "none";
+  const legendWorld = el("div", "hud-legend-world");
+  legendPanel.insertBefore(legendWorld, legendPanel.children[1] ?? null);
   root.append(legendPanel);
 
   // --- Left rail: compact entry points instead of always-open panels ---------
@@ -409,6 +423,9 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     researchDrawer.root.style.display = id === "research" ? "block" : "none";
     diploRail.btn.classList.toggle("active", id === "diplo");
     researchRail.btn.classList.toggle("active", id === "research");
+    // A freshly opened drawer always starts at its top.
+    if (id === "diplo") diploDrawer.root.scrollTop = 0;
+    if (id === "research") researchDrawer.root.scrollTop = 0;
   }
   function toggleDrawer(id: DrawerId): void {
     setDrawer(openDrawer === id ? null : id);
@@ -471,6 +488,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     refreshSlotLabels(); // slot turn markers reflect the latest saves on open
     newGameForm.refreshSeed(); // every visit shows a fresh, real seed
     gameMenuOverlay.style.display = "flex";
+    gameMenuPanel.scrollTop = 0; // the panel persists — reset to its top on open
   }
   function closeGameMenu(): void {
     gameMenuOverlay.style.display = "none";
@@ -1328,6 +1346,9 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     const player = playerNation(state);
     lastPlayer = player;
     lastState = state;
+    // Inspecting a different region starts its panel at the top (the panel
+    // element persists, so a previous region's scroll would otherwise linger).
+    if (selectedRegionId !== lastSelected) rightPanel.scrollTop = 0;
     lastSelected = selectedRegionId;
 
     // Rail badges: offers awaiting your answer; a research choice waiting.
@@ -1370,24 +1391,59 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     }
     syncStockDisplay(); // ease the displayed stock toward the new target (or snap)
     resourceEls.food.flow.classList.toggle("negative", player.famine || flow.food < 0);
-    const activeMods = (player.modifiers ?? [])
-      .filter((m) => m.turnsLeft > 0)
-      .map((m) => {
-        const intensity = (m.stacks ?? 1) > 1 ? ` ×${m.stacks}` : "";
-        return `${MODIFIER_LABEL[m.id]}${intensity} (${m.turnsLeft})`;
-      })
-      .join(" · ");
-    // Trait/modifier labels are fixed data-table strings, but difficulty and
-    // seed come from the (possibly imported) save — escape them.
-    turnBadge.innerHTML =
-      (player.famine ? `${glyphHtml("warning", "⚠")} FAMINE · ` : "") +
-      (player.bankrupt ? `${glyphHtml("warning", "⚠")} BANKRUPT · ` : "") +
-      `Turn ${state.turn} · ${escapeHtml(String(state.difficulty))}` +
-      (player.trait ? ` · ${TRAITS[player.trait].label}` : "") +
-      (activeMods ? ` · ${activeMods}` : "") +
-      ` · seed ${escapeHtml(String(state.seed))}`;
-    turnBadge.title = player.trait ? TRAITS[player.trait].blurb : "";
-    turnBadge.classList.toggle("famine", player.famine || player.bankrupt);
+
+    // Crisis chips — persistent while the condition holds, impossible to miss.
+    const crises: string[] = [];
+    if (player.famine) crises.push(`${glyphHtml("warning", "⚠")} FAMINE`);
+    if (player.bankrupt) crises.push(`${glyphHtml("warning", "⚠")} BANKRUPT`);
+    crisisEl.innerHTML = crises.join(" · ");
+    crisisEl.style.display = crises.length ? "flex" : "none";
+    crisisEl.title =
+      "Famine: population starves and unrest climbs — fix your food flow. " +
+      "Bankruptcy: the treasury ran dry and troops disband.";
+
+    // Timed realm modifiers as compact chips (label ×stacks · turns left).
+    modsBox.innerHTML = "";
+    const mods = (player.modifiers ?? []).filter((m) => m.turnsLeft > 0);
+    for (const m of mods) {
+      const chip = el("span", "hud-mod-chip");
+      const stacks = (m.stacks ?? 1) > 1 ? ` ×${m.stacks}` : "";
+      chip.textContent = `${MODIFIER_LABEL[m.id]}${stacks} · ${m.turnsLeft}`;
+      chip.title = `${MODIFIER_LABEL[m.id]}${stacks} — ${m.turnsLeft} turn${m.turnsLeft === 1 ? "" : "s"} remaining.`;
+      modsBox.append(chip);
+    }
+    modsBox.style.display = mods.length ? "flex" : "none";
+
+    // The grand turn readout: turn, calendar year and the age of the world.
+    // Seed/difficulty/trait move off the bar into the legend's World card
+    // (and this readout's tooltip) — the bar stays clean, Civ-style.
+    const era = eraForTurn(state.turn);
+    turnMain.textContent = `Turn ${state.turn} · ${yearForTurn(state.turn)} AD`;
+    turnEra.textContent = era.name;
+    turnWrap.title =
+      `${era.blurb}\n\nDifficulty: ${state.difficulty} · seed ${state.seed}` +
+      (player.trait ? `\n${TRAITS[player.trait].label} — ${TRAITS[player.trait].blurb}` : "");
+
+    // Legend "This world" card: the game's identity facts, off the busy bar.
+    legendWorld.innerHTML = "";
+    const worldHead = el("div", "hud-legend-h");
+    worldHead.textContent = "This world";
+    legendWorld.append(worldHead);
+    const worldRow = (label: string, value: string, tip?: string): void => {
+      const r = el("div", "hud-legend-fact");
+      const l = el("span", "hud-legend-fact-label");
+      l.textContent = label;
+      const v = el("span", "hud-legend-fact-value");
+      v.textContent = value;
+      if (tip) r.title = tip;
+      r.append(l, v);
+      legendWorld.append(r);
+    };
+    worldRow("Seed", String(state.seed), "The world seed — the same seed and settings rebuild this exact world.");
+    worldRow("Difficulty", String(state.difficulty));
+    worldRow("Regions", String(state.regions.length));
+    worldRow("Age", `${era.name} · ${yearForTurn(state.turn)} AD`, era.blurb);
+    if (player.trait) worldRow("Trait", TRAITS[player.trait].label, TRAITS[player.trait].blurb);
 
     renderVictoryProgress(victoryEl, state);
 
@@ -1458,7 +1514,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     }
   }
 
-  return { update, toast: flashToast, openOptions, openRecords, mapTip, showTurnReport };
+  return { update, toast: flashToast, openOptions, openRecords, mapTip, openRegionScreen, showTurnReport };
 }
 
 function renderRegion(

@@ -271,11 +271,13 @@ anywhere in rendering):
   ownership reads at the borders — a light wash, a wide inner band along each
   realm's outer border/coast, a crisp owner-coloured edge per side (two-tone
   frontiers), a dark centreline, and loud red war fronts.
-- **Caching discipline**: ocean, terrain and political ink are pre-rendered
-  offscreen layers (rebuilt only when map/canvas size/ownership/wars/palette
-  change) and folded into one static composite, so a painted frame is a single
-  blit + selection + markers. A dirty flag skips idle frames entirely — a
-  still map costs nothing per frame — and the render loop doesn't start until
+- **Caching discipline**: ocean, terrain and political ink bake ONCE in
+  camera-independent base space (supersampled ≈2×, pixel-budgeted) and fold
+  into one static composite; every frame draws that composite through the
+  live camera transform, so pan/zoom never rebuilds a layer — gestures are
+  hitch-free by construction (measured p95 ≈ one 60 Hz frame). Layers rebuild
+  only when the map, canvas size, ownership, wars or palette change. A dirty
+  flag skips idle frames entirely, and the render loop doesn't start until
   the title menu closes.
 - **Tuning**: every knob (framing margins, coast pads/roughness, texture
   densities, political widths/alphas, ocean palette) lives in
@@ -292,8 +294,11 @@ anywhere in rendering):
   the marker vocabulary is self-teaching (the legend stays for reference).
 - **Legible water**: deterministic sea-life silhouettes (whale, fish
   schools, a serpent) scatter in open water so the ocean unmistakably reads
-  as ocean; realm nameplates draw *outside* the land clip and clamp to the
-  viewport, so coastal realm names are never cut by the sea.
+  as ocean.
+- **Nameplates**: realm names draw per frame (crisp at any zoom, never cut
+  by the sea) with collision avoidance — each plate takes the first vertical
+  slot clear of region labels, marker clusters and other plates, so big
+  realm names stop stamping over the map's small text.
 
 The M1 node+edge fallback served its purpose during development and has been
 retired — the island territory view is the game's sole renderer. Political
@@ -308,9 +313,17 @@ summary diff plus standing dangers — and holds Enter/Space, so mashing the
 end-turn key pauses at each report instead of skipping history. Quiet turns,
 pending decisions and decided games never pause.
 
-**Region screen.** The compact right-rail inspector stays for quick glances,
-but the Capital rail button and the inspector's ⛶ open the same region as a
-wide two-column modal — the readable view for detailed management.
+**Region screen.** Clicking a region on the map opens it full-size — a wide
+two-column modal (the same screen behind the Capital rail button and the
+inspector's ⛶). The compact right-rail inspector stays as the at-a-glance
+residue after the screen closes.
+
+**Time & the top strip.** The top bar is Civ-style: compact icon+value(+flow)
+resource chips on the left, crisis/modifier chips and victory progress
+centred, and a grand turn readout on the right — turn, calendar year and the
+age of the world (`data/eras.ts`: one turn = one year from 900 AD, five named
+ages across the 150-turn game). Seed, difficulty and the realm trait live in
+the map legend's "This world" card instead of crowding the bar.
 
 ---
 
