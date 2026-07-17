@@ -22,7 +22,7 @@
  */
 
 import { TERRAIN, type TerrainId } from "@/data/terrain";
-import { BUILDINGS } from "@/data/buildings";
+import { BUILDINGS, BUILD_RATE } from "@/data/buildings";
 import { GLYPH_ART, RESOURCE_ART, TERRAIN_ART, TERRAIN_MOTIF, crestSvg } from "@/data/art";
 import { cbSafe } from "@/data/palette";
 import {
@@ -1527,8 +1527,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     }
     if (region.construction) {
       const def = BUILDINGS[region.construction.building];
+      const buildEta = Math.max(1, Math.ceil((def.cost - region.construction.progress) / BUILD_RATE));
       slots.push({
-        tip: `Under construction: ${def.name} (${Math.floor(region.construction.progress)}/${def.cost} materials).`,
+        tip: `Under construction: ${def.name} (${Math.floor(region.construction.progress)}/${def.cost} materials, ~${buildEta} turn${buildEta === 1 ? "" : "s"} left). Building advances each End turn.`,
         draw: (x, y) => {
           iconChip(x, y, 8.5);
           if (!drawIcon(context, "glyph:hammer", GLYPH_ART.hammer, MAP_ICON_COLOR, x, y, 11)) {
@@ -1576,32 +1577,60 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       if (size <= 0) continue;
       const region = s.regions[army.regionId];
       if (!region) continue;
+      const ownerNation = s.nations.find((n) => n.id === army.ownerId);
+      const mine = !!ownerNation?.isPlayer;
       const p = project(region);
       const bx = p.x + NODE_RADIUS - 4;
       const by = p.y + NODE_RADIUS - 4;
+      // YOUR armies must be findable at a glance: bigger badge, gold outer
+      // ring, a tiny banner pennant on top. Rivals keep the plain badge.
+      const r = mine ? 12 : 10;
 
       context.beginPath();
-      context.arc(bx, by, 10, 0, Math.PI * 2);
+      context.arc(bx, by, r, 0, Math.PI * 2);
       context.fillStyle = ownerColor(army.ownerId);
       context.fill();
       // Light ring lifts the badge off the map (a dark ring sank into tints).
       context.lineWidth = 1.5;
       context.strokeStyle = "rgba(238, 242, 248, 0.85)";
       context.stroke();
+      if (mine) {
+        context.beginPath();
+        context.arc(bx, by, r + 2.5, 0, Math.PI * 2);
+        context.lineWidth = 2.5;
+        context.strokeStyle = "#f4d27a";
+        context.stroke();
+        // Banner pennant: a small gold flag poking above the badge.
+        context.beginPath();
+        context.moveTo(bx - 1, by - r - 12);
+        context.lineTo(bx - 1, by - r - 2);
+        context.lineWidth = 1.6;
+        context.strokeStyle = "#f4d27a";
+        context.stroke();
+        context.beginPath();
+        context.moveTo(bx - 1, by - r - 12);
+        context.lineTo(bx + 8, by - r - 9.5);
+        context.lineTo(bx - 1, by - r - 7);
+        context.closePath();
+        context.fillStyle = "#f4d27a";
+        context.fill();
+      }
 
       context.fillStyle = "#0d0f14";
-      context.font = "600 11px system-ui, sans-serif";
+      context.font = `700 ${mine ? 12 : 11}px system-ui, sans-serif`;
       context.textAlign = "center";
       context.textBaseline = "middle";
       context.fillText(String(size), bx, by);
 
-      const ownerNation = s.nations.find((n) => n.id === army.ownerId);
       const who = ownerNation?.isPlayer ? "Your" : ownerNation?.isBarbarian ? "Barbarian" : `${ownerNation?.name ?? "Rival"}'s`;
+      const hint = mine
+        ? " Click the region, then Move / Attack to send it somewhere."
+        : "";
       markerHits.push({
         x: bx,
         y: by,
-        r: 11,
-        text: `${who} army — ${size} unit${size === 1 ? "" : "s"} stationed in ${region.name}.`,
+        r: r + 2,
+        text: `${who} army — ${size} unit${size === 1 ? "" : "s"} stationed in ${region.name}.${hint}`,
       });
     }
   }

@@ -129,11 +129,16 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
     // Mount inside #hud so the HUD's own overlays (Options/Records, z 250 while
     // the menu is up) share this stacking context and can render above the menu
     // — #hud is position:fixed, which traps its children's z-index otherwise.
-    (document.querySelector("#hud") ?? document.body).append(overlay);
+    // The marker class (instead of a :has() selector) keeps style recalc cheap:
+    // :has() over the whole HUD re-evaluated on every DOM mutation.
+    const hudRoot = document.querySelector("#hud") ?? document.body;
+    hudRoot.classList.add("title-open");
+    hudRoot.append(overlay);
     primary.focus();
 
     function dismiss(): void {
       window.removeEventListener("keydown", onKey, true);
+      hudRoot.classList.remove("title-open");
       if (isReduceMotion()) {
         overlay.remove();
       } else {

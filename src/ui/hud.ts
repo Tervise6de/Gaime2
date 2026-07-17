@@ -12,7 +12,7 @@
  * highlighting via the parent.
  */
 
-import { BUILDINGS, BUILDING_IDS, type BuildingId } from "@/data/buildings";
+import { BUILDINGS, BUILDING_IDS, BUILD_RATE, type BuildingId } from "@/data/buildings";
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
 import { TERRAIN, TERRAIN_IDS } from "@/data/terrain";
 import { regionProduction, nationalProduction, nationYieldMult, yieldFactors, singleModifierMult, unrestPenalty } from "@/systems/economy";
@@ -53,6 +53,7 @@ import {
   anyArmyAt,
   canRaiseUnit,
   reachableRegions,
+  strategicAccess,
   totalUpkeep,
   unitCost,
 } from "@/systems/military";
@@ -339,6 +340,12 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const alertStrip = el("div", "hud-alerts");
   alertStrip.style.display = "none";
   root.append(alertStrip);
+
+  // Move-mode banner: while an army awaits its destination, the whole screen
+  // says so — what's moving, what to click, and how to bail out.
+  const moveBanner = el("div", "hud-move-banner");
+  moveBanner.style.display = "none";
+  root.append(moveBanner);
 
   // Map legend (hidden until toggled) — explains the marker vocabulary and
   // carries the World card (seed, difficulty, age…) filled live in update().
@@ -717,12 +724,12 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   hintsTitle.append(document.createTextNode("Welcome, ruler "), glyphEl("crown", "👑"));
   const hintsBody = el("ul", "hud-hints-list");
   for (const tip of [
-    "Set your tax rate on the left — more gold, but higher unrest.",
-    "Click a region to develop it: queue buildings and raise armies.",
-    "Move / Attack an army onto a neighbour to expand or conquer.",
-    "Zoom with the wheel or pinch; drag to pan; double-click to fit.",
-    "End turn to advance; watch the victory progress up top.",
-    "Tap Legend (L) to decode markers; Help (H) reopens these tips.",
+    "Click a region to open it full-screen: queue a building (it builds a little each End turn) and raise units.",
+    "Armies are the round numbered badges on the map — the number is their size; yours wear a gold ring.",
+    "To move or attack: open your region → Move / Attack ▸ → click a highlighted neighbour.",
+    "Research (R): pick a technology — your knowledge income advances it every End turn.",
+    "Hover any map icon for a plain-language explanation; L opens the legend.",
+    "End turn (Enter) advances the world; the report shows what changed.",
   ]) {
     const li = document.createElement("li");
     li.textContent = tip;
@@ -892,6 +899,8 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   let lastState: GameState | null = null;
   // The currently-inspected region, so ⛶ can promote it to the full screen.
   let lastSelected: number | null = null;
+  // The army currently picking a destination (Esc cancels the move).
+  let lastMoveArmy: number | null = null;
 
   function renderStandingsOverlay(): void {
     if (!lastState) return;
@@ -925,7 +934,9 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   }
 
   // --- Options overlay (sound, accessibility, display; all persisted) --------
-  const optionsOverlay = el("div", "hud-techtree-overlay");
+  // The extra marker class lets the title menu raise this overlay above itself
+  // with a plain descendant selector (no :has() — see title.ts).
+  const optionsOverlay = el("div", "hud-techtree-overlay hud-overlay-options");
   optionsOverlay.style.display = "none";
   optionsOverlay.addEventListener("click", (ev) => {
     if (ev.target === optionsOverlay) closeOptions();
@@ -1041,7 +1052,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   }
 
   // --- Records overlay (career stats + achievements) ------------------------
-  const recordsOverlay = el("div", "hud-techtree-overlay");
+  const recordsOverlay = el("div", "hud-techtree-overlay hud-overlay-records");
   recordsOverlay.style.display = "none";
   recordsOverlay.addEventListener("click", (ev) => {
     if (ev.target === recordsOverlay) closeRecords();
@@ -1318,6 +1329,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       ev.preventDefault();
       toggleLog();
     } else if (ev.key === "Escape") {
+      if (lastMoveArmy !== null) callbacks.onCancelMove(); // abort picking a destination
       closeTechTree();
       closeStandings();
       closeOptions();
@@ -1350,6 +1362,20 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     // element persists, so a previous region's scroll would otherwise linger).
     if (selectedRegionId !== lastSelected) rightPanel.scrollTop = 0;
     lastSelected = selectedRegionId;
+    lastMoveArmy = moveArmyId;
+
+    // Move-mode banner (what's moving, what to click, how to cancel).
+    if (moveArmyId !== null) {
+      const movingArmy = state.armies.find((a) => a.id === moveArmyId);
+      const unitCount = movingArmy ? armySize(movingArmy.units) : 0;
+      moveBanner.innerHTML = "";
+      const txt = el("span", "hud-move-banner-text");
+      txt.textContent = `Moving ${unitCount} unit${unitCount === 1 ? "" : "s"} — click a highlighted region to move or attack`;
+      moveBanner.append(txt, btn("✕ Cancel", "hud-move-banner-cancel", () => callbacks.onCancelMove()));
+      moveBanner.style.display = "flex";
+    } else {
+      moveBanner.style.display = "none";
+    }
 
     // Rail badges: offers awaiting your answer; a research choice waiting.
     // The capital jump shows only while you still hold your seat.
@@ -1461,7 +1487,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     rightPanel.style.display = selectedRegionId === null ? "none" : "block";
     renderRegion(regionBody, state, selectedRegionId, moveArmyId, callbacks);
     renderDiplomacy(diploBody, state, callbacks);
-    renderResearch(researchBody, player, callbacks, openTechTree);
+    renderResearch(researchBody, player, flow.knowledge, callbacks, openTechTree);
 
     if (state.outcome === "playing") {
       endDismissed = false; // re-arm the recap for the next decided game
@@ -1707,7 +1733,12 @@ function renderEnemyRegion(container: HTMLElement, state: GameState, region: Reg
     box.append(line("Undefended — an army walking in captures it."));
   }
   box.append(line(`Terrain defence ×${t.defense}${region.fortification ? `, fort ${region.fortification}` : ""}.`, "hud-hint"));
-  box.append(line("Move an adjacent army here to attack.", "hud-hint"));
+  box.append(
+    line(
+      "To attack: open one of YOUR regions with an army next door → Move / Attack ▸ → click this region.",
+      "hud-hint",
+    ),
+  );
   container.append(box);
 }
 
@@ -1741,7 +1772,10 @@ function renderArmySection(
     section.append(line("No army stationed here.", "hud-hint"));
   }
 
-  // Raise-unit menu.
+  // Raise-unit menu. Strategic-resource gates surface right on the buttons:
+  // a unit whose resource you lack says "needs ⚒/🐎" — whatever else also
+  // blocks it — so the map's iron/horses markers stop being trivia.
+  const access = strategicAccess(state, PLAYER_ID);
   const menu = el("div", "hud-unit-menu");
   for (const t of UNIT_TYPES) {
     const def = UNITS[t];
@@ -1753,9 +1787,19 @@ function renderArmySection(
       ? `${def.attack} atk / ${def.defense} def · ${def.upkeep}g upkeep${def.requires ? ` · needs ${def.requires}` : ""}`
       : check.reason ?? "";
     const cost = unitCost(playerNation(state), t);
+    const resourceLocked = !!def.requires && !access.has(def.requires);
+    const costHtml = resourceLocked
+      ? `needs ${resourceIconHtml(def.requires!, def.requires === "iron" ? "⚒" : "🐎")}`
+      : `${cost.gold}g ${cost.materials}${resourceIconHtml("materials", "⛏")}`;
     btn.innerHTML =
       `<span class="hud-unit-name">${unitIconHtml(t, "")}${def.short}</span>` +
-      `<span class="hud-unit-cost">${cost.gold}g ${cost.materials}${resourceIconHtml("materials", "⛏")}</span>`;
+      `<span class="hud-unit-cost">${costHtml}</span>`;
+    if (resourceLocked) {
+      btn.title =
+        `${check.ok ? "" : `${check.reason ?? ""}\n`}` +
+        `${def.name} needs ${def.requires} — conquer or settle any region bearing the ` +
+        `${def.requires === "iron" ? "⚒ iron deposit" : "🐎 horses"} marker to unlock it.`;
+    }
     if (check.ok) btn.addEventListener("click", () => callbacks.onRaiseUnit(region.id, t));
     menu.append(btn);
   }
@@ -1833,8 +1877,17 @@ function renderBuildSection(region: Region, done: TechId[], callbacks: HudCallba
 
   if (region.construction) {
     const def = BUILDINGS[region.construction.building];
+    const remaining = def.cost - region.construction.progress;
+    // Best-case pace: BUILD_RATE materials flow into a site per turn while the
+    // stockpile lasts — so the estimate is a floor, not a promise.
+    const eta = Math.max(1, Math.ceil(remaining / BUILD_RATE));
     const wrap = el("div", "hud-build-progress");
-    wrap.append(line(`${def.name} — ${fmt(region.construction.progress)}/${def.cost} materials`, "hud-build-progress-label"));
+    wrap.append(
+      line(
+        `Building ${def.name} — ${fmt(region.construction.progress)}/${def.cost} materials · ~${eta} turn${eta === 1 ? "" : "s"} left`,
+        "hud-build-progress-label",
+      ),
+    );
     const bar = el("div", "hud-build-bar");
     const fill = el("div", "hud-build-fill");
     fill.style.width = `${(region.construction.progress / def.cost) * 100}%`;
@@ -1845,6 +1898,12 @@ function renderBuildSection(region: Region, done: TechId[], callbacks: HudCallba
     cancel.addEventListener("click", () => callbacks.onCancelConstruction(region.id));
     wrap.append(bar, cancel);
     section.append(wrap);
+    section.append(
+      line(
+        `Construction advances by up to ${BUILD_RATE} materials each End turn, drawn from your stockpile — it is never instant.`,
+        "hud-hint",
+      ),
+    );
     return section;
   }
 
@@ -1860,11 +1919,15 @@ function renderBuildSection(region: Region, done: TechId[], callbacks: HudCallba
     btn.className = "hud-build-btn";
     btn.disabled = already || !unlocked;
     btn.title = unlocked ? def.blurb : `Locked — research ${def.requiresTech?.replace(/_/g, " ")}.`;
+    const eta = Math.max(1, Math.ceil(def.cost / BUILD_RATE));
+    if (!already && unlocked) {
+      btn.title = `${def.blurb}\n\nCosts ${def.cost} materials over ~${eta} turn${eta === 1 ? "" : "s"} (up to ${BUILD_RATE}/turn from your stockpile).`;
+    }
     const costLabel = already
       ? "built"
       : !unlocked
         ? glyphHtml("lock", "🔒")
-        : def.cost + resourceIconHtml("materials", "⛏");
+        : `${def.cost}${resourceIconHtml("materials", "⛏")} · ${eta}t`;
     btn.innerHTML =
       `<span class="hud-build-name">${buildingIconHtml(id, "")}${def.name}</span>` +
       `<span class="hud-build-cost">${costLabel}</span>`;
@@ -1872,6 +1935,7 @@ function renderBuildSection(region: Region, done: TechId[], callbacks: HudCallba
     menu.append(btn);
   }
   section.append(menu);
+  section.append(line("One project per region; it builds a little each End turn.", "hud-hint"));
   return section;
 }
 
@@ -1883,7 +1947,14 @@ function renderBuildSection(region: Region, done: TechId[], callbacks: HudCallba
  */
 function buildLegend(): HTMLElement {
   const panel = el("div", "hud-panel hud-legend");
-  panel.append(heading("Map legend"));
+  const head = el("div", "hud-drawer-head");
+  head.append(
+    heading("Map legend"),
+    closeButton(() => {
+      panel.style.display = "none";
+    }),
+  );
+  panel.append(head);
 
   const section = (title: string): void => {
     const h = el("div", "hud-legend-h");
@@ -1920,7 +1991,7 @@ function buildLegend(): HTMLElement {
   row(glyphHtml("hammer", "🔨", "hud-legend-ico"), "Building under construction (status row under the name)");
   row(glyphHtml("shield", "🛡", "hud-legend-ico"), "Fortification level (harder to capture; siege strips it)");
   row(glyphHtml("crown", "👑", "hud-legend-ico"), "Capital — the crest beside the population chip");
-  row('<span class="hud-legend-badge">3</span>', "Army (owner colour, unit count)");
+  row('<span class="hud-legend-badge">3</span>', "Army — unit count on the owner's colour; yours wears a gold ring");
 
   section("Territory");
   row(line("#d8a24a"), "Your realm — gold wash, the widest and brightest rim, named YOU");
@@ -1938,11 +2009,11 @@ function buildLegend(): HTMLElement {
 }
 
 /**
- * Compact victory-progress readout for the top bar: the leading realm's
- * territory share (domination fires at DOMINATION_FRACTION), the player's Great
- * Works, and the turn vs. the prestige deadline. The domination math mirrors
- * `checkVictory` exactly (share of all owned regions, barbarians included), so
- * the number matches the actual win condition. Flags a rival nearing domination.
+ * Compact victory-progress readout for the top bar, phrased as progress toward
+ * the goal so it makes sense from turn 1: whoever holds the most land is the
+ * "leader", and their share is shown as % of the DOMINATION_FRACTION target
+ * (everyone starts with a few regions, so the race never starts at zero).
+ * The domination math mirrors `checkVictory` exactly. Flags a rival nearing it.
  */
 function renderVictoryProgress(elm: HTMLElement, state: GameState): void {
   const total = state.regions.filter((r) => r.ownerId !== null).length || 1;
@@ -1956,15 +2027,24 @@ function renderVictoryProgress(elm: HTMLElement, state: GameState): void {
       leader = n;
     }
   }
-  const share = Math.round((Math.max(0, leaderRegions) / total) * 100);
+  const share = Math.max(0, leaderRegions) / total;
+  const towardGoal = Math.min(100, Math.round((share / DOMINATION_FRACTION) * 100));
   const leaderName = leader ? (leader.isPlayer ? "You" : leader.name) : "—";
   const player = playerNation(state);
   // Nation names can come from an imported save — escape before HTML interpolation.
   elm.innerHTML =
-    `${glyphHtml("victory", "🏆")} ${escapeHtml(leaderName)} ${share}%  ·  ` +
+    `${glyphHtml("victory", "🏆")} ${escapeHtml(leaderName)} ${leader?.isPlayer ? "lead" : "leads"} · ` +
+    `${towardGoal}% to domination  ·  ` +
     `${glyphHtml("star", "⭐")} ${player.wonders}/${WONDER_GOAL}  ·  ` +
     `${glyphHtml("hourglass", "⏳")} ${state.turn}/${TURN_LIMIT}`;
-  const rivalNearing = !!leader && !leader.isPlayer && share >= DOMINATION_FRACTION * 100 - 12;
+  elm.title =
+    "The victory race — three ways the game ends:\n" +
+    `· Domination: hold ${Math.round(DOMINATION_FRACTION * 100)}% of all claimed land. ` +
+    `${escapeHtml(leaderName)} ${leader?.isPlayer ? "hold" : "holds"} the most (${leaderRegions} of ${total} regions — ` +
+    `${towardGoal}% of the way there). Every realm starts with land, so this never reads zero.\n` +
+    `· Great Works: complete ${WONDER_GOAL} (you: ${player.wonders}).\n` +
+    `· Prestige: highest score when turn ${TURN_LIMIT} ends.`;
+  const rivalNearing = !!leader && !leader.isPlayer && share >= DOMINATION_FRACTION - 0.12;
   elm.classList.toggle("threat", rivalNearing);
 }
 
@@ -2364,6 +2444,7 @@ function renderDiplomacy(
 function renderResearch(
   container: HTMLElement,
   player: Nation,
+  knowledgeFlow: number,
   callbacks: HudCallbacks,
   onOpenTree: () => void,
 ): void {
@@ -2381,7 +2462,19 @@ function renderResearch(
     // Progress can overshoot the cost mid-turn (completion lands at resolve);
     // clamp the display so it never reads "32/20".
     const shown = Math.min(Math.floor(research.progress), def.cost);
-    title.innerHTML = `${resourceIconHtml("knowledge", "📖")} ${def.name} — ${shown}/${def.cost}`;
+    // Research is never instant: knowledge income flows into the current tech
+    // each End turn — show the pace so "how long?" always has an answer.
+    const remaining = Math.max(0, def.cost - research.progress);
+    const eta = knowledgeFlow > 0 ? Math.max(1, Math.ceil(remaining / knowledgeFlow)) : null;
+    title.innerHTML =
+      `${resourceIconHtml("knowledge", "📖")} ${def.name} — ${shown}/${def.cost}` +
+      (eta !== null
+        ? ` · ~${eta} turn${eta === 1 ? "" : "s"}`
+        : ` · stalled`);
+    title.title =
+      eta !== null
+        ? `Your ${fmt(knowledgeFlow)} knowledge/turn flows into this technology at each End turn.`
+        : "No knowledge income — build Libraries or work hills/mountains to research at all.";
     const bar = el("div", "hud-research-bar");
     const fill = el("div", "hud-research-fill");
     fill.style.width = `${pct}%`;
