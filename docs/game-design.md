@@ -571,6 +571,14 @@ Scandinavia across the seas) — chosen from a **World** picker (Random /
 Baltic / Europe) in new-game setup. A guard test asserts every region sits on
 land and each graph is connected.
 
+**Outer world + island shapes (v0.17).** Scripted maps gain an optional
+`context` layer — faded, non-interactive land beyond the play area (Baltic:
+Norway, Lappland, the Rus, the Empire; Europe: the North, the Steppe, Africa,
+Byzantium) with dim place labels, drawn under the active land and framed by a
+larger inset — so the map reads as a real region of a larger world rather than
+floating landmasses. Islands (Gotland, Saaremaa, Sicily) were re-authored with
+proper multi-vertex outlines instead of triangles.
+
 **Historical homelands + play-as (v0.16).** Each scripted map declares its
 starting **factions** — the real powers, each owning its home regions (Baltic:
 Sweden, Novgorod, Livonia, Lithuania, Prussia, Poland, Denmark; Europe:

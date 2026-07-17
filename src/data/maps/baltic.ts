@@ -43,11 +43,39 @@ export const BALTIC_MAP: ScriptedMap = {
       [0.06, 0.66], [0.16, 0.68], [0.19, 0.78], [0.14, 0.87], [0.05, 0.85],
       [0.02, 0.75],
     ],
-    // Gotland — inhabited island in the middle of the sea (Visby).
-    [[0.40, 0.51], [0.47, 0.52], [0.46, 0.61], [0.40, 0.62], [0.37, 0.56]],
-    // Ösel / Saaremaa — inhabited island off the Livonian coast (Arensburg).
-    [[0.55, 0.45], [0.64, 0.45], [0.64, 0.53], [0.56, 0.54], [0.53, 0.49]],
+    // Gotland — a long, narrow island running north–south (Visby on its west).
+    [
+      [0.42, 0.50], [0.452, 0.515], [0.46, 0.55], [0.455, 0.59], [0.44, 0.625],
+      [0.42, 0.635], [0.405, 0.61], [0.40, 0.575], [0.405, 0.54], [0.412, 0.516],
+    ],
+    // Saaremaa (Ösel) — an irregular island with the Sõrve peninsula to the
+    // south-west (Arensburg on it).
+    [
+      [0.55, 0.455], [0.585, 0.443], [0.625, 0.448], [0.648, 0.47], [0.638, 0.495],
+      [0.606, 0.505], [0.578, 0.516], [0.552, 0.528], [0.536, 0.508], [0.548, 0.486],
+      [0.54, 0.468],
+    ],
   ],
+  // Outer-world context: the wider realms beyond the Baltic shore, faded and
+  // uninteractive, framing the play area so it reads as the Baltic.
+  context: {
+    land: [
+      // Norway & the Scandinavian mountains, west of Sweden.
+      [[-0.35, -0.15], [0.05, -0.05], [0.02, 0.3], [0.05, 0.55], [-0.05, 0.75], [-0.3, 0.7], [-0.4, 0.25]],
+      // Lappland and the far north, above Finland.
+      [[0.2, -0.3], [1.15, -0.3], [1.2, 0.0], [0.85, 0.05], [0.5, 0.0], [0.3, 0.03]],
+      // The Rus interior, east of Novgorod and Polotsk.
+      [[0.98, 0.28], [1.4, 0.22], [1.45, 0.78], [1.0, 0.9], [0.97, 0.6]],
+      // The Empire — the German and Polish interior, south of the shore.
+      [[-0.1, 0.98], [1.1, 0.98], [1.15, 1.35], [-0.15, 1.35]],
+    ],
+    labels: [
+      { text: "Norway", x: -0.07, y: 0.34 },
+      { text: "Lappland", x: 0.5, y: -0.07 },
+      { text: "The Rus", x: 1.09, y: 0.5 },
+      { text: "The Empire", x: 0.5, y: 1.07 },
+    ],
+  },
   regions: [
     // Sweden (west)
     { name: "Sigtuna", x: 0.19, y: 0.22, terrain: "hills", resource: "iron" },

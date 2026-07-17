@@ -147,6 +147,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   // Island archetype: pure function of the map (region count + seed), refreshed
   // on every setState so the projection frame is always in step with the state.
   let archetype: IslandArchetype = "medium";
+  // Extra inset (fraction of canvas) around the [0,1] play area, so a context
+  // map's outer-world land shows as a framing border. 0 for non-context maps.
+  let outerMargin = 0;
 
   // --- Camera: pan/zoom over the fitted base projection ----------------------
   // screen = base * s + t. At s = 1 the map fits exactly (t clamps to 0), so
@@ -360,10 +363,14 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       const smap = scriptedMap(s.mapId);
       if (smap) {
         archetype = "large"; // tight framing — the authored land fills [0,1]
+        // A context map insets the play area so the outer-world land shows as
+        // a border; a plain scripted map fills the frame.
+        outerMargin = smap.context ? 0.11 : 0;
         const toPoly = (poly: [number, number][]): Point[] => poly.map((v) => ({ x: v[0], y: v[1] }));
         shape = { blobs: smap.land.map(toPoly), islets: (smap.islets ?? []).map(toPoly) };
       } else {
         archetype = islandArchetype(s.regions.length, s.seed);
+        outerMargin = 0;
         shape = islandShape(sites, s.seed, archetype);
       }
       projSig = ""; // both projections derive from the cells — force rebuilds
@@ -425,6 +432,11 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     grad.addColorStop(1, OCEAN.outer);
     g.fillStyle = grad;
     g.fillRect(0, 0, w, h);
+
+    // Outer-world context: faded distant land framing the play area (drawn on
+    // the water, under the active landmasses), so the map reads as a real
+    // region of a larger world. Scripted maps only.
+    drawContextLand(g, s);
 
     // Wave flecks across the open water — tiny ˘ strokes everywhere, so even
     // the far corners read as sea. The land layers paint over any beneath them.
@@ -545,6 +557,44 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   }
 
   /** One small hand-drawn sea creature; `k` picks the species and its lean. */
+  /**
+   * Distant "outer world" land beyond the play area — faded, non-interactive,
+   * unlabelled-terrain fill with a soft coastline and dim place labels, so the
+   * playable region sits inside a larger, legible world. Baked into the ocean
+   * layer under the active land. Scripted maps only.
+   */
+  function drawContextLand(g: CanvasRenderingContext2D, s: GameState): void {
+    const smap = scriptedMap(s.mapId);
+    const ctx = smap?.context;
+    if (!ctx) return;
+    for (const poly of ctx.land) {
+      const px = poly.map((v) => projectXY(v[0], v[1]));
+      if (px.length < 3) continue;
+      g.beginPath();
+      g.moveTo(px[0]!.x, px[0]!.y);
+      for (let i = 1; i < px.length; i++) g.lineTo(px[i]!.x, px[i]!.y);
+      g.closePath();
+      g.fillStyle = OCEAN.contextLand;
+      g.fill();
+      g.strokeStyle = OCEAN.contextCoast;
+      g.lineWidth = 1.4;
+      g.lineJoin = "round";
+      g.stroke();
+    }
+    // Distant place labels — dim, wide-tracked, so they read as "elsewhere".
+    const plate = g as CanvasRenderingContext2D & { letterSpacing?: string };
+    for (const lb of ctx.labels ?? []) {
+      const p = projectXY(lb.x, lb.y);
+      if ("letterSpacing" in plate) plate.letterSpacing = "3px";
+      g.font = "700 15px system-ui, sans-serif";
+      g.textAlign = "center";
+      g.textBaseline = "middle";
+      g.fillStyle = OCEAN.contextLabel;
+      g.fillText(lb.text.toUpperCase(), p.x, p.y);
+      if ("letterSpacing" in plate) plate.letterSpacing = "0px";
+    }
+  }
+
   function drawSeaCreature(g: CanvasRenderingContext2D, k: number, x: number, y: number): void {
     g.strokeStyle = OCEAN.seaLifeInk;
     g.fillStyle = OCEAN.seaLifeFill;
@@ -1223,8 +1273,11 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
    */
   function frameMargins(): { x: number; top: number; bottom: number } {
     const f = ISLAND_FRAME[archetype];
-    const my = canvas.clientHeight * f.marginY;
-    return { x: canvas.clientWidth * f.marginX + 8, top: my * 0.78 + 6, bottom: my * 1.22 + 30 };
+    // Context maps inset the play area so the surrounding outer-world land is
+    // visible as a framing border around it.
+    const mx = (f.marginX + outerMargin) * canvas.clientWidth;
+    const my = (f.marginY + outerMargin) * canvas.clientHeight;
+    return { x: mx + 8, top: my * 0.78 + 6, bottom: my * 1.22 + 30 };
   }
 
   function projectXY(x: number, y: number): Point {

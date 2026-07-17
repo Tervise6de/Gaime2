@@ -37,8 +37,8 @@ export const EUROPE_MAP: ScriptedMap = {
     [[0.02, 0.28], [0.09, 0.27], [0.10, 0.35], [0.04, 0.38], [0.01, 0.33]],
   ],
   islets: [
-    // Sicily
-    [[0.52, 0.94], [0.56, 0.95], [0.55, 0.99], [0.51, 0.98]],
+    // Sicily — the triangle off the toe of Italy.
+    [[0.495, 0.925], [0.565, 0.945], [0.525, 0.99]],
     // Gotland (Baltic)
     [[0.60, 0.34], [0.63, 0.35], [0.62, 0.40], [0.59, 0.39]],
   ],
@@ -99,4 +99,23 @@ export const EUROPE_MAP: ScriptedMap = {
     { name: "Hungary", color: "#6cae7a", capital: 25, regions: [25, 26, 27] },
     { name: "Rus", color: "#7a86d8", capital: 28, regions: [28, 29, 30, 31, 32] },
   ],
+  // Outer-world context beyond the continent, framing it.
+  context: {
+    land: [
+      // The far north, above Scandinavia.
+      [[0.2, -0.3], [1.1, -0.3], [1.15, 0.03], [0.6, 0.04], [0.38, 0.0]],
+      // The Eurasian steppe, east of the Rus.
+      [[0.95, 0.34], [1.4, 0.3], [1.45, 0.86], [1.0, 0.92], [0.94, 0.6]],
+      // North Africa, across the Mediterranean.
+      [[-0.15, 0.98], [0.62, 0.96], [0.66, 1.32], [-0.2, 1.32]],
+      // Byzantium & Anatolia, south-east beyond the Balkans.
+      [[0.66, 0.96], [1.3, 0.9], [1.35, 1.32], [0.66, 1.32]],
+    ],
+    labels: [
+      { text: "The North", x: 0.72, y: -0.07 },
+      { text: "The Steppe", x: 1.1, y: 0.55 },
+      { text: "Africa", x: 0.24, y: 1.08 },
+      { text: "Byzantium", x: 1.0, y: 1.04 },
+    ],
+  },
 };

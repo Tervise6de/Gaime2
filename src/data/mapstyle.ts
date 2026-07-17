@@ -165,4 +165,9 @@ export const OCEAN = {
   isletEdge: "rgba(210, 220, 235, 0.12)",
   /** Dashed sea lane marking a cross-water adjacency (archipelago). */
   lane: "rgba(150, 185, 215, 0.3)",
+  /** Outer-world context land (distant, non-interactive): a dim landmass fill,
+      a soft coastline, and faint place labels — framing the play area. */
+  contextLand: "rgba(37, 45, 55, 0.92)",
+  contextCoast: "rgba(12, 16, 22, 0.55)",
+  contextLabel: "rgba(150, 166, 186, 0.34)",
 } as const;

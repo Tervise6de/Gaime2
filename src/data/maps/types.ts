@@ -52,6 +52,16 @@ export interface ScriptedMap {
   /** Starting realms; every region should belong to exactly one. The human
       plays one of these (chosen in setup, or picked from the seed). */
   factions: ScriptedFaction[];
+  /**
+   * Outer-world context: faded, non-interactive land beyond the play area (the
+   * wider continent) that frames it so the map reads as a real place, not
+   * floating islands. Polygons may extend past [0,1] to bleed off the edges;
+   * optional labels name the distant lands ("THE RUS", "THE EMPIRE"…).
+   */
+  context?: {
+    land: Coord[][];
+    labels?: { text: string; x: number; y: number }[];
+  };
 }
 
 import { BALTIC_MAP } from "@/data/maps/baltic";
