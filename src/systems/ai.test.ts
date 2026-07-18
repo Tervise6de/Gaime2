@@ -636,6 +636,21 @@ describe("bestTarget prizes valuable regions", () => {
     );
     expect(bestTarget(s, attacker, RIVAL)).toBe(null);
   });
+
+  it("prioritises reclaiming its own breakaway land (E5 loop)", () => {
+    // Two equal barbarian-held prizes; region 1 broke away from RIVAL and still
+    // remembers it, so the reclaim bonus should win it over the richer region 2.
+    const attacker = army({ id: 1, ownerId: RIVAL, regionId: 0, units: units({ infantry: 6 }) });
+    const s = targetState(
+      [
+        region({ id: 0, ownerId: RIVAL, adjacency: [1, 2] }),
+        region({ id: 1, ownerId: BARBARIAN_ID, population: 3, priorOwnerId: RIVAL, adjacency: [0] }),
+        region({ id: 2, ownerId: BARBARIAN_ID, population: 5, adjacency: [0] }), // richer, but not ours
+      ],
+      [attacker],
+    );
+    expect(bestTarget(s, attacker, RIVAL)).toBe(1);
+  });
 });
 
 describe("bestTarget capital strikes (archetype-weighted)", () => {

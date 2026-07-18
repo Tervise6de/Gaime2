@@ -6,6 +6,30 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-18 — Close the defection loop: AI reconquest + war confirm (v0.49.0)
+
+Making E5's breakaways *bite* in AI games, and guarding the player against
+starting a war by accident.
+
+- **Breakaway regions remember their former ruler.** A seceded (`applySecession`)
+  or defected (`applyDefection`) region now records `priorOwnerId`, which also
+  hands the former owner the existing **reclaim** casus belli.
+- **The AI prioritises retaking its own lost land.** `bestTarget` adds a
+  `RECLAIM_VALUE` bonus for a target whose `priorOwnerId` is the attacker —
+  so a rival whose province revolts or whose general defects marches to take it
+  back rather than shrugging it off. E5's consequences now land in rival play.
+- **War-confirm dialog.** Ordering an attack that would start a *new* war now
+  asks first ("Attack Lithuania? Striking here declares war… their allies may be
+  drawn in") — because combined battles + allied rally made an accidental war
+  costly. Barbarians, current enemies, and plain relocations never prompt; the
+  explicit Declare-war button already confirmed. Wraps both attack paths
+  (the map click and the Attack chooser) via the shared `confirmAction`.
+
+Verified: 585 tests green (+1 reclaim-priority + priorOwnerId assertions).
+Typecheck + build clean; 12 browser turns with zero console errors.
+
+---
+
 ## 2026-07-18 — E5: named pretender revolts + commander defection (v0.48.0)
 
 Deepening the army systems: commanders become a *threat*, not just a combat

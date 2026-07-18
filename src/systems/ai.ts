@@ -1087,10 +1087,14 @@ export function bestTarget(state: GameState, army: { id: number; regionId: numbe
       const isCapital =
         isEnemy &&
         state.nations.some((n) => n.id === target.ownerId && n.capitalRegionId === target.id);
+      // Reclaiming our own breakaway land (a seceded or defected region that
+      // still remembers us) is a priority — close the defection loop (E5).
+      const isReclaim = target.priorOwnerId === nationId;
       const value =
         target.population * REGION_POP_VALUE +
         (target.resource ? resourceValue : 0) +
-        (isCapital ? capitalValue : 0);
+        (isCapital ? capitalValue : 0) +
+        (isReclaim ? RECLAIM_VALUE : 0);
       const score = atk - def + value + (isBarb ? 2 : 5);
       if (score > bestScore) {
         bestScore = score;
@@ -1107,6 +1111,8 @@ const REGION_POP_VALUE = 1.5;
 const RESOURCE_VALUE = 6;
 /** Base weight for an enemy nation's capital (scaled by attacker aggression). */
 const CAPITAL_VALUE = 10;
+/** Weight for retaking a region that broke away from us (seceded/defected). */
+const RECLAIM_VALUE = 9;
 
 // --- small helpers ----------------------------------------------------------
 

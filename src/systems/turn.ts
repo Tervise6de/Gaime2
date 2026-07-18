@@ -439,7 +439,9 @@ export function applySecession(state: GameState): GameState {
     const turns = (r.revoltTurns ?? 0) + 1;
     if (turns < SECESSION_REVOLT_TURNS) return { ...r, revoltTurns: turns };
     secededIds.push(r.id);
-    return { ...r, ownerId: BARBARIAN_ID, unrest: UNREST_BASE, construction: null, revoltTurns: 0 };
+    // Remember who lost it, so the former ruler gets a reclaim casus belli and
+    // the AI prioritises retaking its own breakaway land (E5 loop).
+    return { ...r, ownerId: BARBARIAN_ID, priorOwnerId: owner, unrest: UNREST_BASE, construction: null, revoltTurns: 0 };
   });
   if (secededIds.length === 0) return { ...state, regions };
 

@@ -182,6 +182,7 @@ describe("secession (revolt → break away)", () => {
     const rebels = s.armies.find((a) => a.regionId === 0 && a.ownerId === BARBARIAN_ID);
     expect(rebels && armySize(rebels.units)).toBe(REBEL_GARRISON);
     expect(rebels!.commander).toBeDefined(); // led by a named pretender (E5)
+    expect(s.regions[0]!.priorOwnerId).toBe(PLAYER_ID); // remembers who to reclaim from
     expect(s.log.some((l) => /seceding from/.test(l))).toBe(true);
   });
 

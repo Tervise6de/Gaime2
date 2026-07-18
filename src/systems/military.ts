@@ -280,7 +280,7 @@ export function applyDefection(state: GameState): GameState {
   );
   const regions = state.regions.map((r) =>
     defectRegionIds.has(r.id)
-      ? { ...r, ownerId: BARBARIAN_ID, unrest: UNREST_BASE, construction: null, revoltTurns: 0 }
+      ? { ...r, ownerId: BARBARIAN_ID, priorOwnerId: r.ownerId, unrest: UNREST_BASE, construction: null, revoltTurns: 0 }
       : r,
   );
   let log = state.log;

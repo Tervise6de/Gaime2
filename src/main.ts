@@ -15,6 +15,7 @@ import {
 import { raiseUnit, moveArmy, moveDetachment, disbandUnits, fortifyArmy, appointCommander, reachableRegions } from "@/systems/military";
 import {
   declareWar,
+  atWar,
   playerPropose,
   callToArms,
   gift,
@@ -25,7 +26,8 @@ import {
 import { resolveChoice } from "@/systems/events";
 import { saveToLocal, loadFromLocal, hasLocalSave, clearLocalSave, serializeGame, deserializeGame } from "@/systems/save";
 import { summarizeTurn, type TurnSummary } from "@/systems/summary";
-import { PLAYER_ID, type GameState } from "@/systems/state";
+import { PLAYER_ID, BARBARIAN_ID, type GameState } from "@/systems/state";
+import { confirmAction } from "@/ui/confirm";
 import { createHud } from "@/ui/hud";
 import { showMainMenu } from "@/ui/title";
 import { runTutorial, hasSeenTutorial } from "@/ui/tutorial";
@@ -170,19 +172,21 @@ function main(): void {
           state.regions[a.regionId]?.adjacency.includes(regionId),
       );
       if (!army) return;
-      const before = state;
-      const battlesBefore = before.battles?.length ?? 0;
-      state = moveArmy(state, army.id, regionId);
-      const moved = state.armies.find((a) => a.id === army.id);
-      // Stay on the fight's outcome region: the captured target, or the army's
-      // spot if it was repelled.
-      selectedRegion = state.regions[regionId]?.ownerId === PLAYER_ID ? regionId : (moved?.regionId ?? regionId);
-      moveArmyId = null;
-      commit();
-      for (const after of state.regions) {
-        if (before.regions[after.id]?.ownerId !== after.ownerId) renderer.pulseCapture(after.id);
-      }
-      maybeShowBattle(battlesBefore);
+      withWarConfirm(regionId, () => {
+        const before = state;
+        const battlesBefore = before.battles?.length ?? 0;
+        state = moveArmy(state, army.id, regionId);
+        const moved = state.armies.find((a) => a.id === army.id);
+        // Stay on the fight's outcome region: the captured target, or the army's
+        // spot if it was repelled.
+        selectedRegion = state.regions[regionId]?.ownerId === PLAYER_ID ? regionId : (moved?.regionId ?? regionId);
+        moveArmyId = null;
+        commit();
+        for (const after of state.regions) {
+          if (before.regions[after.id]?.ownerId !== after.ownerId) renderer.pulseCapture(after.id);
+        }
+        maybeShowBattle(battlesBefore);
+      });
     },
     onMoveDetachment(armyId, targetRegionId, subset) {
       state = moveDetachment(state, armyId, targetRegionId, subset);
@@ -286,13 +290,16 @@ function main(): void {
     if (moveArmyId !== null && regionId !== null) {
       const army = state.armies.find((a) => a.id === moveArmyId);
       if (army && reachableRegions(state, army).includes(regionId)) {
-        const battlesBefore = state.battles?.length ?? 0;
-        state = moveArmy(state, moveArmyId, regionId);
-        const moved = state.armies.find((a) => a.id === moveArmyId);
-        selectedRegion = moved ? moved.regionId : regionId;
-        moveArmyId = moved && moved.movesLeft > 0 ? moved.id : null;
-        commit();
-        maybeShowBattle(battlesBefore);
+        const attackerId = moveArmyId;
+        withWarConfirm(regionId, () => {
+          const battlesBefore = state.battles?.length ?? 0;
+          state = moveArmy(state, attackerId, regionId);
+          const moved = state.armies.find((a) => a.id === attackerId);
+          selectedRegion = moved ? moved.regionId : regionId;
+          moveArmyId = moved && moved.movesLeft > 0 ? moved.id : null;
+          commit();
+          maybeShowBattle(battlesBefore);
+        });
         return;
       }
     }
@@ -403,6 +410,39 @@ function main(): void {
     if (battles.length <= battlesBefore) return;
     const b = battles[battles.length - 1];
     if (b && (b.attackerIsPlayer || b.defenderIsPlayer)) hud.showBattleReport(b);
+  }
+
+  /** The rival an attack on `regionId` would newly declare war on, or null. */
+  function attackDeclaresWarOn(regionId: number): number | null {
+    const target = state.regions[regionId];
+    if (!target) return null;
+    const enemyArmy = state.armies.find((a) => a.regionId === regionId && a.ownerId !== PLAYER_ID);
+    const defenderOwner = enemyArmy?.ownerId ?? target.ownerId;
+    if (defenderOwner === null || defenderOwner === PLAYER_ID || defenderOwner === BARBARIAN_ID) {
+      return null;
+    }
+    return atWar(state, PLAYER_ID, defenderOwner) ? null : defenderOwner;
+  }
+
+  /**
+   * Run `proceed` immediately unless the strike would start a *new* war — then
+   * ask first (combined battles and allied rally make war costly to trigger by
+   * accident). Barbarians, current enemies, and plain relocations never prompt.
+   */
+  function withWarConfirm(regionId: number, proceed: () => void): void {
+    const foe = attackDeclaresWarOn(regionId);
+    if (foe === null) {
+      proceed();
+      return;
+    }
+    const name = state.nations.find((n) => n.id === foe)?.name ?? "this realm";
+    void confirmAction({
+      title: `Attack ${name}?`,
+      body: `Striking here declares war on ${name}. Their allies may be drawn in to defend them.`,
+      confirmLabel: "Declare war & attack",
+    }).then((ok) => {
+      if (ok) proceed();
+    });
   }
 
   function sync(): void {

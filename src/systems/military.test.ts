@@ -624,6 +624,7 @@ describe("commander defection (E5)", () => {
     g.armies[0]!.commander = { name: "Skirgaila", epithet: "the Fox", martial: 6, trait: "ambitious", loyalty: 15 };
     const next = applyDefection(g);
     expect(next.regions[0]!.ownerId).toBe(BARBARIAN_ID); // region lost
+    expect(next.regions[0]!.priorOwnerId).toBe(PLAYER_ID); // remembers who to reclaim from
     expect(next.armies[0]!.ownerId).toBe(BARBARIAN_ID);  // the army defected...
     expect(next.armies[0]!.commander!.name).toBe("Skirgaila"); // ...still led by the pretender
     expect(next.log.some((l) => /turns his coat, seizing/.test(l))).toBe(true);
