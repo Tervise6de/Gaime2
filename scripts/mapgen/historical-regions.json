@@ -1,0 +1,899 @@
+{
+  "England": {
+    "South-East & London (Kent / London)": {
+      "note": "Core of the Anglo-Saxon south-east; London held the Hanse Steelyard (Stalhof) and the Cinque Ports faced Flanders.",
+      "admin1": [
+        "Barking and Dagenham",
+        "Barnet",
+        "Bexley",
+        "Brent",
+        "Bromley",
+        "Camden",
+        "City",
+        "Croydon",
+        "Ealing",
+        "Enfield",
+        "Greenwich",
+        "Hackney",
+        "Hammersmith and Fulham",
+        "Haringey",
+        "Harrow",
+        "Havering",
+        "Hillingdon",
+        "Hounslow",
+        "Islington",
+        "Kensington and Chelsea",
+        "Kingston upon Thames",
+        "Lambeth",
+        "Lewisham",
+        "Merton",
+        "Newham",
+        "Redbridge",
+        "Richmond upon Thames",
+        "Southwark",
+        "Sutton",
+        "Tower Hamlets",
+        "Waltham Forest",
+        "Wandsworth",
+        "Westminster",
+        "Kent",
+        "Medway",
+        "Surrey",
+        "East Sussex",
+        "West Sussex",
+        "Brighton and Hove",
+        "Essex",
+        "Southend-on-Sea",
+        "Thurrock",
+        "Hertfordshire",
+        "Bedford",
+        "Central Bedfordshire",
+        "Luton",
+        "Buckinghamshire",
+        "Milton Keynes",
+        "Oxfordshire",
+        "West Berkshire",
+        "Reading",
+        "Wokingham",
+        "Bracknell Forest",
+        "Slough",
+        "Royal Borough of Windsor and Maidenhead"
+      ]
+    },
+    "Wessex & the South-West": {
+      "note": "Old kingdom of Wessex plus Cornwall/Dumnonia; Southampton and Bristol were the western outlets for wool and Gascon wine.",
+      "admin1": [
+        "Cornwall",
+        "Isles of Scilly",
+        "Devon",
+        "Plymouth",
+        "Torbay",
+        "Somerset",
+        "North Somerset",
+        "Bath and North East Somerset",
+        "Dorset",
+        "Bournemouth",
+        "Poole",
+        "Wiltshire",
+        "Swindon",
+        "Hampshire",
+        "Southampton",
+        "Portsmouth",
+        "Isle of Wight",
+        "Gloucestershire",
+        "South Gloucestershire",
+        "Bristol"
+      ]
+    },
+    "Mercia & the Midlands": {
+      "note": "Inland kingdom of Mercia and the Danelaw shires; wool-growing hinterland feeding the eastern staple ports.",
+      "admin1": [
+        "Birmingham",
+        "Coventry",
+        "Dudley",
+        "Sandwell",
+        "Solihull",
+        "Walsall",
+        "Wolverhampton",
+        "Staffordshire",
+        "Stoke-on-Trent",
+        "Warwickshire",
+        "Worcestershire",
+        "Herefordshire",
+        "Shropshire",
+        "Telford and Wrekin",
+        "Derbyshire",
+        "Derby",
+        "Nottinghamshire",
+        "Nottingham",
+        "Leicestershire",
+        "Leicester",
+        "Rutland",
+        "Northamptonshire",
+        "Lincolnshire",
+        "North Lincolnshire",
+        "North East Lincolnshire"
+      ]
+    },
+    "East Anglia": {
+      "note": "Kingdom of the East Angles; King's Lynn (Bishop's Lynn), Yarmouth and Ipswich were major Hanse grain/wool ports on the Wash and North Sea.",
+      "admin1": [
+        "Norfolk",
+        "Suffolk",
+        "Cambridgeshire",
+        "Peterborough"
+      ]
+    },
+    "Northumbria & the North": {
+      "note": "Old Northumbria and the northern Danelaw; Hull (Kingston upon Hull) and York shipped Yorkshire wool to the Low Countries and Baltic.",
+      "admin1": [
+        "North Yorkshire",
+        "York",
+        "East Riding of Yorkshire",
+        "Kingston upon Hull",
+        "Sheffield",
+        "Rotherham",
+        "Barnsley",
+        "Doncaster",
+        "Leeds",
+        "Bradford",
+        "Wakefield",
+        "Kirklees",
+        "Calderdale",
+        "Northumberland",
+        "Newcastle upon Tyne",
+        "North Tyneside",
+        "South Tyneside",
+        "Gateshead",
+        "Sunderland",
+        "Durham",
+        "Darlington",
+        "Hartlepool",
+        "Stockton-on-Tees",
+        "Middlesbrough",
+        "Redcar and Cleveland",
+        "Cumbria",
+        "Lancashire",
+        "Blackburn with Darwen",
+        "Blackpool",
+        "Manchester",
+        "Salford",
+        "Bolton",
+        "Bury",
+        "Oldham",
+        "Rochdale",
+        "Stockport",
+        "Tameside",
+        "Trafford",
+        "Wigan",
+        "Liverpool",
+        "Knowsley",
+        "Sefton",
+        "Merseyside",
+        "Halton",
+        "Warrington",
+        "Cheshire East",
+        "Cheshire West and Chester"
+      ]
+    }
+  },
+  "Flanders": {
+    "County of Flanders": {
+      "note": "The great cloth county; Bruges hosted the Hanseatic Kontor, the western hub of the whole League, with Ghent and Ypres.",
+      "admin1": [
+        "West Flanders",
+        "East Flanders"
+      ]
+    },
+    "Duchy of Brabant": {
+      "note": "Brabant fairs and the rise of Antwerp as staple; Brussels the ducal seat, North Brabant its northern quarter.",
+      "admin1": [
+        "Antwerp",
+        "Flemish Brabant",
+        "Brussels",
+        "Walloon Brabant",
+        "Noord-Brabant"
+      ]
+    },
+    "Hainaut, Namur & Liège (the Meuse principalities)": {
+      "note": "Inland Walloon lands: the county of Hainaut, prince-bishopric of Liège, Namur and Luxembourg — partly framing, south of the Hanse coast.",
+      "admin1": [
+        "Hainaut",
+        "Namur",
+        "Liege",
+        "Luxembourg"
+      ]
+    },
+    "County of Holland & Zeeland": {
+      "note": "Holland and Zeeland: Amsterdam, Dordrecht and the Zuiderzee ports — Hanse partners and eventually its fiercest maritime rivals; Utrecht was a prince-bishopric.",
+      "admin1": [
+        "Noord-Holland",
+        "Zuid-Holland",
+        "Utrecht",
+        "Zeeland",
+        "Flevoland"
+      ]
+    },
+    "Guelders & the Oversticht (IJssel Hanse towns)": {
+      "note": "The IJssel/Zuiderzee Hanseatic towns — Kampen, Deventer, Zwolle — in the duchy of Guelders and the bishop of Utrecht's Oversticht (Overijssel, Drenthe).",
+      "admin1": [
+        "Gelderland",
+        "Overijssel",
+        "Drenthe"
+      ]
+    },
+    "The Limburgs & Lower Meuse": {
+      "note": "The Meuse marches around Maastricht: the county of Loon (Belgian Limburg, under Liège) and Upper Guelders/Jülich (Dutch Limburg). NB both admin-1 units are literally named \"Limburg\".",
+      "admin1": [
+        "Limburg"
+      ]
+    },
+    "Frisia (Friesland & Groningen)": {
+      "note": "The Free Frisian lands and the city of Groningen — never fully feudalised; Groningen dominated the Ommelanden and Frisian coastal trade.",
+      "admin1": [
+        "Friesland",
+        "Groningen"
+      ]
+    }
+  },
+  "Lübeck": {
+    "Holstein & Lübeck (Schleswig-Holstein)": {
+      "note": "Holstein and the Wagrian coast; Lübeck — \"Queen of the Hanse\" and capital of the Wendish quarter — lies on this isthmus between North and Baltic Seas.",
+      "admin1": [
+        "Schleswig-Holstein"
+      ]
+    },
+    "Hamburg (Free Hanseatic City)": {
+      "note": "The Elbe-mouth Hanse metropolis; Hamburg and Lübeck jointly controlled the salt road and the North-Sea–Baltic transit.",
+      "admin1": [
+        "Hamburg"
+      ]
+    },
+    "Mecklenburg & Pomerania (Vorpommern)": {
+      "note": "The Wendish Baltic shore: Wismar and Rostock (Mecklenburg) plus Stralsund, Greifswald and Rügen (Vorpommern) — the militant core of the Wendish towns.",
+      "admin1": [
+        "Mecklenburg-Vorpommern"
+      ]
+    }
+  },
+  "Saxony": {
+    "Lower Saxony (Duchy of the Welfs)": {
+      "note": "The Welf duchy of Brunswick-Lüneburg: Lüneburg's salt, Brunswick and Hanover — a founding Saxon-Hanse heartland.",
+      "admin1": [
+        "Niedersachsen"
+      ]
+    },
+    "Bremen (Free Hanseatic City)": {
+      "note": "The Weser-mouth archbishopric and Hanse city; gateway for Westphalian and North-Sea trade.",
+      "admin1": [
+        "Bremen"
+      ]
+    },
+    "Old Saxony & Magdeburg (Saxony-Anhalt)": {
+      "note": "The Ottonian heartland on the middle Elbe; Magdeburg and its far-copied town law, plus the Harz silver.",
+      "admin1": [
+        "Sachsen-Anhalt"
+      ]
+    },
+    "Mark Brandenburg": {
+      "note": "The Ascanian march east of the Elbe; Berlin/Cölln and Frankfurt-an-der-Oder were Hanse towns on the road to Poland.",
+      "admin1": [
+        "Brandenburg",
+        "Berlin"
+      ]
+    },
+    "Meissen & Thuringia (the upland hinterland)": {
+      "note": "Wettin Upper Saxony (Meissen, Leipzig) and Thuringia (Erfurt) — inland trade-route hinterland, largely framing.",
+      "admin1": [
+        "Sachsen",
+        "Thüringen"
+      ]
+    }
+  },
+  "Cologne": {
+    "Rhineland & Westphalia (Archbishopric of Cologne)": {
+      "note": "Cologne — the greatest German city and Rhine staple — with the Westphalian Hanse towns Dortmund, Soest and Münster (one Bundesland spans both historic regions).",
+      "admin1": [
+        "Nordrhein-Westfalen"
+      ]
+    },
+    "Middle Rhine (Rhineland-Palatinate)": {
+      "note": "Mainz, Trier, Worms and Koblenz on the middle Rhine and Moselle — the up-river wine and transit trade feeding Cologne.",
+      "admin1": [
+        "Rheinland-Pfalz"
+      ]
+    },
+    "Hesse (Landgraviate)": {
+      "note": "Landgraviate of Hesse; Frankfurt's fairs and the central German overland routes — Hanse-adjacent hinterland.",
+      "admin1": [
+        "Hessen"
+      ]
+    }
+  },
+  "Denmark": {
+    "Zealand (Sjælland)": {
+      "note": "The Danish royal core: Copenhagen (which taxed the Sound) and Roskilde; includes Lolland-Falster and Bornholm.",
+      "admin1": [
+        "Hovedstaden",
+        "Sjaælland"
+      ]
+    },
+    "Funen & South Jutland (Fyn / Sønderjylland)": {
+      "note": "Funen (Odense) with southern Jutland and the duchy of Schleswig borderland; Ribe was an old North-Sea trade town.",
+      "admin1": [
+        "Syddanmark"
+      ]
+    },
+    "Jutland (Nørrejylland)": {
+      "note": "The northern peninsula: Aalborg, Aarhus and Viborg; cattle and herring for the Hanse.",
+      "admin1": [
+        "Midtjylland",
+        "Nordjylland"
+      ]
+    },
+    "Scania (Skåneland)": {
+      "note": "MEDIEVALLY DANISH (Swedish only after 1658): Skåne, Halland and Blekinge; the Scanian herring fairs at Skanör/Falsterbo were the Hanse's greatest market, with Lund the archiepiscopal see.",
+      "admin1": [
+        "Skåne",
+        "Halland",
+        "Blekinge"
+      ]
+    }
+  },
+  "Norway": {
+    "Viken (the Oslofjord & East)": {
+      "note": "The eastern trading region around the Oslofjord: Oslo and Tønsberg, where Hanse (mainly Rostock) merchants were active.",
+      "admin1": [
+        "Oslo",
+        "Akershus",
+        "Østfold",
+        "Vestfold",
+        "Buskerud",
+        "Telemark"
+      ]
+    },
+    "Agder (the South Coast)": {
+      "note": "The Skagerrak coast of Agder — timber and small harbours between Viken and the west.",
+      "admin1": [
+        "Aust-Agder",
+        "Vest-Agder"
+      ]
+    },
+    "Opplandene (the Interior)": {
+      "note": "The inland valleys (Gudbrandsdalen, Hedmark, Oppland) — agricultural hinterland behind Viken.",
+      "admin1": [
+        "Hedmark",
+        "Oppland"
+      ]
+    },
+    "Vestlandet (the West Country)": {
+      "note": "The fjord west: Bergen held the Hanseatic Kontor at Bryggen, controlling the stockfish (dried cod) staple that fed much of Europe.",
+      "admin1": [
+        "Rogaland",
+        "Hordaland",
+        "Sogn og Fjordane",
+        "Møre og Romsdal"
+      ]
+    },
+    "Trøndelag": {
+      "note": "Trøndelag around Nidaros (Trondheim), Norway's archiepiscopal see and northern grain district.",
+      "admin1": [
+        "Sør-Trøndelag",
+        "Nord-Trøndelag"
+      ]
+    },
+    "Hålogaland (the North)": {
+      "note": "The far north; Lofoten/Vesterålen stockfish shipped south to Bergen. Troms and Finnmark lie mostly beyond the play-area (framing).",
+      "admin1": [
+        "Nordland",
+        "Troms",
+        "Finnmark"
+      ]
+    }
+  },
+  "Sweden": {
+    "Uppland": {
+      "note": "The royal land north of the Mälaren; Stockholm (founded c.1250) became the capital and iron/copper export port with a large German burgher community; Uppsala the archiepiscopal see.",
+      "admin1": [
+        "Uppsala",
+        "Stockholm"
+      ]
+    },
+    "Södermanland & the Mälaren lands": {
+      "note": "Södermanland, Västmanland and Närke around Lake Mälaren, plus Värmland and the Bergslagen/Dalarna mining country (Falun copper, osmund iron) shipped via Stockholm.",
+      "admin1": [
+        "Södermanland",
+        "Västmanland",
+        "Orebro",
+        "Värmland",
+        "Dalarna"
+      ]
+    },
+    "Östergötland": {
+      "note": "The fertile eastern plain; Söderköping was the medieval east-coast staple and Hanse port, with Vadstena its great abbey.",
+      "admin1": [
+        "Östergötland"
+      ]
+    },
+    "Västergötland": {
+      "note": "The western land toward the Göta river; Lödöse was Sweden's outlet to the North Sea. (Admin-1 also covers Bohuslän and Dalsland, medievally Norwegian borderlands — flag.)",
+      "admin1": [
+        "Västra Götaland"
+      ]
+    },
+    "Småland & Öland": {
+      "note": "The forested southern uplands and the island of Öland; Kalmar — great castle and east-coast port, seat of the 1397 Kalmar Union — bordered Danish Scania.",
+      "admin1": [
+        "Jönköping",
+        "Kronoberg",
+        "Kalmar"
+      ]
+    },
+    "Gotland": {
+      "note": "Visby on Gotland was the pivotal early Hanse hub of the eastern Baltic (\"community of German merchants visiting Gotland\"); sacked by Denmark 1361 and thereafter Danish.",
+      "admin1": [
+        "Gotland"
+      ]
+    },
+    "Norrland (the North)": {
+      "note": "The northern forest and Bothnian coast (furs, tar, salmon, iron). Jämtland was medievally Norwegian; Norrbotten lies largely beyond the play-area (framing).",
+      "admin1": [
+        "Gävleborg",
+        "Västernorrland",
+        "Jämtland",
+        "Västerbotten",
+        "Norrbotten"
+      ]
+    }
+  },
+  "Finland": {
+    "Finland Proper (Varsinais-Suomi)": {
+      "note": "The south-west core around Åbo/Turku — cathedral city, bishop's seat and Finland's chief port linked to Stockholm and the Hanse.",
+      "admin1": [
+        "Finland Proper"
+      ]
+    },
+    "Satakunta": {
+      "note": "The Kokemäki-river country north of Turku (Ulvila/Pori); Pirkanmaa (Tampere) formed its inland march with Häme.",
+      "admin1": [
+        "Satakunta",
+        "Pirkanmaa"
+      ]
+    },
+    "Tavastia (Häme)": {
+      "note": "The interior lake district dominated by Häme Castle; Päijät-Häme and Central Finland its northern extensions.",
+      "admin1": [
+        "Tavastia Proper",
+        "Päijät-Häme",
+        "Central Finland"
+      ]
+    },
+    "Uusimaa (Nyland)": {
+      "note": "The Gulf-of-Finland coast (Porvoo/Borgå, later Helsinki); Kymenlaakso its eastern, Karelian-facing march.",
+      "admin1": [
+        "Uusimaa",
+        "Kymenlaakso"
+      ]
+    },
+    "Savonia (Savo)": {
+      "note": "The eastern lake wilderness colonised from Häme; Olofsborg/Savonlinna (1475) guarded the frontier with Novgorod. Kainuu was long a disputed northern wilderness.",
+      "admin1": [
+        "Northern Savonia",
+        "Southern Savonia",
+        "Kainuu"
+      ]
+    },
+    "Karelia (Karjala)": {
+      "note": "The Novgorod frontier; Viborg/Viipuri, founded 1293, was the great eastern fortress and fur-trade town of the Swedish realm.",
+      "admin1": [
+        "South Karelia",
+        "North Karelia"
+      ]
+    },
+    "Ostrobothnia (Österbotten)": {
+      "note": "The Bothnian coast; tar, furs, salmon and stockfish from Vaasa/Mustasaari up to Oulu.",
+      "admin1": [
+        "Ostrobothnia",
+        "Southern Ostrobothnia",
+        "Central Ostrobothnia",
+        "Northern Ostrobothnia"
+      ]
+    }
+  },
+  "Livonia": {
+    "Kurzeme (Courland)": {
+      "note": "The duchy of Courland west of the Gulf of Riga; the Livonian Order's Kurland bailiwick, with the ports of Windau (Ventspils), Libau (Liepāja) and Goldingen (Kuldīga).",
+      "admin1": [
+        "Aizputes",
+        "Alsungas",
+        "Brocenu",
+        "Dundagas",
+        "Durbes",
+        "Engures",
+        "Grobinas",
+        "Jaunpils",
+        "Kandavas",
+        "Kuldigas",
+        "Liepāja",
+        "Mersraga",
+        "Nicas",
+        "Pavilostas",
+        "Priekules",
+        "Rojas",
+        "Rucavas",
+        "Saldus",
+        "Skrundas",
+        "Talsi",
+        "Tukums",
+        "Vainodes",
+        "Ventspils"
+      ]
+    },
+    "Zemgale (Semigallia)": {
+      "note": "The Semigallian plain south of Riga (Mitau/Jelgava, Bauske); fertile Lielupe grain country, long a pagan-Baltic frontier.",
+      "admin1": [
+        "Auces",
+        "Baldones",
+        "Bauska",
+        "Dobele",
+        "Iecavas",
+        "Jelgava",
+        "Keguma",
+        "Kekavas",
+        "Ozolnieku",
+        "Rundales",
+        "Tervetes",
+        "Vecumnieku"
+      ]
+    },
+    "Sēlija (Selonia)": {
+      "note": "Selonia, south of the Daugava between Semigallia and Latgale (Jēkabpils, Ilūkste). Often merged into Zemgale — flag for review.",
+      "admin1": [
+        "Aizkraukles",
+        "Aknistes",
+        "Ilukstes",
+        "Jaunjelgavas",
+        "Jekabpils",
+        "Neretas",
+        "Plavinu",
+        "Salas",
+        "Viesites"
+      ]
+    },
+    "Vidzeme (Livonia proper)": {
+      "note": "The core of medieval \"Livland\" north of the Daugava: Riga (Hanse city, archbishop's and Order's seat) and Wenden/Cēsis, capital of the Livonian Order.",
+      "admin1": [
+        "Alojas",
+        "Aluksne",
+        "Amatas",
+        "Apes",
+        "Babites",
+        "Beverinas",
+        "Burtnieku",
+        "Carnikavas",
+        "Cesu",
+        "Cesvaines",
+        "Erglu",
+        "Garkalnes",
+        "Gulbene",
+        "Ikskiles",
+        "Incukalna",
+        "Jaunpiebalgas",
+        "Jurmala",
+        "Kocenu",
+        "Kokneses",
+        "Krimuldas",
+        "Lielvardes",
+        "Ligatnes",
+        "Limbaži",
+        "Lubanas",
+        "Madona",
+        "Malpils",
+        "Marupes",
+        "Mazsalacas",
+        "Nauksenu",
+        "Ogre",
+        "Olaines",
+        "Pargaujas",
+        "Priekulu",
+        "Raunas",
+        "Riga",
+        "Ropazu",
+        "Rujienas",
+        "Salacgrivas",
+        "Salaspils",
+        "Saulkrastu",
+        "Sejas",
+        "Siguldas",
+        "Skriveru",
+        "Smiltenes",
+        "Stopinu",
+        "Strencu",
+        "Valkas",
+        "Valmiera",
+        "Vecpiebalgas",
+        "Ādaži"
+      ]
+    },
+    "Latgale (Latgallia)": {
+      "note": "Latgallia in the far south-east (Rēzekne, Ludza, Dünaburg/Daugavpils); the Order's eastern march facing Pskov and Polotsk.",
+      "admin1": [
+        "Aglonas",
+        "Baltinavas",
+        "Balvu",
+        "Ciblas",
+        "Dagdas",
+        "Daugavpils",
+        "Karsavas",
+        "Kraslavas",
+        "Krustpils",
+        "Livanu",
+        "Ludzas",
+        "Preilu",
+        "Rezekne",
+        "Rezeknes",
+        "Riebinu",
+        "Rugaju",
+        "Varaklanu",
+        "Varkavas",
+        "Vilakas",
+        "Vilanu",
+        "Zilupes"
+      ]
+    }
+  },
+  "Lithuania": {
+    "Samogitia (Žemaitija)": {
+      "note": "The western lowlands the Teutonic Order fought Lithuania for; Memel/Klaipėda was actually Order territory in the Hansa era (flag). Šiauliai and Telšiai are the Samogitian heartland.",
+      "admin1": [
+        "Telšiai",
+        "Klaipedos",
+        "Šiauliai",
+        "Taurages"
+      ]
+    },
+    "Aukštaitija (the Highlands)": {
+      "note": "The upper Neris/Nemunas highlands north-east of Kaunas — the old ethnographic core of the Lithuanians.",
+      "admin1": [
+        "Panevezio",
+        "Utenos"
+      ]
+    },
+    "Kaunas & the Nemunas valley": {
+      "note": "Kaunas/Kauen at the Neris–Nemunas confluence; a river trade town that hosted a Hanseatic office in the 15th century, on the road from Danzig up the Nemunas.",
+      "admin1": [
+        "Kauno"
+      ]
+    },
+    "Vilnius (Lithuania Proper)": {
+      "note": "The grand-ducal capital founded c.1323; seat of the Gediminid dynasty and hub of the Grand Duchy of Lithuania.",
+      "admin1": [
+        "Vilniaus"
+      ]
+    },
+    "Sūduva & Dzūkija (the southern forests)": {
+      "note": "Sudovia/Užnemunė west of the Nemunas (old Yotvingian land) and Dzūkija to the south-east — sparsely settled forest borderland toward Prussia and Poland.",
+      "admin1": [
+        "Marijampoles",
+        "Alytaus"
+      ]
+    }
+  },
+  "Novgorod": {
+    "Novgorod the Great": {
+      "note": "The Novgorod Republic; the Hanseatic Peterhof (St Peter's Court) was the League's easternmost Kontor, trading furs, wax and honey for cloth.",
+      "admin1": [
+        "Novgorod"
+      ]
+    },
+    "Ingria & Ladoga (Vodskaya & Korela)": {
+      "note": "Novgorod's north-western pyatiny on the Neva and Lake Ladoga (Oreshek/Nöteborg); the fur/fish frontier contested with Sweden. (St Petersburg is a later foundation on this ground.)",
+      "admin1": [
+        "Leningrad",
+        "City of St. Petersburg"
+      ]
+    },
+    "Pskov": {
+      "note": "The Pskov Republic; a walled Hanse trading town (the Zavelichye German quarter) on the front line with the Livonian Order.",
+      "admin1": [
+        "Pskov"
+      ]
+    },
+    "Polotsk & Vitebsk": {
+      "note": "The principality of Polotsk on the Western Dvina/Daugava — terminus of the Riga river route into Rus'; Vitebsk and Polotsk drew Hanse cloth up the Dvina. (Belarus admin-1.)",
+      "admin1": [
+        "Vitebsk"
+      ]
+    }
+  },
+  "Prussia": {
+    "Pomerelia (Danzig)": {
+      "note": "Gdańsk/Danzig — the premier Baltic Hanse port at the Vistula mouth; Pomerelia was seized by the Teutonic Order in 1308, then Royal Prussia after 1466. Marienburg/Malbork, the Order's capital, lies here.",
+      "admin1": [
+        "Pomeranian"
+      ]
+    },
+    "Culmerland & Warmia (the Order's heartland)": {
+      "note": "Thorn/Toruń and Kulm/Chełmno — the first Hanse towns of the Ordensstaat — with Warmia (the prince-bishopric) and Masuria. NB the Kuyavian-Pomeranian unit also covers Polish Kuyavia in its south (split unit — flag).",
+      "admin1": [
+        "Warmian-Masurian",
+        "Kuyavian-Pomeranian"
+      ]
+    },
+    "East Prussia / Sambia (Königsberg)": {
+      "note": "Königsberg (Kaliningrad) — Order capital from 1457 and a Hanse town — with the Samland peninsula and the amber coast. (Belongs to Russia today.)",
+      "admin1": [
+        "Kaliningrad"
+      ]
+    }
+  },
+  "Poland": {
+    "Greater Poland (Wielkopolska)": {
+      "note": "The cradle of the Polish state — Poznań and Gniezno — with the Lubusz (Lebus) land on the Oder and the Sieradz-Łęczyca march (Łódź).",
+      "admin1": [
+        "Greater Poland",
+        "Lubusz",
+        "Łódź"
+      ]
+    },
+    "Masovia (Mazowsze)": {
+      "note": "The duchy of Masovia (Warsaw, Płock), only fully absorbed into the Crown in 1526; Podlasie was a Lithuanian-Mazovian borderland (part of the Grand Duchy until 1569 — flag).",
+      "admin1": [
+        "Masovian",
+        "Podlachian"
+      ]
+    },
+    "Lesser Poland (Małopolska)": {
+      "note": "Kraków — the royal capital — with Sandomierz and Lublin; the upper Vistula grain and Kraków–Thorn trade route ran down to Danzig.",
+      "admin1": [
+        "Lesser Poland",
+        "Lublin",
+        "Świętokrzyskie",
+        "Subcarpathian"
+      ]
+    },
+    "Silesia (Śląsk)": {
+      "note": "Wrocław/Breslau was a major Hanse city, but Silesia passed to the Bohemian (Luxembourg) crown after 1335 — Imperial, not Polish, in the Hansa era (flag).",
+      "admin1": [
+        "Lower Silesian",
+        "Opole",
+        "Silesian"
+      ]
+    },
+    "Pomerania (Stettin / Farther Pomerania)": {
+      "note": "Szczecin/Stettin and Kolberg — the Baltic coast of the duchy of Pomerania (Wolgast/Stettin), an Imperial fief and Hanse shore, not a Polish-crown land medievally (flag).",
+      "admin1": [
+        "West Pomeranian"
+      ]
+    }
+  },
+  "_framing_out_of_play": {
+    "United Kingdom (Scotland/Wales/N. Ireland)": {
+      "note": "Outside the England-only realm; framing.",
+      "admin1": [
+        "Antrim",
+        "Ards",
+        "Armagh",
+        "Ballymena",
+        "Ballymoney",
+        "Banbridge",
+        "Belfast",
+        "Carrickfergus",
+        "Castlereagh",
+        "Coleraine",
+        "Craigavon",
+        "Derry",
+        "Down",
+        "Dungannon",
+        "Fermanagh",
+        "Larne",
+        "Limavady",
+        "Lisburn",
+        "Magherafelt",
+        "Mid Ulster",
+        "Moyle",
+        "Newry and Mourne",
+        "Newtownabbey",
+        "North Down",
+        "Omagh",
+        "Strabane",
+        "Aberdeen",
+        "Aberdeenshire",
+        "Angus",
+        "Argyll and Bute",
+        "Clackmannanshire",
+        "Dumfries and Galloway",
+        "Dundee",
+        "East Ayrshire",
+        "East Dunbartonshire",
+        "East Lothian",
+        "East Renfrewshire",
+        "Edinburgh",
+        "Eilean Siar",
+        "Falkirk",
+        "Fife",
+        "Glasgow",
+        "Highland",
+        "Inverclyde",
+        "Midlothian",
+        "Moray",
+        "North Ayshire",
+        "North Lanarkshire",
+        "Orkney",
+        "Perthshire and Kinross",
+        "Renfrewshire",
+        "Scottish Borders",
+        "Shetland Islands",
+        "South Ayrshire",
+        "South Lanarkshire",
+        "Stirling",
+        "West Dunbartonshire",
+        "West Lothian",
+        "Anglesey",
+        "Blaenau Gwent",
+        "Bridgend",
+        "Caerphilly",
+        "Cardiff",
+        "Carmarthenshire",
+        "Ceredigion",
+        "Conwy",
+        "Denbighshire",
+        "Flintshire",
+        "Gwynedd",
+        "Merthyr Tydfil",
+        "Monmouthshire",
+        "Neath Port Talbot",
+        "Newport",
+        "Pembrokeshire",
+        "Powys",
+        "Rhondda, Cynon, Taff",
+        "Swansea",
+        "Torfaen",
+        "Vale of Glamorgan",
+        "Wrexham"
+      ]
+    },
+    "Netherlands (Caribbean)": {
+      "note": "Caribbean municipalities, far outside the map.",
+      "admin1": [
+        "Saba",
+        "St. Eustatius"
+      ]
+    },
+    "Germany (South)": {
+      "note": "South Germany beyond the Hanse realms.",
+      "admin1": [
+        "Saarland",
+        "Bayern",
+        "Baden-Württemberg"
+      ]
+    },
+    "Finland (Lapland)": {
+      "note": "The far north, almost entirely beyond the play-area (lat > 66).",
+      "admin1": [
+        "Lapland"
+      ]
+    },
+    "Belarus (Grand Duchy interior)": {
+      "note": "Interior of the Grand Duchy of Lithuania / Ruthenia, beyond the coastal realms.",
+      "admin1": [
+        "Brest",
+        "Grodno",
+        "Minsk",
+        "City of Minsk",
+        "Mogilev",
+        "Gomel"
+      ]
+    },
+    "Russia (beyond Novgorod scope)": {
+      "note": "Russian oblasts east/south of the Novgorod scope; Bryansk, Smolensk, Tver' and Karelia only clip the play-area edge, their centres lie beyond. Chukchi appears as a false positive (its geometry crosses the antimeridian). All other Russian units are fully out of the map.",
+      "admin1": [
+        "Bryansk",
+        "Smolensk",
+        "Tver'",
+        "Karelia",
+        "Chukchi Autonomous Okrug"
+      ]
+    }
+  }
+}

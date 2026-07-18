@@ -26,6 +26,10 @@ import {
 
 const RIVAL = 2;
 
+// Kontor host region ids on the real Hansa map (kept out of the tests' literals so
+// re-seating the map never silently breaks these synthetic fixtures).
+const BRUGES = KONTORE.bruges.regionId; // 5 on the current map
+
 function reg(over: Partial<Region> = {}): Region {
   return {
     id: 0, name: "R", terrain: "plains", ownerId: PLAYER_ID, population: 5, unrest: 0,
@@ -125,72 +129,72 @@ describe("laneFor", () => {
   it("returns [] when the Kontor host is unreachable or off this map", () => {
     const regions = regionsOf(2, { 0: { adjacency: [] }, 1: { adjacency: [] } });
     expect(laneFor(state(regions), 1, "london")).toEqual([]); // no path to 0
-    expect(laneFor(state(regions), 1, "bergen")).toEqual([]); // Bergen host (23) absent
+    expect(laneFor(state(regions), 1, "bergen")).toEqual([]); // Bergen host absent from this map
   });
 });
 
 describe("createRoute", () => {
-  // 5 = plains (grain) owned by player, adjacent to 4 = Bruges host owned by player.
+  // 4 = plains (grain) owned by player, adjacent to the Bruges host (coast), also player.
   const base = () =>
     state(
-      regionsOf(6, {
-        4: { terrain: "coast", ownerId: PLAYER_ID, adjacency: [5] }, // Bruges host
-        5: { terrain: "plains", ownerId: PLAYER_ID, adjacency: [4] }, // grain source
+      regionsOf(BRUGES + 1, {
+        4: { terrain: "plains", ownerId: PLAYER_ID, adjacency: [BRUGES] }, // grain source
+        [BRUGES]: { terrain: "coast", ownerId: PLAYER_ID, adjacency: [4] }, // Bruges host
       }),
     );
 
   it("founds a valid route (grain → Bruges) and bumps nextRouteId", () => {
-    const next = createRoute(base(), PLAYER_ID, 5, "grain", "bruges");
+    const next = createRoute(base(), PLAYER_ID, 4, "grain", "bruges");
     expect(next.routes).toHaveLength(1);
     expect(next.routes![0]).toMatchObject({
-      id: 0, ownerId: PLAYER_ID, good: "grain", fromRegionId: 5, toKontorId: "bruges", lane: [5, 4],
+      id: 0, ownerId: PLAYER_ID, good: "grain", fromRegionId: 4, toKontorId: "bruges", lane: [4, BRUGES],
     });
     expect(next.nextRouteId).toBe(1);
   });
 
   it("rejects a good the Kontor does not demand", () => {
     // Bruges demands grain/iron, not timber → no-op.
-    const s = createRoute(base(), PLAYER_ID, 5, "timber", "bruges");
+    const s = createRoute(base(), PLAYER_ID, 4, "timber", "bruges");
     expect(s.routes).toEqual([]);
   });
 
   it("rejects a region that does not source the good", () => {
-    // Region 5 is plains (no iron), Bruges demands iron → no-op.
-    expect(createRoute(base(), PLAYER_ID, 5, "iron", "bruges").routes).toEqual([]);
+    // Region 4 is plains (no iron), Bruges demands iron → no-op.
+    expect(createRoute(base(), PLAYER_ID, 4, "iron", "bruges").routes).toEqual([]);
   });
 
   it("rejects a region the owner does not hold", () => {
-    expect(createRoute(base(), RIVAL, 5, "grain", "bruges").routes).toEqual([]);
+    expect(createRoute(base(), RIVAL, 4, "grain", "bruges").routes).toEqual([]);
   });
 
   it("rejects when no lane reaches the Kontor host (off-map Kontor)", () => {
-    // Bergen host (region 23) is absent from this 6-region map → no lane.
-    const regions = regionsOf(6, { 5: { terrain: "plains", ownerId: PLAYER_ID, adjacency: [] } });
-    expect(createRoute(state(regions), PLAYER_ID, 5, "grain", "bergen").routes).toEqual([]);
+    // Bergen's host region is absent from this small map → no lane.
+    const regions = regionsOf(6, { 4: { terrain: "plains", ownerId: PLAYER_ID, adjacency: [] } });
+    expect(createRoute(state(regions), PLAYER_ID, 4, "grain", "bergen").routes).toEqual([]);
   });
 
   it("rejects trading into a Kontor whose host you are at war with", () => {
-    const regions = regionsOf(6, {
-      4: { terrain: "coast", ownerId: RIVAL, adjacency: [5] }, // Bruges host held by a foe
-      5: { terrain: "plains", ownerId: PLAYER_ID, adjacency: [4] },
+    const regions = regionsOf(BRUGES + 1, {
+      4: { terrain: "plains", ownerId: PLAYER_ID, adjacency: [BRUGES] },
+      [BRUGES]: { terrain: "coast", ownerId: RIVAL, adjacency: [4] }, // Bruges host held by a foe
     });
     const atWarState = state(regions, { treaties: { "0-2": "war" } });
-    expect(createRoute(atWarState, PLAYER_ID, 5, "grain", "bruges").routes).toEqual([]);
+    expect(createRoute(atWarState, PLAYER_ID, 4, "grain", "bruges").routes).toEqual([]);
   });
 
   it("enforces the per-nation route cap", () => {
     let s = base();
-    for (let i = 0; i < MAX_ROUTES_PER_NATION; i++) s = createRoute(s, PLAYER_ID, 5, "grain", "bruges");
+    for (let i = 0; i < MAX_ROUTES_PER_NATION; i++) s = createRoute(s, PLAYER_ID, 4, "grain", "bruges");
     expect(s.routes).toHaveLength(MAX_ROUTES_PER_NATION);
     // One more is refused.
-    s = createRoute(s, PLAYER_ID, 5, "grain", "bruges");
+    s = createRoute(s, PLAYER_ID, 4, "grain", "bruges");
     expect(s.routes).toHaveLength(MAX_ROUTES_PER_NATION);
   });
 
   it("is a no-op that does not mutate its input on an invalid request", () => {
     const s = base();
     const snap = JSON.stringify(s);
-    createRoute(s, PLAYER_ID, 5, "timber", "bruges");
+    createRoute(s, PLAYER_ID, 4, "timber", "bruges");
     expect(JSON.stringify(s)).toBe(snap);
   });
 });
@@ -224,34 +228,36 @@ describe("routeIncome & distanceFactor", () => {
 });
 
 describe("routeDisrupted", () => {
-  const route: TradeRoute = { id: 0, ownerId: PLAYER_ID, good: "grain", fromRegionId: 5, toKontorId: "bruges", lane: [5, 3, 4] };
+  // Lane 4 → 3 → Bruges host: node 4 the source, 3 an intermediate, BRUGES the host.
+  const route: TradeRoute = { id: 0, ownerId: PLAYER_ID, good: "grain", fromRegionId: 4, toKontorId: "bruges", lane: [4, 3, BRUGES] };
 
   it("is not disrupted at peace", () => {
-    const regions = regionsOf(6, { 4: { ownerId: RIVAL }, 3: { ownerId: PLAYER_ID }, 5: { ownerId: PLAYER_ID } });
+    const regions = regionsOf(BRUGES + 1, { 4: { ownerId: PLAYER_ID }, 3: { ownerId: PLAYER_ID }, [BRUGES]: { ownerId: PLAYER_ID } });
     expect(routeDisrupted(state(regions), route)).toBe(false);
   });
 
   it("is disrupted when at war with the Kontor host's owner", () => {
-    const regions = regionsOf(6, { 4: { ownerId: RIVAL }, 3: { ownerId: PLAYER_ID }, 5: { ownerId: PLAYER_ID } });
+    // Host (BRUGES) held by a foe the player is at war with.
+    const regions = regionsOf(BRUGES + 1, { 4: { ownerId: PLAYER_ID }, 3: { ownerId: PLAYER_ID }, [BRUGES]: { ownerId: RIVAL } });
     expect(routeDisrupted(state(regions, { treaties: { "0-2": "war" } }), route)).toBe(true);
   });
 
   it("is disrupted when an enemy at war holds a node on the lane", () => {
-    // Host (4) is friendly, but intermediate node 3 is held by a foe at war.
-    const regions = regionsOf(6, { 4: { ownerId: PLAYER_ID }, 3: { ownerId: RIVAL }, 5: { ownerId: PLAYER_ID } });
+    // Host (BRUGES) is friendly, but intermediate node 3 is held by a foe at war.
+    const regions = regionsOf(BRUGES + 1, { 4: { ownerId: PLAYER_ID }, 3: { ownerId: RIVAL }, [BRUGES]: { ownerId: PLAYER_ID } });
     expect(routeDisrupted(state(regions, { treaties: { "0-2": "war" } }), route)).toBe(true);
   });
 });
 
 describe("stepTrade", () => {
-  // Route grain 5 → Bruges (host 4), lane [5,4]. Host owned by player = trivially at peace.
+  // Route grain 4 → Bruges host, lane [4, BRUGES]. Host owned by player = trivially at peace.
   function tradingState(over: Partial<GameState> = {}): GameState {
-    const regions = regionsOf(6, {
-      4: { terrain: "coast", ownerId: PLAYER_ID, adjacency: [5] },
-      5: { terrain: "plains", ownerId: PLAYER_ID, adjacency: [4] },
+    const regions = regionsOf(BRUGES + 1, {
+      4: { terrain: "plains", ownerId: PLAYER_ID, adjacency: [BRUGES] },
+      [BRUGES]: { terrain: "coast", ownerId: PLAYER_ID, adjacency: [4] },
     });
     const routes: TradeRoute[] = [
-      { id: 0, ownerId: PLAYER_ID, good: "grain", fromRegionId: 5, toKontorId: "bruges", lane: [5, 4] },
+      { id: 0, ownerId: PLAYER_ID, good: "grain", fromRegionId: 4, toKontorId: "bruges", lane: [4, BRUGES] },
     ];
     return state(regions, { routes, nextRouteId: 1, ...over });
   }
@@ -269,13 +275,13 @@ describe("stepTrade", () => {
   });
 
   it("pays a disrupted route nothing (war on the host)", () => {
-    // Bruges host (4) held by a foe the player is at war with.
+    // Bruges host held by a foe the player is at war with.
     const s = tradingState({
-      regions: regionsOf(6, {
-        4: { terrain: "coast", ownerId: RIVAL, adjacency: [5] },
-        5: { terrain: "plains", ownerId: PLAYER_ID, adjacency: [4] },
+      regions: regionsOf(BRUGES + 1, {
+        4: { terrain: "plains", ownerId: PLAYER_ID, adjacency: [BRUGES] },
+        [BRUGES]: { terrain: "coast", ownerId: RIVAL, adjacency: [4] },
       }),
-      routes: [{ id: 0, ownerId: PLAYER_ID, good: "grain", fromRegionId: 5, toKontorId: "bruges", lane: [5, 4] }],
+      routes: [{ id: 0, ownerId: PLAYER_ID, good: "grain", fromRegionId: 4, toKontorId: "bruges", lane: [4, BRUGES] }],
       treaties: { "0-2": "war" },
     });
     const before = s.nations[PLAYER_ID]!.stocks.gold;
@@ -300,9 +306,9 @@ describe("stepTrade", () => {
 
 describe("seedKontore", () => {
   it("opens all four Kontore, holder = host region's owner", () => {
-    // London host (0) owned by player; Bruges host (4) owned by a rival; Bergen &
-    // Novgorod hosts (23, 39) are off this small map.
-    const regions = regionsOf(6, { 0: { ownerId: PLAYER_ID }, 4: { ownerId: RIVAL } });
+    // London host (0) owned by player; Bruges host owned by a rival; Bergen &
+    // Novgorod hosts are off this small map.
+    const regions = regionsOf(BRUGES + 1, { 0: { ownerId: PLAYER_ID }, [BRUGES]: { ownerId: RIVAL } });
     const kontore = seedKontore(state(regions, { turn: 1 }));
     expect(kontore).toHaveLength(4);
     expect(kontore.every((k) => k.open)).toBe(true);
@@ -323,10 +329,10 @@ describe("seedKontore", () => {
 });
 
 describe("goods ⇄ kontore host ids", () => {
-  it("the Kontor host region ids match the design (London 0, Bruges 4, Bergen 23, Novgorod 39)", () => {
+  it("the Kontor host region ids match the design (London 0, Bruges 5, Bergen 30, Novgorod 62)", () => {
     expect(KONTORE.london.regionId).toBe(0);
-    expect(KONTORE.bruges.regionId).toBe(4);
-    expect(KONTORE.bergen.regionId).toBe(23);
-    expect(KONTORE.novgorod.regionId).toBe(39);
+    expect(KONTORE.bruges.regionId).toBe(5);
+    expect(KONTORE.bergen.regionId).toBe(30);
+    expect(KONTORE.novgorod.regionId).toBe(62);
   });
 });

@@ -1680,25 +1680,36 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       }
     }
 
+    // On a dense province map (the Hanseatic World's 74 regions) the small
+    // labels pile up at fit zoom, so reveal them progressively — capitals and
+    // the selected region always read, the rest appear as you zoom in. Sparse
+    // maps (procedural realms, small scenarios) always label everything.
+    const denseMap = (state?.regions.length ?? 0) > 30;
+    const showDetail = !denseMap || cam.s >= 1.25 || capitals.has(region.id) || region.id === selected;
+
     // Region name below, with a dark halo so it reads on bright terrain too.
     // A touch of tracking gives the labels a cartographic voice where the
     // browser supports canvas letterSpacing (harmless no-op elsewhere).
-    const label = context as CanvasRenderingContext2D & { letterSpacing?: string };
-    if ("letterSpacing" in label) label.letterSpacing = "0.4px";
-    context.font = "600 11px system-ui, sans-serif";
-    context.textAlign = "center";
-    context.textBaseline = "top";
-    context.lineWidth = 3;
-    context.lineJoin = "round";
-    context.strokeStyle = "rgba(10, 12, 16, 0.7)";
-    context.strokeText(region.name, p.x, p.y + NODE_RADIUS + 4);
-    context.fillStyle = "#e6eaf3";
-    context.fillText(region.name, p.x, p.y + NODE_RADIUS + 4);
-    if ("letterSpacing" in label) label.letterSpacing = "0px";
+    if (showDetail) {
+      const label = context as CanvasRenderingContext2D & { letterSpacing?: string };
+      if ("letterSpacing" in label) label.letterSpacing = "0.4px";
+      context.font = "600 11px system-ui, sans-serif";
+      context.textAlign = "center";
+      context.textBaseline = "top";
+      context.lineWidth = 3;
+      context.lineJoin = "round";
+      context.strokeStyle = "rgba(10, 12, 16, 0.7)";
+      context.strokeText(region.name, p.x, p.y + NODE_RADIUS + 4);
+      context.fillStyle = "#e6eaf3";
+      context.fillText(region.name, p.x, p.y + NODE_RADIUS + 4);
+      if ("letterSpacing" in label) label.letterSpacing = "0px";
+    }
 
     // Status row: one slot per active signal, centred under the name. Each
-    // slot draws its icon and registers its hover tip.
-    const slots: { tip: string; draw(x: number, y: number): void }[] = [];
+    // slot draws its icon and registers its hover tip. A revolt always shows
+    // (a warning must never hide); the calmer signals follow the name's zoom
+    // reveal so they do not clutter the fit-zoom province map.
+    const slots: { tip: string; draw(x: number, y: number): void; always?: boolean }[] = [];
     if (region.resource) {
       const tip =
         region.resource === "iron"
@@ -1756,6 +1767,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     const dot = unrestDot(region.unrest);
     if (dot) {
       slots.push({
+        always: region.unrest >= UNREST_REVOLT, // a revolt warning must never hide
         tip:
           region.unrest >= UNREST_REVOLT
             ? `Unrest ${Math.round(region.unrest)} — REVOLT: the region produces nothing and may secede. Garrison it or cut taxes.`
@@ -1771,11 +1783,14 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         },
       });
     }
-    if (slots.length > 0) {
+    // At fit zoom on the dense map, keep only the must-show signals (revolts);
+    // the rest ride the same zoom reveal as the name.
+    const shownSlots = showDetail ? slots : slots.filter((sl) => sl.always);
+    if (shownSlots.length > 0) {
       const gap = 19;
       const rowY = p.y + NODE_RADIUS + 25;
-      const x0 = p.x - ((slots.length - 1) * gap) / 2;
-      slots.forEach((slot, i) => {
+      const x0 = p.x - ((shownSlots.length - 1) * gap) / 2;
+      shownSlots.forEach((slot, i) => {
         const x = x0 + i * gap;
         slot.draw(x, rowY);
         markerHits.push({ x, y: rowY, r: 9.5, text: slot.tip });

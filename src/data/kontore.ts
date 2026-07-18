@@ -20,7 +20,7 @@ export type KontorId = "novgorod" | "bergen" | "bruges" | "london";
 export interface KontorDef {
   id: KontorId;
   name: string;
-  /** Host region id on the Hansa map (London 0, Bruges 4, Bergen 23, Novgorod 39). */
+  /** Host region id on the Hansa map (London 0, Bruges 5, Bergen 30, Novgorod 62). */
   regionId: number;
   /** Goods this Kontor pays for — the inverse of GoodDef.demandedAt. */
   demands: GoodId[];
@@ -37,7 +37,7 @@ export const KONTORE: Record<KontorId, KontorDef> = {
   novgorod: {
     id: "novgorod",
     name: "Peterhof (Novgorod)",
-    regionId: 39,
+    regionId: 62,
     demands: ["furs", "timber"],
     leagueIncome: 4,
     blurb: "The Peterhof on the Volkhov — the eastern terminus of the fur and timber road into the Rus.",
@@ -45,7 +45,7 @@ export const KONTORE: Record<KontorId, KontorDef> = {
   bergen: {
     id: "bergen",
     name: "Bryggen (Bergen)",
-    regionId: 23,
+    regionId: 30,
     demands: ["grain"],
     leagueIncome: 2,
     blurb: "The Bryggen wharf — grain-poor Norway's lifeline and the staple of the northern fisheries.",
@@ -53,7 +53,7 @@ export const KONTORE: Record<KontorId, KontorDef> = {
   bruges: {
     id: "bruges",
     name: "Kontor of Bruges",
-    regionId: 4,
+    regionId: 5,
     demands: ["grain", "iron"],
     leagueIncome: 5,
     blurb: "The great western market of Flanders, where Baltic wares meet the cloth of the Low Countries.",
