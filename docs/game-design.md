@@ -156,18 +156,26 @@ knowledge_out  = buildings + specialists
 
 ### 3.4 Military
 
-- **Armies** are stacks of units occupying a region. Core unit types (5):
-  **Militia** (cheap, weak, defensive), **Infantry** (generalist), **Ranged**
-  (strong attack, weak in melee), **Cavalry** (fast, flanking), **Siege**
-  (vs. fortifications). Two tech-gated specialists extend the roster into the
-  later ages (SHIPPED v0.42): **Pikemen** (Feudalism, no resource) — a tanky
-  anti-cavalry wall beyond the humble Militia — and **Handgunners** (Gunpowder +
-  iron) — a hard late-game volley unit, the endgame Ranged: high attack, fragile
-  in melee. Each new unit *counters an existing type*, so the loop stays intact.
-- **Counter loop (rock-paper-scissors):** Spear/Militia > Cavalry > Ranged >
-  Infantry > Spear — plus Siege as the fortification answer. Pikemen also counter
-  Cavalry; Handgunners counter Infantry. Composition matters, so "just build the
-  strongest unit" is never optimal.
+- **Armies** are stacks of units occupying a region. Each of the four counter
+  roles has a **basic** (cheap, from the start) and a tech-gated **premium** that
+  counters the same type, plus **Siege** as the fortification answer — nine land
+  units in a clean four-cycle (SHIPPED v0.42–v0.43):
+
+  | Counters | Basic | Premium (gate) |
+  |---|---|---|
+  | Cavalry | **Militia** (cheap, defensive) | **Pikemen** — tanky anti-cavalry wall (Feudalism) |
+  | Militia | **Infantry** (generalist line) | **Swordsmen** — elite men-at-arms, more bite + armour (Standing Army + iron) |
+  | Infantry | **Ranged** (strong attack, weak melee) | **Handgunners** — hard volley, fragile in melee (Gunpowder + iron) |
+  | Ranged | **Cavalry** (fast, flanking) | **Knights** — heavy shock horse, the orders' mailed fist (Feudalism + horses) |
+
+  Plus **Siege** (vs. fortifications). Premiums cost more and gate behind tech
+  (often a strategic resource), so the early game is the tidy four-unit loop and
+  the late game adds heavy specialists — each *counters an existing type*, so the
+  loop never widens past four cycles.
+- **Counter loop (rock-paper-scissors):** Militia/Pikemen > Cavalry/Knights >
+  Ranged/Handgunners > Infantry/Swordsmen > Militia — plus Siege as the
+  fortification answer. Composition matters, so "just build the strongest unit"
+  is never optimal.
 - **Cost:** gold + materials (some need a strategic resource) to raise; gold
   **upkeep** each turn — armies are an ongoing economic drag, not a one-time buy.
 - **Movement:** along the adjacency graph, limited moves/turn (cavalry more).
@@ -806,19 +814,24 @@ rides through save/load as an optional field. **§9.4 is now complete.**
   next queued tech that's valid for the age, skipping any that aren't yet. Queue up
   a path before bed and the realm studies it in order. (`queueResearch` /
   `dequeueResearch` / `clearQueue` / `recommendedTech`, all pure in `systems/tech.ts`.)
-- **New unit types — SHIPPED (v0.42).** Two tech-gated specialists join the roster:
-  **Pikemen** (Feudalism, no strategic resource) — a cheap, tanky anti-cavalry wall
-  (4 atk / 7 def, counters Cavalry) that answers horse beyond the Militia — and
-  **Handgunners** (Gunpowder + iron) — the endgame Ranged: a hard 8-atk volley unit
-  that shreds foot but is fragile in melee (counters Infantry). Data-only in
-  `data/units.ts` (cost/upkeep/counter/volley/tech + resource gate); the muster menu,
-  AI recruitment, combat and forecasts pick them up automatically from `UNIT_TYPES`.
-  The "ripple through `emptyUnits`/`armySize`" concern that deferred this is handled
-  structurally: every unit-count site is an exhaustive `Record<UnitType, number>`, so
-  the compiler flags each place to extend, and `deserializeGame` back-fills the new
-  slots to 0 so **saves from before v0.42 load cleanly**. The AI musters the strongest
-  available *counter* to whatever it faces, so once it researches Feudalism/Gunpowder it
-  fields the new units against cavalry/infantry-heavy foes. **§9.5 is now complete.**
+- **New unit types — SHIPPED (v0.42 → completed v0.43).** Four tech-gated premiums
+  now give each counter role a basic + a heavy specialist (see §3.4 for the full
+  table): **Pikemen** (Feudalism) and **Handgunners** (Gunpowder + iron) landed in
+  v0.42; **Swordsmen** (Standing Army + iron) — elite men-at-arms, 7/6, counters
+  Militia — and **Knights** (Feudalism + horses) — heavy shock cavalry, 9/5 moves 2,
+  counters Ranged, the crusading orders' mailed fist — complete the symmetry in v0.43.
+  Data-only in `data/units.ts` (cost/upkeep/counter/volley/tech + resource gate); the
+  muster menu, AI recruitment, combat and forecasts pick every unit up automatically
+  from `UNIT_TYPES`. The "ripple through `emptyUnits`/`armySize`" concern that deferred
+  this is handled structurally: unit-count records are exhaustive
+  `Record<UnitType, number>` (the compiler flags each literal to extend), the
+  `emptyUnits`/`armySize`/`zero` helpers now iterate `UNIT_TYPES` instead of
+  hand-listing (so **a new unit never needs them touched again** — and `armySize` no
+  longer silently undercounts a premium-only stack), `isUnitUnlockedFor` keys off the
+  unit's own `requiresTech`, and `deserializeGame` back-fills new slots to 0 so **older
+  saves load cleanly**. The AI musters the strongest *available* counter to whatever it
+  faces (Knights over Cavalry vs shot, Swordsmen over Infantry vs levy), gated by
+  `canRaiseUnit` at the muster. **§9.5 is now complete.**
 
 ### 9.6 Victory types — SHIPPED v2 (v0.26, faith v0.33)
 The paths (Domination / Great Works / **Faith** / Prestige) are a **legible race**.

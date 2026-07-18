@@ -118,6 +118,26 @@ describe("recruitment", () => {
     expect(canRaiseUnit(g, 0, "handgunner", PLAYER_ID).ok).toBe(false);
   });
 
+  it("canRaiseUnit gates swordsmen on Standing Army and iron access", () => {
+    const g = battlefield({ militia: 1 }, {});
+    g.nations[PLAYER_ID]!.research.done = ["standing_army"];
+    expect(canRaiseUnit(g, 0, "swordsman", PLAYER_ID).ok).toBe(false); // no iron yet
+    g.regions[0]!.resource = "iron";
+    expect(canRaiseUnit(g, 0, "swordsman", PLAYER_ID).ok).toBe(true);
+    g.nations[PLAYER_ID]!.research.done = []; // tech removed → blocked even with iron
+    expect(canRaiseUnit(g, 0, "swordsman", PLAYER_ID).ok).toBe(false);
+  });
+
+  it("canRaiseUnit gates knights on Feudalism and horse access", () => {
+    const g = battlefield({ militia: 1 }, {});
+    g.nations[PLAYER_ID]!.research.done = ["feudalism"];
+    expect(canRaiseUnit(g, 0, "knight", PLAYER_ID).ok).toBe(false); // no horses yet
+    g.regions[0]!.resource = "horses";
+    expect(canRaiseUnit(g, 0, "knight", PLAYER_ID).ok).toBe(true);
+    g.nations[PLAYER_ID]!.research.done = []; // tech removed → blocked even with horses
+    expect(canRaiseUnit(g, 0, "knight", PLAYER_ID).ok).toBe(false);
+  });
+
   it("canRaiseUnit rejects when too poor", () => {
     const g = battlefield({ militia: 1 }, {});
     g.nations[PLAYER_ID]!.stocks.gold = 0;

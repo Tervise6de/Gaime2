@@ -14,7 +14,7 @@
 import type { BuildingId } from "@/data/buildings";
 import type { FocusId } from "@/data/focuses";
 import type { ResourceYield, StrategicResource, TerrainId } from "@/data/terrain";
-import type { UnitType } from "@/data/units";
+import { UNIT_TYPES, type UnitType } from "@/data/units";
 import type { BattleReport } from "@/systems/combat";
 import type { TechId } from "@/data/techs";
 import type { TraitId } from "@/data/traits";
@@ -530,14 +530,16 @@ export type ResourceKey = (typeof RESOURCE_KEYS)[number];
 
 /** A zeroed unit-count record. */
 export function emptyUnits(): Record<UnitType, number> {
-  return { militia: 0, infantry: 0, ranged: 0, cavalry: 0, siege: 0, pikeman: 0, handgunner: 0 };
+  const u = {} as Record<UnitType, number>;
+  for (const t of UNIT_TYPES) u[t] = 0;
+  return u;
 }
 
-/** Total number of units in a stack. */
+/** Total number of units in a stack. Sums every unit type, so new units count. */
 export function armySize(units: Record<UnitType, number>): number {
-  return (
-    units.militia + units.infantry + units.ranged + units.cavalry + units.siege
-  );
+  let n = 0;
+  for (const t of UNIT_TYPES) n += units[t];
+  return n;
 }
 
 /** A per-turn production/consumption breakdown, used for the HUD and the sim. */

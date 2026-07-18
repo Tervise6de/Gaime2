@@ -403,7 +403,9 @@ function subtract(a: UnitCounts, b: UnitCounts): UnitCounts {
 }
 
 function zero(): UnitCounts {
-  return { militia: 0, infantry: 0, ranged: 0, cavalry: 0, siege: 0, pikeman: 0, handgunner: 0 };
+  const u = {} as UnitCounts;
+  for (const t of UNIT_TYPES) u[t] = 0;
+  return u;
 }
 
 function clamp(v: number, lo: number, hi: number): number {

@@ -4,9 +4,15 @@
  * A 4-cycle counter loop plus siege as the fortification answer:
  *   Militia → Cavalry → Ranged → Infantry → Militia   (X → Y means "X counters Y")
  *   Siege: weak in the field, but strips enemy fortification.
- * Two tech-gated specialists extend the roster into the later ages: Pikemen (a
- * stronger anti-cavalry wall, Feudalism) and Handgunners (a hard late volley
- * unit, Gunpowder). Both counter an existing type, so the loop stays intact.
+ * Each of the four roles has a cheap, early **basic** and a tech-gated **premium**
+ * that counters the same type, so the loop stays a clean 4-cycle while the roster
+ * deepens over the ages:
+ *   counters Cavalry :  Militia   → Pikemen     (Feudalism)
+ *   counters Militia :  Infantry  → Swordsmen   (Standing Army + iron)
+ *   counters Infantry:  Ranged    → Handgunners (Gunpowder + iron)
+ *   counters Ranged  :  Cavalry   → Knights     (Feudalism + horses)
+ * Premiums cost more and gate behind tech (and often a strategic resource), so the
+ * early game is the tidy four-unit loop and the late game adds heavy specialists.
  *
  * Composition matters, so "just spam the strongest unit" is never optimal.
  * Costs are gold + materials to raise; every unit also draws gold upkeep each
@@ -20,7 +26,16 @@
 import type { StrategicResource } from "@/data/terrain";
 import type { TechId } from "@/data/techs";
 
-export type UnitType = "militia" | "infantry" | "ranged" | "cavalry" | "siege" | "pikeman" | "handgunner";
+export type UnitType =
+  | "militia"
+  | "infantry"
+  | "ranged"
+  | "cavalry"
+  | "siege"
+  | "pikeman"
+  | "handgunner"
+  | "swordsman"
+  | "knight";
 
 export interface UnitDef {
   id: UnitType;
@@ -154,6 +169,40 @@ export const UNITS: Record<UnitType, UnitDef> = {
     siegePower: 0,
     requires: "iron",
     requiresTech: "gunpowder",
+  },
+  // Elite men-at-arms: a hard, well-armoured melee line that outclasses the levy
+  // it hunts (Standing Army + iron) — the premium Infantry: more bite, more armour.
+  swordsman: {
+    id: "swordsman",
+    name: "Swordsmen",
+    short: "Swd",
+    cost: { gold: 26, materials: 14 },
+    upkeep: 3,
+    attack: 7,
+    defense: 6,
+    moves: 1,
+    counters: "militia",
+    volley: false,
+    siegePower: 0,
+    requires: "iron",
+    requiresTech: "standing_army",
+  },
+  // Heavy shock cavalry — the crusading orders' mailed fist. Fast, hard-hitting and
+  // dear to field (Feudalism + horses) — the premium Cavalry, death to loose shot.
+  knight: {
+    id: "knight",
+    name: "Knights",
+    short: "Kni",
+    cost: { gold: 40, materials: 16 },
+    upkeep: 4,
+    attack: 9,
+    defense: 5,
+    moves: 2,
+    counters: "ranged",
+    volley: false,
+    siegePower: 0,
+    requires: "horses",
+    requiresTech: "feudalism",
   },
 };
 

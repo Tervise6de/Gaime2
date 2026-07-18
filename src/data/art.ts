@@ -192,6 +192,14 @@ export const UNIT_ART: Record<UnitType, string | null> = {
   handgunner: ico(
     '<path d="M4.4 13l9.6-1.7.5 2.7-9.6 1.7z"/><path d="M14 11.1l4.6-.8.5 2.7-4.6.8z"/><path d="M6.3 15l1.8 3.4"/><path d="M18.6 10.3l1.4-.3"/>',
   ),
+  // Crossed swords — the elite men-at-arms.
+  swordsman: ico(
+    '<path d="M5 18.6L16.5 6M19 18.6L7.5 6"/><path d="M15.2 5.4l2.6-.9-.6 2.7zM8.8 5.4L6.2 4.5l.6 2.7z" fill="currentColor" stroke="none"/><path d="M4 17.6l2.4 2.4M20 17.6l-2.4 2.4"/>',
+  ),
+  // A great helm — the mailed knight.
+  knight: ico(
+    '<path d="M7.5 8.5a4.5 4.5 0 019 0v8a1.6 1.6 0 01-1.6 1.6H9.1A1.6 1.6 0 017.5 16.5z"/><path d="M7.6 12.1h8.8"/><path d="M12 13.7v3.4"/>',
+  ),
 };
 
 export const BUILDING_ART: Record<BuildingId, string | null> = {

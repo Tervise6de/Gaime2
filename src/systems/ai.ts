@@ -1021,8 +1021,8 @@ export function planRecruitment(state: GameState, nationId: number): UnitType[] 
   // 3) Generalist fallback — a balanced core army (so the default host isn't an
   //    all-glass-cannon stack); the premium late units sit behind it, reached only
   //    when the core is unbuildable or via the counter above.
-  if (access.has("horses")) pref.push("cavalry");
-  pref.push("infantry", "ranged", "pikeman", "handgunner", "militia");
+  if (access.has("horses")) pref.push("cavalry", "knight");
+  pref.push("infantry", "swordsman", "ranged", "pikeman", "handgunner", "militia");
 
   return [...new Set(pref)];
 }
@@ -1106,5 +1106,7 @@ function queueFor(state: GameState, regionId: number, building: BuildingId, owne
 }
 
 function zeroUnits(): Record<UnitType, number> {
-  return { militia: 0, infantry: 0, ranged: 0, cavalry: 0, siege: 0, pikeman: 0, handgunner: 0 };
+  const u = {} as Record<UnitType, number>;
+  for (const t of UNIT_TYPES) u[t] = 0;
+  return u;
 }

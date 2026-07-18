@@ -11,7 +11,7 @@
 
 import { TECHS, TECH_IDS, type TechId, type TechBranch } from "@/data/techs";
 import { BUILDINGS, type BuildingId } from "@/data/buildings";
-import type { UnitType } from "@/data/units";
+import { UNITS, type UnitType } from "@/data/units";
 import type { ResourceYield } from "@/data/terrain";
 import type { Nation, Research } from "@/systems/state";
 
@@ -57,7 +57,10 @@ export function isUnitUnlocked(nation: Nation, unit: UnitType): boolean {
 }
 
 export function isUnitUnlockedFor(done: TechId[], unit: UnitType): boolean {
-  const req = TECH_IDS.find((t) => TECHS[t].unlockUnit === unit);
+  // The unit's own `requiresTech` is the source of truth (the same gate
+  // `canRaiseUnit` uses); fall back to the tech's `unlockUnit` reverse-lookup for
+  // any unit wired only that way. Either present tech must be researched.
+  const req = UNITS[unit].requiresTech ?? TECH_IDS.find((t) => TECHS[t].unlockUnit === unit) ?? null;
   return !req || done.includes(req);
 }
 

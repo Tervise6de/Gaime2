@@ -37,6 +37,19 @@ describe("unlocks", () => {
     expect(isUnitUnlockedFor(["bronze_working"], "ranged")).toBe(true);
   });
 
+  it("gates units wired via requiresTech (not just tech.unlockUnit)", () => {
+    // Pikemen/Handgunners/Swordsmen/Knights gate through the unit's own
+    // requiresTech; isUnitUnlockedFor must honour that, not report them unlocked.
+    expect(isUnitUnlockedFor([], "pikeman")).toBe(false);
+    expect(isUnitUnlockedFor(["feudalism"], "pikeman")).toBe(true);
+    expect(isUnitUnlockedFor([], "handgunner")).toBe(false);
+    expect(isUnitUnlockedFor(["gunpowder"], "handgunner")).toBe(true);
+    expect(isUnitUnlockedFor([], "swordsman")).toBe(false);
+    expect(isUnitUnlockedFor(["standing_army"], "swordsman")).toBe(true);
+    expect(isUnitUnlockedFor([], "knight")).toBe(false);
+    expect(isUnitUnlockedFor(["feudalism"], "knight")).toBe(true);
+  });
+
   it("gates advanced buildings behind tech", () => {
     expect(isBuildingUnlockedFor([], "market")).toBe(true);
     expect(isBuildingUnlockedFor([], "wonder")).toBe(false);

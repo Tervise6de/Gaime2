@@ -133,12 +133,15 @@ describe("planRecruitment (composition-aware)", () => {
     expect(plan.indexOf("pikeman")).toBeLessThan(plan.indexOf("militia"));
   });
 
-  it("counters an enemy stack of ranged with cavalry", () => {
+  it("counters an enemy stack of ranged with its strongest mounted (Knights ahead of Cavalry)", () => {
     const plan = planRecruitment(
       scenario({ fortification: 0 }, { units: units({ ranged: 5 }) }),
       RIVAL,
     );
-    expect(plan[0]).toBe("cavalry");
+    // Knights lead (canRaiseUnit gates them by Feudalism + horses at the muster);
+    // Cavalry stays the earlier fallback, listed behind.
+    expect(plan[0]).toBe("knight");
+    expect(plan.indexOf("knight")).toBeLessThan(plan.indexOf("cavalry"));
   });
 
   it("counters an enemy stack of infantry with its strongest volley (Handgunners ahead of Ranged)", () => {
@@ -156,7 +159,7 @@ describe("planRecruitment (composition-aware)", () => {
       RIVAL,
     );
     expect(plan[0]).toBe("siege");
-    expect(plan[1]).toBe("cavalry");
+    expect(plan[1]).toBe("knight"); // strongest anti-ranged, ahead of Cavalry
   });
 
   it("falls back to a generalist plan with no enemy intel, favouring cavalry when horses are available", () => {

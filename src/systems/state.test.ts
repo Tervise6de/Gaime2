@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   nationInstability,
+  armySize,
+  emptyUnits,
   UNREST_REVOLT,
   PLAYER_ID,
   BARBARIAN_ID,
@@ -8,6 +10,7 @@ import {
   type Nation,
   type Region,
 } from "@/systems/state";
+import { UNIT_TYPES } from "@/data/units";
 
 const RIVAL = 2; // 0 = player, 1 = barbarians, so a rival starts at 2
 
@@ -51,6 +54,20 @@ function region(over: Partial<Region> = {}): Region {
 function stateOf(nations: Nation[], regions: Region[]): GameState {
   return { turn: 30, nations, regions } as unknown as GameState;
 }
+
+describe("armySize", () => {
+  it("counts every unit type — including the tech-gated premiums", () => {
+    // One of each unit type; the total must equal the roster size. This guards the
+    // old hand-summed armySize that silently dropped pikemen/handgunners.
+    const one = emptyUnits();
+    for (const t of UNIT_TYPES) one[t] = 1;
+    expect(armySize(one)).toBe(UNIT_TYPES.length);
+    // A stack of only a premium unit is not "empty".
+    expect(armySize({ ...emptyUnits(), swordsman: 3 })).toBe(3);
+    expect(armySize({ ...emptyUnits(), knight: 2 })).toBe(2);
+    expect(armySize(emptyUnits())).toBe(0);
+  });
+});
 
 describe("nationInstability", () => {
   it("reports a fully stable nation as not reeling", () => {
