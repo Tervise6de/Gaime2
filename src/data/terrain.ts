@@ -42,7 +42,8 @@ export const TERRAIN: Record<TerrainId, TerrainDef> = {
   plains: {
     id: "plains",
     name: "Plains",
-    color: "#8fae5d",
+    // Pale wheat — the base parchment tone (vintage-map land, not saturated green).
+    color: "#e6d7ab",
     base: { food: 4, materials: 1, gold: 2, knowledge: 0 },
     popCapacity: 12,
     defense: 1.0,
@@ -52,7 +53,8 @@ export const TERRAIN: Record<TerrainId, TerrainDef> = {
   forest: {
     id: "forest",
     name: "Forest",
-    color: "#3f7a4f",
+    // Muted sage — a greyed green that sits in the aged-paper family.
+    color: "#a6b884",
     base: { food: 2, materials: 4, gold: 1, knowledge: 0 },
     popCapacity: 8,
     defense: 1.2,
@@ -62,7 +64,8 @@ export const TERRAIN: Record<TerrainId, TerrainDef> = {
   hills: {
     id: "hills",
     name: "Hills",
-    color: "#a98b52",
+    // Warm tan — dry upland parchment, a shade deeper than the plains wheat.
+    color: "#d2b98c",
     base: { food: 1, materials: 3, gold: 2, knowledge: 1 },
     popCapacity: 7,
     defense: 1.25,
@@ -72,7 +75,8 @@ export const TERRAIN: Record<TerrainId, TerrainDef> = {
   mountains: {
     id: "mountains",
     name: "Mountains",
-    color: "#7c7f88",
+    // Warm grey-taupe — neutral stony parchment, the least saturated terrain.
+    color: "#b4a996",
     base: { food: 0, materials: 2, gold: 1, knowledge: 2 },
     popCapacity: 4,
     defense: 1.4,
@@ -82,9 +86,10 @@ export const TERRAIN: Record<TerrainId, TerrainDef> = {
   coast: {
     id: "coast",
     name: "Coast",
-    // Teal-green coastal lowland — deliberately NOT ocean-blue, so coast cells
-    // read as wet *land* rather than lakes inside the island silhouette.
-    color: "#569a87",
+    // Green-tinted cream — a slightly greener parchment than the plains wheat,
+    // deliberately NOT ocean-blue so coast cells read as wet *land* rather than
+    // lakes inside the island silhouette.
+    color: "#cfd6ac",
     base: { food: 3, materials: 1, gold: 4, knowledge: 1 },
     popCapacity: 10,
     defense: 1.0,

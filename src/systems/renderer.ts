@@ -772,7 +772,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       g.save();
       clipOutOtherBlobs(g, proj, i);
       g.strokeStyle = OCEAN.coastLine;
-      g.lineWidth = 2.6;
+      g.lineWidth = 2.1; // thin warm-brown pen line (was 2.6, near-black)
       g.stroke(path);
       g.clip(path);
       g.strokeStyle = OCEAN.coastHighlight;

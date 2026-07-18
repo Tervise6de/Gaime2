@@ -23,6 +23,45 @@ export const HANSA_MAP: ScriptedMap = {
   blurb:
     "The whole world of the Hansa on real coastlines — England, Flanders and the Low Countries, the German and Wendish shore, Denmark, Norway, Sweden, Gotland, and the Finnish, Livonian, Rus, Prussian and Polish Baltic.",
   land: HANSA_LAND,
+  // Outer-world context: faded, non-interactive land bleeding PAST the play
+  // area's hard box edges (the continent is clipped to a rectangle — a flat
+  // south shore at y≈0.806 and a flat east wall at x=1). These crude, distant
+  // slabs tuck UNDER the real coast (drawn faded, beneath the active land) so
+  // the world continues off-frame instead of ending on a slab. West is left as
+  // open Atlantic, with only a lonely Iceland and an "Ocean" hint. Coordinates
+  // may run outside [0,1]; the renderer draws these dim and label-only.
+  context: {
+    land: [
+      // The Empire — the German, Polish and continental interior south of the
+      // Hansa shore. A broad slab whose top hides under the y≈0.806 coast and
+      // whose body bleeds off the bottom of the frame.
+      [
+        [-0.28, 0.85], [0.12, 0.8], [0.4, 0.804], [0.72, 0.799], [1.0, 0.804],
+        [1.22, 0.82], [1.28, 1.42], [-0.28, 1.42],
+      ],
+      // The Rus — the vast interior east of Novgorod, Pskov and the Livonian
+      // shore, bleeding off the right past the x=1 wall.
+      [
+        [0.99, 0.1], [1.15, 0.06], [1.45, 0.2], [1.48, 0.6], [1.35, 0.88],
+        [1.05, 0.9], [0.99, 0.62], [0.985, 0.32],
+      ],
+      // Lappland and the far north, above Scandinavia and the Finnish shore,
+      // bleeding off the top past the y=0 edge.
+      [
+        [0.28, -0.32], [1.2, -0.32], [1.28, 0.12], [1.0, 0.05], [0.75, 0.02],
+        [0.55, 0.045], [0.42, 0.02], [0.3, 0.05],
+      ],
+      // Iceland — a lonely hint out in the north-western ocean.
+      [[-0.15, 0.16], [-0.09, 0.11], [-0.02, 0.14], [-0.04, 0.21], [-0.12, 0.23]],
+    ],
+    labels: [
+      { text: "The Empire", x: 0.5, y: 1.06 },
+      { text: "The Rus", x: 1.16, y: 0.48 },
+      { text: "Lappland", x: 0.62, y: -0.13 },
+      { text: "Iceland", x: -0.08, y: 0.18 },
+      { text: "The Ocean", x: -0.07, y: 0.5 },
+    ],
+  },
   // Real towns at their true positions (projected from lon/lat). Author order is
   // the region id; the factions below own them by these indices.
   regions: [

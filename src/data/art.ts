@@ -395,12 +395,16 @@ export interface TerrainShade {
   lo: string;
 }
 
+// Parchment / vintage-cartography shading: each pair stays within its terrain's
+// aged-paper tint (lit centre → base → faintly deeper rim), so cells gain gentle
+// volume without leaving the cream/tan/sage family. These dominate the fill, so
+// they must move together with TERRAIN[id].color (data/terrain.ts).
 export const TERRAIN_ART: Record<TerrainId, TerrainShade | null> = {
-  plains: { hi: "#a8c476", lo: "#6f8c45" },
-  forest: { hi: "#549465", lo: "#2c5c3a" },
-  hills: { hi: "#c2a468", lo: "#866c3d" },
-  mountains: { hi: "#979aa5", lo: "#5e616b" },
-  coast: { hi: "#6cb39d", lo: "#3a6e5f" },
+  plains: { hi: "#f1e6c4", lo: "#d0bd8f" },
+  forest: { hi: "#bccaa0", lo: "#869a68" },
+  hills: { hi: "#e2cda2", lo: "#b69a6b" },
+  mountains: { hi: "#c8bfad", lo: "#948977" },
+  coast: { hi: "#dee0be", lo: "#b4bd8f" },
 };
 
 /**

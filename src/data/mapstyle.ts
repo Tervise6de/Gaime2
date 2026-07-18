@@ -79,10 +79,12 @@ export const TERRAIN_TEXTURE_ALPHA = 0.75;
  * cells visually merge while different-owner borders stay unmistakable.
  */
 export const POLITICAL = {
-  /** Owner wash over the terrain fill — political colour is the first read;
-      terrain stays visible as texture and value beneath it. */
-  washAlpha: 0.38,
-  barbarianWashAlpha: 0.18,
+  /** Owner wash over the terrain fill — a translucent tint over the pale
+      parchment land (like a hand-tinted realm on an old map); the crisp bands
+      and edges below carry the identity, so this stays light and the terrain
+      still reads beneath it. */
+  washAlpha: 0.28,
+  barbarianWashAlpha: 0.15,
   /** Unclaimed land: darkened and hatched so "no one's" is as legible as
       "someone's" (shape-coded, so it survives any palette). */
   neutralWash: "rgba(12, 16, 23, 0.32)",
@@ -101,7 +103,7 @@ export const POLITICAL = {
    * glance: a stronger wash, a wider double band (soft outer + bright inner)
    * and a full-strength edge.
    */
-  playerWashAlpha: 0.5,
+  playerWashAlpha: 0.36,
   playerBandWidth: 24,
   playerBandAlpha: 0.55,
   playerInnerBandWidth: 9,
@@ -137,37 +139,44 @@ export const DEPTH = {
   grainAlpha: 0.07,
 } as const;
 
-/** Ocean & coastline palette (the terrain palette stays in data/terrain.ts). */
+/** Ocean & coastline palette (the terrain palette stays in data/terrain.ts).
+    Tuned for a parchment / vintage-cartography look: soft slate-blue seas, a
+    pale coastal glow, and warm-brown pen-line coasts. */
 export const OCEAN = {
-  /** Radial vignette centre/edge — clearly *water* blue all the way to the
-      corners (never near-black), so the world reads as sea in every direction. */
-  inner: "#1e3049",
-  outer: "#122033",
-  /** Tiny wave flecks scattered across the open water (count at 1600×900). */
-  fleck: "rgba(168, 203, 232, 0.11)",
+  /** Radial vignette centre/edge — a soft, calm slate-blue all the way to the
+      corners (pale like an old sea chart, never dark navy). */
+  inner: "#aecfe1",
+  outer: "#9cc0d8",
+  /** Tiny wave flecks scattered across the open water (count at 1600×900) —
+      a faint muted-blue stipple, a touch darker than the sea so it reads. */
+  fleck: "rgba(120, 152, 180, 0.16)",
   fleckCount: 260,
-  /** Sea life: deterministic whale/fish/serpent silhouettes in open water. */
+  /** Sea life: deterministic whale/fish/serpent silhouettes in open water,
+      inked in a muted slate so they read over the pale water. */
   seaLifeCount: 7,
-  seaLifeInk: "rgba(170, 208, 236, 0.45)",
-  seaLifeFill: "rgba(150, 190, 222, 0.24)",
-  /** Land underlay colour and its drop shadow (under the terrain fills). */
-  landBase: "#1b222c",
-  shadow: "rgba(0, 0, 0, 0.55)",
-  /** Shallow-water glow hugging the coastline (narrow bright + wide faint). */
-  shallow: "rgba(116, 170, 206, 0.13)",
-  shallowWide: "rgba(116, 170, 206, 0.07)",
-  /** Coastline ink: dark outer line + pale inner highlight. */
-  coastLine: "rgba(9, 11, 15, 0.9)",
-  coastHighlight: "rgba(226, 216, 186, 0.2)",
+  seaLifeInk: "rgba(84, 116, 142, 0.5)",
+  seaLifeFill: "rgba(150, 180, 202, 0.26)",
+  /** Land underlay colour (parchment, so any hairline gap reads warm not dark)
+      and its soft drop shadow (a gentle blue-grey, not a heavy black halo). */
+  landBase: "#e3d7bb",
+  shadow: "rgba(60, 84, 104, 0.28)",
+  /** Shallow-water glow hugging the coastline (narrow bright + wide faint) —
+      a pale near-white blue, like shoaling water on a hand-tinted chart. */
+  shallow: "rgba(219, 238, 246, 0.5)",
+  shallowWide: "rgba(219, 238, 246, 0.28)",
+  /** Coastline ink: a thin warm-brown pen line + a faint cream inner highlight. */
+  coastLine: "rgba(122, 106, 72, 0.95)",
+  coastHighlight: "rgba(236, 228, 200, 0.12)",
   /** Offshore wave dashes and islet rock colours. */
-  wave: "rgba(140, 180, 212, 0.14)",
-  islet: "#232b35",
-  isletEdge: "rgba(210, 220, 235, 0.12)",
-  /** Dashed sea lane marking a cross-water adjacency (archipelago). */
-  lane: "rgba(150, 185, 215, 0.3)",
-  /** Outer-world context land (distant, non-interactive): a dim landmass fill,
-      a soft coastline, and faint place labels — framing the play area. */
-  contextLand: "rgba(37, 45, 55, 0.92)",
-  contextCoast: "rgba(12, 16, 22, 0.55)",
-  contextLabel: "rgba(150, 166, 186, 0.34)",
+  wave: "rgba(122, 158, 188, 0.2)",
+  islet: "#d8cba9",
+  isletEdge: "rgba(122, 106, 72, 0.45)",
+  /** Dashed sea lane marking a cross-water adjacency (archipelago) — muted slate. */
+  lane: "rgba(110, 142, 172, 0.55)",
+  /** Outer-world context land (distant, non-interactive): a faded parchment
+      fill, a soft brown coastline, and faint sepia labels — framing the play
+      area so it reads as a real region of a larger world. */
+  contextLand: "rgba(212, 197, 165, 0.62)",
+  contextCoast: "rgba(120, 104, 74, 0.42)",
+  contextLabel: "rgba(101, 88, 64, 0.45)",
 } as const;
