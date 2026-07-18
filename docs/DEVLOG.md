@@ -6,6 +6,40 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-18 — D5: localisation scaffolding — a string catalogue + a live Estonian locale (v0.55.0)
+
+Roadmap D5 (extract UI strings). Stood up the i18n foundation and wired a
+representative slice through it, with a real second locale as the worked example.
+
+**The engine (`ui/i18n.ts`, dependency-free, environment-safe).** A dotted-key
+string catalogue with `t("menu.newGame")` lookup: the active locale first, English
+as the fallback for any untranslated key, and the key itself for an unknown one (so
+a gap is *visible*, never a crash). `{name}` placeholders interpolate. The locale
+is persisted (`localStorage`), defaults from `navigator.language`, and stamps
+`<html lang>`. It lives in `ui/` (not the sim — strings are presentation) and
+degrades to English with no DOM/`localStorage` (the Node test env), so importing it
+never throws.
+
+**Extracted as the worked example.** The whole boot screen (`ui/title.ts`) and the
+top-bar navigation rail + End-turn button (`ui/hud.ts`) now read their copy from
+`t()`. English is the exhaustive reference; **Estonian (`et`) ships as a real
+partial locale** (the setting is literally the Baltic) — brand strings (wordmark,
+studio) stay English via fallback. An **Options → Language** picker switches locale
+and reloads (the continuous autosave resumes the game) so every string re-renders.
+
+**How the rest follows.** Adding a string is: add the key to `EN`, switch the call
+site to `t()`, optionally translate. No engine changes — the scaffold is the point.
+
+**Verified** in the running app: the title menu and in-game nav rail flip cleanly
+between English ("Begin your reign · Diplomacy · Research…") and Estonian ("Alusta
+valitsemist · Diplomaatia · Teadus…"), diacritics intact, `<html lang>` tracks the
+choice, zero console errors.
+
+620 tests green (+10 for i18n: lookup, interpolation, fallback, locale coverage),
+typecheck + build clean.
+
+---
+
 ## 2026-07-18 — B6: responsive/touch layout — the lens strip no longer fights the frame (v0.54.0)
 
 Roadmap B6. The pointer-event map input (tap to select, drag to pan, pinch to

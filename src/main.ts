@@ -33,6 +33,7 @@ import { showMainMenu } from "@/ui/title";
 import { runTutorial, hasSeenTutorial } from "@/ui/tutorial";
 import { play, outcomeCue, armAmbientOnGesture } from "@/ui/audio";
 import { applyDisplaySettings, isColourblind, isReduceMotion, isCombatReport } from "@/ui/settings";
+import { applyLocale } from "@/ui/i18n";
 import { lensColorsFor, type LensId } from "@/ui/lenses";
 import { recordGameEnd } from "@/ui/profile";
 import { ACHIEVEMENTS } from "@/data/achievements";
@@ -64,6 +65,7 @@ function main(): void {
   // legacy first-run hints box (still on 💡 Help) *before* the HUD reads the flag.
   // Reflect persisted accessibility prefs onto the document root before first paint.
   applyDisplaySettings();
+  applyLocale(); // reflect the chosen UI language on <html lang> (D5)
 
   const firstEver = !hasSeenTutorial();
   if (firstEver) {

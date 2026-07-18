@@ -17,6 +17,7 @@
 
 import { TITLE_ART } from "@/data/art";
 import { isReduceMotion } from "@/ui/settings";
+import { t } from "@/ui/i18n";
 import { buildNewGameForm, type NewGameConfig } from "@/ui/newgame";
 
 export interface MainMenuHooks {
@@ -49,11 +50,11 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
     // Studio credit above the wordmark; the version sits in the corner below.
     const studio = document.createElement("p");
     studio.className = "title-studio";
-    studio.textContent = "GAIME Studio";
+    studio.textContent = t("menu.studio");
 
     const wordmark = document.createElement("h1");
     wordmark.className = "title-wordmark";
-    wordmark.textContent = "Petty Kingdoms";
+    wordmark.textContent = t("menu.wordmark");
 
     const version = document.createElement("p");
     version.className = "title-version";
@@ -65,13 +66,13 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
     const menu = document.createElement("div");
     menu.className = "title-menu";
 
-    const primary = menuBtn(hooks.hasSave ? "Continue your reign" : "Begin your reign", "primary");
+    const primary = menuBtn(hooks.hasSave ? t("menu.continue") : t("menu.begin"), "primary");
     primary.addEventListener("click", dismiss);
 
-    const newGameBtn = menuBtn("New game");
-    const optionsBtn = menuBtn("Options");
+    const newGameBtn = menuBtn(t("menu.newGame"));
+    const optionsBtn = menuBtn(t("menu.options"));
     optionsBtn.addEventListener("click", () => hooks.onOpenOptions());
-    const recordsBtn = menuBtn("Records");
+    const recordsBtn = menuBtn(t("menu.records"));
     recordsBtn.addEventListener("click", () => hooks.onOpenRecords());
     menu.append(primary, newGameBtn, optionsBtn, recordsBtn);
 
@@ -80,41 +81,41 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
     setup.style.display = "none";
     const setupHead = document.createElement("div");
     setupHead.className = "title-setup-head";
-    setupHead.textContent = "New game";
+    setupHead.textContent = t("menu.newGame");
     const form = buildNewGameForm();
-    const startBtn = menuBtn("Start game ▶", "primary title-start");
+    const startBtn = menuBtn(t("menu.startGame"), "primary title-start");
     // Guard against discarding a live game with a mis-click: the first Start
     // arms an inline confirm (no separate dialog — that would sit under this
     // opaque overlay), the second starts. Fresh boots start immediately.
     let armed = false;
     function disarmStart(): void {
       armed = false;
-      startBtn.textContent = "Start game ▶";
+      startBtn.textContent = t("menu.startGame");
       startBtn.classList.remove("armed");
     }
     startBtn.addEventListener("click", () => {
       if (hooks.liveGameTurn !== null && !armed) {
         armed = true;
-        startBtn.textContent = `Discard your turn ${hooks.liveGameTurn} game — start over?`;
+        startBtn.textContent = t("menu.discard", { turn: hooks.liveGameTurn });
         startBtn.classList.add("armed");
         return;
       }
       hooks.onNewGame(form.readConfig());
       dismiss();
     });
-    const backBtn = menuBtn("← Back");
+    const backBtn = menuBtn(t("menu.back"));
     backBtn.addEventListener("click", () => showSetup(false));
     setup.append(setupHead, ...form.rows, startBtn, backBtn);
     newGameBtn.addEventListener("click", () => showSetup(true));
 
     const hint = document.createElement("p");
     hint.className = "title-hint";
-    hint.textContent = "Esc to continue";
+    hint.textContent = t("menu.escContinue");
 
     function showSetup(open: boolean): void {
       menu.style.display = open ? "none" : "flex";
       setup.style.display = open ? "flex" : "none";
-      hint.textContent = open ? "Esc to go back" : "Esc to continue";
+      hint.textContent = open ? t("menu.escBack") : t("menu.escContinue");
       overlay.scrollTop = 0; // a fresh screen always starts at its top
       if (open) {
         form.refreshSeed(); // every visit to the setup gets a fresh, real seed

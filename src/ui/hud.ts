@@ -20,6 +20,7 @@ import { garrisonCalm, overexpansionUnrest } from "@/systems/stability";
 import { techUnrestReduction } from "@/systems/tech";
 import { runTutorial } from "@/ui/tutorial";
 import { confirmAction } from "@/ui/confirm";
+import { t, LOCALES, getLocale, setLocale, isLocale } from "@/ui/i18n";
 import { isMuted, setMuted, play, isAmbientEnabled, setAmbientEnabled, getVolume, setVolume } from "@/ui/audio";
 import {
   isColourblind,
@@ -433,25 +434,25 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     return { btn, badge };
   }
 
-  const diploRail = railBtn("flag", "⚑", "Diplomacy", "Relations, treaties and offers. Shortcut: D", () =>
+  const diploRail = railBtn("flag", "⚑", t("nav.diplomacy"), t("nav.diplomacy.tip"), () =>
     toggleScreen("diplo"),
   );
-  const researchRail = railBtn("book", "📖", "Research", "Technology and research. Shortcut: R", () =>
+  const researchRail = railBtn("book", "📖", t("nav.research"), t("nav.research.tip"), () =>
     toggleScreen("research"),
   );
   researchRail.btn.classList.add("hud-railbtn-research");
   const productionRail = railBtn(
     "hammer",
     "🔨",
-    "Production",
-    "Every region's construction — and the idle ones. Shortcut: B",
+    t("nav.production"),
+    t("nav.production.tip"),
     () => openProduction(),
   );
   const armiesRail = railBtn(
     "attack",
     "⚔",
-    "Armies",
-    "All your armies — strength, readiness, and move orders. Shortcut: A",
+    t("nav.armies"),
+    t("nav.armies.tip"),
     () => openArmies(),
   );
   // Politics: taxes, fiscal policy and the victory race — the realm's governance
@@ -459,8 +460,8 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const politicsRail = railBtn(
     "crown",
     "⚖",
-    "Politics",
-    "Taxes, fiscal policy and victory progress. Shortcut: P",
+    t("nav.politics"),
+    t("nav.politics.tip"),
     () => openPolitics(),
   );
   const navWrap = el("div", "hud-navwrap");
@@ -549,7 +550,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
   const endTurnBtn = document.createElement("button");
   endTurnBtn.className = "hud-endturn";
-  endTurnBtn.textContent = "End turn ▶";
+  endTurnBtn.textContent = t("action.endTurn");
   endTurnBtn.addEventListener("click", () => callbacks.onEndTurn());
 
   // End-turn advisor: what still wants orders (research / idle builds /
@@ -1137,6 +1138,32 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     title.textContent = "Options";
     head.append(title, closeButton(closeOptions));
     panel.append(head);
+
+    // Language ---------------------------------------------------------------
+    // The localisation scaffold (D5): pick the UI language. The HUD reads its
+    // copy at build time, so a change reloads the app (the continuous autosave
+    // resumes the game) to re-render every string in the new locale.
+    panel.append(sectionHeading(t("options.language")));
+    const langRow = el("label", "hud-opt-row");
+    const langLabel = el("span", "hud-opt-label");
+    langLabel.textContent = t("options.language");
+    const langSel = document.createElement("select");
+    langSel.className = "hud-select";
+    for (const l of LOCALES) {
+      const opt = document.createElement("option");
+      opt.value = l.id;
+      opt.textContent = l.label;
+      if (l.id === getLocale()) opt.selected = true;
+      langSel.append(opt);
+    }
+    langSel.addEventListener("change", () => {
+      if (isLocale(langSel.value) && langSel.value !== getLocale()) {
+        setLocale(langSel.value);
+        location.reload();
+      }
+    });
+    langRow.append(langLabel, langSel);
+    panel.append(langRow);
 
     // Sound ------------------------------------------------------------------
     panel.append(sectionHeading("Sound"));
