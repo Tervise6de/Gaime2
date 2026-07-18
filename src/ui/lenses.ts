@@ -8,13 +8,13 @@
  * the renderer bakes into the political layer. UI layer — no DOM, no sim writes.
  */
 
-import { PLAYER_ID, BARBARIAN_ID, type GameState, type Region } from "@/systems/state";
+import { PLAYER_ID, BARBARIAN_ID, armySize, type GameState, type Region } from "@/systems/state";
 import { regionProduction, nationYieldMult } from "@/systems/economy";
 import { getRelation, getTreaty } from "@/systems/diplomacy";
 
-/** Heat lenses colour by a normalised scalar; "faith"/"relations" are categorical. */
+/** Heat lenses colour by a normalised scalar; faith/relations/military are categorical. */
 type HeatLens = "population" | "gold" | "materials" | "food" | "unrest";
-export type LensId = "none" | HeatLens | "faith" | "relations";
+export type LensId = "none" | HeatLens | "faith" | "relations" | "military";
 
 export interface LensDef {
   id: LensId;
@@ -36,6 +36,7 @@ export const LENSES: LensDef[] = [
   { id: "unrest", label: "Unrest", glyph: "warning", fallback: "🔥", hint: "How restless each region is (red = revolt risk)." },
   { id: "faith", label: "Faith", glyph: "faith", fallback: "🛐", hint: "Whose faith each province holds — win by converting the world." },
   { id: "relations", label: "Relations", glyph: "diplomacy", fallback: "🤝", hint: "How each realm stands with you — allies green, enemies red." },
+  { id: "military", label: "Military", glyph: "attack", fallback: "⚔", hint: "Where the armies are — your forces green, hostiles red, exposed land amber." },
 ];
 
 /** Low → high colour ramp for each heat lens (dark, receding low; bright high). */
@@ -57,10 +58,17 @@ const RELATIONS_NEUTRAL = "#33383f"; // unowned / barbarian land
 const WAR_COLOR = "#c85248"; // at war (strong red)
 const ALLY_COLOR = "#4fa267"; // allied (strong green)
 
+/** Military lens: friendly forces green-heat, hostiles red-heat, exposed land amber. */
+const MIL_FRIENDLY = ["#26332e", "#5faa74"]; // faint → strong (your / allied garrison)
+const MIL_HOSTILE = ["#3a2626", "#d0685e"]; // faint → strong (enemy / barbarian force)
+const MIL_EXPOSED = "#d99a4f"; // your own land, ungarrisoned, with a hostile force next door
+const MIL_QUIET = "#33383f"; // no forces in or beside it
+
 /** CSS gradient for a lens's ramp (low → high), for the picker's scale legend.
-    Faith is categorical (no ramp); Relations shows a diverging enemy→ally ramp. */
+    Faith/Relations/Military are categorical from the player's view — the map speaks;
+    only Relations carries a meaningful single-axis (enemy→ally) legend. */
 export function lensGradient(id: LensId): string | null {
-  if (id === "none" || id === "faith") return null;
+  if (id === "none" || id === "faith" || id === "military") return null;
   if (id === "relations") return `linear-gradient(90deg, ${RELATIONS_RAMP.join(", ")})`;
   return `linear-gradient(90deg, ${RAMPS[id].join(", ")})`;
 }
@@ -146,6 +154,36 @@ export function lensColorsFor(state: GameState, id: LensId): (string | null)[] |
               ? ALLY_COLOR
               : rampColor(RELATIONS_RAMP, (getRelation(state, PLAYER_ID, r.ownerId) + 100) / 200);
       }
+    }
+    return out;
+  }
+  // Military is categorical from the player's seat: sum army strength in each region
+  // as friendly (yours + allies) vs hostile (at war + barbarian), then tint —
+  // your forces green, hostiles red (both by strength), and any undefended province
+  // of yours with a hostile force next door amber, so exposure reads at a glance.
+  if (id === "military") {
+    const friendlyTo = (owner: number): boolean =>
+      owner === PLAYER_ID || (owner !== BARBARIAN_ID && getTreaty(state, PLAYER_ID, owner) === "alliance");
+    const hostileTo = (owner: number): boolean =>
+      owner === BARBARIAN_ID || getTreaty(state, PLAYER_ID, owner) === "war";
+    const friendly: number[] = [];
+    const hostile: number[] = [];
+    let maxStr = 1;
+    for (const a of state.armies) {
+      const str = armySize(a.units);
+      if (str <= 0) continue;
+      if (friendlyTo(a.ownerId)) friendly[a.regionId] = (friendly[a.regionId] ?? 0) + str;
+      else if (hostileTo(a.ownerId)) hostile[a.regionId] = (hostile[a.regionId] ?? 0) + str;
+      maxStr = Math.max(maxStr, friendly[a.regionId] ?? 0, hostile[a.regionId] ?? 0);
+    }
+    const out: (string | null)[] = [];
+    for (const r of state.regions) {
+      const f = friendly[r.id] ?? 0;
+      const h = hostile[r.id] ?? 0;
+      if (f > 0 && f >= h) out[r.id] = rampColor(MIL_FRIENDLY, f / maxStr);
+      else if (h > 0) out[r.id] = rampColor(MIL_HOSTILE, h / maxStr);
+      else if (r.ownerId === PLAYER_ID && r.adjacency.some((n) => (hostile[n] ?? 0) > 0)) out[r.id] = MIL_EXPOSED;
+      else out[r.id] = MIL_QUIET;
     }
     return out;
   }

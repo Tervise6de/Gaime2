@@ -718,7 +718,14 @@ seat: your land in the player gold, allies green, enemies at war red, and every 
 realm on a diverging enemy→neutral→ally warmth ramp by standing (neutral/barbarian
 land muted). The picker shows the red→green legend. So the whole board's disposition
 toward you is legible at a glance — where the coalitions and the threats are.
-- Still open, optionally: a **Military lens** (army moves / border threat).
+
+**Military lens — SHIPPED (v0.39).** The board's forces at a glance: each province
+tints by the army strength standing in it — **your and allied garrisons green** (by
+strength), **hostile forces (at war + the Free Tribes) red**, and any **undefended
+province of yours with a hostile army next door amber** ("exposed"), the rest muted.
+So you can read your defensive posture and where a blow is coming without hunting
+army markers. Presentation-only and pure (`armySize` + treaties), like the other
+categorical lenses. **§9.3's lens set is now complete.**
 
 ### 9.4 Region development & focus — SHIPPED v1 (`data/focuses.ts`, v0.24)
 Regions can be **specialised** (the "what is this province for?" decision) from

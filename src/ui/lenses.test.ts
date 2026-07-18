@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createGame } from "@/systems/turn";
 import { setTreaty } from "@/systems/diplomacy";
-import { PLAYER_ID } from "@/systems/state";
+import { PLAYER_ID, BARBARIAN_ID, emptyUnits } from "@/systems/state";
 import { LENSES, lensColorsFor, lensGradient, type LensId } from "@/ui/lenses";
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -82,5 +82,39 @@ describe("categorical lenses (faith, relations)", () => {
     if (self) expect(colors[self.id]).toBe("#e6c874");
     if (enemy) expect(colors[enemy.id]).toBe("#c85248");
     if (ally) expect(colors[ally.id]).toBe("#4fa267");
+  });
+});
+
+describe("military lens", () => {
+  it("is offered, categorical (no ramp legend), and valid hex everywhere", () => {
+    expect(LENSES.map((l) => l.id)).toContain("military");
+    expect(lensGradient("military")).toBeNull();
+    const g = createGame({ seed: 7, rivals: 2 });
+    const colors = lensColorsFor(g, "military")!;
+    for (const r of g.regions) expect(colors[r.id]).toMatch(HEX);
+  });
+
+  it("tints the player's garrisoned capital as friendly (not quiet or exposed)", () => {
+    const g = createGame({ seed: 7, rivals: 2 });
+    const colors = lensColorsFor(g, "military")!;
+    const held = g.regions.find((r) => g.armies.some((a) => a.regionId === r.id && a.ownerId === PLAYER_ID));
+    if (held) {
+      expect(colors[held.id]).not.toBe("#33383f"); // not quiet
+      expect(colors[held.id]).not.toBe("#d99a4f"); // not exposed
+    }
+  });
+
+  it("marks an undefended province flanked by a hostile army as exposed amber", () => {
+    let g = createGame({ seed: 7, rivals: 2 });
+    const pr = g.regions.find(
+      (r) => r.ownerId === PLAYER_ID && r.adjacency.length > 0 && !g.armies.some((a) => a.regionId === r.id),
+    );
+    if (!pr) return; // no undefended player region this seed — skip
+    const nb = pr.adjacency[0]!;
+    g = {
+      ...g,
+      armies: [...g.armies, { id: 99999, ownerId: BARBARIAN_ID, regionId: nb, units: { ...emptyUnits(), militia: 3 }, movesLeft: 0 }],
+    };
+    expect(lensColorsFor(g, "military")![pr.id]).toBe("#d99a4f");
   });
 });
