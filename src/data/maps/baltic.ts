@@ -43,6 +43,16 @@ export const BALTIC_MAP: ScriptedMap = {
       [0.06, 0.66], [0.16, 0.68], [0.19, 0.78], [0.14, 0.87], [0.05, 0.85],
       [0.02, 0.75],
     ],
+    // The Wendish (German Baltic) coast — the Hanseatic heartland. A coastal
+    // strip along the southern shore between Jutland and Pomerania, the Bay of
+    // Mecklenburg opening to the sea in the north. Its west end meets Denmark's
+    // tip and its south-east edge runs just clear of Prussia's south-western
+    // shore (the Rügen seam) so the shores read as one without overlapping.
+    [
+      [0.10, 0.885], [0.125, 0.876], [0.145, 0.872], [0.17, 0.878], [0.196, 0.888],
+      [0.202, 0.912], [0.23, 0.938], [0.262, 0.96], [0.23, 0.977], [0.18, 0.983],
+      [0.13, 0.972], [0.10, 0.95],
+    ],
     // Gotland — a long, narrow island running north–south (Visby on its west).
     [
       [0.42, 0.50], [0.452, 0.515], [0.46, 0.55], [0.455, 0.59], [0.44, 0.625],
@@ -74,6 +84,11 @@ export const BALTIC_MAP: ScriptedMap = {
       { text: "Lappland", x: 0.5, y: -0.07 },
       { text: "The Rus", x: 1.09, y: 0.5 },
       { text: "The Empire", x: 0.5, y: 1.07 },
+      // The great western Kontore of the wider Hansa world — faded, off-map
+      // hints of the trade cities the League will one day reach.
+      { text: "Bergen", x: -0.03, y: 0.2 },
+      { text: "London", x: -0.1, y: 0.64 },
+      { text: "Bruges", x: -0.06, y: 0.9 },
     ],
   },
   regions: [
@@ -111,8 +126,14 @@ export const BALTIC_MAP: ScriptedMap = {
     // Islands
     { name: "Visby", x: 0.43, y: 0.56, terrain: "coast" },
     { name: "Arensburg", x: 0.60, y: 0.49, terrain: "coast" },
+    // Wendish / German coast — the Hansa heartland, west→east (indices 28–31).
+    // The arc bends south-east so the eastern towns clear Prussia's shore.
+    { name: "Lübeck", x: 0.145, y: 0.885, terrain: "coast" },
+    { name: "Wismar", x: 0.175, y: 0.905, terrain: "coast" },
+    { name: "Rostock", x: 0.205, y: 0.925, terrain: "coast" },
+    { name: "Stralsund", x: 0.24, y: 0.95, terrain: "coast" },
   ],
-  // Historical realms of the Baltic rim, each on its home ground. Ten seated
+  // Historical realms of the Baltic rim, each on its home ground. Eleven seated
   // realms (of the full roster in `data/factions.ts`); every region belongs to
   // exactly one. Colours mirror the roster. (Region indices match the order above.)
   factions: [
@@ -136,5 +157,7 @@ export const BALTIC_MAP: ScriptedMap = {
     { name: "Denmark", color: "#d0796e", capital: 24, regions: [24, 25] },
     // Gotland — Visby's Hansa and Ösel, the island realms.
     { name: "Gotland", color: "#9aa4b2", capital: 26, regions: [26, 27] },
+    // Lübeck — the Wendish coast towns; the future head of the Hanseatic League.
+    { name: "Lübeck", color: "#b0273b", capital: 28, regions: [28, 29, 30, 31] },
   ],
 };

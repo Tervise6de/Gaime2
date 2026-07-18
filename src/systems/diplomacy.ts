@@ -40,7 +40,9 @@ export function getRelation(state: GameState, a: number, b: number): number {
 }
 
 export function setRelation(state: GameState, a: number, b: number, value: number): GameState {
-  const v = clamp(Math.round(value), RELATION_MIN, RELATION_MAX);
+  // `|| 0` normalises a rounded -0 (Math.round of a small negative) back to +0,
+  // so the scalar round-trips through JSON identically — JSON has no signed zero.
+  const v = clamp(Math.round(value), RELATION_MIN, RELATION_MAX) || 0;
   return { ...state, relations: { ...state.relations, [pairKey(a, b)]: v } };
 }
 
@@ -798,7 +800,8 @@ export function driftRelations(state: GameState): GameState {
 
       if (treaty === "war") rel = Math.min(rel, HOSTILE_THRESHOLD);
 
-      relations[key] = clamp(Math.round(rel), RELATION_MIN, RELATION_MAX);
+      // `|| 0` keeps a rounded -0 from being stored (JSON has no signed zero).
+      relations[key] = clamp(Math.round(rel), RELATION_MIN, RELATION_MAX) || 0;
     }
   }
   return { ...state, relations };

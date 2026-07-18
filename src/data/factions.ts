@@ -68,7 +68,7 @@ export interface FactionDef {
 }
 
 /**
- * The roster (12). Colours are well-spaced hues kept clear of the player gold
+ * The roster (13). Colours are well-spaced hues kept clear of the player gold
  * and the Free Tribes' brown. Traits spread across the five so no realm feels
  * like a strict upgrade of another; each also carries a distinct opening bonus
  * of roughly comparable value (a free Age-of-Founding tech, ~35-55 gold, or a
@@ -99,6 +99,8 @@ export const FACTIONS: FactionDef[] = [
     bonus: { label: "Hansa heart", detail: "Begin with +55 gold — the richest opening.", startGold: 55 } },
   { name: "Samogitia", color: "#c56b6b", trait: "martial", disposition: "warlord", homeFocus: "garrison", blurb: "Fierce pagan holdouts who bow to no crusader.",
     bonus: { label: "Pagan holdouts", detail: "Begin with an Infantry and a Militia regiment.", startUnits: { infantry: 1, militia: 1 } } },
+  { name: "Lübeck", color: "#b0273b", trait: "mercantile", disposition: "merchant", homeFocus: "market", blurb: "Queen of the Hansa — the Wendish sea's chief town and the League's future head.",
+    bonus: { label: "Queen of the Hansa", detail: "Begin with +50 gold from the burgher charters.", startGold: 50 } },
 ];
 
 export const FACTION_NAMES: string[] = FACTIONS.map((f) => f.name);

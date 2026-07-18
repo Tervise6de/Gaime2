@@ -62,8 +62,8 @@ describe("faction selection in random games", () => {
 });
 
 describe("faction identity on the scripted Baltic map", () => {
-  it("seats ten roster realms, each carrying its faction trait", () => {
-    expect(BALTIC_MAP.factions.length).toBe(10);
+  it("seats eleven roster realms, each carrying its faction trait", () => {
+    expect(BALTIC_MAP.factions.length).toBe(11);
     for (const f of BALTIC_MAP.factions) {
       const def = factionByName(f.name);
       expect(def, `${f.name} is in the roster`).toBeDefined();
