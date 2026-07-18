@@ -217,7 +217,10 @@ export function createGame(options: NewGameOptions): GameState {
   const laidOut: Region[] = regions.map((r) => {
     const owner = ownerOf.get(r.id);
     if (owner !== undefined) {
-      return { ...r, ownerId: owner, fortification: capitalSet.has(r.id) ? 1 : 0 };
+      const isCapital = capitalSet.has(r.id);
+      // A realm's capital opens with its signature focus (data/factions.ts).
+      const focus = isCapital ? defByNation.get(owner)?.homeFocus : undefined;
+      return { ...r, ownerId: owner, fortification: isCapital ? 1 : 0, focus };
     }
     // Barbarian-held: light fortification + a small garrison.
     const fort = rng.int(0, 2);
@@ -318,22 +321,25 @@ function createScriptedGame(map: ScriptedMap, regions: Region[], options: NewGam
   // Ownership + capitals + a starting army per realm.
   const ownerOf = new Map<number, number>();
   const capitalSet = new Set<number>();
+  const capitalFocus = new Map<number, FocusId | undefined>();
   const armies: Army[] = [];
   let nextArmyId = 0;
   map.factions.forEach((f, fi) => {
     const nationId = factionToNation.get(fi)!;
     nations[nationId]!.capitalRegionId = f.capital;
     capitalSet.add(f.capital);
+    capitalFocus.set(f.capital, factionByName(f.name)?.homeFocus);
     for (const rid of f.regions) ownerOf.set(rid, nationId);
     const startUnits = addStartUnits({ ...emptyUnits(), militia: 2, infantry: 1 }, factionByName(f.name)?.bonus);
     armies.push({ id: nextArmyId++, ownerId: nationId, regionId: f.capital, units: startUnits, movesLeft: armyMoves(startUnits) });
   });
 
-  // Lay out regions: owned (fort on capitals) or Free-Tribe held (light garrison).
+  // Lay out regions: owned (fort + home focus on capitals) or Free-Tribe held.
   const laidOut: Region[] = regions.map((r) => {
     const owner = ownerOf.get(r.id);
     if (owner !== undefined) {
-      return { ...r, ownerId: owner, fortification: capitalSet.has(r.id) ? 1 : 0 };
+      const isCapital = capitalSet.has(r.id);
+      return { ...r, ownerId: owner, fortification: isCapital ? 1 : 0, focus: isCapital ? capitalFocus.get(r.id) : undefined };
     }
     const fort = rng.int(0, 2);
     const garrison = { ...emptyUnits(), militia: rng.int(1, 2) };

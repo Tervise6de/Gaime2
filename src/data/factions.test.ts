@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { FACTIONS, FACTION_NAMES, factionByName } from "@/data/factions";
 import { ARCHETYPES, personalityByArchetype } from "@/data/personalities";
+import { FOCUS_IDS } from "@/data/focuses";
 import { TRAIT_IDS } from "@/data/traits";
 import { createGame } from "@/systems/turn";
 import { BALTIC_MAP } from "@/data/maps/baltic";
@@ -109,6 +110,37 @@ describe("faction AI disposition (per-faction temperament)", () => {
     // A handful of aggressors at most, so the world isn't perpetual war.
     expect(warlords).toBeLessThanOrEqual(4);
     expect(new Set(FACTIONS.map((f) => f.disposition)).size).toBeGreaterThanOrEqual(3); // variety
+  });
+});
+
+describe("faction home focus (capital opens specialised)", () => {
+  it("every faction declares a valid home focus", () => {
+    const valid = new Set(FOCUS_IDS);
+    for (const f of FACTIONS) {
+      expect(f.homeFocus, `${f.name} has a home focus`).toBeDefined();
+      expect(valid.has(f.homeFocus!), `${f.name}'s home focus is a real focus`).toBe(true);
+    }
+  });
+
+  it("the player's capital opens with its faction's home focus (random game)", () => {
+    const g = createGame({ seed: 3, rivals: 3, playerFaction: "Gotland" });
+    const cap = g.regions[playerNation(g).capitalRegionId!]!;
+    expect(cap.focus).toBe(factionByName("Gotland")!.homeFocus); // market
+  });
+
+  it("seats every AI realm's home focus at its capital too", () => {
+    const g = createGame({ seed: 7, rivals: 5 });
+    for (const n of g.nations) {
+      if (n.isBarbarian || n.capitalRegionId === undefined) continue;
+      const def = factionByName(n.name);
+      if (def?.homeFocus) expect(g.regions[n.capitalRegionId]!.focus).toBe(def.homeFocus);
+    }
+  });
+
+  it("seats home focuses on the scripted Baltic map", () => {
+    const g = createGame({ seed: 5, mapId: "baltic", playerFaction: "Lithuania" });
+    const p = playerNation(g);
+    expect(g.regions[p.capitalRegionId!]!.focus).toBe(factionByName(p.name)!.homeFocus);
   });
 });
 

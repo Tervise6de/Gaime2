@@ -630,6 +630,17 @@ balanced for a dynamic-but-not-perpetual-war world (a 60-game sweep: ~57/60 game
 see war, ~2.3 declarations each, ~⅓ still resolved by prestige). Pure data — the
 existing `ai.ts` thresholds already read `personality`, so no new sim logic.
 
+**Signature home focus (v0.41).** A fourth per-faction touch: each realm's
+**capital opens with its signature region focus** (`FactionDef.homeFocus`) — a
+martial seat (Sweden, Lithuania, Samogitia) starts a **Garrison**, a Hansa one
+(Denmark, Curonia, Gotland) a **Market town**, the builders (Prussia, Livonia,
+Finland) a **Workshop**, Novgorod an **Academy**, the grain realms (Poland,
+Estonia) **Farmland** — so factions read distinctly from turn 1 and the focus
+system is introduced by example. It is only a pre-set of a normal player choice
+(you can re-focus your capital; the AI keeps its home focus as it does any other),
+seated in both createGame paths — no new maths, verified balance-neutral by a
+full-game sweep (game length and war frequency unchanged).
+
 **Original plan (for reference).** The current renderer wraps the region
 sites in a *generated organic island*. A real Baltic map is a different shape:
 **land around a central sea**, with the Gulf of Finland, Gulf of Riga and the

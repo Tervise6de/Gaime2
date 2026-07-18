@@ -1021,8 +1021,12 @@ describe("AI region focus", () => {
     expect(focused.length).toBeGreaterThan(rivalRegions.length * 0.7);
     const valid = ["balanced", "farmland", "market", "workshop", "academy", "garrison"];
     for (const r of focused) expect(valid).toContain(r.focus);
-    // Plains always lean Farmland (never a Garrison), whoever holds them.
-    for (const r of rivalRegions) if (r.terrain === "plains" && r.focus) expect(r.focus).toBe("farmland");
+    // Plains lean Farmland by terrain — except a *capital*, which opens with its
+    // faction's signature home focus (data/factions.ts) and the AI keeps it.
+    const capitals = new Set(s.nations.map((n) => n.capitalRegionId));
+    for (const r of rivalRegions) {
+      if (r.terrain === "plains" && r.focus && !capitals.has(r.id)) expect(r.focus).toBe("farmland");
+    }
   });
 
   it("keeps a focus once assigned (no thrash across turns)", () => {
