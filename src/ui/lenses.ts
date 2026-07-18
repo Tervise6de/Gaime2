@@ -8,12 +8,13 @@
  * the renderer bakes into the political layer. UI layer — no DOM, no sim writes.
  */
 
-import type { GameState, Region } from "@/systems/state";
+import { PLAYER_ID, BARBARIAN_ID, type GameState, type Region } from "@/systems/state";
 import { regionProduction, nationYieldMult } from "@/systems/economy";
+import { getRelation, getTreaty } from "@/systems/diplomacy";
 
-/** Heat lenses colour by a normalised scalar; "faith" is categorical (see below). */
+/** Heat lenses colour by a normalised scalar; "faith"/"relations" are categorical. */
 type HeatLens = "population" | "gold" | "materials" | "food" | "unrest";
-export type LensId = "none" | HeatLens | "faith";
+export type LensId = "none" | HeatLens | "faith" | "relations";
 
 export interface LensDef {
   id: LensId;
@@ -34,6 +35,7 @@ export const LENSES: LensDef[] = [
   { id: "food", label: "Food", glyph: "food", fallback: "🌾", hint: "Food produced per turn." },
   { id: "unrest", label: "Unrest", glyph: "warning", fallback: "🔥", hint: "How restless each region is (red = revolt risk)." },
   { id: "faith", label: "Faith", glyph: "faith", fallback: "🛐", hint: "Whose faith each province holds — win by converting the world." },
+  { id: "relations", label: "Relations", glyph: "diplomacy", fallback: "🤝", hint: "How each realm stands with you — allies green, enemies red." },
 ];
 
 /** Low → high colour ramp for each heat lens (dark, receding low; bright high). */
@@ -48,10 +50,18 @@ const RAMPS: Record<HeatLens, string[]> = {
 /** Muted neutral for pagan / unconverted land under the faith lens. */
 const PAGAN_COLOR = "#3a3f45";
 
+/** Relations lens: a diverging enemy→neutral→ally ramp, plus fixed treaty/self tints. */
+const RELATIONS_RAMP = ["#d0685e", "#5a616e", "#5faa74"]; // hostile → neutral → warm
+const RELATIONS_SELF = "#e6c874"; // your own realm (the player gold)
+const RELATIONS_NEUTRAL = "#33383f"; // unowned / barbarian land
+const WAR_COLOR = "#c85248"; // at war (strong red)
+const ALLY_COLOR = "#4fa267"; // allied (strong green)
+
 /** CSS gradient for a lens's ramp (low → high), for the picker's scale legend.
-    Categorical lenses (Political, Faith) have no ramp — the map colours speak. */
+    Faith is categorical (no ramp); Relations shows a diverging enemy→ally ramp. */
 export function lensGradient(id: LensId): string | null {
   if (id === "none" || id === "faith") return null;
+  if (id === "relations") return `linear-gradient(90deg, ${RELATIONS_RAMP.join(", ")})`;
   return `linear-gradient(90deg, ${RAMPS[id].join(", ")})`;
 }
 
@@ -115,6 +125,27 @@ export function lensColorsFor(state: GameState, id: LensId): (string | null)[] |
     const out: (string | null)[] = [];
     for (const r of state.regions) {
       out[r.id] = r.faith !== undefined ? colorOf(r.faith) : PAGAN_COLOR;
+    }
+    return out;
+  }
+  // Relations is categorical from the *player's* view: your land gold, allies
+  // green, enemies red, and everyone else on a diverging warmth ramp by standing.
+  if (id === "relations") {
+    const out: (string | null)[] = [];
+    for (const r of state.regions) {
+      if (r.ownerId === null || r.ownerId === BARBARIAN_ID) {
+        out[r.id] = RELATIONS_NEUTRAL;
+      } else if (r.ownerId === PLAYER_ID) {
+        out[r.id] = RELATIONS_SELF;
+      } else {
+        const treaty = getTreaty(state, PLAYER_ID, r.ownerId);
+        out[r.id] =
+          treaty === "war"
+            ? WAR_COLOR
+            : treaty === "alliance"
+              ? ALLY_COLOR
+              : rampColor(RELATIONS_RAMP, (getRelation(state, PLAYER_ID, r.ownerId) + 100) / 200);
+      }
     }
     return out;
   }

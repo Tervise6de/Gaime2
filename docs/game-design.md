@@ -706,12 +706,19 @@ round's loser always shedding ≥1 regiment so fights converge. Outcomes are
 ### 9.3 Map lenses (Civ-style overlays) — SHIPPED (`ui/lenses.ts`)
 Toggleable map filters so the board is readable at a glance without clicking
 each region. A floated lens strip (bottom-centre) offers **Political** (owners,
-the default), **Population**, **Gold / Materials / Food income**, and **Unrest**
-— each recolours every region by a normalised heat ramp with a low→high scale
-legend; `M` cycles them. Colours are computed pure in `ui/lenses.ts` and baked
-into the renderer's political layer (`setLens`), so the heat reads at any zoom.
-Later, optionally: a **Military lens** (army moves / border threat) and a
-**Political-relations lens** (allies green, enemies red).
+the default), **Population**, **Gold / Materials / Food income**, **Unrest**, the
+**Faith** lens (§9.6, categorical — whose faith holds each province), and the
+**Relations** lens (v0.38) — each recolours every region; heat lenses use a
+normalised low→high ramp, the categorical ones tint by realm/standing; `M` cycles
+them. Colours are computed pure in `ui/lenses.ts` and baked into the renderer's
+political layer (`setLens`), so they read at any zoom.
+
+**Political-relations lens — SHIPPED (v0.38).** Reads the diplomatic map from *your*
+seat: your land in the player gold, allies green, enemies at war red, and every other
+realm on a diverging enemy→neutral→ally warmth ramp by standing (neutral/barbarian
+land muted). The picker shows the red→green legend. So the whole board's disposition
+toward you is legible at a glance — where the coalitions and the threats are.
+- Still open, optionally: a **Military lens** (army moves / border threat).
 
 ### 9.4 Region development & focus — SHIPPED v1 (`data/focuses.ts`, v0.24)
 Regions can be **specialised** (the "what is this province for?" decision) from
