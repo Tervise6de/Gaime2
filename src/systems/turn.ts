@@ -28,6 +28,7 @@ import type { ScriptedMap } from "@/data/maps/types";
 import { nationalProduction, round1 } from "@/systems/economy";
 import { advanceConstruction } from "@/systems/construction";
 import { stepFaith, seedFaith } from "@/systems/faith";
+import { stepTrade, seedKontore } from "@/systems/trade";
 import { nextPopulation } from "@/systems/population";
 import { nextUnrest } from "@/systems/stability";
 import { applyCommanderEffects, applyDefection, armyMoves, tickEntrenchment, totalUpkeep } from "@/systems/military";
@@ -264,6 +265,8 @@ export function createGame(options: NewGameOptions): GameState {
     regions: seedFaith(laidOut),
     armies,
     nextArmyId,
+    routes: [],
+    nextRouteId: 0,
     relations: {},
     treaties: {},
     offers: [],
@@ -279,6 +282,8 @@ export function createGame(options: NewGameOptions): GameState {
   };
   // Seed the score graph with the opening position (one sample per nation).
   game.scoreHistory = appendScores(game);
+  // Open the four Kontore (holder = host region's owner), mirroring seedFaith.
+  game.kontore = seedKontore(game);
   return game;
 }
 
@@ -405,6 +410,8 @@ function createScriptedGame(map: ScriptedMap, regions: Region[], options: NewGam
     regions: seedFaith(laidOut),
     armies,
     nextArmyId,
+    routes: [],
+    nextRouteId: 0,
     relations: {},
     treaties: {},
     offers: [],
@@ -419,6 +426,8 @@ function createScriptedGame(map: ScriptedMap, regions: Region[], options: NewGam
     scoreHistory: {},
   };
   game.scoreHistory = appendScores(game);
+  // Open the four Kontore (holder = host region's owner), mirroring seedFaith.
+  game.kontore = seedKontore(game);
   return game;
 }
 
@@ -858,6 +867,11 @@ export function resolveTurn(state: GameState): GameState {
 
   // 1.6. Trade income: active trade routes pay both partners (economic diplomacy).
   s = applyTradeIncome(s);
+
+  // 1.65. Goods trade (the merchant layer): standing routes carry goods to the
+  // Kontore, turning goods into gold. Sits beside applyTradeIncome — a parallel
+  // stream that never touches the four-resource economy.
+  s = stepTrade(s);
 
   // 2. Rival AI turns (deterministic RNG stream).
   const rng: Rng = createRng(s.rngState);
