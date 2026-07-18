@@ -117,6 +117,11 @@ export function victoryRaces(state: GameState): VictoryRace[] {
   const rScore = topRival((n) => nationScore(state, n.id));
   const maxScore = Math.max(pScore, rScore?.v ?? 0, 1);
 
+  // Effective turn limit for this game (Game-length setting): a number, or null
+  // for an endless game (no deadline — the "∞" shown below, no alarm).
+  const limit = state.turnLimit === undefined ? TURN_LIMIT : state.turnLimit;
+  const endless = limit === null;
+
   return [
     {
       kind: "domination",
@@ -148,11 +153,12 @@ export function victoryRaces(state: GameState): VictoryRace[] {
     },
     {
       kind: "prestige",
-      title: `Prestige · turn ${state.turn}/${TURN_LIMIT}`,
-      goal: `Lead in score when turn ${TURN_LIMIT} ends`,
+      title: endless ? `Prestige · turn ${state.turn}/∞` : `Prestige · turn ${state.turn}/${limit}`,
+      goal: endless ? "Lead in score — no turn limit" : `Lead in score when turn ${limit} ends`,
       you: { value: `${pScore}`, fraction: pScore / maxScore },
       rival: rScore ? { name: rScore.n.name, value: `${rScore.v}`, fraction: rScore.v / maxScore } : null,
-      alarm: !!rScore && rScore.v > pScore && state.turn >= TURN_LIMIT - 25,
+      // Endless games never raise the deadline alarm (there is no deadline).
+      alarm: !endless && !!rScore && rScore.v > pScore && state.turn >= (limit as number) - 25,
     },
   ];
 }
@@ -183,7 +189,10 @@ export function checkVictory(state: GameState): VictoryCheck | null {
     }
   }
 
-  if (state.turn >= TURN_LIMIT) {
+  // Effective turn limit for this game (Game-length setting): a number, or null
+  // for an endless game — which never resolves on the score tiebreak.
+  const limit = state.turnLimit === undefined ? TURN_LIMIT : state.turnLimit;
+  if (limit !== null && state.turn >= limit) {
     const ranked = contenders
       .map((n) => ({ id: n.id, score: nationScore(state, n.id) }))
       .sort((a, b) => b.score - a.score);

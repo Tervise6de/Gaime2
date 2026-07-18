@@ -22,12 +22,14 @@ import { FACTION_NAMES, factionByName } from "@/data/factions";
 import { ARCHETYPE_LABEL, ARCHETYPE_BLURB } from "@/data/personalities";
 import { DEFAULT_MAP_OPTIONS, type MapGenOptions } from "@/systems/mapgen";
 import { scriptedMap } from "@/data/maps/types";
-import type { Difficulty } from "@/systems/state";
+import type { Difficulty, GameLength } from "@/systems/state";
 
 export interface NewGameConfig {
   seed: number;
   difficulty: Difficulty;
   rivals: number;
+  /** Session length (Short/Standard/Long/Endless); Endless drops the score deadline. */
+  gameLength: GameLength;
   /** Map generation options (region count etc.); omitted = engine default. */
   map?: MapGenOptions;
   /** Scripted real-geography map ("baltic"/"europe"); absent = random realm. */
@@ -53,6 +55,7 @@ interface NewGamePrefs {
   rivals?: string;
   mapSize?: string;
   world?: string;
+  gameLength?: string;
 }
 
 const NEWGAME_PREFS_KEY = "gaime2:newgame-prefs";
@@ -154,6 +157,24 @@ export function buildNewGameForm(): NewGameForm {
   );
   mapSizeSeg.root.title =
     "World size: fewer regions play tight and quick; more regions give room to expand.";
+
+  // Game length: how long a session runs before the prestige-score tiebreak.
+  // Decoupled from the calendar — every length still spans the same Hansa arc,
+  // just at fewer/more turns. Endless drops the deadline (play until a decisive
+  // victory or you stop).
+  const gameLengthSeg = segmented(
+    [
+      ["short", "Short"],
+      ["standard", "Standard"],
+      ["long", "Long"],
+      ["endless", "Endless"],
+    ],
+    prefs.gameLength ?? "standard",
+    "standard",
+    () => dropToCustom(),
+  );
+  gameLengthSeg.root.title =
+    "Game length: how many turns before the score decides it — Short 150, Standard 220, Long 300. Endless has no deadline; play until a decisive victory or you stop.";
 
   // World: a random realm, or a real-geography map. A real map fixes its own
   // size and shape, so the World-size field is hidden while one is selected.
@@ -273,6 +294,7 @@ export function buildNewGameForm(): NewGameForm {
       field("Difficulty", difficultySeg.root),
       rivalsField,
       sizeField,
+      field("Game length", gameLengthSeg.root),
     ],
     readConfig(): NewGameConfig {
       const raw = seedInput.value.trim();
@@ -282,6 +304,7 @@ export function buildNewGameForm(): NewGameForm {
         rivals: rivalsSeg.get(),
         mapSize: mapSizeSeg.get(),
         world,
+        gameLength: gameLengthSeg.get(),
       });
       const rivals = Number(rivalsSeg.get()) || 2;
       const regionCount = Number(mapSizeSeg.get()) || DEFAULT_MAP_OPTIONS.regionCount;
@@ -294,6 +317,7 @@ export function buildNewGameForm(): NewGameForm {
         mapId: world || undefined,
         playerFaction: playAsSel.value || undefined,
         playerTrait: scenarioTrait,
+        gameLength: (gameLengthSeg.get() || "standard") as GameLength,
       };
     },
     refreshSeed(): void {

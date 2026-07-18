@@ -153,8 +153,23 @@ export const FAITH_VICTORY_FRACTION = 0.6;
 /** Great Works needed for an economic victory. */
 export const WONDER_GOAL = 5;
 /** The game ends at this turn on a prestige-score tiebreak. A full campaign is
-    a long arc through all five ages (research is era-gated, data/eras.ts). */
+    a long arc through all five ages (research is era-gated, data/eras.ts). The
+    standard-length default; per-game the effective limit lives on
+    `GameState.turnLimit` (chosen via the Game-length setting). */
 export const TURN_LIMIT = 220;
+
+/**
+ * Game-length setting (docs/hansa-plan.md §3): how long a session runs before
+ * the prestige-score tiebreak decides it. Decoupled from the calendar — a
+ * shorter or longer game still spans the same Hansa arc, just at fewer/more
+ * turns. "endless" drops the score tiebreak entirely (play until a decisive
+ * victory or you stop) — the home of the "how big can you get it" fantasy.
+ */
+export type GameLength = "short" | "standard" | "long" | "endless";
+
+/** Turn limits for the finite game lengths ("endless" has none → null). */
+export const GAME_LENGTH_TURNS = { short: 150, standard: 220, long: 300 } as const;
+
 /** Per-turn probability a bounded random event fires for the player. */
 export const EVENT_CHANCE = 0.16;
 
@@ -442,6 +457,13 @@ export interface GameState {
   nextOfferId: number;
   /** Difficulty chosen for this game (scales rivals). */
   difficulty: Difficulty;
+  /**
+   * Effective turn limit for the prestige-score tiebreak, from the Game-length
+   * setting: a number (short 150 / standard 220 / long 300), or `null` for an
+   * endless game (no score-limit — play until a decisive victory). Optional so
+   * legacy saves load; a missing value back-fills to the standard TURN_LIMIT.
+   */
+  turnLimit?: number | null;
   /** Set once the game has been decided. */
   outcome: "playing" | "defeat" | "victory";
   /** How the game was decided (for the banner), e.g. "domination". */

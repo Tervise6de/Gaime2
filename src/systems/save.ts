@@ -7,7 +7,7 @@
  * exported/imported as a JSON string for sharing or backup.
  */
 
-import { emptyUnits, type GameState } from "@/systems/state";
+import { emptyUnits, TURN_LIMIT, type GameState } from "@/systems/state";
 
 const SAVE_VERSION = 1;
 /**
@@ -60,6 +60,10 @@ export function deserializeGame(json: string): GameState | null {
     if (s.difficulty !== "easy" && s.difficulty !== "normal" && s.difficulty !== "hard") {
       s.difficulty = "normal";
     }
+    // Game-length setting arrived after some saves: a missing turnLimit means a
+    // pre-setting save, which was always the standard length — back-fill it so
+    // old saves load and resolve exactly as before. (An explicit null = endless.)
+    if (s.turnLimit === undefined) s.turnLimit = TURN_LIMIT;
     // Forward-migrate army unit records: a save from before a unit type existed
     // lacks that key, which would read as `undefined` (→ NaN) in armySize/combat.
     // Backfill every unit slot to 0 so older saves load cleanly.

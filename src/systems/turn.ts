@@ -53,6 +53,7 @@ import {
   DEFAULT_TAX,
   DIFFICULTY,
   EVENT_CHANCE,
+  GAME_LENGTH_TURNS,
   GRANARY_CAP,
   PLAYER_ID,
   UNREST_MAX,
@@ -61,6 +62,7 @@ import {
   emptyUnits,
   type Army,
   type Difficulty,
+  type GameLength,
   type GameState,
   type Nation,
   type NationModifier,
@@ -101,6 +103,17 @@ export interface NewGameOptions {
   mapId?: string;
   /** On a scripted map, the faction name the human plays (else picked from seed). */
   playerFaction?: string;
+  /** Session length (Short/Standard/Long/Endless); default "standard". Sets `turnLimit`. */
+  gameLength?: GameLength;
+}
+
+/**
+ * The prestige-tiebreak turn limit a Game-length option maps to: a finite turn
+ * count for short/standard/long, or `null` for "endless" (no score-limit).
+ * Default (undefined) is "standard" → TURN_LIMIT (220).
+ */
+function turnLimitFor(gameLength: GameLength | undefined): number | null {
+  return gameLength === "endless" ? null : GAME_LENGTH_TURNS[gameLength ?? "standard"];
 }
 
 /** Apply a faction's opening gold / free tech to a nation (units handled separately). */
@@ -256,6 +269,7 @@ export function createGame(options: NewGameOptions): GameState {
     offers: [],
     nextOfferId: 0,
     difficulty: options.difficulty ?? "normal",
+    turnLimit: turnLimitFor(options.gameLength),
     outcome: "playing",
     log: [
       `Turn 1 — ${playerDef.name} rises around ${playerCapitalName} under your rule; ` +
@@ -396,6 +410,7 @@ function createScriptedGame(map: ScriptedMap, regions: Region[], options: NewGam
     offers: [],
     nextOfferId: 0,
     difficulty: options.difficulty ?? "normal",
+    turnLimit: turnLimitFor(options.gameLength),
     outcome: "playing",
     log: [
       `Turn 1 — you rule ${playerName} on the ${map.name} map; ` +
