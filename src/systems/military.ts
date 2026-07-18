@@ -23,6 +23,7 @@ import {
   generateCommander,
 } from "@/data/commanders";
 import { TERRAIN, type StrategicResource } from "@/data/terrain";
+import { recordChronicle, chronicleName } from "@/systems/chronicle";
 import { traitUnitCostMult } from "@/data/traits";
 import { focusUnitCostMult, type FocusId } from "@/data/focuses";
 import { createRng } from "@/systems/rng";
@@ -292,7 +293,15 @@ export function applyDefection(state: GameState): GameState {
       `${commanderTitle(a.commander!)} turns his coat, seizing ${r.name} from ${former?.isPlayer ? "your realm" : (former?.name ?? "its ruler")}!`,
     ].slice(-50);
   }
-  return { ...state, armies, regions, log };
+  let next: GameState = { ...state, armies, regions, log };
+  for (const a of defectors) {
+    next = recordChronicle(
+      next,
+      "betrayal",
+      `${commanderTitle(a.commander!)} turned traitor, seizing ${state.regions[a.regionId]!.name} from ${chronicleName(next, a.ownerId)}.`,
+    );
+  }
+  return next;
 }
 
 /** Grow one turn's worth of entrenchment on every dug-in army (called by the turn pipeline). */

@@ -13,10 +13,12 @@
 
 import type { BuildingId } from "@/data/buildings";
 import type { Commander } from "@/data/commanders";
+import type { Ruler } from "@/data/rulers";
 import type { FocusId } from "@/data/focuses";
 import type { ResourceYield, StrategicResource, TerrainId } from "@/data/terrain";
 import { UNIT_TYPES, type UnitType } from "@/data/units";
 import type { BattleReport } from "@/systems/combat";
+import type { ChronicleEntry } from "@/systems/chronicle";
 import type { TechId } from "@/data/techs";
 import type { TraitId } from "@/data/traits";
 
@@ -318,6 +320,8 @@ export interface Nation {
   personality?: Personality;
   /** National trait drawn per game; undefined for barbarians. */
   trait?: TraitId;
+  /** The named figure at the head of the realm (E1); undefined for barbarians / legacy saves. */
+  ruler?: Ruler;
   /** Founding capital's region id (undefined for barbarians and legacy saves). */
   capitalRegionId?: number;
   /** Research state (techs done, current, progress). */
@@ -444,6 +448,13 @@ export interface GameState {
   victoryKind?: string;
   /** Human-readable turn log, newest last. */
   log: string[];
+  /**
+   * The chronicle (E2): a curated, run-long list of the story's major beats —
+   * wars, revolts, betrayals, falls, victory — in chronicle prose, oldest first.
+   * Distinct from `log` (the transient last-50 feed): the chronicle persists and
+   * feeds the end-game summary. Undefined on legacy saves = empty.
+   */
+  chronicle?: ChronicleEntry[];
   /**
    * Per-nation prestige score sampled once per turn (nation id → series, turn 1
    * first), for the end-game score graph. Barbarians are excluded; series stay

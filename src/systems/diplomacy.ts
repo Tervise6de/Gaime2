@@ -14,6 +14,7 @@
  */
 
 import { UNITS, type UnitType } from "@/data/units";
+import { recordChronicle, chronicleName } from "@/systems/chronicle";
 import {
   BARBARIAN_ID,
   GIFT_RELATION,
@@ -272,7 +273,14 @@ export function declareWar(state: GameState, a: number, b: number, cb?: CasusBel
     }
   }
   const note = CASUS_BELLI[reason].justified ? ` (${CASUS_BELLI[reason].label.toLowerCase()})` : "";
-  return { ...next, log: [...next.log, `${name(next, a)} declared war on ${name(next, b)}${note}!`].slice(-50) };
+  next = { ...next, log: [...next.log, `${name(next, a)} declared war on ${name(next, b)}${note}!`].slice(-50) };
+  // Chronicle beat (E2): a war is a spine of the story.
+  const called = reason === "ally_call" ? " — answering the call" : "";
+  return recordChronicle(
+    next,
+    "war",
+    `${chronicleName(next, a)} declared war on ${chronicleName(next, b)}${called}.`,
+  );
 }
 
 // --- trade routes (economic diplomacy) --------------------------------------

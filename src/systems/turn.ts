@@ -32,6 +32,8 @@ import { nextPopulation } from "@/systems/population";
 import { nextUnrest } from "@/systems/stability";
 import { applyCommanderEffects, applyDefection, armyMoves, tickEntrenchment, totalUpkeep } from "@/systems/military";
 import { commanderTitle, generateCommander } from "@/data/commanders";
+import { generateRuler } from "@/data/rulers";
+import { recordChronicle, chronicleName } from "@/systems/chronicle";
 import { driftRelations, decayOpinions, atWar, tradePartners, tradeIncome } from "@/systems/diplomacy";
 import { runNationTurn } from "@/systems/ai";
 import { advanceResearch, dequeueResearch, techUnrestReduction, isBuildingUnlockedFor, selectTech, queueResearch as queueResearchTech, clearQueue } from "@/systems/tech";
@@ -182,6 +184,11 @@ export function createGame(options: NewGameOptions): GameState {
     });
   }
 
+  // Give every realm a named ruler (E1), flavoured by its AI disposition.
+  for (const n of nations) {
+    if (!n.isBarbarian) n.ruler = generateRuler(rng, n.personality?.archetype);
+  }
+
   // Choose well-separated capitals for the player + rivals.
   const capitals = pickCapitals(regions, rng, 1 + rivalCount);
   const nationIds = [PLAYER_ID, ...Array.from({ length: rivalCount }, (_, i) => 2 + i)];
@@ -319,6 +326,11 @@ function createScriptedGame(map: ScriptedMap, regions: Region[], options: NewGam
     nextId += 1;
   });
 
+  // Give every realm a named ruler (E1), flavoured by its AI disposition.
+  for (const n of nations) {
+    if (!n.isBarbarian) n.ruler = generateRuler(rng, n.personality?.archetype);
+  }
+
   // Ownership + capitals + a starting army per realm.
   const ownerOf = new Map<number, number>();
   const capitalSet = new Set<number>();
@@ -451,6 +463,7 @@ export function applySecession(state: GameState): GameState {
   let armies = state.armies;
   let nextArmyId = state.nextArmyId;
   let log = state.log;
+  const chronicled: { id: number; pretender: string; former: number | null }[] = [];
   for (const id of secededIds) {
     const pretender = generateCommander(rng);
     armies = [
@@ -458,13 +471,23 @@ export function applySecession(state: GameState): GameState {
       { id: nextArmyId, ownerId: BARBARIAN_ID, regionId: id, units: { ...emptyUnits(), militia: REBEL_GARRISON }, movesLeft: 0, commander: pretender },
     ];
     nextArmyId += 1;
-    const former = state.nations.find((n) => n.id === state.regions[id]!.ownerId);
+    const formerId = state.regions[id]!.ownerId;
+    const former = state.nations.find((n) => n.id === formerId);
     log = [
       ...log,
       `${state.regions[id]!.name} rises in revolt under ${commanderTitle(pretender)}, seceding from ${former?.isPlayer ? "your realm" : (former?.name ?? "its ruler")}.`,
     ].slice(-50);
+    chronicled.push({ id, pretender: commanderTitle(pretender), former: formerId });
   }
-  return { ...state, regions, armies, nextArmyId, log, rngState: rng.seed };
+  let next: GameState = { ...state, regions, armies, nextArmyId, log, rngState: rng.seed };
+  for (const c of chronicled) {
+    next = recordChronicle(
+      next,
+      "revolt",
+      `${next.regions[c.id]!.name} rose in revolt under ${c.pretender}, breaking away from ${chronicleName(next, c.former)}.`,
+    );
+  }
+  return next;
 }
 
 /** Count a nation's temporary modifiers down one turn, dropping any that expire. */
@@ -858,6 +881,19 @@ export function resolveTurn(state: GameState): GameState {
   return s;
 }
 
+/** One-line chronicle close for a decided game, by outcome + victory kind. */
+function victoryChronicle(outcome: string, kind: string): string {
+  const won = outcome === "victory";
+  const how =
+    kind === "domination" ? "by dominion over the land"
+    : kind === "great works" ? "through its Great Works"
+    : kind === "faith" ? "by carrying the faith across the world"
+    : "on the ledger of prestige when the age closed";
+  return won
+    ? `Your realm was judged the greatest power ${how}. The chronicle is complete.`
+    : `Another power was judged greatest ${how}; your realm's tale ends unfinished.`;
+}
+
 /** Fire at most one event per living nation, at low probability. */
 function fireEvents(state: GameState, rng: Rng): GameState {
   let s = state;
@@ -883,22 +919,27 @@ function updateOutcome(state: GameState): GameState {
   for (const n of newlyDead) log = [...log, `${n.name} has been eliminated.`].slice(-50);
 
   let withNations: GameState = { ...state, nations, log };
+  // Chronicle beat (E2): the fall of a realm.
+  for (const n of newlyDead) {
+    withNations = recordChronicle(withNations, "fall", `${chronicleName(withNations, n.id)} was extinguished — its lands lost.`);
+  }
 
   // Elimination outcomes.
   const player = nations[PLAYER_ID]!;
   const livingRivals = nations.filter((n) => !n.isBarbarian && !n.isPlayer && n.alive);
   const hadRivals = state.nations.some((n) => !n.isBarbarian && !n.isPlayer);
   if (!player.alive) {
-    return { ...withNations, outcome: "defeat", victoryKind: "elimination" };
+    return recordChronicle({ ...withNations, outcome: "defeat", victoryKind: "elimination" }, "victory", "Your realm fell. The chronicle ends here.");
   }
   if (hadRivals && livingRivals.length === 0) {
-    return { ...withNations, outcome: "victory", victoryKind: "conquest" };
+    return recordChronicle({ ...withNations, outcome: "victory", victoryKind: "conquest" }, "victory", "Your realm stood alone, all rivals cast down — a conquest for the ages.");
   }
 
   // Domination / great works / turn-limit prestige.
   const verdict = checkVictory(withNations);
   if (verdict) {
-    return { ...withNations, outcome: verdict.outcome, victoryKind: verdict.kind };
+    const ended = { ...withNations, outcome: verdict.outcome, victoryKind: verdict.kind };
+    return recordChronicle(ended, "victory", victoryChronicle(verdict.outcome, verdict.kind));
   }
   return withNations;
 }

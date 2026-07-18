@@ -4293,3 +4293,40 @@ a:focus-visible,
     gap: 7px;
   }
 }
+
+/* Chronicle (E2) — the run's story beats, in the standings + end screens. */
+.hud-chronicle {
+  margin-top: 14px;
+}
+.hud-chronicle-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.hud-chronicle-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 4px 8px;
+  border-left: 2px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+.hud-chronicle-turn {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85em;
+}
+.hud-chronicle-text {
+  color: var(--fg);
+}
+.hud-chronicle-row.kind-war { border-left-color: #d9736a; }
+.hud-chronicle-row.kind-revolt { border-left-color: #e0a852; }
+.hud-chronicle-row.kind-betrayal { border-left-color: #b06ad0; }
+.hud-chronicle-row.kind-fall { border-left-color: #7a8496; }
+.hud-chronicle-row.kind-wonder { border-left-color: #6ab0d0; }
+.hud-chronicle-row.kind-victory { border-left-color: var(--accent); }

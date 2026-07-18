@@ -6,6 +6,36 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-18 — E1 + E2: named rulers & the chronicle (v0.50.0)
+
+The X-factor layer — turning an anonymous colour on the map into someone with a
+reputation, and the run into a story you can read back.
+
+**E1 — named rulers.** Every non-barbarian realm gets a generated ruler (name +
+epithet), flavoured by its AI disposition — a warlord earns "the Cruel / the
+Conqueror", a merchant "the Rich / the Shrewd" (`src/data/rulers.ts`,
+deterministic from the seed). The diplomacy panel now leads with the ruler
+("Visvaldis the Cruel · Lithuania"), and the chronicle speaks in their name.
+New optional `Nation.ruler`.
+
+**E2 — the chronicle.** A curated, run-long list of the story's major beats in
+prose (`src/systems/chronicle.ts`, persisted `GameState.chronicle`): **wars**
+(`declareWar`), **revolts** and **betrayals** (secession / defection — the E5
+drama), the **fall** of a realm, and the closing **victory**. It renders in the
+Standings overlay mid-game and on the end screen, colour-coded by beat kind. This
+is the screenshot/share generator, and it now has E5's defections to tell about.
+
+Verified: 592 tests green (+7 rulers + chronicle). Typecheck + build clean.
+Browser: rulers show in diplomacy ("Vykintas the Fair · Sweden"); a full game to
+a faith victory rendered the closing chronicle beat in the UI with zero console
+errors. New optional `Nation.ruler` / `GameState.chronicle` — saves load clean.
+
+Next: with the character/story layer in, the sim is feature-complete enough for a
+dedicated **stress / bug-bash pass** (self-play across seeds + a Playwright fuzz
+run) before onboarding polish.
+
+---
+
 ## 2026-07-18 — Close the defection loop: AI reconquest + war confirm (v0.49.0)
 
 Making E5's breakaways *bite* in AI games, and guarding the player against

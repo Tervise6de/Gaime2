@@ -85,6 +85,7 @@ import {
   commanderDefense,
   commanderTitle,
 } from "@/data/commanders";
+import { rulerTitle } from "@/data/rulers";
 import {
   BARBARIAN_ID,
   PLAYER_ID,
@@ -870,6 +871,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     renderStandings(board, state, undefined, false); // big graph above replaces the mini one
     panel.append(board);
 
+    // The chronicle (E2): the run's story, read back as a closing saga.
+    const chron = renderChronicle(state, 10);
+    if (chron) panel.append(chron);
+
     const btns = el("div", "hud-end-btns");
     btns.append(
       btn("New game", "hud-end-btn primary", () => newGameBtn.click()),
@@ -1081,6 +1086,9 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       closeStandings();
     });
     panel.append(body);
+    // The chronicle so far (E2): the run's story, readable mid-game.
+    const chron = renderChronicle(lastState);
+    if (chron) panel.append(chron);
     standingsOverlay.append(panel);
   }
   function openStandings(): void {
@@ -3383,6 +3391,34 @@ function summaryItems(summary: TurnSummary): Array<[string, string]> {
   return items;
 }
 
+/**
+ * The chronicle as a list of dated story beats (E2). Returns null when empty.
+ * `limit` caps how many of the most recent beats to show (0 = all), with a note
+ * counting the earlier ones.
+ */
+function renderChronicle(state: GameState, limit = 0): HTMLElement | null {
+  const entries = state.chronicle ?? [];
+  if (entries.length === 0) return null;
+  const box = el("div", "hud-chronicle");
+  box.append(heading("Chronicle"));
+  if (limit > 0 && entries.length > limit) {
+    box.append(line(`…and ${entries.length - limit} earlier beats.`, "hud-hint"));
+  }
+  const list = el("div", "hud-chronicle-list");
+  const shown = limit > 0 ? entries.slice(-limit) : entries;
+  for (const e of shown) {
+    const row = el("div", `hud-chronicle-row kind-${e.kind}`);
+    const t = el("span", "hud-chronicle-turn");
+    t.textContent = `T${e.turn}`;
+    const txt = el("span", "hud-chronicle-text");
+    txt.textContent = e.text;
+    row.append(t, txt);
+    list.append(row);
+  }
+  box.append(list);
+  return box;
+}
+
 /** Render the "last turn" summary of strategic changes, or hide it. */
 function renderSummary(box: HTMLElement, summary: TurnSummary | null): void {
   if (!summary) {
@@ -3439,7 +3475,8 @@ function renderDiplomacy(
     const head = el("div", "hud-diplo-head");
     const sw = nationMark(rival);
     const nm = el("span", "hud-diplo-name");
-    nm.textContent = rival.name;
+    // Speak as the ruler (E1): "Visvaldis the Cruel · Lithuania".
+    nm.textContent = rival.ruler ? `${rulerTitle(rival.ruler)} · ${rival.name}` : rival.name;
     const arch = el("span", "hud-diplo-arch");
     const archLabel = rival.personality ? ARCHETYPE_LABEL[rival.personality.archetype] : "";
     const traitLabel = rival.trait ? TRAITS[rival.trait].label : "";
