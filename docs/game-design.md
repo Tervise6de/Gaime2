@@ -885,22 +885,31 @@ from. Every one must land as a playable, testable, deterministic slice.
    *units* that fight over sea lanes, or an abstract "naval control" of lanes? Does
    losing a lane cut trade/reinforcement? Is there a naval-power victory or just
    leverage? Biggest scope of the queue; the setting rewards it most.
-2. **Army stacking / combined battles** (§9.2, still-open). When several friendly
+2. **Characters & dynasty — the X-factor (advisor review, 2026-07-18).** The
+   design's stated dream mix (AoE2 + CK3 + Civ5) is missing the CK3 ingredient
+   entirely: *people*. Proposal, in leverage order: named AI rulers over the
+   existing personality AI; a chronicle/story log; governors with traits as
+   modifiers on the existing yields/unrest maths; generals; named pretender
+   revolts; ruler mortality + succession as a second anti-snowball beat. All
+   deterministic data rows plugging into systems that already exist — stories
+   from numbers, per the pillars. Itemised as section E of `TODO.md`; the first
+   two slices (named rulers, chronicle) are cheap enough to land ahead of naval.
+3. **Army stacking / combined battles** (§9.2, still-open). When several friendly
    armies sit adjacent to one fight, do they combine into a single battle, or stay
    one-army-per-engagement as now? Changes how the map's front lines feel. Medium.
-3. **Culture axis** (§9.6, still-open). A cultural identity *distinct from faith*:
+4. **Culture axis** (§9.6, still-open). A cultural identity *distinct from faith*:
    assimilation of conquered provinces, cultural unrest on mismatched rule, and maybe
    a culture victory. The setting's German/Baltic/Rus/Norse frictions are begging for
    it. Medium–large; pairs naturally with faith.
-4. **Religion blocs / coalitions** (§9.6, still-open). Shared-faith realms cooperating
+5. **Religion blocs / coalitions** (§9.6, still-open). Shared-faith realms cooperating
    — crusader coalitions, joint wars, a bloc's combined victory pressure. The Crusades
    were coalitions; this makes faith a *diplomatic* force, not just a per-realm race.
    Medium.
-5. **Vassalage / deeper diplomacy** (§9.1, beyond casus belli). Tributaries, vassal
+6. **Vassalage / deeper diplomacy** (§9.1, beyond casus belli). Tributaries, vassal
    states, defensive pacts with teeth, an alliance/diplomatic victory. Casus belli
    already ships (v0.27); this is the layer above it. Medium.
-6. **Event chains / branching questlines** (§2 non-goal today). Events are single-beat;
+7. **Event chains / branching questlines** (§2 non-goal today). Events are single-beat;
    this would add multi-step storylines with consequences that carry across turns.
    Content-heavy, low mechanical risk — a texture play, not a systems play.
-7. **Espionage** (§2 non-goal). Spies, sabotage, stolen tech, intel on rivals. Largest
+8. **Espionage** (§2 non-goal). Spies, sabotage, stolen tech, intel on rivals. Largest
    new-system scope and the least certain fit; parked at the back deliberately.

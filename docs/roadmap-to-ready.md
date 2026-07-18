@@ -1,5 +1,10 @@
 # Roadmap to ready — testing-ready (75) → market-ready (100)
 
+> **Index:** the consolidated backlog across *all* docs (this roadmap, the
+> design queue, the Steam checklist, in-flight branches, and the advisor's
+> X-factor items) lives in [`TODO.md`](TODO.md). This file keeps the detailed
+> Phase A–D specs.
+
 **Where we are (assessment, 2026-07-14):** the *game systems* are essentially
 complete and well-tested (~336 tests, deterministic, deep AI, three balanced
 victory paths, diplomacy incl. trade, save/load, Voronoi renderer, 1–5 rivals,
