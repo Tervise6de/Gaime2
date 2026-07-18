@@ -64,6 +64,13 @@ export function deserializeGame(json: string): GameState | null {
     // pre-setting save, which was always the standard length — back-fill it so
     // old saves load and resolve exactly as before. (An explicit null = endless.)
     if (s.turnLimit === undefined) s.turnLimit = TURN_LIMIT;
+    // The merchant layer (trade routes + Kontore) arrived after some saves: a
+    // pre-trade save has no routes/Kontore, which loads as "no trade yet" — the
+    // route sim (stepTrade) is a no-op on empty routes, so it resolves exactly as
+    // before. Back-fill so the optional fields are always present.
+    if (s.routes === undefined) s.routes = [];
+    if (s.nextRouteId === undefined) s.nextRouteId = 0;
+    if (s.kontore === undefined) s.kontore = [];
     // Forward-migrate army unit records: a save from before a unit type existed
     // lacks that key, which would read as `undefined` (→ NaN) in armySize/combat.
     // Backfill every unit slot to 0 so older saves load cleanly.

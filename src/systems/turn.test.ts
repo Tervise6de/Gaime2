@@ -15,6 +15,7 @@ import {
   applyTradeIncome,
 } from "@/systems/turn";
 import { nationalProduction } from "@/systems/economy";
+import { routeIncome } from "@/systems/trade";
 import { factionByName } from "@/data/factions";
 import { totalUpkeep } from "@/systems/military";
 import { establishTrade, tradeIncome } from "@/systems/diplomacy";
@@ -35,6 +36,7 @@ import {
   type GameState,
   type Region,
   type Army,
+  type TradeRoute,
 } from "@/systems/state";
 
 describe("createGame", () => {
@@ -125,6 +127,36 @@ describe("createGame", () => {
       expect(capital!.ownerId).toBe(n.id);
       expect(capital!.fortification).toBe(1);
     }
+  });
+});
+
+describe("trade layer (goods → Kontore)", () => {
+  it("createGame opens the four Kontore and an empty route registry", () => {
+    const g = createGame({ seed: 1 });
+    expect(g.routes).toEqual([]);
+    expect(g.nextRouteId).toBe(0);
+    expect(g.kontore).toHaveLength(4);
+    expect(g.kontore!.every((k) => k.open)).toBe(true);
+  });
+
+  it("resolveTurn runs stepTrade — a live route credits its income on top of production", () => {
+    const g = setTaxRate(createGame({ seed: 5, rivals: 0 }), 0);
+    const pRegion = g.regions.find((r) => r.ownerId === PLAYER_ID)!;
+    // Inject a route to the London Kontor (host region 0). With no rivals there is
+    // no war, so the route is undisrupted and pays each turn.
+    const route: TradeRoute = {
+      id: 0, ownerId: PLAYER_ID, good: "iron", fromRegionId: pRegion.id, toKontorId: "london", lane: [pRegion.id, 0],
+    };
+    const income = routeIncome(g, route);
+    expect(income).toBeGreaterThan(0);
+    const withRoute: GameState = { ...g, routes: [route], nextRouteId: 1 };
+    // Same seed/flow either way; the only difference is the injected route, so the
+    // gold delta after one turn is exactly the route income.
+    const base = resolveTurn(g);
+    const traded = resolveTurn(withRoute);
+    expect(traded.nations[PLAYER_ID]!.stocks.gold).toBeCloseTo(base.nations[PLAYER_ID]!.stocks.gold + income, 5);
+    expect(traded.routes![0]!.lastIncome).toBe(income);
+    expect(traded.routes![0]!.disrupted).toBe(false);
   });
 });
 

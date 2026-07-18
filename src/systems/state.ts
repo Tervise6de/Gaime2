@@ -15,6 +15,8 @@ import type { BuildingId } from "@/data/buildings";
 import type { Commander } from "@/data/commanders";
 import type { Ruler } from "@/data/rulers";
 import type { FocusId } from "@/data/focuses";
+import type { GoodId } from "@/data/goods";
+import type { KontorId } from "@/data/kontore";
 import type { ResourceYield, StrategicResource, TerrainId } from "@/data/terrain";
 import { UNIT_TYPES, type UnitType } from "@/data/units";
 import type { BattleReport } from "@/systems/combat";
@@ -141,6 +143,25 @@ export const FRIENDLY_THRESHOLD = 40;
 export const TRADE_INCOME_BASE = 1;
 export const TRADE_INCOME_PER_REGION = 0.3;
 export const TRADE_INCOME_MAX = 5;
+
+/**
+ * Goods-trade tuning (the merchant layer, hansa-plan.md §6). A trade route carries
+ * one good from a region that sources it, along a lane of regions, to a Kontor that
+ * demands it — turning the good into gold each turn (systems/trade.ts `stepTrade`).
+ * This sits BESIDE the four-resource economy: goods never touch `regionProduction`,
+ * they only add gold on arrival, so the core economy and its tests are untouched.
+ *
+ * A route's income scales with the good's value and the lane it runs: reaching a
+ * distant Kontor pays a premium (`+DIST_COEF` per lane node beyond the first),
+ * capped at `DIST_CAP` so a cross-world lane doesn't pay without bound. Scarcity
+ * and monopoly premiums are stubbed at 1 for this slice (systems/trade.ts).
+ */
+/** Gold multiplier added to a route per lane node beyond the first (distance premium). */
+export const TRADE_DIST_COEF = 0.15;
+/** Ceiling on a route's distance multiplier. */
+export const TRADE_DIST_CAP = 2.5;
+/** How many trade routes one nation may run at once. */
+export const MAX_ROUTES_PER_NATION = 6;
 
 /**
  * Tech / victory / events tuning (M5, docs/game-design.md §3.6, §6).
@@ -294,6 +315,44 @@ export interface Army {
   commander?: Commander;
 }
 
+/**
+ * A standing trade route (the merchant layer): one nation ships one good from a
+ * region it holds, along a fixed lane of regions, to a Kontor that demands it —
+ * turning the good into gold each turn (systems/trade.ts `stepTrade`). Mirrors the
+ * armies / nextArmyId id-registry pattern. Serialisable data only.
+ */
+export interface TradeRoute {
+  id: number;
+  ownerId: number;
+  /** The good carried (data/goods.ts). */
+  good: GoodId;
+  /** The producing region the route ships from (held by `ownerId`). */
+  fromRegionId: number;
+  /** The demanding Kontor the route delivers to (data/kontore.ts). */
+  toKontorId: KontorId;
+  /** Region ids the route runs over, producer → Kontor host (BFS shortest path). */
+  lane: number[];
+  /** Gold the route paid last turn (0 while disrupted). Undefined until first resolved. */
+  lastIncome?: number;
+  /** Set when war on the lane or at the host severed the route last turn (paid 0). */
+  disrupted?: boolean;
+}
+
+/**
+ * The live state of a Kontor (the merchant network): who holds it and whether it
+ * trades. Seeded open for all four Kontore at game start (systems/trade.ts
+ * `seedKontore`), mirroring how faith is seeded. Serialisable data only.
+ */
+export interface KontorState {
+  id: KontorId;
+  /** Nation holding the Kontor's host region, or null if unheld / off this map. */
+  holderId: number | null;
+  /** Whether the Kontor is currently open for trade. */
+  open: boolean;
+  /** Turn the Kontor's current holder took it (or the game began). */
+  sinceTurn?: number;
+}
+
 export interface ResourceStocks {
   gold: number;
   food: number;
@@ -427,6 +486,19 @@ export interface GameState {
   armies: Army[];
   /** Monotonic id source for new armies. */
   nextArmyId: number;
+  /**
+   * Standing trade routes (the merchant layer) — each carries a good to a Kontor
+   * for gold each turn (systems/trade.ts). Mirrors armies / nextArmyId. Optional
+   * so legacy saves load as "no routes" (back-filled to [] on deserialize).
+   */
+  routes?: TradeRoute[];
+  /** Monotonic id source for new trade routes. Optional (legacy saves back-fill 0). */
+  nextRouteId?: number;
+  /**
+   * The Kontore's live state (holder + open), seeded at game start (`seedKontore`).
+   * Optional so legacy saves load (back-filled to [] on deserialize).
+   */
+  kontore?: KontorState[];
   /** Pairwise relations, keyed by pairKey(a,b): −100..+100. */
   relations: Record<string, number>;
   /**

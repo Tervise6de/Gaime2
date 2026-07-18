@@ -110,4 +110,16 @@ export {
 
 export { runNationTurn } from "@/systems/ai";
 
+export {
+  regionSources,
+  regionGoodOutput,
+  laneFor,
+  createRoute,
+  distanceFactor,
+  routeIncome,
+  routeDisrupted,
+  stepTrade,
+  seedKontore,
+} from "@/systems/trade";
+
 export * from "@/systems/state";
