@@ -47,22 +47,28 @@ recipe, then delete/retire the branches and `next-3-developments.md`.
 - ⬜ B3. Options panel (volume, colourblind, reduce-motion, map default)
 - ⬜ B4. Accessibility: colourblind-safe palette, keyboard nav, ARIA, focus
 - ⬜ B5. Visual juice: battle flash/shake, capture ripple, count tweening
-- ⬜ B6. Responsive/touch layout
+- ✅ B6. Responsive/touch layout (pointer tap/drag/pinch already shipped; the
+  map-lens strip now docks out of the corner panels' way below 1100px — v0.54)
 
 ## C. Depth & meta (specs: `roadmap-to-ready.md` Phase C)
 
 - ⬜ C1. Meta-progression: per-profile stats + achievements screen
-- ⬜ C2. Content depth: more techs/buildings/units/events, probe-balanced
+- ✅ C2. Content depth: strategic-resource works (Bloomery/Stable via a new
+  requiresResource gate) + 3 events (hard_winter, ship_launch, royal_wedding);
+  probe balance-neutral (v0.53)
 - ⬜ C3. Scenario/challenge starts (preset seeds + goals in new-game panel)
-- ⬜ C4. Diplomacy/AI depth II: treaty-breaking with reputation cost
+- ✅ C4. Diplomacy/AI depth II: treaty-breaking with reputation cost — NAP/
+  alliance betrayal, self-punished via a broad reputation hit (v0.52)
 
 ## D. Market polish (specs: `roadmap-to-ready.md` Phase D)
 
 - ⬜ D1. **[RESOURCE]** Art direction / real visual identity
 - ⬜ D2. **[RESOURCE]** Human playtesting + rebalance
 - ⬜ D3. **[RESOURCE]** Store/marketing: trailer, packaging (see §F)
-- ⬜ D4. Performance profiling at largest configs
-- ⬜ D5. Localisation scaffolding (extract UI strings)
+- ✅ D4. Performance profiling at largest configs (harness `systems/profile.ts`;
+  ~1.3 ms/turn, AI-dominant, no superlinear growth — no optimisation warranted, v0.56)
+- ✅ D5. Localisation scaffolding (`ui/i18n.ts` catalogue + `t()`; boot screen &
+  nav rail extracted, live English/Estonian, Options language picker — v0.55)
 
 ## E. X-factor — characters & dynasty (advisor review, 2026-07-18)
 
