@@ -4,6 +4,7 @@ import {
   islandArchetype,
   islandShape,
   organicCells,
+  polygonCells,
   pointInIsland,
   ISLAND_BOUNDS,
 } from "@/systems/island";
@@ -169,6 +170,51 @@ describe("organicCells", () => {
         }
       });
     });
+  });
+});
+
+describe("polygonCells", () => {
+  /** An axis-aligned unit square, open (first vertex not repeated), from (x0,y0). */
+  const square = (x0: number, y0: number): Point[] => [
+    { x: x0, y: y0 },
+    { x: x0 + 1, y: y0 },
+    { x: x0 + 1, y: y0 + 1 },
+    { x: x0, y: y0 + 1 },
+  ];
+  /** The index of a cell's vertical segment on x = 1 (the two squares' seam). */
+  const seamAt1 = (cell: { edges: Point[][] }): number =>
+    cell.edges.findIndex((e) => e[0]!.x === 1 && e[1]!.x === 1);
+
+  it("shares a segment as mutual neighbours; outer edges stay −1", () => {
+    // Two unit squares sharing the x = 1 edge (region 1 traverses it reversed).
+    const cells = polygonCells([[square(0, 0)], [square(1, 0)]]);
+    expect(cells).toHaveLength(2);
+
+    const s0 = seamAt1(cells[0]!);
+    const s1 = seamAt1(cells[1]!);
+    expect(s0).toBeGreaterThanOrEqual(0);
+    expect(s1).toBeGreaterThanOrEqual(0);
+    // The shared segment names the other region; every other edge is coast.
+    expect(cells[0]!.neighbor[s0]).toBe(1);
+    expect(cells[1]!.neighbor[s1]).toBe(0);
+    cells[0]!.neighbor.forEach((n, k) => expect(n).toBe(k === s0 ? 1 : -1));
+    cells[1]!.neighbor.forEach((n, k) => expect(n).toBe(k === s1 ? 0 : -1));
+
+    // organicCells' invariant: poly equals the edges' start points, in order.
+    for (const cell of cells) {
+      expect(cell.poly).toEqual(cell.edges.map((e) => e[0]));
+      expect(cell.rings).toBeUndefined(); // single-ring cells carry no rings
+    }
+  });
+
+  it("keeps every ring of a multipart region, with poly staying ring 0", () => {
+    const ring0 = square(0, 0);
+    const ring1 = square(3, 3); // a detached island fragment
+    const [cell] = polygonCells([[ring0, ring1]]);
+    expect(cell!.rings).toEqual([ring0, ring1]);
+    expect(cell!.poly).toEqual(ring0); // ring 0 drives hit-test/label/terrain
+    expect(cell!.edges).toHaveLength(ring0.length);
+    expect(cell!.neighbor.every((n) => n === -1)).toBe(true); // all coast here
   });
 });
 

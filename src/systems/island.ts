@@ -335,6 +335,12 @@ export interface OrganicCell {
   edges: Point[][];
   /** Same edge labels as the source VoronoiCell (−1 = clipping bounds). */
   neighbor: number[];
+  /**
+   * Multi-part (island/archipelago) province: every ring of the region, so the
+   * renderer fills and clips all parts. `poly` stays ring 0 (hit-test, label,
+   * centroid, terrain). Absent for ordinary single-ring cells.
+   */
+  rings?: Point[][];
 }
 
 /**
@@ -399,5 +405,59 @@ export function organicCells(cells: VoronoiCell[], seed: number): OrganicCell[] 
     }
     const poly = edges.flatMap((e) => e.slice(0, -1));
     return { poly, edges, neighbor: [...cell.neighbor] };
+  });
+}
+
+/**
+ * Cells straight from authored region boundaries — no Voronoi, no midpoint
+ * displacement (a real coastline is already organic). Each region supplies one
+ * or more rings (extra rings are island/multipart fragments), open (the first
+ * vertex is not repeated). Adjacency is recovered exactly like `organicCells`
+ * caches its shared edges: every segment is keyed by its UNORDERED quantised
+ * endpoint pair (the same `qz` scheme), so a segment authored by two regions —
+ * even traversed in opposite directions — collapses to one key and each side
+ * learns the other as its neighbour. Coast/outer segments (owned by a single
+ * region) stay −1. Deterministic and pure.
+ */
+export function polygonCells(regionRings: Point[][][]): OrganicCell[] {
+  const segKey = (a: Point, b: Point): string => {
+    const ka = `${qz(a.x)},${qz(a.y)}`;
+    const kb = `${qz(b.x)},${qz(b.y)}`;
+    return ka > kb ? `${kb}|${ka}` : `${ka}|${kb}`;
+  };
+
+  // Pass 1: which region ids touch each segment key (across every ring).
+  const owners = new Map<string, number[]>();
+  regionRings.forEach((rings, id) => {
+    for (const ring of rings) {
+      const n = ring.length;
+      for (let k = 0; k < n; k++) {
+        const key = segKey(ring[k]!, ring[(k + 1) % n]!);
+        const list = owners.get(key);
+        if (list) list.push(id);
+        else owners.set(key, [id]);
+      }
+    }
+  });
+
+  // Pass 2: ring 0 becomes the cell's poly/edges/neighbor; extra rings ride
+  // along in `rings` so all island parts still fill.
+  return regionRings.map((rings, id) => {
+    const ring0 = rings[0] ?? [];
+    const n = ring0.length;
+    const edges: Point[][] = [];
+    const neighbor: number[] = [];
+    for (let k = 0; k < n; k++) {
+      const a = ring0[k]!;
+      const b = ring0[(k + 1) % n]!;
+      edges.push([a, b]);
+      const list = owners.get(segKey(a, b));
+      const other = list?.find((rid) => rid !== id);
+      neighbor.push(other ?? -1);
+    }
+    const poly = edges.flatMap((e) => e.slice(0, -1));
+    const cell: OrganicCell = { poly, edges, neighbor };
+    if (rings.length > 1) cell.rings = rings;
+    return cell;
   });
 }

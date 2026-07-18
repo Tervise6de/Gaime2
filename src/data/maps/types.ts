@@ -25,6 +25,8 @@ export interface ScriptedRegion {
   terrain: TerrainId;
   /** Strategic resource on this region (else none). */
   resource?: StrategicResource | null;
+  /** Real boundary in [0,1] game space; one or more rings (islands/multipart), open (first vertex not repeated). When every region of a scripted map has this, the renderer draws these as province cells instead of Voronoi. */
+  polygon?: Coord[][];
 }
 
 /** A historical realm that starts on the map, owning its home regions. */

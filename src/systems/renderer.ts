@@ -52,6 +52,7 @@ import {
   islandArchetype,
   islandShape,
   organicCells,
+  polygonCells,
   pointInIsland,
   ISLAND_BOUNDS,
   type IslandShape,
@@ -327,12 +328,20 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   function buildProjection(s: GameState): Projection {
     const px = organic.map((c) => c.poly.map((v) => projectXY(v.x, v.y)));
     const edgesPx = organic.map((c) => c.edges.map((e) => e.map((v) => projectXY(v.x, v.y))));
-    const paths = px.map((poly) => {
+    const addRing = (p: Path2D, ring: Point[]): void => {
+      if (ring.length < 3) return;
+      p.moveTo(ring[0]!.x, ring[0]!.y);
+      for (let i = 1; i < ring.length; i++) p.lineTo(ring[i]!.x, ring[i]!.y);
+      p.closePath();
+    };
+    const paths = organic.map((c, i) => {
       const p = new Path2D();
-      if (poly.length >= 3) {
-        p.moveTo(poly[0]!.x, poly[0]!.y);
-        for (let i = 1; i < poly.length; i++) p.lineTo(poly[i]!.x, poly[i]!.y);
-        p.closePath();
+      // A multipart province (authored islands) fills and clips all its rings;
+      // an ordinary cell is just its single projected polygon.
+      if (c.rings) {
+        for (const ring of c.rings) addRing(p, ring.map((v) => projectXY(v.x, v.y)));
+      } else {
+        addRing(p, px[i]!);
       }
       return p;
     });
@@ -380,11 +389,25 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     if (sig !== cellSig) {
       cellSig = sig;
       const sites = s.regions.map((r) => ({ x: r.x, y: r.y }));
-      cells = computeVoronoiCells(sites, ISLAND_BOUNDS);
-      organic = organicCells(cells, s.seed);
+      const smap = scriptedMap(s.mapId);
+      // Province cells: a scripted map whose every region carries a real
+      // boundary polygon draws those directly (adjacency recovered from shared
+      // segments); otherwise fall back to the Voronoi of the sites — the path
+      // that every existing map (baltic/europe/procedural) still takes.
+      if (
+        smap &&
+        smap.regions.length &&
+        smap.regions.every((r) => r.polygon && r.polygon.length)
+      ) {
+        const toRing = (r: [number, number][]): Point[] => r.map((v) => ({ x: v[0], y: v[1] }));
+        organic = polygonCells(smap.regions.map((r) => r.polygon!.map(toRing)));
+        cells = [];
+      } else {
+        cells = computeVoronoiCells(sites, ISLAND_BOUNDS);
+        organic = organicCells(cells, s.seed);
+      }
       // Scripted maps supply their own coastline (real geography); procedural
       // realms generate an organic island around the sites.
-      const smap = scriptedMap(s.mapId);
       if (smap) {
         archetype = "large"; // tight framing — the authored land fills [0,1]
         // A context map insets the play area so the outer-world land shows as
