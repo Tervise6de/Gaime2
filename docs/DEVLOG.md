@@ -6,6 +6,25 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-18 — Stress / bug-bash harness (roadmap A4)
+
+A permanent self-play regression net now that the army/character stack is
+feature-complete. `src/systems/stress.test.ts` plays a matrix of full games —
+6 configs (procedural small/large/hard/easy + scripted Baltic & Europe) × several
+seeds, with the AI driving *every* nation including the player — to their verdict
+or the turn cap, checking a set of hard invariants after **every turn**: finite
+stocks, unrest ∈ [0, 100], integer non-negative unit counts, no orphaned/empty
+armies, valid region owners, commander loyalty ∈ [0, 100], a valid rngState, and
+well-formed chronicle entries. It also asserts **determinism** (same seed+config →
+byte-identical game) and **termination**, plus a **coverage guard** proving the
+matrix actually drives conflict (wars, revolts/betrayals, decisive games).
+
+Result: **no invariant violations across ~42 full games** — the whole interacting
+stack (combined battles, allied rally, ZoC, entrenchment, commanders, defection,
+reconquest, revolts, chronicle) holds up under long-run self-play. 595 tests green.
+
+---
+
 ## 2026-07-18 — E1 + E2: named rulers & the chronicle (v0.50.0)
 
 The X-factor layer — turning an anonymous colour on the map into someone with a
