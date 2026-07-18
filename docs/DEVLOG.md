@@ -6,6 +6,38 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-18 — C2: content depth — resource works + more events (v0.53.0)
+
+Roadmap C2: a few more carefully-balanced techs / buildings / events, each adding
+a *decision*, biased to help the materials/military path the DEVLOG flagged as weak.
+
+**Strategic-resource works (a new territorial decision).** A building may now gate
+on a region's **strategic resource** (`BuildingDef.requiresResource`, the mirror of
+`requiresTerrain`; shared gate `buildingResourceOk` wired into the sim's build
+validity, the build menu, the advisor and the AI). Two works use it:
+- **Bloomery** (Metallurgy, iron country): +5 materials — forge your iron into arms.
+- **Stable** (Husbandry, horse country): +2 materials, +2 gold, +2 pop.
+Both are gated on the same resource that gates a *premium unit*, so an iron/horse
+province is now worth **developing**, not just mustering from — deepening "specific
+territory worth fighting for" (design §3.2). Both pay in materials, aiding the
+military/expansion path without swelling gold. Two new techs carry them —
+**Husbandry** (economy, era 1) and **Metallurgy** (military, era 2).
+
+**Three new events.** `hard_winter` (a Baltic seasonal setback — food + unrest),
+`ship_launch` (a coastal windfall — a merchant fleet's coin and catch), and the
+decision **`royal_wedding`**: a dowry warms your *friendliest* neighbour and seals a
+NAP — the mirror of `envoy_exchange` (which mends your worst relation), and a neat
+tie to C4 (a pact a faithless realm might one day break).
+
+**Balance (probe: 36 all-AI games).** Victory spread and pacing unchanged (median
+still 220 all-AI; a touch more conquest — elimination 9→12 — exactly the nudge the
+military path wanted). The new works are reachable and used: the AI raised a Stable
+in 81% of games, a Bloomery in 67%. No archetype or path dominates.
+
+610 tests green (+4), typecheck + build clean.
+
+---
+
 ## 2026-07-18 — C4: treaty-breaking with a reputation cost (v0.52.0)
 
 Diplomacy/AI depth II (roadmap C4): a NAP or an alliance is now a *given word*

@@ -30,6 +30,7 @@ export type TechId =
   | "irrigation"
   | "banking"
   | "horseback"
+  | "husbandry"
   | "masonry"
   | "mathematics"
   | "civil_service"
@@ -37,6 +38,7 @@ export type TechId =
   | "scholasticism"
   // Age of Crowns (era 2)
   | "engineering"
+  | "metallurgy"
   | "economics"
   | "philosophy"
   | "feudalism"
@@ -117,6 +119,11 @@ export const TECHS: Record<TechId, TechDef> = {
     id: "horseback", name: "Horseback Riding", branch: "military", tier: 1, era: 1, cost: 34,
     requires: ["bronze_working"], unlockUnit: "cavalry", blurb: "Unlock Cavalry (needs horses).",
   },
+  husbandry: {
+    id: "husbandry", name: "Husbandry", branch: "economy", tier: 1, era: 1, cost: 32,
+    requires: ["agriculture"], yieldMult: { food: 0.1 }, unlockBuilding: "stable",
+    blurb: "+10% food; unlocks the Stable — develop your horse country (materials + gold).",
+  },
   masonry: {
     id: "masonry", name: "Masonry", branch: "military", tier: 1, era: 1, cost: 30,
     requires: ["bronze_working"], unrestReduction: 4, unlockBuilding: "mine",
@@ -145,6 +152,11 @@ export const TECHS: Record<TechId, TechDef> = {
     id: "engineering", name: "Engineering", branch: "military", tier: 2, era: 2, cost: 52,
     requires: ["masonry", "mathematics"], unlockUnit: "siege", unlockBuilding: "fortress",
     blurb: "Unlock Siege (needs iron) and the Fortress.",
+  },
+  metallurgy: {
+    id: "metallurgy", name: "Metallurgy", branch: "military", tier: 2, era: 2, cost: 50,
+    requires: ["masonry"], yieldMult: { materials: 0.1 }, unlockBuilding: "bloomery",
+    blurb: "+10% materials; unlocks the Bloomery — forge your iron country into arms.",
   },
   economics: {
     id: "economics", name: "Economics", branch: "economy", tier: 2, era: 2, cost: 54,

@@ -55,6 +55,13 @@ describe("unlocks", () => {
     expect(isBuildingUnlockedFor([], "wonder")).toBe(false);
     expect(isBuildingUnlockedFor(["architecture"], "wonder")).toBe(true);
   });
+
+  it("gates the new resource works behind their techs (C2)", () => {
+    expect(isBuildingUnlockedFor([], "stable")).toBe(false);
+    expect(isBuildingUnlockedFor(["husbandry"], "stable")).toBe(true);
+    expect(isBuildingUnlockedFor([], "bloomery")).toBe(false);
+    expect(isBuildingUnlockedFor(["metallurgy"], "bloomery")).toBe(true);
+  });
 });
 
 describe("researchFrontier", () => {

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { fireEvent, resolveChoice } from "@/systems/events";
 import { createGame } from "@/systems/turn";
 import { createRng } from "@/systems/rng";
-import { getRelation } from "@/systems/diplomacy";
+import { getRelation, getTreaty } from "@/systems/diplomacy";
 import { PLAYER_ID, BARBARIAN_ID, RESEARCH_SURGE_TURNS, pairKey, type GameState } from "@/systems/state";
 
 const relationBetween = (s: GameState, a: number, b: number): number => getRelation(s, a, b);
@@ -223,6 +223,28 @@ describe("choice events", () => {
     expect(aided.nations[PLAYER_ID]!.stocks.food).toBe(food0 - 12);
     const mine = aided.regions.filter((r) => r.ownerId === PLAYER_ID);
     expect(mine.every((r) => r.unrest === 14)).toBe(true);
+  });
+
+  it("a royal wedding weds the friendliest court: dowry, warmth and a NAP (C2)", () => {
+    const s = pendingChoiceState("royal_wedding");
+    const gold0 = s.nations[PLAYER_ID]!.stocks.gold;
+    expect(gold0).toBeGreaterThanOrEqual(15);
+    const wed = resolveChoice(s, "wed");
+    expect(wed.pendingChoice).toBeUndefined();
+    expect(wed.nations[PLAYER_ID]!.stocks.gold).toBe(gold0 - 15);
+    // A neighbouring court is now bound by pact and warmer than before.
+    const rivals = wed.nations.filter((n) => !n.isPlayer && !n.isBarbarian);
+    const nap = rivals.find((r) => getTreaty(wed, PLAYER_ID, r.id) === "nap");
+    expect(nap).toBeDefined();
+    expect(getRelation(wed, PLAYER_ID, nap!.id)).toBeGreaterThan(0);
+  });
+
+  it("declining a royal wedding keeps the dowry and signs nothing (C2)", () => {
+    const s = pendingChoiceState("royal_wedding");
+    const gold0 = s.nations[PLAYER_ID]!.stocks.gold;
+    const declined = resolveChoice(s, "decline");
+    expect(declined.pendingChoice).toBeUndefined();
+    expect(declined.nations[PLAYER_ID]!.stocks.gold).toBe(gold0);
   });
 
   it("call-the-banners only fires for a Martial nation", () => {

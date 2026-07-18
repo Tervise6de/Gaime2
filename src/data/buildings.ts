@@ -14,7 +14,7 @@
  * Numbers are illustrative starting values for tuning.
  */
 
-import type { ResourceYield, TerrainId } from "@/data/terrain";
+import type { ResourceYield, StrategicResource, TerrainId } from "@/data/terrain";
 import type { TechId } from "@/data/techs";
 import type { FocusId } from "@/data/focuses";
 
@@ -41,6 +41,9 @@ export type BuildingId =
   | "courthouse"
   | "printing_house"
   | "cathedral"
+  // Strategic-resource works — each needs the matching resource on the region.
+  | "stable"
+  | "bloomery"
   // Focus capstones — each needs the matching region focus (see requiresFocus).
   | "manor"
   | "charter_fair"
@@ -71,6 +74,13 @@ export interface BuildingDef {
   requiresTech?: TechId;
   /** Terrain the region must have — hidden entirely elsewhere (not just locked). */
   requiresTerrain?: TerrainId;
+  /**
+   * Strategic resource the region must hold (iron / horses) — a works that
+   * *exploits* that resource, so a resource province is worth developing as well
+   * as mustering from. Hidden where the region lacks the resource (design §3.2:
+   * makes specific territory worth fighting for). Gate mirrors `requiresTerrain`.
+   */
+  requiresResource?: StrategicResource;
   /**
    * Region focus the province must be set to — a *focus capstone*, the payoff
    * for committing a region to a specialisation. Only offered where the region's
@@ -308,6 +318,35 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     blurb: "+2 knowledge, +1 gold, -10 unrest, and projects your faith far — a seat of faith. (Theology)",
   },
 
+  // --- Strategic-resource works ----------------------------------------------
+  // Each exploits the resource that already gates a premium unit, so holding
+  // iron/horse land is worth *developing*, not just mustering from — deepening the
+  // "specific territory worth fighting for" decision (design §3.2). Both pay in
+  // materials (production → armies & works), so they aid the military/expansion
+  // path without swelling gold.
+  stable: {
+    id: "stable",
+    name: "Stable",
+    cost: 20,
+    yield: { materials: 2, gold: 2 },
+    popCapacity: 2,
+    unrest: 0,
+    requiresTech: "husbandry",
+    requiresResource: "horses",
+    blurb: "+2 materials, +2 gold, +2 population. Horse country only. (Husbandry)",
+  },
+  bloomery: {
+    id: "bloomery",
+    name: "Bloomery",
+    cost: 24,
+    yield: { materials: 5 },
+    popCapacity: 0,
+    unrest: 0,
+    requiresTech: "metallurgy",
+    requiresResource: "iron",
+    blurb: "+5 materials — ironworks that forge the realm's arms. Iron country only. (Metallurgy)",
+  },
+
   // --- Focus capstones -------------------------------------------------------
   // Each needs BOTH the matching region focus and an Age-of-Crowns tech — the
   // reward for committing a province to a specialisation and researching into it.
@@ -384,6 +423,20 @@ export function buildingFocusOk(regionFocus: FocusId | undefined, building: Buil
 /** The focus-capstone building a given focus unlocks, if any (for hints / AI). */
 export function focusCapstone(focus: FocusId): BuildingId | undefined {
   return BUILDING_IDS.find((b) => BUILDINGS[b].requiresFocus === focus);
+}
+
+/**
+ * Whether a region's strategic resource permits this building. A building with no
+ * `requiresResource` builds anywhere; a resource works only where the region holds
+ * that resource. Pure — the shared gate (mirrors `buildingFocusOk`) used by the
+ * sim, build menu, advisor and AI.
+ */
+export function buildingResourceOk(
+  regionResource: StrategicResource | null | undefined,
+  building: BuildingId,
+): boolean {
+  const req = BUILDINGS[building].requiresResource;
+  return !req || req === regionResource;
 }
 
 /** Materials invested into a region's queued building each turn (if funded). */

@@ -847,6 +847,19 @@ rides through save/load as an optional field. **§9.4 is now complete.**
   faces (Knights over Cavalry vs shot, Swordsmen over Infantry vs levy), gated by
   `canRaiseUnit` at the muster. **§9.5 is now complete.**
 
+**Content depth — SHIPPED (v0.53, roadmap C2).** A few more decision-bearing
+tables, biased to help the materials/military path. A building may now gate on a
+region's **strategic resource** (`requiresResource`, the mirror of `requiresTerrain`;
+shared gate `buildingResourceOk`): the **Bloomery** (Metallurgy, iron: +5 materials)
+and **Stable** (Husbandry, horses: +materials/gold/pop) let you *develop* a
+resource province, not just muster its premium unit — so iron/horse land is doubly
+worth holding (design §3.2). Two techs carry them (Husbandry era 1 economy,
+Metallurgy era 2 military → 32 techs). Three events join the pool: `hard_winter`
+(seasonal setback), `ship_launch` (coastal windfall) and the decision `royal_wedding`
+(a dowry seals a NAP with your friendliest neighbour — mirror of the envoy, and a
+pact C4 lets a schemer later break). Probed balance-neutral (a touch more conquest);
+the AI builds the works in most games.
+
 ### 9.6 Victory types — SHIPPED v2 (v0.26, faith v0.33)
 The paths (Domination / Great Works / **Faith** / Prestige) are a **legible race**.
 `victoryRaces()` (pure, in `systems/victory.ts`) reports, per path, *your* standing

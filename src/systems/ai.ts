@@ -16,9 +16,9 @@
  */
 
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
-import { BUILDINGS, buildingFocusOk, focusCapstone, type BuildingId } from "@/data/buildings";
+import { BUILDINGS, buildingFocusOk, buildingResourceOk, focusCapstone, type BuildingId } from "@/data/buildings";
 import type { TraitId } from "@/data/traits";
-import { TERRAIN, type TerrainId } from "@/data/terrain";
+import { TERRAIN, type StrategicResource, type TerrainId } from "@/data/terrain";
 import type { FocusId } from "@/data/focuses";
 import { sideStrength, type UnitCounts } from "@/systems/combat";
 import {
@@ -234,9 +234,12 @@ function pickTech(done: TechId[], nation: Nation, era: number): TechId | null {
   return pool.reduce((best, t) => (TECHS[t].cost < TECHS[best].cost ? t : best), pool[0]!);
 }
 
-/** Base build order when a nation's trait expresses no preference. */
+/** Base build order when a nation's trait expresses no preference. The
+    resource works (bloomery/stable) sit early — they only pass `fits` on a
+    region that actually holds the resource, so they are cheap to keep near the
+    front and get raised wherever they apply. */
 const BASE_BUILD_ORDER: BuildingId[] = [
-  "market", "harbor", "bank", "guildhall", "workshop", "mine", "university", "forum", "farm", "aqueduct", "library", "temple", "monastery", "cathedral", "fortress",
+  "bloomery", "stable", "market", "harbor", "bank", "guildhall", "workshop", "mine", "university", "forum", "farm", "aqueduct", "library", "temple", "monastery", "cathedral", "fortress",
 ];
 
 /** Buildings a trait rushes first, so rivals open along their strength. A
@@ -251,7 +254,7 @@ const TRAIT_BUILD_PRIORITY: Record<TraitId, BuildingId[]> = {
 };
 
 export function chooseBuilding(
-  region: { unrest: number; buildings: BuildingId[]; terrain: TerrainId; focus?: FocusId },
+  region: { unrest: number; buildings: BuildingId[]; terrain: TerrainId; focus?: FocusId; resource?: StrategicResource | null },
   done: TechId[],
   wonders: number,
   canStartWonder: boolean,
@@ -262,6 +265,7 @@ export function chooseBuilding(
   const fits = (b: BuildingId) => {
     const t = BUILDINGS[b].requiresTerrain;
     if (t && region.terrain !== t) return false;
+    if (!buildingResourceOk(region.resource, b)) return false;
     return buildingFocusOk(region.focus, b);
   };
   if (region.unrest > 35 && !has("temple")) return "temple";

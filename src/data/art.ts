@@ -291,6 +291,14 @@ export const BUILDING_ART: Record<BuildingId, string | null> = {
   cathedral: ico(
     '<path d="M3.9 8.6L12 3.9l8.1 4.7z"/><path d="M5.8 8.6v7.6M12 8.6v7.6M18.2 8.6v7.6"/><path d="M4.4 16.2h15.2M3.2 19.5h17.6"/><path d="M12 2v3M10.6 3.3h2.8"/>',
   ),
+  // Stable — a barn for horse country (reuses the farm barn read).
+  stable: ico(
+    '<path d="M4.5 19.5v-8.5L12 5.3l7.5 5.7v8.5z"/><path d="M9.8 19.5v-5.3h4.4v5.3"/><path d="M3.4 19.5h17.2"/>',
+  ),
+  // Bloomery — a smelting-furnace arch (reuses the mine/furnace read).
+  bloomery: ico(
+    '<path d="M4.2 19.5v-6.1a7.8 7.8 0 0115.6 0v6.1"/><path d="M9.3 19.5v-4a2.7 2.7 0 015.4 0v4"/><path d="M3 19.5h18"/>',
+  ),
   // Manor hall (reuses the guildhall read).
   manor: ico(
     '<path d="M4.9 19.5V9.2L12 4.6l7.1 4.6v10.3z"/><path d="M12 10.3l2.7 1v2c0 1.8-1.1 3.1-2.7 3.6-1.6-.5-2.7-1.8-2.7-3.6v-2z"/><path d="M3.4 19.5h17.2"/>',
@@ -508,6 +516,7 @@ const EVENT_THEME: Record<string, keyof typeof EVENT_VIGNETTE> = {
   wandering_scholars: "scholars",
   expedition: "scholars",
   envoy_exchange: "scholars",
+  royal_wedding: "festival",
   // Trait-decision events (events.ts trait-choice block).
   call_the_banners: "war",
   forbidden_lore: "scholars",

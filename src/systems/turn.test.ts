@@ -335,6 +335,22 @@ describe("construction", () => {
     expect(canQueueBuilding(flat, "mine", ["masonry"])).toBe(false);
   });
 
+  it("canQueueBuilding needs BOTH the resource and the tech for the resource works (C2)", () => {
+    const g = createGame({ seed: 1 });
+    const owned = g.regions[ownedId(g)]!;
+    const ironLand = { ...owned, resource: "iron" as const };
+    const horseLand = { ...owned, resource: "horses" as const };
+    const barren = { ...owned, resource: null };
+    // Bloomery needs iron on the region AND Metallurgy.
+    expect(canQueueBuilding(ironLand, "bloomery", ["metallurgy"])).toBe(true);
+    expect(canQueueBuilding(ironLand, "bloomery", [])).toBe(false); // no tech
+    expect(canQueueBuilding(barren, "bloomery", ["metallurgy"])).toBe(false); // no iron
+    expect(canQueueBuilding(horseLand, "bloomery", ["metallurgy"])).toBe(false); // wrong resource
+    // Stable needs horses on the region AND Husbandry.
+    expect(canQueueBuilding(horseLand, "stable", ["husbandry"])).toBe(true);
+    expect(canQueueBuilding(ironLand, "stable", ["husbandry"])).toBe(false); // wrong resource
+  });
+
   it("queueBuilding refuses a terrain-bound building off its terrain", () => {
     const g = createGame({ seed: 1 });
     const id = ownedId(g);

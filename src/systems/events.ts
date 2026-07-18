@@ -22,7 +22,7 @@ import {
   type ModifierId,
   type Region,
 } from "@/systems/state";
-import { atWar, adjustRelation, getRelation } from "@/systems/diplomacy";
+import { atWar, adjustRelation, getRelation, getTreaty, setPact } from "@/systems/diplomacy";
 import { round1 } from "@/systems/economy";
 import type { TraitId } from "@/data/traits";
 
@@ -175,6 +175,27 @@ function lowestRelationRival(state: GameState, nationId: number): number | null 
     }
   }
   return best.id;
+}
+
+/**
+ * The living rival `nationId` stands *best* with that it could seal a marriage
+ * pact to — at peace (neither at war nor already allied), highest relations, ties
+ * by lowest id. Null if there is no such court. Deterministic; for royal_wedding.
+ */
+function bestMarriageRival(state: GameState, nationId: number): number | null {
+  let best: number | null = null;
+  let bestRel = -Infinity;
+  for (const n of state.nations) {
+    if (n.isBarbarian || !n.alive || n.id === nationId) continue;
+    const t = getTreaty(state, nationId, n.id);
+    if (t === "war" || t === "alliance") continue;
+    const rel = getRelation(state, nationId, n.id);
+    if (rel > bestRel || (rel === bestRel && (best === null || n.id < best))) {
+      bestRel = rel;
+      best = n.id;
+    }
+  }
+  return best;
 }
 
 /**
@@ -414,6 +435,82 @@ const EVENTS: EventDef[] = [
         r.ownerId === nationId ? { ...r, unrest: Math.max(0, round1(r.unrest - 4)) } : r,
       );
       return { state: { ...paid, regions }, message: "A travelling fair passes through — coin and cheer in its wake." };
+    },
+  },
+  {
+    // SETBACK (Baltic): a hard northern winter — stores thin and tempers fray
+    // realm-wide. The seasonal counterweight to good_harvest / market_boom.
+    id: "hard_winter",
+    weight: 2,
+    apply: (state, nationId) => {
+      const owned = state.regions.filter((r) => r.ownerId === nationId);
+      if (!owned.length) return null;
+      const drained = addStock(state, nationId, "food", -10);
+      const floored = {
+        ...drained,
+        nations: drained.nations.map((n) =>
+          n.id === nationId ? { ...n, stocks: { ...n.stocks, food: Math.max(0, n.stocks.food) } } : n,
+        ),
+      };
+      const regions = floored.regions.map((r) =>
+        r.ownerId === nationId ? { ...r, unrest: Math.min(UNREST_MAX, round1(r.unrest + 6)) } : r,
+      );
+      return { state: { ...floored, regions }, message: "A hard winter grips the realm — stores thin and tempers fray." };
+    },
+  },
+  {
+    // WINDFALL (coastal): a merchant fleet returns to port — coin and catch. Fires
+    // only for a realm that holds a coast (the Baltic is a sea).
+    id: "ship_launch",
+    weight: 1,
+    eligible: (state, nationId) => state.regions.some((r) => r.ownerId === nationId && r.terrain === "coast"),
+    apply: (state, nationId) => {
+      let s = addStock(state, nationId, "gold", 14);
+      s = addStock(s, nationId, "food", 4, GRANARY_CAP);
+      return { state: s, message: "A merchant fleet returns to port — coin and catch fill the quays." };
+    },
+  },
+  {
+    // DECISION (diplomacy): a marriage pact — a dowry warms ties with your
+    // friendliest neighbour and seals a non-aggression pact. Complements
+    // envoy_exchange (which mends your *worst* relation); this cements your *best*
+    // into a pact — which, post-C4, a faithless realm might one day break. Offered
+    // only when a peaceful, non-allied court exists.
+    id: "royal_wedding",
+    weight: 2,
+    eligible: (state, nationId) => bestMarriageRival(state, nationId) !== null,
+    choice: {
+      prompt: "A neighbouring court proposes a royal marriage — pay a 15-gold dowry to seal the match?",
+      options: [
+        {
+          id: "wed",
+          label: "Seal the match (−15g)",
+          detail: "Spend 15 gold; +15 relations and a non-aggression pact with your friendliest neighbour.",
+          apply: (state, nationId) => {
+            const n = state.nations.find((x) => x.id === nationId);
+            if (!n || n.stocks.gold < 15) return { state, message: "The treasury cannot furnish a dowry." };
+            const target = bestMarriageRival(state, nationId);
+            if (target === null) return { state, message: "No court stands ready to wed." };
+            let s = addStock(state, nationId, "gold", -15);
+            s = adjustRelation(s, nationId, target, 15);
+            if (getTreaty(s, nationId, target) !== "nap") s = setPact(s, nationId, target, "nap");
+            const targetName = state.nations.find((x) => x.id === target)?.name ?? "a neighbour";
+            return { state: s, message: `A royal marriage binds your house to ${targetName} — kin do not war lightly.` };
+          },
+        },
+        {
+          id: "decline",
+          label: "Decline",
+          detail: "Keep the dowry; leave the match unmade.",
+          apply: (state) => ({ state, message: "You let the marriage proposal pass." }),
+        },
+      ],
+      // A funded, non-aggressive realm weds to secure a border; warlords scorn it.
+      aiPick: (state, nationId) => {
+        const n = state.nations.find((x) => x.id === nationId);
+        const aggr = n?.personality?.aggression ?? 0.4;
+        return n && n.stocks.gold >= 30 && aggr < 0.6 ? "wed" : "decline";
+      },
     },
   },
   {

@@ -12,7 +12,7 @@
  * highlighting via the parent.
  */
 
-import { BUILDINGS, BUILDING_IDS, BUILD_RATE, buildingFocusOk, focusCapstone, type BuildingId } from "@/data/buildings";
+import { BUILDINGS, BUILDING_IDS, BUILD_RATE, buildingFocusOk, buildingResourceOk, focusCapstone, type BuildingId } from "@/data/buildings";
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
 import { TERRAIN, TERRAIN_IDS } from "@/data/terrain";
 import { regionProduction, nationalProduction, nationYieldMult, yieldFactors, singleModifierMult, unrestPenalty } from "@/systems/economy";
@@ -2985,6 +2985,9 @@ function renderBuildSection(region: Region, done: TechId[], callbacks: HudCallba
     // Terrain-bound buildings (Harbor) are hidden off-terrain, not shown locked —
     // a lock invites research, but no tech makes plains into coast.
     if (def.requiresTerrain && def.requiresTerrain !== region.terrain) continue;
+    // Resource works (Stable, Bloomery) are likewise hidden where the region lacks
+    // the strategic resource — no tech puts iron under a province that has none.
+    if (!buildingResourceOk(region.resource, id)) continue;
     // Focus capstones are hidden unless the region carries the matching focus —
     // the capstone appears the moment you specialise the province (then tech-locks
     // like any other), so the menu stays uncluttered by the other four.
