@@ -698,10 +698,18 @@ round's loser always shedding ≥1 regiment so fights converge. Outcomes are
   casualties, forces, terrain/fort, outcome) which the UI replays as a modal —
   the player's own attacks pop it immediately; AI attacks on the player are
   listed in the end-turn report to open on click. Toggle in Options → Gameplay.
-- Still open (future): explicit **per-unit combat preview** (today the preview
-  is a single win-chance %), and whether multiple armies **combine** into one
-  battle vs. attack **sequentially** (current) — likely a pre-battle merge at a
-  staging region with single-battle resolution.
+- **A per-unit combat forecast — SHIPPED (v0.40).** The attack preview is no longer
+  just a win-chance %: `forecastCombat` (pure, `systems/combat.ts`) runs the *real*
+  resolver on a constant no-swing RNG to report the **expected casualties** — per
+  side and per unit type — the survivors, and the mean-case outcome. Each attack
+  row now shows a compact `~−you/−them` cost inline, and the chip / Attack-button
+  tooltip spells out the likely price ("You lose ~3 (2 Infantry, 1 Ranged); they
+  lose ~5…") and whether it's a likely capture, repulse or stalemate — so you weigh
+  the *cost*, not just the odds. Because it drives the same maths the sim uses, the
+  forecast can never drift from the real fight.
+- Still open (future): whether multiple armies **combine** into one battle vs.
+  attack **sequentially** (current) — likely a pre-battle merge at a staging region
+  with single-battle resolution.
 
 ### 9.3 Map lenses (Civ-style overlays) — SHIPPED (`ui/lenses.ts`)
 Toggleable map filters so the board is readable at a glance without clicking

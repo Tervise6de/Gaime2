@@ -6,6 +6,7 @@ import {
   combatStrengths,
   winChance,
   previewCombat,
+  forecastCombat,
 } from "@/systems/combat";
 import { createRng } from "@/systems/rng";
 import { emptyUnits, armySize } from "@/systems/state";
@@ -231,5 +232,42 @@ describe("combatStrengths & winChance (odds preview)", () => {
     expect(p.undefended).toBe(true);
     expect(p.winChance).toBe(1);
     expect(p.defense).toBe(0);
+  });
+});
+
+describe("forecastCombat", () => {
+  it("carries the same win chance as previewCombat, plus expected casualties", () => {
+    const a = units({ infantry: 6, ranged: 2 });
+    const d = units({ militia: 3, ranged: 1 });
+    const f = forecastCombat(a, d, NO_TERRAIN);
+    const p = previewCombat(a, d, NO_TERRAIN);
+    expect(f.winChance).toBe(p.winChance);
+    expect(f.attack).toBe(p.attack);
+    // Losses are per-unit, non-negative, and never exceed the starting stack.
+    for (const k of Object.keys(a) as (keyof UnitCounts)[]) {
+      expect(f.attackerLosses[k]).toBeGreaterThanOrEqual(0);
+      expect(f.attackerLosses[k]).toBeLessThanOrEqual(a[k]);
+      expect(f.defenderLosses[k]).toBeLessThanOrEqual(d[k]);
+    }
+  });
+
+  it("a lopsided attack is a likely capture that costs the defender more", () => {
+    const f = forecastCombat(units({ infantry: 12, ranged: 3 }), units({ militia: 2 }), NO_TERRAIN);
+    expect(f.likelyOutcome).toBe("captured");
+    expect(armySize(f.defenderLosses)).toBeGreaterThan(armySize(f.attackerLosses));
+    expect(armySize(f.defenderRemaining)).toBe(0); // defender wiped in the mean case
+  });
+
+  it("an undefended target: certain capture at no cost", () => {
+    const f = forecastCombat(units({ infantry: 1 }), emptyUnits(), NO_TERRAIN);
+    expect(f.undefended).toBe(true);
+    expect(f.likelyOutcome).toBe("captured");
+    expect(armySize(f.attackerLosses)).toBe(0);
+  });
+
+  it("is deterministic (mean case) — same inputs, same forecast", () => {
+    const a = units({ infantry: 4, cavalry: 1 });
+    const d = units({ ranged: 3 });
+    expect(forecastCombat(a, d, NO_TERRAIN)).toEqual(forecastCombat(a, d, NO_TERRAIN));
   });
 });

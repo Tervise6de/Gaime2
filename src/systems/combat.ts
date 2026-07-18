@@ -118,6 +118,53 @@ export function previewCombat(
   return { attack, defense, winChance: winChance(attack, defense), undefended: false };
 }
 
+/**
+ * A constant "mean" RNG (always 0.5) — the no-swing roll. Combat only draws
+ * `next()`; the rest are conformant stubs. Used to forecast the *expected* fight.
+ */
+const MEAN_RNG: Rng = {
+  next: () => 0.5,
+  range: (min, max) => min + 0.5 * (max - min),
+  int: (min, max) => Math.floor(min + 0.5 * (max - min + 1)),
+  pick: <T>(items: readonly T[]): T => items[Math.floor(0.5 * items.length)]!,
+  seed: 0,
+};
+
+export interface CombatForecast extends CombatPreview {
+  /** Expected (mean-case) casualties for each side, per unit type. */
+  attackerLosses: UnitCounts;
+  defenderLosses: UnitCounts;
+  /** Expected survivors on each side. */
+  attackerRemaining: UnitCounts;
+  defenderRemaining: UnitCounts;
+  /** The mean-case outcome (the dice landing average). */
+  likelyOutcome: BattleReport["outcome"];
+}
+
+/**
+ * A richer, still non-destructive forecast: the win chance PLUS the expected
+ * (mean-case, no-swing) casualties, survivors and outcome — so the player sees
+ * not just the odds but the likely *price* of the attack, per unit type. Pure:
+ * it runs the very resolver the sim uses, on a constant 0.5 RNG (no swing), so
+ * the forecast can never drift from the real combat maths.
+ */
+export function forecastCombat(
+  attacker: UnitCounts,
+  defender: UnitCounts,
+  ctx: CombatContext,
+): CombatForecast {
+  const preview = previewCombat(attacker, defender, ctx);
+  const result = resolveCombat(attacker, defender, ctx, MEAN_RNG);
+  return {
+    ...preview,
+    attackerLosses: result.attackerLosses,
+    defenderLosses: result.defenderLosses,
+    attackerRemaining: result.attackerRemaining,
+    defenderRemaining: result.defenderRemaining,
+    likelyOutcome: result.report.outcome,
+  };
+}
+
 /** One resolved phase of a battle (an opening volley, or a melee round). */
 export interface BattlePhase {
   kind: "volley" | "melee";

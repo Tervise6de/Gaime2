@@ -55,7 +55,7 @@ import { WAR_EDGE_COLOR } from "@/systems/renderer";
 import { regionCapacity } from "@/systems/population";
 import { popDisplay, soldiersCompact, soldiersDisplay } from "@/systems/format";
 import { buildOptions, deriveAdvice, regionCanStartBuild } from "@/ui/advisor";
-import { previewCombat } from "@/systems/combat";
+import { previewCombat, forecastCombat } from "@/systems/combat";
 import {
   armyAt,
   anyArmyAt,
@@ -2563,16 +2563,17 @@ function renderEnemyRegion(
     attackBtn.disabled = true;
     attackBtn.title = "No army of yours with moves left borders this region — march one next door first.";
   } else if (attackers.length === 1) {
-    const preview = previewCombat(attackers[0]!.units, garrison?.units ?? emptyUnits(), {
+    const preview = forecastCombat(attackers[0]!.units, garrison?.units ?? emptyUnits(), {
       terrainDefense: TERRAIN[region.terrain].defense,
       fortification: region.fortification,
     });
     const oddsText = preview.undefended ? "capture" : `${Math.round(preview.winChance * 100)}%`;
     attackBtn.innerHTML = `${glyphHtml("attack", "⚔")} Attack (${oddsText})`;
-    attackBtn.title =
-      `Strike with your ${soldiersDisplay(armySize(attackers[0]!.units))}-soldier army from ` +
-      `${state.regions[attackers[0]!.regionId]?.name ?? "next door"}` +
-      (preview.undefended ? " — undefended, walking in captures it." : ` — estimated ${oddsText} to win.`);
+    const from = state.regions[attackers[0]!.regionId]?.name ?? "next door";
+    attackBtn.title = preview.undefended
+      ? `Strike with your ${soldiersDisplay(armySize(attackers[0]!.units))}-soldier army from ${from} — undefended, walking in captures it.`
+      : `Strike with your ${soldiersDisplay(armySize(attackers[0]!.units))}-soldier army from ${from} — ${oddsText} to win.\n` +
+        `Likely cost: you ~${armySize(preview.attackerLosses)} (${lossBreakdown(preview.attackerLosses)}), them ~${armySize(preview.defenderLosses)} (${lossBreakdown(preview.defenderLosses)}).`;
     attackBtn.addEventListener("click", () => openAttack(region.id));
   } else {
     attackBtn.innerHTML = `${glyphHtml("attack", "⚔")} Attack (${attackers.length} armies)`;
@@ -2685,7 +2686,7 @@ function renderCombatOdds(state: GameState, army: Army): HTMLElement {
     }
     if (target.ownerId === PLAYER_ID) continue; // plain relocation — not listed
     const defender = state.armies.find((a) => a.regionId === nid && a.ownerId !== PLAYER_ID);
-    const preview = previewCombat(army.units, defender?.units ?? emptyUnits(), {
+    const preview = forecastCombat(army.units, defender?.units ?? emptyUnits(), {
       terrainDefense: TERRAIN[target.terrain].defense,
       fortification: target.fortification,
     });
@@ -2698,15 +2699,22 @@ function renderCombatOdds(state: GameState, army: Army): HTMLElement {
     if (preview.undefended) {
       const chip = el("span", "hud-odds-chip win");
       chip.textContent = "capture";
+      chip.title = "Undefended — your army walks in and takes it at no cost.";
       row.append(chip);
     } else {
+      const youLost = armySize(preview.attackerLosses);
+      const themLost = armySize(preview.defenderLosses);
       const detail = el("span", "hud-odds-detail");
       detail.innerHTML =
         `${glyphHtml("attack", "⚔")}${Math.round(preview.attack)} · ` +
-        `${glyphHtml("shield", "🛡")}${Math.round(preview.defense)}`;
+        `${glyphHtml("shield", "🛡")}${Math.round(preview.defense)} · ` +
+        `<span class="hud-odds-cost">~−${youLost}/−${themLost}</span>`;
       const pct = Math.round(preview.winChance * 100);
       const chip = el("span", "hud-odds-chip " + oddsClass(preview.winChance));
       chip.textContent = `${pct}%`;
+      const tip = combatForecastTip(pct, preview.likelyOutcome, preview.attackerLosses, preview.defenderLosses);
+      chip.title = tip;
+      detail.title = tip;
       row.append(detail, chip);
     }
     rows.push(row);
@@ -2725,6 +2733,32 @@ function oddsClass(chance: number): string {
   if (chance >= 0.65) return "win";
   if (chance >= 0.4) return "even";
   return "lose";
+}
+
+/** Compact per-unit casualty list for a forecast tooltip, e.g. "2 Infantry, 1 Ranged". */
+function lossBreakdown(losses: Record<UnitType, number>): string {
+  const parts: string[] = [];
+  for (const t of UNIT_TYPES) if (losses[t] > 0) parts.push(`${losses[t]} ${UNITS[t].name}`);
+  return parts.length ? parts.join(", ") : "no losses";
+}
+
+/** The mean-case outcome as a short phrase for a tooltip. */
+function outcomeWord(o: "captured" | "repelled" | "held"): string {
+  return o === "captured" ? "you capture it" : o === "repelled" ? "your army is destroyed" : "a stalemate";
+}
+
+/** The full per-unit attack forecast tooltip: odds, likely outcome, and each side's price. */
+function combatForecastTip(
+  pct: number,
+  outcome: "captured" | "repelled" | "held",
+  attackerLosses: Record<UnitType, number>,
+  defenderLosses: Record<UnitType, number>,
+): string {
+  return (
+    `${pct}% to win — likely ${outcomeWord(outcome)}.\n` +
+    `You lose ~${armySize(attackerLosses)} (${lossBreakdown(attackerLosses)}); ` +
+    `they lose ~${armySize(defenderLosses)} (${lossBreakdown(defenderLosses)}).`
+  );
 }
 
 /** Colour a victory-progress gauge: closer to a win reads more alarming. */
