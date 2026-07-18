@@ -1,9 +1,12 @@
 /**
  * Unit types and the rock-paper-scissors counter loop (docs/game-design.md §3.4).
  *
- * Five units, a 4-cycle counter loop plus siege as the fortification answer:
+ * A 4-cycle counter loop plus siege as the fortification answer:
  *   Militia → Cavalry → Ranged → Infantry → Militia   (X → Y means "X counters Y")
  *   Siege: weak in the field, but strips enemy fortification.
+ * Two tech-gated specialists extend the roster into the later ages: Pikemen (a
+ * stronger anti-cavalry wall, Feudalism) and Handgunners (a hard late volley
+ * unit, Gunpowder). Both counter an existing type, so the loop stays intact.
  *
  * Composition matters, so "just spam the strongest unit" is never optimal.
  * Costs are gold + materials to raise; every unit also draws gold upkeep each
@@ -17,7 +20,7 @@
 import type { StrategicResource } from "@/data/terrain";
 import type { TechId } from "@/data/techs";
 
-export type UnitType = "militia" | "infantry" | "ranged" | "cavalry" | "siege";
+export type UnitType = "militia" | "infantry" | "ranged" | "cavalry" | "siege" | "pikeman" | "handgunner";
 
 export interface UnitDef {
   id: UnitType;
@@ -117,6 +120,40 @@ export const UNITS: Record<UnitType, UnitDef> = {
     siegePower: 2,
     requires: "iron",
     requiresTech: "engineering",
+  },
+  // Mid-game anti-cavalry wall: a drilled pike block. Cheap, tanky, low bite —
+  // a dedicated answer to horse beyond the humble Militia (Feudalism, no resource).
+  pikeman: {
+    id: "pikeman",
+    name: "Pikemen",
+    short: "Pik",
+    cost: { gold: 16, materials: 10 },
+    upkeep: 2,
+    attack: 4,
+    defense: 7,
+    moves: 1,
+    counters: "cavalry",
+    volley: false,
+    siegePower: 0,
+    requires: null,
+    requiresTech: "feudalism",
+  },
+  // Late-game firepower: early handguns. A hard-hitting volley unit that punches
+  // through foot, but fragile in the melee (Gunpowder + iron) — the endgame Ranged.
+  handgunner: {
+    id: "handgunner",
+    name: "Handgunners",
+    short: "Gun",
+    cost: { gold: 24, materials: 12 },
+    upkeep: 3,
+    attack: 8,
+    defense: 3,
+    moves: 1,
+    counters: "infantry",
+    volley: true,
+    siegePower: 0,
+    requires: "iron",
+    requiresTech: "gunpowder",
   },
 };
 

@@ -968,12 +968,6 @@ function assessThreat(state: GameState, nationId: number): ThreatProfile {
   return { composition, maxTargetFort, hasTarget: targetIds.size > 0 };
 }
 
-/** The counter-loop unit that beats a given enemy field unit (null for siege). */
-function counterTo(enemy: UnitType): UnitType | null {
-  for (const t of UNIT_TYPES) if (UNITS[t].counters === enemy) return t;
-  return null;
-}
-
 /** The enemy's most numerous field unit (siege excluded), or null if none seen. */
 function dominantFieldUnit(composition: UnitCounts): UnitType | null {
   let best: UnitType | null = null;
@@ -1014,16 +1008,21 @@ export function planRecruitment(state: GameState, nationId: number): UnitType[] 
     pref.push("siege");
   }
 
-  // 2) Counter the enemy's dominant field unit.
+  // 2) Counter the enemy's dominant field unit — the strongest available counter
+  //    first (Pikemen over Militia vs cavalry, etc.); canRaiseUnit gates by tech.
   const dominant = dominantFieldUnit(threat.composition);
   if (dominant) {
-    const counter = counterTo(dominant);
-    if (counter) pref.push(counter);
+    const counters = UNIT_TYPES.filter((t) => UNITS[t].counters === dominant).sort(
+      (a, b) => UNITS[b].attack + UNITS[b].defense - (UNITS[a].attack + UNITS[a].defense),
+    );
+    pref.push(...counters);
   }
 
-  // 3) Generalist fallback / diversification.
+  // 3) Generalist fallback — a balanced core army (so the default host isn't an
+  //    all-glass-cannon stack); the premium late units sit behind it, reached only
+  //    when the core is unbuildable or via the counter above.
   if (access.has("horses")) pref.push("cavalry");
-  pref.push("infantry", "ranged", "militia");
+  pref.push("infantry", "ranged", "pikeman", "handgunner", "militia");
 
   return [...new Set(pref)];
 }
@@ -1107,5 +1106,5 @@ function queueFor(state: GameState, regionId: number, building: BuildingId, owne
 }
 
 function zeroUnits(): Record<UnitType, number> {
-  return { militia: 0, infantry: 0, ranged: 0, cavalry: 0, siege: 0 };
+  return { militia: 0, infantry: 0, ranged: 0, cavalry: 0, siege: 0, pikeman: 0, handgunner: 0 };
 }

@@ -25,6 +25,18 @@ describe("sideStrength", () => {
     const vsInfantry = sideStrength(units({ militia: 4 }), units({ infantry: 4 }), "attack");
     expect(vsCavalry).toBeGreaterThan(vsInfantry);
   });
+
+  it("pikemen get their counter bonus against cavalry", () => {
+    const vsCavalry = sideStrength(units({ pikeman: 4 }), units({ cavalry: 4 }), "defense");
+    const vsInfantry = sideStrength(units({ pikeman: 4 }), units({ infantry: 4 }), "defense");
+    expect(vsCavalry).toBeGreaterThan(vsInfantry);
+  });
+
+  it("handgunners get their counter bonus against infantry", () => {
+    const vsInfantry = sideStrength(units({ handgunner: 4 }), units({ infantry: 4 }), "attack");
+    const vsCavalry = sideStrength(units({ handgunner: 4 }), units({ cavalry: 4 }), "attack");
+    expect(vsInfantry).toBeGreaterThan(vsCavalry);
+  });
 });
 
 describe("siegePower", () => {
@@ -118,7 +130,7 @@ describe("resolveCombat — phased battle (volley + melee)", () => {
       createRng(11),
     );
     const r = res.report;
-    for (const t of ["militia", "infantry", "ranged", "cavalry", "siege"] as const) {
+    for (const t of ["militia", "infantry", "ranged", "cavalry", "siege", "pikeman", "handgunner"] as const) {
       expect(r.attackerStart[t] - r.attackerLosses[t]).toBe(r.attackerRemaining[t]);
       expect(r.defenderStart[t] - r.defenderLosses[t]).toBe(r.defenderRemaining[t]);
     }

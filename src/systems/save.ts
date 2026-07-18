@@ -7,7 +7,7 @@
  * exported/imported as a JSON string for sharing or backup.
  */
 
-import type { GameState } from "@/systems/state";
+import { emptyUnits, type GameState } from "@/systems/state";
 
 const SAVE_VERSION = 1;
 /**
@@ -59,6 +59,14 @@ export function deserializeGame(json: string): GameState | null {
     s.seed = Number(s.seed) >>> 0;
     if (s.difficulty !== "easy" && s.difficulty !== "normal" && s.difficulty !== "hard") {
       s.difficulty = "normal";
+    }
+    // Forward-migrate army unit records: a save from before a unit type existed
+    // lacks that key, which would read as `undefined` (→ NaN) in armySize/combat.
+    // Backfill every unit slot to 0 so older saves load cleanly.
+    if (Array.isArray(s.armies)) {
+      for (const a of s.armies) {
+        if (a && a.units) a.units = { ...emptyUnits(), ...a.units };
+      }
     }
     return s;
   } catch {

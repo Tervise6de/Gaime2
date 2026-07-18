@@ -184,6 +184,14 @@ export const UNIT_ART: Record<UnitType, string | null> = {
   siege: ico(
     '<circle cx="7.8" cy="17.6" r="2.1"/><circle cx="15.4" cy="17.6" r="2.1"/><path d="M4.6 15.4h14.2"/><path d="M7.4 14.6l9-9M16.4 5.6l3.5-.6-.8 3.4z"/>',
   ),
+  // Long pike with a leaf blade — the anti-cavalry wall.
+  pikeman: ico(
+    '<path d="M12 21.2V4.4"/><path d="M12 3.2l-1.5 2.6h3z" fill="currentColor" stroke="none"/><path d="M9.4 9.6h5.2"/>',
+  ),
+  // Hand-cannon on a stock — early firearms.
+  handgunner: ico(
+    '<path d="M4.4 13l9.6-1.7.5 2.7-9.6 1.7z"/><path d="M14 11.1l4.6-.8.5 2.7-4.6.8z"/><path d="M6.3 15l1.8 3.4"/><path d="M18.6 10.3l1.4-.3"/>',
+  ),
 };
 
 export const BUILDING_ART: Record<BuildingId, string | null> = {

@@ -99,6 +99,25 @@ describe("recruitment", () => {
     expect(canRaiseUnit(g, 0, "cavalry", PLAYER_ID).ok).toBe(false);
   });
 
+  it("canRaiseUnit gates pikemen on Feudalism, but needs no strategic resource", () => {
+    const g = battlefield({ militia: 1 }, {});
+    expect(canRaiseUnit(g, 0, "pikeman", PLAYER_ID).ok).toBe(false); // no tech yet
+    g.nations[PLAYER_ID]!.research.done = ["feudalism"];
+    // Unlike cavalry/siege, pikemen draw on no resource — the tech alone unlocks them.
+    expect(canRaiseUnit(g, 0, "pikeman", PLAYER_ID).ok).toBe(true);
+  });
+
+  it("canRaiseUnit gates handgunners on Gunpowder and iron access", () => {
+    const g = battlefield({ militia: 1 }, {});
+    g.nations[PLAYER_ID]!.research.done = ["gunpowder"];
+    expect(canRaiseUnit(g, 0, "handgunner", PLAYER_ID).ok).toBe(false); // no iron yet
+    g.regions[0]!.resource = "iron";
+    expect(canRaiseUnit(g, 0, "handgunner", PLAYER_ID).ok).toBe(true);
+    // Without the tech it's blocked even with iron.
+    g.nations[PLAYER_ID]!.research.done = [];
+    expect(canRaiseUnit(g, 0, "handgunner", PLAYER_ID).ok).toBe(false);
+  });
+
   it("canRaiseUnit rejects when too poor", () => {
     const g = battlefield({ militia: 1 }, {});
     g.nations[PLAYER_ID]!.stocks.gold = 0;
@@ -114,6 +133,15 @@ describe("recruitment", () => {
     expect(armyAt(next, 0, PLAYER_ID)!.units.infantry).toBe(1);
     // Input not mutated.
     expect(g.nations[PLAYER_ID]!.stocks.gold).toBe(200);
+  });
+
+  it("raises a tech-unlocked pikeman into the field", () => {
+    const g = battlefield({ militia: 1 }, {});
+    g.nations[PLAYER_ID]!.research.done = ["feudalism"];
+    const next = raiseUnit(g, 0, "pikeman", PLAYER_ID);
+    expect(armyAt(next, 0, PLAYER_ID)!.units.pikeman).toBe(1);
+    // A gate miss is a no-op: without the tech the state is returned untouched.
+    expect(raiseUnit(battlefield({ militia: 1 }, {}), 0, "pikeman", PLAYER_ID).armies[0]!.units.pikeman).toBe(0);
   });
 });
 

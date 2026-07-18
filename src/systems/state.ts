@@ -530,7 +530,7 @@ export type ResourceKey = (typeof RESOURCE_KEYS)[number];
 
 /** A zeroed unit-count record. */
 export function emptyUnits(): Record<UnitType, number> {
-  return { militia: 0, infantry: 0, ranged: 0, cavalry: 0, siege: 0 };
+  return { militia: 0, infantry: 0, ranged: 0, cavalry: 0, siege: 0, pikeman: 0, handgunner: 0 };
 }
 
 /** Total number of units in a stack. */

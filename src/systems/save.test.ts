@@ -28,6 +28,24 @@ describe("save / load", () => {
     expect(b.nations[0]!.stocks.gold).toBe(a.nations[0]!.stocks.gold);
   });
 
+  it("forward-migrates armies from a save predating a unit type", () => {
+    // Simulate an old save whose army records lack the newer unit slots.
+    let g = createGame({ seed: 99, rivals: 2 });
+    for (let i = 0; i < 3; i++) g = resolveTurn(g);
+    const envelope = JSON.parse(serializeGame(g, 0));
+    for (const a of envelope.state.armies) {
+      delete a.units.pikeman;
+      delete a.units.handgunner;
+    }
+    const restored = deserializeGame(JSON.stringify(envelope))!;
+    expect(restored).not.toBeNull();
+    // Every army has the missing slots backfilled to 0 (not undefined → NaN).
+    for (const a of restored.armies) {
+      expect(a.units.pikeman).toBe(0);
+      expect(a.units.handgunner).toBe(0);
+    }
+  });
+
   it("rejects malformed or foreign JSON", () => {
     expect(deserializeGame("not json")).toBeNull();
     expect(deserializeGame(JSON.stringify({ hello: "world" }))).toBeNull();

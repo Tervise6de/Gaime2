@@ -122,12 +122,15 @@ describe("planRecruitment (composition-aware)", () => {
     expect(planRecruitment(s, RIVAL)).not.toContain("siege");
   });
 
-  it("counters an enemy stack of cavalry with militia", () => {
+  it("counters an enemy stack of cavalry with its strongest anti-cavalry (Pikemen ahead of Militia)", () => {
     const plan = planRecruitment(
       scenario({ fortification: 0 }, { units: units({ cavalry: 4 }) }),
       RIVAL,
     );
-    expect(plan[0]).toBe("militia");
+    // Pikemen lead (canRaiseUnit gates them by Feudalism at the muster); Militia
+    // remain the always-available fallback, listed behind.
+    expect(plan[0]).toBe("pikeman");
+    expect(plan.indexOf("pikeman")).toBeLessThan(plan.indexOf("militia"));
   });
 
   it("counters an enemy stack of ranged with cavalry", () => {
@@ -138,12 +141,13 @@ describe("planRecruitment (composition-aware)", () => {
     expect(plan[0]).toBe("cavalry");
   });
 
-  it("counters an enemy stack of infantry with ranged", () => {
+  it("counters an enemy stack of infantry with its strongest volley (Handgunners ahead of Ranged)", () => {
     const plan = planRecruitment(
       scenario({ fortification: 0 }, { units: units({ infantry: 5 }) }),
       RIVAL,
     );
-    expect(plan[0]).toBe("ranged");
+    expect(plan[0]).toBe("handgunner");
+    expect(plan.indexOf("handgunner")).toBeLessThan(plan.indexOf("ranged"));
   });
 
   it("puts siege first and the counter unit second against a fortified, defended target", () => {
