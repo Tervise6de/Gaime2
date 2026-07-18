@@ -129,6 +129,11 @@ Each stance has a known failure mode; the design must answer it:
 - **The Hansa is a single, dynamic institution** — one League, everyone relates to
   it (Form/Join/Break). If nobody forms it, the game stays a normal feudal 4X (a
   valid outcome).
+- **Built up over time, CK3-dynasty style (confirmed).** The League is a persistent
+  institution you *grow*, not a one-shot toggle — it accumulates a **standing /
+  renown** (from Kontore, trade volume, members, victories) that *is* the score and
+  the win pressure. Like a dynasty it has a **head**, **members** spread across
+  realms, and internal prestige politics; you build its power across the whole game.
 - **Dynamic head (the seat):** **Lübeck** is the historical default seat if
   AI-run, but **any qualifying city can become the head** by forming/holding the
   League. → *Tallinn/Reval can become THE Hansa city if the player earns it.*
@@ -253,34 +258,37 @@ version-bumped. Ordered so value lands early and the base is reused throughout.
 - **H0 · Calendar & length (tiny, first).** Stretch years/turn, re-space/rename
   eras to the Hansa arc, add the Game Length setting incl. Endless. Config +
   presentation only. Ships value immediately.
-- **H1 · Naval nodes & fleets.** Sea zones as nodes; fleets (hull types,
+- **H1 · Map expansion & Hansa geography (pulled early — confirmed).** Add the
+  Wendish/German coast (Lübeck, Rostock, Wismar, Stralsund) + Kontor edge-nodes
+  (Bergen/Bruges/London), author the sea-zone geography, seed trade-good regions —
+  so all naval/trade/League work is built on the *final* map, not re-authored later.
+  *Playable: the fuller Hansa board.*
+- **H2 · Naval nodes & fleets.** Sea zones as nodes; fleets (hull types,
   era-gated); Shipyard; embark/disembark; sea-as-barrier; islands defensible.
   *Playable: project power across the sea.*
-- **H2 · Naval combat & blockade.** Fleets fight in zones; zone control →
+- **H3 · Naval combat & blockade.** Fleets fight in zones; zone control →
   blockade/escort; coastal raids. *Playable: the sea is a contested front.*
-- **H3 · Trade goods & routes.** ~6–8 goods on existing terrain/resource; routes as
+- **H4 · Trade goods & routes.** ~6–8 goods on existing terrain/resource; routes as
   objects over the lanes; blockade/toll interferes. *Playable: trade you build and
   fight over.*
-- **H4 · Kontore, tolls & privileges.** Kontore (Novgorod on-map + Bergen/Bruges/
+- **H5 · Kontore, tolls & privileges.** Kontore (Novgorod on-map + Bergen/Bruges/
   London edge nodes); chokepoint tolls (the Sound); privileges/monopolies.
   *Playable: the merchant-network layer.*
-- **H5 · The League (Form / Join / Break).** Joinable institution; forming
-  threshold + first Diet; **dynamic head** (Tallinn can seize it); membership +
-  internal politics (climb); defection; Break via blockade/expel/war.
-  *Playable: the three stances are real — the identity payoff.*
-- **H6 · Endgame, scoring & anti-snowball.** Hansa-control meter; "how big" score;
-  Hansneid (envy → coalitions); Endless/Sandbox polish; League-control victory.
-  *Playable: the Hansa endgame.*
-- **H7 · AI for all stances.** Rivals form/join/climb/break, blockade, contest
+- **H6 · The League (Form / Join / Break).** Joinable institution built up
+  CK3-dynasty style; forming threshold + first Diet; **dynamic head** (Tallinn can
+  seize it); membership + internal politics (climb); defection; Break via blockade/
+  expel/war. *Playable: the three stances are real — the identity payoff.*
+- **H7 · Endgame, scoring & anti-snowball.** Hansa-control/renown meter; "how big"
+  score; Hansneid (envy → coalitions); Endless/Sandbox polish; League-control
+  victory. *Playable: the Hansa endgame.*
+- **H8 · AI for all stances.** Rivals form/join/climb/break, blockade, contest
   zones, defend/attack Kontore, run amphibious assaults.
-- **H8 · Map expansion & rebrand.** Wendish/German coast (Lübeck) + Kontor nodes;
-  seed goods; rename & re-art. (Can slot earlier if the League needs Lübeck sooner.)
-- **H9 · Balance & polish.** Sweeps, naval/trade lenses, tooltips, reports,
-  save/load migration. *Dutch competition DLC flagged as post-launch.*
+- **H9 · Balance, polish & rebrand.** Sweeps, naval/trade lenses, tooltips, reports,
+  save/load migration, the rename/re-art. *Dutch competition DLC flagged as
+  post-launch.*
 
-Note: H0–H2 double as the **cheap validation slice** — after H2 we can feel whether
-"economic warfare on a contested sea" is fun *before* the heavier League build
-(H5+). Reassess there.
+Note: H2–H3 deliver the naval slice; after H3 we can feel whether "economic warfare
+on a contested sea" is fun *before* the heavier League build (H6+). Reassess there.
 
 ---
 
@@ -304,10 +312,12 @@ Note: H0–H2 double as the **cheap validation slice** — after H2 we can feel 
 
 1. **Exact trade-goods list** and how demand/price is modelled (fixed demand nodes
    vs. simple supply/demand). Recommend: fixed Kontor/market demand, abstract price.
-2. **League representation depth** — confirm target is the **joinable institution
-   (model b)**, not a fully-separate "you ARE the League" faction (model c) for v1.
-3. **Map expansion timing** — add Lübeck/Wendish coast at H8, or earlier (H5) so
-   the League has its historical heartland from the start?
+2. **League representation depth — RESOLVED:** the **joinable institution (model b)**,
+   built up CK3-dynasty style (§5) — not a fully-separate "you ARE the League"
+   faction (model c) for v1.
+3. **Map expansion timing — RESOLVED:** pulled **early (H1)**, so all naval/trade/
+   League work is authored on the final Hansa geography (Lübeck/Wendish coast +
+   Kontor nodes present from the start).
 4. **How much faith survives** as flavour (pagan-vs-crusader) vs. cut for focus.
 5. **Fleet micromanagement budget** — reuse army merge/split/forecast UX 1:1 to
    avoid doubling end-turn busywork (strongly recommended).
