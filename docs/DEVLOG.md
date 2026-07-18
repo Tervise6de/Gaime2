@@ -6,6 +6,36 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-18 — Army M2: combined battles (v0.45.0)
+
+Second step of the army-stacking arc (after M1's stack command). Attacking a
+defended region no longer pits your stack against that region's garrison alone:
+the defender's realm **rallies its adjacent garrisons into one combined
+defence**. This is the missing symmetric half of concentration-of-force — the
+attacker already massed (M1 merge + the AI's own massing), but a defender could
+never coordinate across regions.
+
+- **`military.ts`** — `moveArmy` now pools the garrison with every same-realm
+  army standing in a region adjacent to the target that still has a move, and
+  resolves the assault once against the combined stack (`resolveCombat`
+  unchanged: sum the defenders, split the casualties back). Casualties are
+  distributed per unit type by the **largest-remainder method** so per-stack
+  losses reconcile exactly with the combined total and never exceed what a
+  stack holds. Rallying stacks spend a move (they marched to the guns) and hold
+  their own ground; the garrison in place does not. Automatic and symmetric —
+  player and AI both benefit, no new UI or player micro.
+- **Barbarians never coordinate** — a barbarian holder stands alone and draws
+  no rally, keeping them the static neutral foil they're designed to be.
+- **`combat.ts` / `hud.ts`** — the battle report carries `defenderReinforcements`
+  (soldiers rallied, counted inside `defenderStart`) and the report header shows
+  a "neighbours rallied +N" note so the combined defence is legible.
+
+Design note: this makes a layered line meaningfully harder to crack than a
+single forward stack, which is the groundwork for M3 (fortify + zone of
+control). 560 tests green (+6), typecheck + production build clean.
+
+---
+
 ## 2026-07-15 (ninth pass) — Vercel-ready
 
 Prepared `main` for one-click Vercel deployment (static build, no backend):

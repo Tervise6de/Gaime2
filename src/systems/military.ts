@@ -214,15 +214,27 @@ export function moveArmy(
     return occupyAndCapture(state, army, target);
   }
 
-  // Defended: resolve combat.
+  // Defended: rally the neighbourhood into a combined defence (M2), then resolve
+  // the assault once against the pooled stack.
+  const defenders = ralliedDefenders(state, target, enemyAtTarget);
+  const combinedDefender = defenders.reduce(
+    (acc, d) => addUnits(acc, d.units),
+    emptyUnits(),
+  );
+  const reinforcements = armySize(combinedDefender) - armySize(enemyAtTarget.units);
+
   const rng = createRng(state.rngState);
   const result = resolveCombat(
     army.units,
-    enemyAtTarget.units,
+    combinedDefender,
     { terrainDefense: TERRAIN[target.terrain].defense, fortification: target.fortification },
     rng,
   );
   const rngState = rng.seed;
+
+  // Split the combined defender's casualties back across the stacks that rallied,
+  // proportional to each stack's contribution of every unit type.
+  const perDefenderLosses = distributeLosses(defenders, result.defenderLosses);
 
   const log: string[] = [];
   const attackerNation = state.nations.find((n) => n.id === owner);
@@ -230,6 +242,12 @@ export function moveArmy(
   const atkName = attackerNation?.name ?? "Army";
   const myLoss = armySize(result.attackerLosses);
   const theirLoss = armySize(result.defenderLosses);
+  if (reinforcements > 0) {
+    const defName = defenderNation?.isPlayer ? "Your" : `${defenderNation?.name ?? "The"}'s`;
+    log.push(
+      `${defName} neighbouring garrisons rallied to ${target.name} (+${soldiersDisplay(reinforcements)} soldiers).`,
+    );
+  }
   log.push(
     `${atkName} ${result.attackerWins ? "won" : "was repelled"} at ${target.name}` +
       (result.captured ? ` — ${target.name} captured!` : ".") +
@@ -250,13 +268,26 @@ export function moveArmy(
         : (defenderNation?.name ?? "the garrison"),
     attackerIsPlayer: !!attackerNation?.isPlayer,
     defenderIsPlayer: !!defenderNation?.isPlayer,
+    defenderReinforcements: reinforcements,
   };
 
-  // Update both armies with survivors; drop empty stacks.
+  // Update the armies with survivors: attacker keeps its remainder; each rallied
+  // stack sheds its share; reinforcements that marched to the fight spend a move.
+  // Drop any stack wiped out.
+  const lossById = new Map<number, UnitCounts>();
+  defenders.forEach((d, i) => lossById.set(d.id, perDefenderLosses[i]));
   let armies = state.armies
     .map((a) => {
       if (a.id === army.id) return { ...a, units: result.attackerRemaining };
-      if (a.id === enemyAtTarget.id) return { ...a, units: result.defenderRemaining };
+      const loss = lossById.get(a.id);
+      if (loss) {
+        const spentMove = a.id !== enemyAtTarget.id; // the garrison in place holds; rallies march
+        return {
+          ...a,
+          units: subtractUnits(a.units, loss),
+          movesLeft: spentMove ? Math.max(0, a.movesLeft - 1) : a.movesLeft,
+        };
+      }
       return a;
     })
     .filter((a) => armySize(a.units) > 0);
@@ -368,6 +399,66 @@ export function disbandUnits(
 }
 
 // --- internal helpers -------------------------------------------------------
+
+/**
+ * Combined defence (M2): the stacks that fight a defended region as one. That is
+ * the garrison standing in the region, plus every army of the *same realm* in an
+ * adjacent region that still has a move to spend — they march to the sound of the
+ * guns. The garrison is always first. Barbarians never coordinate, so a barbarian
+ * holder stands alone and no rally is ever raised on its behalf.
+ */
+function ralliedDefenders(state: GameState, target: Region, garrison: Army): Army[] {
+  if (garrison.ownerId === BARBARIAN_ID) return [garrison];
+  const reinforcements = state.armies.filter(
+    (a) =>
+      a.id !== garrison.id &&
+      a.ownerId === garrison.ownerId &&
+      a.movesLeft > 0 &&
+      target.adjacency.includes(a.regionId),
+  );
+  return [garrison, ...reinforcements];
+}
+
+/**
+ * Split a combined stack's losses back across the armies that contributed to it,
+ * proportional to each army's share of every unit type. Uses the largest-
+ * remainder method per type so the per-stack casualties always sum back exactly
+ * to `losses`, and never removes more of a type than a stack actually holds.
+ * Deterministic: fractional ties break by contributor order.
+ */
+function distributeLosses(contributors: Army[], losses: UnitCounts): UnitCounts[] {
+  const out = contributors.map(() => emptyUnits());
+  for (const t of UNIT_TYPES) {
+    let toAssign = losses[t];
+    if (toAssign <= 0) continue;
+    const held = contributors.map((a) => a.units[t]);
+    const total = held.reduce((s, n) => s + n, 0);
+    if (total === 0) continue;
+    const exact = held.map((n) => (losses[t] * n) / total);
+    const alloc = exact.map((v) => Math.floor(v));
+    let assigned = alloc.reduce((s, n) => s + n, 0);
+    // Hand out the remainder to the largest fractional parts first.
+    const order = exact
+      .map((v, i) => ({ i, frac: v - Math.floor(v) }))
+      .sort((a, b) => b.frac - a.frac || a.i - b.i);
+    for (let k = 0; assigned < toAssign && k < order.length; k++) {
+      const idx = order[k].i;
+      if (alloc[idx] < held[idx]) {
+        alloc[idx] += 1;
+        assigned += 1;
+      }
+    }
+    // Safety net if capacity caps blocked the remainder: spill onto any stack with room.
+    for (let i = 0; assigned < toAssign && i < contributors.length; i++) {
+      while (assigned < toAssign && alloc[i] < held[i]) {
+        alloc[i] += 1;
+        assigned += 1;
+      }
+    }
+    for (let i = 0; i < contributors.length; i++) out[i][t] = Math.min(alloc[i], held[i]);
+  }
+  return out;
+}
 
 /** Clamp a requested unit subset to what the army actually holds; null if empty. */
 function clampSubset(

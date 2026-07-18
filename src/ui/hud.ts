@@ -1792,6 +1792,9 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       `${escapeHtml(report.terrainName)} · ${glyphHtml("shield", "🛡")} defence ×${report.terrainDefense}` +
       (report.fortification > 0
         ? ` · fort ${report.fortification}${report.effectiveFort < report.fortification ? ` → ${report.effectiveFort} (siege)` : ""}`
+        : "") +
+      (report.defenderReinforcements
+        ? ` · ${glyphHtml("shield", "🛡")} neighbours rallied +${soldiersDisplay(report.defenderReinforcements)}`
         : "");
     panel.append(setting);
 

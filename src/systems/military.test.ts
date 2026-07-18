@@ -339,6 +339,101 @@ describe("moveArmy", () => {
   });
 });
 
+const RIVAL = 2;
+
+/**
+ * Player attacker in r0 assaults rival-held r1, which has a same-realm garrison
+ * next door in r2. r0–r1 and r1–r2 are the only edges, so r2 can rally to r1.
+ */
+function rallyField(
+  attacker: Partial<Record<string, number>>,
+  garrison: Partial<Record<string, number>>,
+  reserve: Partial<Record<string, number>>,
+  reserveMoves = 1,
+): GameState {
+  const r0 = region(0, { ownerId: PLAYER_ID, adjacency: [1] });
+  const r1 = region(1, { ownerId: RIVAL, adjacency: [0, 2] });
+  const r2 = region(2, { ownerId: RIVAL, adjacency: [1] });
+  const armies: Army[] = [
+    { id: 0, ownerId: PLAYER_ID, regionId: 0, units: { ...emptyUnits(), ...attacker }, movesLeft: 1 },
+    { id: 1, ownerId: RIVAL, regionId: 1, units: { ...emptyUnits(), ...garrison }, movesLeft: 0 },
+  ];
+  if (Object.keys(reserve).length) {
+    armies.push({ id: 2, ownerId: RIVAL, regionId: 2, units: { ...emptyUnits(), ...reserve }, movesLeft: reserveMoves });
+  }
+  const stocks = { gold: 200, food: 20, materials: 50, knowledge: 0 };
+  const nation = (id: number, name: string, isPlayer: boolean) => ({
+    id, name, color: "#000", isPlayer, isBarbarian: false, alive: true,
+    stocks: { ...stocks }, taxRate: 0, research: { current: null, progress: 0, done: [] },
+    wonders: 0, famine: false, bankrupt: false,
+  });
+  return {
+    seed: 1, rngState: 999, turn: 1,
+    nations: [nation(PLAYER_ID, "Realm", true), nation(RIVAL, "Rival", false)],
+    regions: [r0, r1, r2], armies, nextArmyId: 3,
+    relations: {}, treaties: {}, offers: [], nextOfferId: 0,
+    difficulty: "normal", outcome: "playing", log: [],
+  };
+}
+
+describe("combined defence (M2)", () => {
+  it("rallies a same-realm neighbour into the fight and reports the reinforcement", () => {
+    const g = rallyField({ infantry: 6 }, { militia: 2 }, { infantry: 4 });
+    const next = moveArmy(g, 0, 1);
+    const report = next.battles!.at(-1)!;
+    expect(report.defenderReinforcements).toBeGreaterThan(0);
+    expect(next.log.some((l) => /rallied to R1 \(\+[\d,]+ soldiers\)/.test(l))).toBe(true);
+  });
+
+  it("the combined stack holds a region the lone garrison would have lost", () => {
+    const solo = moveArmy(rallyField({ infantry: 9 }, { militia: 2 }, {}), 0, 1);
+    expect(solo.regions[1]!.ownerId).toBe(PLAYER_ID); // lone garrison falls
+
+    const combined = moveArmy(rallyField({ infantry: 9 }, { militia: 2 }, { infantry: 6 }), 0, 1);
+    expect(combined.regions[1]!.ownerId).toBe(RIVAL); // the rally saves it
+  });
+
+  it("splits casualties across both defenders and makes the reserve spend its move", () => {
+    const g = rallyField({ infantry: 8, ranged: 3 }, { militia: 3 }, { infantry: 3 });
+    const next = moveArmy(g, 0, 1);
+    const garrison = next.armies.find((a) => a.id === 1);
+    const reserve = next.armies.find((a) => a.id === 2);
+    // Both took losses (each smaller than its starting size), and totals reconcile
+    // with the reported combined defender casualties.
+    const report = next.battles!.at(-1)!;
+    const gLoss = 3 - (garrison ? garrison.units.militia : 0);
+    const rLoss = 3 - (reserve ? reserve.units.infantry : 0);
+    expect(gLoss + rLoss).toBe(armySize(report.defenderLosses));
+    expect(gLoss).toBeGreaterThan(0);
+    expect(rLoss).toBeGreaterThan(0);
+    if (reserve) expect(reserve.movesLeft).toBe(0); // marched to the guns
+  });
+
+  it("does not rally a neighbour that has no move left", () => {
+    const g = rallyField({ infantry: 6 }, { militia: 2 }, { infantry: 4 }, 0);
+    const next = moveArmy(g, 0, 1);
+    expect(next.battles!.at(-1)!.defenderReinforcements).toBe(0);
+  });
+
+  it("barbarians never coordinate — a barbarian neighbour never rallies", () => {
+    const g = battlefield({ infantry: 6 }, { militia: 2 });
+    // Give the barbarian target a second barbarian stack next door.
+    g.regions[1] = region(1, { ownerId: BARBARIAN_ID, adjacency: [0, 2] });
+    g.regions.push(region(2, { ownerId: BARBARIAN_ID, adjacency: [1] }));
+    g.armies.push({ id: 2, ownerId: BARBARIAN_ID, regionId: 2, units: { ...emptyUnits(), infantry: 4 }, movesLeft: 1 });
+    g.nextArmyId = 3;
+    const next = moveArmy(g, 0, 1);
+    expect(next.battles!.at(-1)!.defenderReinforcements).toBe(0);
+  });
+
+  it("is deterministic — same field resolves identically", () => {
+    const a = moveArmy(rallyField({ infantry: 7 }, { militia: 2 }, { infantry: 4 }), 0, 1);
+    const b = moveArmy(rallyField({ infantry: 7 }, { militia: 2 }, { infantry: 4 }), 0, 1);
+    expect(JSON.stringify(a.armies)).toBe(JSON.stringify(b.armies));
+    expect(a.regions[1]!.ownerId).toBe(b.regions[1]!.ownerId);
+  });
+});
+
 describe("upkeep and bankruptcy", () => {
   it("totalUpkeep sums the player's unit upkeep", () => {
     const g = battlefield({ infantry: 2, militia: 1 }, { militia: 5 });

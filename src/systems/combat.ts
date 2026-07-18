@@ -199,6 +199,12 @@ export interface BattleReport {
   outcome: "captured" | "repelled" | "held";
   /** One-line summary of why it went the way it did. */
   decisive: string;
+  /**
+   * Soldiers the defender's neighbouring garrisons rallied into this fight
+   * (combined defence, M2). 0 when the region stood alone; filled by the caller,
+   * which knows the map. Counted inside `defenderStart`.
+   */
+  defenderReinforcements?: number;
 }
 
 export interface CombatResult {
