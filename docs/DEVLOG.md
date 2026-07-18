@@ -6,6 +6,34 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-18 — B6: responsive/touch layout — the lens strip no longer fights the frame (v0.54.0)
+
+Roadmap B6. The pointer-event map input (tap to select, drag to pan, pinch to
+zoom), `touch-action` rules and coarse-pointer tap targets were already in place;
+driving the real app across five viewports (Playwright + the pre-installed
+Chromium) surfaced the one genuine layout bug and fixed it.
+
+**The lens strip collided with the bottom corner panels.** The Civ-style map-lens
+strip floats bottom-centre, and once the frame narrows the bottom corners (the
+action stack 236px, the log 300px) leave no centred room — so on phones/tablets/
+small laptops the strip landed on top of the panels, and (worse) `flex-wrap` turned
+it into a *tall* block that swallowed the End-turn button. Fixes:
+- The strip is now a single **horizontally-scrollable row** (`nowrap`), never a
+  tall block — a strict improvement at every width.
+- **Below 1100px it docks to the top**, a compact scrollable strip just under the
+  resource bar, with the side panels dropped below it — leaving the whole bottom
+  edge to the action + log panels (its title and heat-ramp legend drop to save
+  width). Above 1100px it keeps the wide-desktop bottom-centre look unchanged.
+- Lens and nav buttons join the coarse-pointer 40px min-hit-area set.
+
+**Verified** at 390×780, 780×390, 834×1112, 1024×768 and 1440×900: zero console
+errors, no horizontal overflow, tap-to-select works, and the End-turn button is
+unobscured at every size (the wide-desktop layout is pixel-identical to before).
+
+610 tests green (CSS-only change), typecheck + build clean.
+
+---
+
 ## 2026-07-18 — C2: content depth — resource works + more events (v0.53.0)
 
 Roadmap C2: a few more carefully-balanced techs / buildings / events, each adding

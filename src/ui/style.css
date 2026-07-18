@@ -779,13 +779,25 @@ body {
   gap: 4px;
   padding: 5px 8px;
   max-width: calc(100vw - 540px);
-  flex-wrap: wrap;
+  /* One row that scrolls sideways rather than wrapping — a wrapped strip grows
+     tall and, on narrow screens, swallows the bottom corner panels beneath it. */
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
   justify-content: center;
   background: var(--panel-grad);
   border: 1px solid var(--panel-border);
   border-radius: 12px;
   box-shadow: var(--panel-shadow);
   pointer-events: auto;
+}
+
+.hud-lensbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hud-lensbar > * {
+  flex: 0 0 auto;
 }
 
 .hud-lens-title {
@@ -848,11 +860,8 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-@media (max-width: 1100px) {
-  .hud-lensbar {
-    max-width: calc(100vw - 40px);
-  }
-}
+/* (Below 1100px the lens strip docks to the top — see the block near the
+   responsive frame rules — so it needs no bottom-centre width override here.) */
 
 .hud-gamemenu-btn {
   padding: 7px 12px;
@@ -3862,7 +3871,9 @@ a:focus-visible,
   .hud-techtree-close,
   .confirm-btn,
   .hud-railbtn,
-  .hud-gamemenu-btn {
+  .hud-gamemenu-btn,
+  .hud-navbtn,
+  .hud-lens-btn {
     min-height: 40px;
   }
   .hud-endturn {
@@ -3969,6 +3980,35 @@ a:focus-visible,
   }
   .hud-panel {
     padding: 10px;
+  }
+}
+
+/* The lens strip floats bottom-centre on wide desktops, where the frame reserves
+   room for it clear of the bottom corner panels. Once the frame narrows the
+   corners (actions 236px, log 300px) leave no centred room, so below 1100px it
+   docks as a single compact, horizontally-scrollable strip just under the resource
+   bar, with the side panels dropped below it — leaving the whole bottom edge to
+   the action + log panels. The heat-ramp legend and title are dropped to save
+   width (the lenses themselves still work). This block sits after the 640px one so
+   it wins the top override on phones too. */
+@media (max-width: 1100px) {
+  .hud-lensbar {
+    top: 52px;
+    bottom: auto;
+    left: 6px;
+    right: 6px;
+    transform: none;
+    max-width: none;
+    justify-content: flex-start;
+    padding: 4px 6px;
+  }
+  .hud-lens-title,
+  .hud-lens-scale {
+    display: none;
+  }
+  .hud-leftstack,
+  .hud-right {
+    top: 96px;
   }
 }
 
