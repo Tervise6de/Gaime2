@@ -85,6 +85,8 @@ export const GRANARY_CAP = 60;
  */
 /** Fortification defensive bonus per level. */
 export const FORT_PER_LEVEL = 0.2;
+/** Maximum entrenchment (extra fort levels) an army can dig in for (M3). */
+export const MAX_ENTRENCH = 3;
 /** Random swing applied to the attacker's strength ratio in combat. */
 export const COMBAT_VARIANCE = 0.15;
 /** Fraction of the losing side's army destroyed in a decisive fight. */
@@ -256,6 +258,17 @@ export interface Army {
   units: Record<UnitType, number>;
   /** Region moves remaining this turn. */
   movesLeft: number;
+  /**
+   * Dug in (M3): the army holds position to entrench. Set by the fortify action,
+   * cleared the moment it moves or attacks. Undefined on legacy saves = not dug in.
+   */
+  fortifying?: boolean;
+  /**
+   * Entrenchment level in [0, MAX_ENTRENCH] — extra fortification the dug-in
+   * garrison adds to its region's defence, grown one level per held turn while
+   * `fortifying`. Undefined on legacy saves = 0.
+   */
+  entrenchment?: number;
 }
 
 export interface ResourceStocks {

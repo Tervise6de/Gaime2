@@ -6,6 +6,43 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-18 — Army M3: fortify + zone of control, and allied rally (v0.46.0)
+
+Third army step, plus the alliance extension of M2's combined defence.
+
+**Allied rally (extends M2).** A defended region now rallies not just its own
+realm's neighbours but its **formal allies'** adjacent garrisons. Answering the
+call draws the ally into the war against the aggressor (the `ally_call` casus
+belli), so an alliance finally has teeth on the battlefield. A non-allied
+neighbour stands aside. (`military.ts` `ralliedDefenders` + a war-entry pass in
+`moveArmy`.)
+
+**M3 fortify (entrenchment).** A new **Fortify (dig in)** stance: an army forgoes
+the rest of its turn's movement to entrench, and its region's defence climbs one
+level per held turn up to `MAX_ENTRENCH` (3), grown in the turn pipeline
+(`tickEntrenchment`). A dug-in garrison fights as if the region had that much
+extra fortification — siege still strips it. Attacking or relocating gives up the
+stance. The rival AI digs in idle frontier garrisons automatically (a Phase 3 in
+the army loop). New `Army.fortifying` / `Army.entrenchment` (both optional →
+legacy saves load clean).
+
+**M3 zone of control.** An enemy stack now **pins the ground around it**: marching
+into a region adjacent to a hostile army ends that army's movement for the turn
+(`inEnemyZoc` + a clamp in every move path). Armies can no longer slip past enemy
+forces freely — you have to deal with the stack. Allies and non-belligerents exert
+no ZoC; barbarians (always hostile) do. Applies to the AI through the same
+`moveArmy`.
+
+**UI.** The army panel shows entrenchment (`n/3`, "deepening") and an
+"in an enemy zone of control" note, and offers the Fortify button. The battle
+report already surfaced rallied reinforcements (M2).
+
+Verified: 569 tests green (+7 fortify/ZoC, +2 allied rally on top of M2's), typecheck
++ production build clean, app boots with no console errors. Save round-trips the new
+army fields.
+
+---
+
 ## 2026-07-18 — Army M2: combined battles (v0.45.0)
 
 Second step of the army-stacking arc (after M1's stack command). Attacking a

@@ -8,15 +8,20 @@ import {
   moveArmy,
   moveDetachment,
   disbandUnits,
+  fortifyArmy,
+  tickEntrenchment,
+  inEnemyZoc,
   totalUpkeep,
 } from "@/systems/military";
 import { createGame } from "@/systems/turn";
 import { UNITS } from "@/data/units";
 import {
   BARBARIAN_ID,
+  MAX_ENTRENCH,
   PLAYER_ID,
   armySize,
   emptyUnits,
+  pairKey,
   type Army,
   type GameState,
   type Region,
@@ -431,6 +436,128 @@ describe("combined defence (M2)", () => {
     const b = moveArmy(rallyField({ infantry: 7 }, { militia: 2 }, { infantry: 4 }), 0, 1);
     expect(JSON.stringify(a.armies)).toBe(JSON.stringify(b.armies));
     expect(a.regions[1]!.ownerId).toBe(b.regions[1]!.ownerId);
+  });
+});
+
+const ALLY = 3;
+
+/**
+ * Player (r0) assaults rival-held r1; the rival's ally holds r2 next door with a
+ * standing army. Alliance is set between the rival and the ally. `allied` toggles
+ * whether the r2 holder is the ally (true) or an unrelated neutral (false).
+ */
+function allianceField(reserve: Partial<Record<string, number>>, allied: boolean): GameState {
+  const r0 = region(0, { ownerId: PLAYER_ID, adjacency: [1] });
+  const r1 = region(1, { ownerId: RIVAL, adjacency: [0, 2] });
+  const r2 = region(2, { ownerId: ALLY, adjacency: [1] });
+  const stocks = { gold: 200, food: 20, materials: 50, knowledge: 0 };
+  const nation = (id: number, name: string, isPlayer: boolean) => ({
+    id, name, color: "#000", isPlayer, isBarbarian: false, alive: true,
+    stocks: { ...stocks }, taxRate: 0, research: { current: null, progress: 0, done: [] },
+    wonders: 0, famine: false, bankrupt: false,
+  });
+  return {
+    seed: 1, rngState: 4242, turn: 1,
+    nations: [nation(PLAYER_ID, "Realm", true), nation(RIVAL, "Rival", false), nation(ALLY, "Ally", false)],
+    regions: [r0, r1, r2],
+    armies: [
+      { id: 0, ownerId: PLAYER_ID, regionId: 0, units: { ...emptyUnits(), infantry: 9 }, movesLeft: 1 },
+      { id: 1, ownerId: RIVAL, regionId: 1, units: { ...emptyUnits(), militia: 2 }, movesLeft: 0 },
+      { id: 2, ownerId: ALLY, regionId: 2, units: { ...emptyUnits(), ...reserve }, movesLeft: 1 },
+    ],
+    nextArmyId: 3,
+    relations: {},
+    // The ally stands with the rival only when the alliance treaty exists.
+    treaties: allied ? { [pairKey(RIVAL, ALLY)]: "alliance" } : {},
+    offers: [], nextOfferId: 0, difficulty: "normal", outcome: "playing", log: [],
+  };
+}
+
+describe("allied rally (alliances answer the call)", () => {
+  it("an ally rallies to a defended ally and is drawn into the war", () => {
+    const next = moveArmy(allianceField({ infantry: 6 }, true), 0, 1);
+    expect(next.battles!.at(-1)!.defenderReinforcements).toBeGreaterThan(0);
+    expect(next.treaties[pairKey(PLAYER_ID, ALLY)]).toBe("war"); // answered the call
+    expect(next.regions[1]!.ownerId).toBe(RIVAL); // the rally saved the region
+  });
+
+  it("a non-allied neighbour does not rally and is not dragged into war", () => {
+    const next = moveArmy(allianceField({ infantry: 6 }, false), 0, 1);
+    expect(next.battles!.at(-1)!.defenderReinforcements).toBe(0);
+    expect(next.treaties[pairKey(PLAYER_ID, ALLY)] ?? "peace").toBe("peace");
+    expect(next.regions[1]!.ownerId).toBe(PLAYER_ID); // lone garrison falls
+  });
+});
+
+describe("fortify / entrenchment (M3)", () => {
+  it("digging in forgoes movement and flags the army", () => {
+    const g = realm({ infantry: 3 });
+    const next = fortifyArmy(g, 0);
+    const army = armyAt(next, 0, PLAYER_ID)!;
+    expect(army.fortifying).toBe(true);
+    expect(army.movesLeft).toBe(0);
+    expect(next.log.some((l) => /dug in at/.test(l))).toBe(true);
+    expect(fortifyArmy(next, 0)).toBe(next); // already dug in → no-op
+  });
+
+  it("entrenchment deepens one level per held turn, capped at MAX_ENTRENCH", () => {
+    let armies: Army[] = [{ id: 0, ownerId: PLAYER_ID, regionId: 0, units: { ...emptyUnits(), infantry: 2 }, movesLeft: 0, fortifying: true }];
+    for (let t = 0; t < MAX_ENTRENCH + 2; t++) armies = tickEntrenchment(armies);
+    expect(armies[0]!.entrenchment).toBe(MAX_ENTRENCH);
+    // A non-fortifying army never entrenches.
+    expect(tickEntrenchment([{ id: 1, ownerId: PLAYER_ID, regionId: 0, units: emptyUnits(), movesLeft: 1 }])[0]!.entrenchment).toBeUndefined();
+  });
+
+  it("an entrenched garrison holds an assault an un-dug one loses", () => {
+    const attacker = { infantry: 5 };
+    const open = battlefield(attacker, { militia: 5 });
+    const dug = battlefield(attacker, { militia: 5 });
+    dug.armies[1]!.entrenchment = MAX_ENTRENCH;
+    expect(moveArmy(open, 0, 1).regions[1]!.ownerId).toBe(PLAYER_ID); // open region falls
+    expect(moveArmy(dug, 0, 1).regions[1]!.ownerId).toBe(BARBARIAN_ID); // dug-in holds
+  });
+
+  it("attacking clears the attacker's own entrenchment", () => {
+    const g = battlefield({ infantry: 8 }, { militia: 1 });
+    g.armies[0]!.fortifying = true;
+    g.armies[0]!.entrenchment = 2;
+    const next = moveArmy(g, 0, 1);
+    const moved = armyAt(next, 1, PLAYER_ID)!; // advanced into the captured region
+    expect(moved.fortifying).toBe(false);
+    expect(moved.entrenchment).toBe(0);
+  });
+});
+
+describe("zone of control (M3)", () => {
+  // r0(own) – r1(own) – r2(own); an enemy stack in r3 borders r1 only.
+  function zocBoard(enemyBordersR1: boolean): GameState {
+    const g = realm({ infantry: 2 });
+    g.armies[0]!.movesLeft = 2;
+    g.regions[3] = region(3, { ownerId: RIVAL, adjacency: enemyBordersR1 ? [1] : [2] });
+    g.regions[1]!.adjacency = enemyBordersR1 ? [0, 2, 3] : [0, 2];
+    g.regions[2]!.adjacency = enemyBordersR1 ? [1] : [1, 3];
+    g.nations.push({ id: RIVAL, name: "Rival", color: "#000", isPlayer: false, isBarbarian: false, alive: true, stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, taxRate: 0, research: { current: null, progress: 0, done: [] }, wonders: 0, famine: false, bankrupt: false });
+    g.armies.push({ id: 9, ownerId: RIVAL, regionId: 3, units: { ...emptyUnits(), infantry: 3 }, movesLeft: 0 });
+    // At war so the enemy actually exerts control.
+    g.treaties = { [pairKey(PLAYER_ID, RIVAL)]: "war" };
+    return g;
+  }
+
+  it("marching into an enemy zone of control halts the army", () => {
+    const pinned = moveArmy(zocBoard(true), 0, 1); // r1 borders the enemy in r3
+    expect(armyAt(pinned, 1, PLAYER_ID)!.movesLeft).toBe(0);
+  });
+
+  it("moving through open ground keeps the remaining move", () => {
+    const free = moveArmy(zocBoard(false), 0, 1); // enemy borders r2, not r1
+    expect(armyAt(free, 1, PLAYER_ID)!.movesLeft).toBe(1);
+  });
+
+  it("inEnemyZoc ignores allies and non-belligerents", () => {
+    const g = zocBoard(true);
+    expect(inEnemyZoc(g, 1, PLAYER_ID)).toBe(true);
+    g.treaties = { [pairKey(PLAYER_ID, RIVAL)]: "alliance" }; // now friends
+    expect(inEnemyZoc(g, 1, PLAYER_ID)).toBe(false);
   });
 });
 

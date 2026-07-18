@@ -61,6 +61,7 @@ import {
   anyArmyAt,
   canRaiseUnit,
   reachableRegions,
+  inEnemyZoc,
   strategicAccess,
   totalUpkeep,
   unitCost,
@@ -76,7 +77,7 @@ import { ARCHETYPE_LABEL } from "@/data/personalities";
 import { eraForTurn, yearForTurn } from "@/data/eras";
 import { TRAITS } from "@/data/traits";
 import { TECHS, TECH_IDS, type TechId, type TechBranch } from "@/data/techs";
-import { WONDER_GOAL, DOMINATION_FRACTION, TURN_LIMIT, MODIFIER_LABEL } from "@/systems/state";
+import { WONDER_GOAL, DOMINATION_FRACTION, TURN_LIMIT, MODIFIER_LABEL, MAX_ENTRENCH } from "@/systems/state";
 import {
   PLAYER_ID,
   RESOURCE_KEYS,
@@ -130,6 +131,8 @@ export interface HudCallbacks {
   onMoveDetachment(armyId: number, targetRegionId: number, subset: Partial<Record<UnitType, number>>): void;
   /** Disband a chosen subset of an army's units to cut upkeep. */
   onDisbandUnits(armyId: number, subset: Partial<Record<UnitType, number>>): void;
+  /** Dig an army in where it stands to entrench (M3). */
+  onFortifyArmy(armyId: number): void;
   onDeclareWar(targetId: number): void;
   onMakePeace(targetId: number): void;
   onProposePact(targetId: number, kind: "nap" | "alliance"): void;
@@ -2610,6 +2613,19 @@ function renderArmySection(
   if (army && armySize(army.units) > 0) {
     section.append(compositionLine(army));
     section.append(line(`Moves left: ${army.movesLeft}`, "hud-hint"));
+    const entrench = army.entrenchment ?? 0;
+    if (army.fortifying || entrench > 0) {
+      section.append(
+        line(
+          `${glyphHtml("shield", "🛡")} Dug in — entrenchment ${entrench}/${MAX_ENTRENCH}` +
+            (army.fortifying && entrench < MAX_ENTRENCH ? " (deepening)" : ""),
+          "hud-hint",
+        ),
+      );
+    }
+    if (inEnemyZoc(state, region.id, PLAYER_ID)) {
+      section.append(line("In an enemy zone of control — moving here ends the march.", "hud-hint"));
+    }
     const moving = moveArmyId === army.id;
     const moveBtn = document.createElement("button");
     moveBtn.className = "hud-move-btn" + (moving ? " active" : "");
@@ -2619,6 +2635,18 @@ function renderArmySection(
       moving ? callbacks.onCancelMove() : callbacks.onBeginMove(army.id),
     );
     section.append(moveBtn);
+    // Dig in: hold this region to entrench (forgoes the rest of the turn's moves).
+    if (!army.fortifying) {
+      const fortBtn = document.createElement("button");
+      fortBtn.className = "hud-move-btn";
+      fortBtn.textContent = "Fortify (dig in)";
+      fortBtn.disabled = army.movesLeft <= 0;
+      fortBtn.title =
+        "Hold this region to entrench — defence climbs one level per turn held (up to " +
+        `${MAX_ENTRENCH}). Moving or attacking gives it up.`;
+      fortBtn.addEventListener("click", () => callbacks.onFortifyArmy(army.id));
+      section.append(fortBtn);
+    }
     if (moving) {
       section.append(line("Click a highlighted neighbour to move or attack.", "hud-hint"));
       section.append(renderCombatOdds(state, army));

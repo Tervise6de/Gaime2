@@ -19,10 +19,11 @@ import { focusUnitCostMult, type FocusId } from "@/data/focuses";
 import { createRng } from "@/systems/rng";
 import { resolveCombat, type UnitCounts } from "@/systems/combat";
 import { soldiersDisplay } from "@/systems/format";
-import { atWar, declareWar } from "@/systems/diplomacy";
+import { atWar, declareWar, getTreaty } from "@/systems/diplomacy";
 import {
   BARBARIAN_ID,
   CONQUEST_UNREST,
+  MAX_ENTRENCH,
   PLAYER_ID,
   UNREST_MAX,
   armySize,
@@ -170,6 +171,62 @@ export function reachableRegions(state: GameState, army: Army): number[] {
 }
 
 /**
+ * Dig an army in where it stands (M3). It forgoes the rest of this turn's
+ * movement to entrench; its region's defence then climbs one level per held turn
+ * (up to MAX_ENTRENCH), grown in the turn pipeline. Attacking or relocating
+ * clears the stance. No-op for an empty stack or one already dug in. Pure.
+ */
+export function fortifyArmy(state: GameState, armyId: number): GameState {
+  const army = state.armies.find((a) => a.id === armyId);
+  if (!army || armySize(army.units) === 0 || army.fortifying) return state;
+  const armies = state.armies.map((a) =>
+    a.id === armyId ? { ...a, fortifying: true, movesLeft: 0 } : a,
+  );
+  const owner = state.nations.find((n) => n.id === army.ownerId);
+  const where = state.regions[army.regionId]?.name ?? "the field";
+  const who = owner?.isPlayer ? "Your army" : `${owner?.name ?? "A rival"}'s army`;
+  return { ...state, armies, log: appendLog(state, [`${who} dug in at ${where}.`]) };
+}
+
+/** Grow one turn's worth of entrenchment on every dug-in army (called by the turn pipeline). */
+export function tickEntrenchment(armies: Army[]): Army[] {
+  return armies.map((a) =>
+    a.fortifying
+      ? { ...a, entrenchment: Math.min(MAX_ENTRENCH, (a.entrenchment ?? 0) + 1) }
+      : a,
+  );
+}
+
+/** Whether `other` is an army an army of `ownerId` must fight (enemy or barbarian). */
+function isHostileOwner(state: GameState, ownerId: number, other: number): boolean {
+  if (other === ownerId) return false;
+  if (other === BARBARIAN_ID || ownerId === BARBARIAN_ID) return true;
+  return atWar(state, ownerId, other);
+}
+
+/**
+ * Zone of control (M3): a region lies in an enemy ZoC when an adjacent region
+ * holds a hostile army. Marching into such a region ends the turn's movement, so
+ * armies can no longer slip past an enemy stack — the stack pins the ground around
+ * it. Allies and non-belligerents exert no ZoC.
+ */
+export function inEnemyZoc(state: GameState, regionId: number, ownerId: number): boolean {
+  const region = state.regions[regionId];
+  if (!region) return false;
+  return region.adjacency.some((nb) =>
+    state.armies.some(
+      (a) => a.regionId === nb && armySize(a.units) > 0 && isHostileOwner(state, ownerId, a.ownerId),
+    ),
+  );
+}
+
+/** Remaining moves after entering `regionId` — clamped to 0 inside an enemy ZoC. */
+function zocClampedMoves(state: GameState, regionId: number, ownerId: number, moves: number): number {
+  if (moves <= 0) return Math.max(0, moves);
+  return inEnemyZoc(state, regionId, ownerId) ? 0 : moves;
+}
+
+/**
  * Move (or attack with) an army into an adjacent region. Pure; resolves combat
  * using the state's RNG stream and returns a new state with rngState advanced.
  */
@@ -217,17 +274,32 @@ export function moveArmy(
   // Defended: rally the neighbourhood into a combined defence (M2), then resolve
   // the assault once against the pooled stack.
   const defenders = ralliedDefenders(state, target, enemyAtTarget);
+
+  // Allies who answered the call are drawn into the war against the aggressor
+  // (the alliance honoured as a defensive pact). Same-realm reinforcements are
+  // already at war by definition; only distinct allied realms declare.
+  const answering = new Set<number>();
+  for (const d of defenders) {
+    if (d.ownerId !== enemyAtTarget.ownerId && d.ownerId !== owner) answering.add(d.ownerId);
+  }
+  for (const allyId of answering) {
+    if (!atWar(state, owner, allyId)) state = declareWar(state, allyId, owner, "ally_call");
+  }
+
   const combinedDefender = defenders.reduce(
     (acc, d) => addUnits(acc, d.units),
     emptyUnits(),
   );
   const reinforcements = armySize(combinedDefender) - armySize(enemyAtTarget.units);
 
+  // A dug-in garrison fights as if the region held extra fortification (M3); the
+  // attacker's siege still strips it inside resolveCombat.
+  const entrenchFort = target.fortification + (enemyAtTarget.entrenchment ?? 0);
   const rng = createRng(state.rngState);
   const result = resolveCombat(
     army.units,
     combinedDefender,
-    { terrainDefense: TERRAIN[target.terrain].defense, fortification: target.fortification },
+    { terrainDefense: TERRAIN[target.terrain].defense, fortification: entrenchFort },
     rng,
   );
   const rngState = rng.seed;
@@ -409,13 +481,14 @@ export function disbandUnits(
  */
 function ralliedDefenders(state: GameState, target: Region, garrison: Army): Army[] {
   if (garrison.ownerId === BARBARIAN_ID) return [garrison];
-  const reinforcements = state.armies.filter(
-    (a) =>
-      a.id !== garrison.id &&
-      a.ownerId === garrison.ownerId &&
-      a.movesLeft > 0 &&
-      target.adjacency.includes(a.regionId),
-  );
+  const realm = garrison.ownerId;
+  const reinforcements = state.armies.filter((a) => {
+    if (a.id === garrison.id || a.movesLeft <= 0) return false;
+    if (a.ownerId === BARBARIAN_ID) return false;
+    if (!target.adjacency.includes(a.regionId)) return false;
+    // Same realm always rallies; a formal ally answers the defensive call.
+    return a.ownerId === realm || getTreaty(state, realm, a.ownerId) === "alliance";
+  });
   return [garrison, ...reinforcements];
 }
 
@@ -500,7 +573,15 @@ function relocateOrMerge(
           ? {
               ...a,
               units: mergedUnits,
-              movesLeft: Math.min(a.movesLeft, army.movesLeft - 1),
+              movesLeft: zocClampedMoves(
+                state,
+                targetRegionId,
+                a.ownerId,
+                Math.min(a.movesLeft, army.movesLeft - 1),
+              ),
+              // Fresh troops arriving break the standing stack's entrenchment.
+              fortifying: false,
+              entrenchment: 0,
             }
           : a,
       );
@@ -514,7 +595,13 @@ function relocateOrMerge(
   }
   armies = state.armies.map((a) =>
     a.id === army.id
-      ? { ...a, regionId: targetRegionId, movesLeft: a.movesLeft - 1 }
+      ? {
+          ...a,
+          regionId: targetRegionId,
+          movesLeft: zocClampedMoves(state, targetRegionId, a.ownerId, a.movesLeft - 1),
+          fortifying: false,
+          entrenchment: 0,
+        }
       : a,
   );
   return { ...state, armies };
@@ -527,17 +614,26 @@ function occupyAndCapture(state: GameState, army: Army, target: Region): GameSta
   return { ...next, log: appendLog(next, [`${name} occupied ${target.name}.`]) };
 }
 
-/** Move an army into a region and spend its move. */
+/** Move an army into a region and spend its move (entering an enemy ZoC halts it). */
 function advanceInto(state: GameState, armyId: number, regionId: number): GameState {
   const armies = state.armies.map((a) =>
-    a.id === armyId ? { ...a, regionId, movesLeft: a.movesLeft - 1 } : a,
+    a.id === armyId
+      ? {
+          ...a,
+          regionId,
+          movesLeft: zocClampedMoves(state, regionId, a.ownerId, a.movesLeft - 1),
+          fortifying: false,
+          entrenchment: 0,
+        }
+      : a,
   );
   return { ...state, armies };
 }
 
 function spendMove(state: GameState, armyId: number): GameState {
+  // A repelled attacker sortied — it is no longer dug in.
   const armies = state.armies.map((a) =>
-    a.id === armyId ? { ...a, movesLeft: a.movesLeft - 1 } : a,
+    a.id === armyId ? { ...a, movesLeft: a.movesLeft - 1, fortifying: false, entrenchment: 0 } : a,
   );
   return { ...state, armies };
 }

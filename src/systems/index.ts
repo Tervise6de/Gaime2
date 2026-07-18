@@ -48,6 +48,8 @@ export {
   raiseUnit,
   reachableRegions,
   moveArmy,
+  fortifyArmy,
+  inEnemyZoc,
   totalUpkeep,
 } from "@/systems/military";
 export type { RaiseCheck } from "@/systems/military";

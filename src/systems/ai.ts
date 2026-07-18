@@ -23,6 +23,7 @@ import type { FocusId } from "@/data/focuses";
 import { sideStrength, type UnitCounts } from "@/systems/combat";
 import {
   canRaiseUnit,
+  fortifyArmy,
   moveArmy,
   raiseUnit,
   strategicAccess,
@@ -610,6 +611,17 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
 
     const step = advanceStep(s, live, nationId);
     if (step !== null) s = moveArmy(s, live.id, step);
+  }
+
+  // Phase 3 — dig in: an army that ended the phase idle (still had a move) on a
+  // threatened owned region holds the line, so entrench it (M3). Entrenchment
+  // then deepens each turn it keeps the ground.
+  for (const a of s.armies) {
+    if (a.ownerId !== nationId || a.fortifying || a.movesLeft <= 0) continue;
+    const r = s.regions[a.regionId];
+    if (r && r.ownerId === nationId && regionIsThreatened(s, a.regionId, nationId)) {
+      s = fortifyArmy(s, a.id);
+    }
   }
   return s;
 }
