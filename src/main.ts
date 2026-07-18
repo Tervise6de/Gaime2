@@ -452,6 +452,8 @@ function main(): void {
   /** Recolour the map for the active lens (null clears it → political default). */
   function refreshLens(): void {
     renderer.setLens(lensColorsFor(state, activeLens));
+    // The trade lens also draws the live merchant lanes; other views clear them.
+    renderer.setTradeLanes(activeLens === "trade" ? (state.routes ?? []) : null);
   }
 
   function highlights(): number[] {

@@ -26,6 +26,7 @@ import { createRng } from "@/systems/rng";
 import {
   PLAYER_ID,
   BARBARIAN_ID,
+  MAX_ROUTES_PER_NATION,
   armySize,
   emptyUnits,
   pairKey,
@@ -35,6 +36,7 @@ import {
   type Region,
 } from "@/systems/state";
 import type { UnitType } from "@/data/units";
+import { GOODS } from "@/data/goods";
 
 const RIVAL = 2;
 
@@ -104,6 +106,50 @@ describe("runNationTurn", () => {
       (r, i) => r.ownerId !== RIVAL && r.construction !== null && g.regions[i]!.construction === null,
     );
     expect(builtElsewhere).toBe(false);
+  });
+});
+
+describe("manageTrade (AI merchant routes)", () => {
+  /** All the realms of the Hanseatic World, so the merchant layer has Kontore. */
+  function hansaRivals(g: GameState): number[] {
+    return g.nations
+      .filter((n) => !n.isPlayer && !n.isBarbarian && g.regions.some((r) => r.ownerId === n.id))
+      .map((n) => n.id);
+  }
+
+  it("rivals open valid trade routes to the Kontore on the Hansa map", () => {
+    const g = createGame({ seed: 7, mapId: "hansa" });
+    let s = g;
+    for (const id of hansaRivals(g)) s = runNationTurn(s, id, createRng(id + 1));
+    const routes = (s.routes ?? []).filter((r) => r.ownerId !== PLAYER_ID);
+    expect(routes.length).toBeGreaterThan(0);
+    // Every route ships a good its origin sources, to a Kontor that demands it,
+    // stays under the per-nation cap, and never routes a foe's land it doesn't hold.
+    for (const rt of routes) {
+      expect(GOODS[rt.good].demandedAt).toContain(rt.toKontorId);
+      expect(s.regions[rt.fromRegionId]!.ownerId).toBe(rt.ownerId);
+    }
+    for (const id of hansaRivals(g)) {
+      expect((s.routes ?? []).filter((r) => r.ownerId === id).length).toBeLessThanOrEqual(MAX_ROUTES_PER_NATION);
+    }
+  });
+
+  it("is deterministic and does not re-open duplicates once a realm's book is full", () => {
+    const g = createGame({ seed: 7, mapId: "hansa" });
+    const rival = hansaRivals(g)[0]!;
+    const a = runNationTurn(g, rival, createRng(rival + 1));
+    const b = runNationTurn(g, rival, createRng(rival + 1));
+    const countIn = (st: GameState) => (st.routes ?? []).filter((r) => r.ownerId === rival).length;
+    expect(countIn(a)).toBe(countIn(b)); // same seed → same book
+    // Re-running on the already-booked state tops up to the cap but never duplicates.
+    const c = runNationTurn(a, rival, createRng(rival + 1));
+    expect(countIn(c)).toBeGreaterThanOrEqual(countIn(a));
+    expect(countIn(c)).toBeLessThanOrEqual(MAX_ROUTES_PER_NATION);
+    const keys = (st: GameState) =>
+      (st.routes ?? [])
+        .filter((r) => r.ownerId === rival)
+        .map((r) => `${r.fromRegionId}:${r.good}:${r.toKontorId}`);
+    expect(new Set(keys(c)).size).toBe(keys(c).length); // no duplicate (region,good,kontor)
   });
 });
 

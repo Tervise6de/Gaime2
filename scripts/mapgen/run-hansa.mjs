@@ -47,7 +47,9 @@ const lookExpr  = JSON.stringify(NAME2REGION);
 console.log('region-lookup entries:', Object.keys(NAME2REGION).length,
   '| distinct regions:', new Set(Object.values(NAME2REGION)).size);
 
-const BBOX = '-8,48,33,66';   // lon/lat play frame -> x[0,1], y[0,0.806]
+const BBOX = '-8,49,33,68';   // lon/lat play frame; north edge sits in the empty
+                              // Arctic (past Lofoten) so no straight cut crosses
+                              // populated Scandinavia. See gen-hansa.mjs projection.
 
 // ---- 1) provinces: tag, clean, dissolve, simplify, clip ----
 execFileSync('mapshaper', [
@@ -78,7 +80,7 @@ execFileSync('mapshaper', [
 // ---- 3) framing continent from ne_10m_land, wider box, heavier simplify ----
 execFileSync('mapshaper', [
   S + '/land.geojson',
-  '-clip', 'bbox=-14,43,42,71',
+  '-clip', 'bbox=-15,43,44,73',
   '-simplify', '4%', 'keep-shapes',
   '-o', S + '/hansa_context.geojson', 'format=geojson',
 ], { stdio: 'inherit' });

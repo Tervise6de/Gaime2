@@ -11,10 +11,13 @@
 import { PLAYER_ID, BARBARIAN_ID, armySize, type GameState, type Region } from "@/systems/state";
 import { regionProduction, nationYieldMult } from "@/systems/economy";
 import { getRelation, getTreaty } from "@/systems/diplomacy";
+import { regionSources } from "@/systems/trade";
+import { KONTORE, KONTOR_IDS } from "@/data/kontore";
+import type { GoodId } from "@/data/goods";
 
-/** Heat lenses colour by a normalised scalar; faith/relations/military are categorical. */
+/** Heat lenses colour by a normalised scalar; faith/relations/military/trade are categorical. */
 type HeatLens = "population" | "gold" | "materials" | "food" | "unrest";
-export type LensId = "none" | HeatLens | "faith" | "relations" | "military";
+export type LensId = "none" | HeatLens | "faith" | "relations" | "military" | "trade";
 
 export interface LensDef {
   id: LensId;
@@ -37,6 +40,18 @@ export const LENSES: LensDef[] = [
   { id: "faith", label: "Faith", glyph: "faith", fallback: "🛐", hint: "Whose faith each province holds — win by converting the world." },
   { id: "relations", label: "Relations", glyph: "diplomacy", fallback: "🤝", hint: "How each realm stands with you — allies green, enemies red." },
   { id: "military", label: "Military", glyph: "attack", fallback: "⚔", hint: "Where the armies are — your forces green, hostiles red, exposed land amber." },
+  { id: "trade", label: "Trade", glyph: "gold", fallback: "⚓", hint: "The merchant world — what each land exports (grain, timber, iron) and the Kontore that buy it (amber)." },
+];
+
+/** Trade lens: the good each land exports, and the Kontor markets (amber). */
+const TRADE_KONTOR = "#e8913a"; // the great Kontore — the markets goods flow to
+const TRADE_MUTED = "#3d434b"; // land with nothing to export (ports, transit, tundra)
+/** Colour a region takes from the good it exports; first match wins (a forest
+    sources timber and furs — it reads as timber, the bulk export). */
+const TRADE_GOODS: { good: GoodId; color: string }[] = [
+  { good: "iron", color: "#8b97a6" }, // mining country — steel grey
+  { good: "grain", color: "#d9b23f" }, // the grain plains — wheat gold
+  { good: "timber", color: "#6f8a4c" }, // the forests — timber/furs green
 ];
 
 /** Low → high colour ramp for each heat lens (dark, receding low; bright high). */
@@ -68,7 +83,7 @@ const MIL_QUIET = "#33383f"; // no forces in or beside it
     Faith/Relations/Military are categorical from the player's view — the map speaks;
     only Relations carries a meaningful single-axis (enemy→ally) legend. */
 export function lensGradient(id: LensId): string | null {
-  if (id === "none" || id === "faith" || id === "military") return null;
+  if (id === "none" || id === "faith" || id === "military" || id === "trade") return null;
   if (id === "relations") return `linear-gradient(90deg, ${RELATIONS_RAMP.join(", ")})`;
   return `linear-gradient(90deg, ${RAMPS[id].join(", ")})`;
 }
@@ -184,6 +199,21 @@ export function lensColorsFor(state: GameState, id: LensId): (string | null)[] |
       else if (h > 0) out[r.id] = rampColor(MIL_HOSTILE, h / maxStr);
       else if (r.ownerId === PLAYER_ID && r.adjacency.some((n) => (hostile[n] ?? 0) > 0)) out[r.id] = MIL_EXPOSED;
       else out[r.id] = MIL_QUIET;
+    }
+    return out;
+  }
+  // Trade is categorical: paint each land by the good it exports, and the four
+  // Kontore (the markets those goods flow to) in a standout amber, so the whole
+  // merchant geography reads at a glance. Land that exports nothing is muted.
+  if (id === "trade") {
+    const kontorHosts = new Set(KONTOR_IDS.map((k) => KONTORE[k].regionId));
+    const out: (string | null)[] = [];
+    for (const r of state.regions) {
+      if (kontorHosts.has(r.id)) {
+        out[r.id] = TRADE_KONTOR;
+        continue;
+      }
+      out[r.id] = TRADE_GOODS.find((g) => regionSources(r, g.good))?.color ?? TRADE_MUTED;
     }
     return out;
   }

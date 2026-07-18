@@ -49,6 +49,9 @@ import {
   wouldJoinWar,
 } from "@/systems/diplomacy";
 import { researchFrontier, selectTech, isBuildingUnlockedFor } from "@/systems/tech";
+import { createRoute, laneFor, regionSources, distanceFactor } from "@/systems/trade";
+import { GOODS, GOOD_IDS } from "@/data/goods";
+import { KONTORE } from "@/data/kontore";
 import { eraIndexForTurn } from "@/data/eras";
 import { TECHS, type TechId, type TechBranch } from "@/data/techs";
 import type { Rng } from "@/systems/rng";
@@ -57,6 +60,7 @@ import {
   DIFFICULTY,
   FORT_PER_LEVEL,
   FRIENDLY_THRESHOLD,
+  MAX_ROUTES_PER_NATION,
   PLAYER_ID,
   WONDER_GOAL,
   UNREST_REVOLT,
@@ -80,8 +84,53 @@ function earlyPeaceTurns(state: GameState): number {
 export function runNationTurn(state: GameState, nationId: number, rng: Rng): GameState {
   let s = state;
   s = manageEconomy(s, nationId);
+  s = manageTrade(s, nationId);
   s = doDiplomacy(s, nationId, rng);
   s = doMilitary(s, nationId, rng);
+  return s;
+}
+
+/**
+ * Open the merchant routes a rival can profitably run: for each owned region that
+ * sources a good, the best reachable Kontor that demands it, filled to the
+ * per-nation cap, richest lane first. `createRoute` is the real guard (ownership,
+ * demand, a lane, no trading into a foe, the cap); this only proposes good
+ * candidates and skips routes already open, so it is a stable no-op once a realm's
+ * book is full. Pure and deterministic — no RNG, tie-broken by ids. Barbarians
+ * (and realms already at the cap) do nothing.
+ */
+function manageTrade(state: GameState, nationId: number): GameState {
+  if (nationId === BARBARIAN_ID) return state;
+  let s = state;
+  const mine = () => (s.routes ?? []).filter((r) => r.ownerId === nationId);
+  if (mine().length >= MAX_ROUTES_PER_NATION) return s;
+
+  interface Cand { regionId: number; good: (typeof GOOD_IDS)[number]; kontorId: keyof typeof KONTORE; income: number }
+  const cands: Cand[] = [];
+  for (const region of s.regions) {
+    if (region.ownerId !== nationId) continue;
+    for (const good of GOOD_IDS) {
+      if (!regionSources(region, good)) continue;
+      for (const kontorId of GOODS[good].demandedAt) {
+        const lane = laneFor(s, region.id, kontorId);
+        if (lane.length === 0) continue; // Kontor unreachable / off this map
+        const hostOwner = s.regions[KONTORE[kontorId].regionId]?.ownerId ?? null;
+        if (hostOwner !== null && hostOwner !== nationId && atWar(s, nationId, hostOwner)) continue;
+        cands.push({ regionId: region.id, good, kontorId, income: GOODS[good].value * distanceFactor(lane.length) });
+      }
+    }
+  }
+  // Richest first; deterministic tie-break so the same seed opens the same book.
+  cands.sort(
+    (a, b) => b.income - a.income || a.regionId - b.regionId || a.good.localeCompare(b.good) || a.kontorId.localeCompare(b.kontorId),
+  );
+  const already = (c: Cand): boolean =>
+    mine().some((r) => r.fromRegionId === c.regionId && r.good === c.good && r.toKontorId === c.kontorId);
+  for (const c of cands) {
+    if (mine().length >= MAX_ROUTES_PER_NATION) break;
+    if (already(c)) continue;
+    s = createRoute(s, nationId, c.regionId, c.good, c.kontorId);
+  }
   return s;
 }
 

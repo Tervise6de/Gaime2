@@ -15,9 +15,12 @@ if (!S) {
 const REPO = path.resolve(HERE, '..', '..'); // repo root, two levels up from scripts/mapgen
 
 // ---------- projection (shared lon/lat -> game space) ----------
-const KX = 0.024390, KY = 0.044785;
+// lon[-8,33] -> x[0,1]; lat[68,~49] -> y[0,~0.92]. KY set for a ~2:1 lat:lon
+// aspect (correct near 59 N) so the land fills the frame without looking squat.
+const LAT0 = 68;                       // north edge of the frame (y = 0)
+const KX = 0.024390, KY = 0.0485;
 const r4 = v => Number(v.toFixed(4));
-const project = (lon, lat) => [r4((lon + 8) * KX), r4((66 - lat) * KY)];
+const project = (lon, lat) => [r4((lon + 8) * KX), r4((LAT0 - lat) * KY)];
 
 function openRing(coords) {
   const pts = coords.map(([lon, lat]) => project(lon, lat));
@@ -258,7 +261,7 @@ const geoTs = `/**
  * Built by scratchpad/genhansa.mjs from Natural Earth 10m admin-1 units,
  * dissolved into medieval Hansa-era regions (mapshaper -clean -dissolve),
  * simplified, clipped to the play frame, and projected to game space
- *   x = (lon + 8) * ${KX} ,  y = (66 - lat) * ${KY}
+ *   x = (lon + 8) * ${KX} ,  y = (${LAT0} - lat) * ${KY}
  * Do not edit by hand — re-run the generator. Serialisable data only.
  */
 import type { Coord, ScriptedRegion } from "@/data/maps/types";
@@ -275,12 +278,13 @@ export const HANSA_LAND: Coord[][] = ${jc(land)};
 export const HANSA_CONTEXT: { land: Coord[][]; labels: { text: string; x: number; y: number }[] } = {
   land: ${jc(ctxLand)},
   labels: [
-    { text: "The Empire", x: 0.52, y: 0.95 },
-    { text: "France", x: 0.14, y: 0.9 },
-    { text: "Scotland", x: 0.1, y: 0.36 },
-    { text: "The Rus", x: 1.08, y: 0.52 },
-    { text: "Lappland", x: 0.62, y: -0.05 },
-    { text: "The Ocean", x: -0.09, y: 0.52 },
+    { text: "The Empire", x: 0.5, y: 1.0 },
+    { text: "France", x: 0.17, y: 0.97 },
+    { text: "Scotland", x: 0.09, y: 0.49 },
+    { text: "Ireland", x: 0.0, y: 0.69 },
+    { text: "The Rus", x: 1.07, y: 0.5 },
+    { text: "Lappland", x: 0.56, y: 0.03 },
+    { text: "The Ocean", x: -0.07, y: 0.62 },
   ],
 };
 `;

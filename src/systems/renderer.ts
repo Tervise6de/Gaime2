@@ -34,7 +34,7 @@ import {
   TERRAIN_TEXTURE_DENSITY,
   type IslandArchetype,
 } from "@/data/mapstyle";
-import { armySize, BARBARIAN_ID } from "@/systems/state";
+import { armySize, BARBARIAN_ID, PLAYER_ID, type TradeRoute } from "@/systems/state";
 import {
   UNREST_PENALTY_START,
   UNREST_REVOLT,
@@ -89,6 +89,12 @@ export interface Renderer {
    * default. Baked into the political layer, so it reads at any zoom.
    */
   setLens(colors: (string | null)[] | null): void;
+  /**
+   * Trade overlay: the routes whose lanes to draw as merchant lines on the map
+   * (the trade lens passes the live routes; other views pass null). Cheap — a
+   * few polylines per frame — so it just follows the live camera.
+   */
+  setTradeLanes(routes: TradeRoute[] | null): void;
   /** Remap owner colours to the colour-blind-safe palette (or back). */
   setColourblind(on: boolean): void;
   /** Suppress cosmetic motion (capture ripples) when true. */
@@ -192,6 +198,15 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     return `${cam.s.toFixed(3)}|${cam.tx.toFixed(1)}|${cam.ty.toFixed(1)}`;
   }
 
+  // Zoom crossfade for labels on the dense province map: region/city names fade
+  // IN across this zoom window while the realm nameplates fade OUT over the same
+  // range, so a zoomed-out view reads by realm and a zoomed-in view by province,
+  // and the two never pile up. 0 at (and below) fit zoom, 1 once zoomed past HI.
+  const LABEL_FADE_LO = 1.22, LABEL_FADE_HI = 1.6;
+  function regionLabelAlpha(): number {
+    return Math.max(0, Math.min(1, (cam.s - LABEL_FADE_LO) / (LABEL_FADE_HI - LABEL_FADE_LO)));
+  }
+
   function clampCam(): void {
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
@@ -280,6 +295,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   // Baked into the political layer; its signature triggers the rebake.
   let lensColors: (string | null)[] | null = null;
   let lensSig = "";
+  // Active trade overlay: routes whose lanes draw as merchant lines (trade lens
+  // only). Not baked — drawn live each frame over the political layer.
+  let tradeLanes: TradeRoute[] | null = null;
   // Composite of ocean+terrain+political: the per-frame cost is ONE blit, not
   // three. Recomposited (three offscreen blits, no re-drawing) when any part
   // rebuilds.
@@ -410,9 +428,10 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       // realms generate an organic island around the sites.
       if (smap) {
         archetype = "large"; // tight framing — the authored land fills [0,1]
-        // A context map insets the play area so the outer-world land shows as
-        // a border; a plain scripted map fills the frame.
-        outerMargin = smap.context ? 0.11 : 0;
+        // A context map insets the play area a touch so the outer-world land
+        // frames it; kept small so the playable land stays large on screen (the
+        // faded continent bleeds past [0,1] anyway, so it still shows).
+        outerMargin = smap.context ? 0.045 : 0;
         const toPoly = (poly: [number, number][]): Point[] => poly.map((v) => ({ x: v[0], y: v[1] }));
         shape = { blobs: smap.land.map(toPoly), islets: (smap.islets ?? []).map(toPoly) };
       } else {
@@ -430,12 +449,14 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   // then draw through the camera transform each frame — so zooming to CAM_MAX
   // stays acceptably crisp without ever re-rendering a stamp. The pixel budget
   // caps memory on large/hi-DPI screens (soft-at-max-zoom beats jank).
-  const MAX_LAYER_PIXELS = 6_000_000;
+  const MAX_LAYER_PIXELS = 9_000_000;
 
   function layerScaleNow(): number {
     const dpr = window.devicePixelRatio || 1;
     const area = Math.max(1, canvas.clientWidth * canvas.clientHeight);
-    return Math.max(1, Math.min(Math.max(2, dpr), Math.sqrt(MAX_LAYER_PIXELS / area)));
+    // Bake nearer the max zoom so zooming in stays crisp (the layers are scaled
+    // up by the camera, so a higher bake = less softening at CAM_MAX).
+    return Math.max(1, Math.min(Math.max(2.4, dpr), Math.sqrt(MAX_LAYER_PIXELS / area)));
   }
 
   /** (Re)build an offscreen layer canvas at the supersampled base resolution. */
@@ -1034,6 +1055,11 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
    * map's small text. Clamped on-canvas; the player's plate reads "YOU".
    */
   function drawNameplates(s: GameState, proj: Projection): void {
+    // On the dense province map the realm names fade OUT as the region/city names
+    // fade in (the zoom crossfade), so a zoomed-in view reads by province. Sparse
+    // maps keep their realm names at every zoom.
+    const realmFade = s.regions.length > 30 ? 1 - regionLabelAlpha() : 1;
+    if (realmFade <= 0.02) return;
     interface Rect {
       x0: number;
       y0: number;
@@ -1113,11 +1139,12 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         placedRect = { x0: x - half - 6, y0: y - size / 2 - 3, x1: x + half + 6, y1: y + size / 2 + 3 };
       }
       obstacles.push(placedRect); // later plates must dodge this one too
+      context.globalAlpha = realmFade;
       context.lineWidth = 4;
       context.lineJoin = "round";
       context.strokeStyle = POLITICAL.nameplateHalo;
       context.strokeText(label, x, y);
-      context.globalAlpha = POLITICAL.nameplateAlpha;
+      context.globalAlpha = POLITICAL.nameplateAlpha * realmFade;
       context.fillStyle = ownerColor(nation.id);
       context.fillText(label, x, y);
       context.globalAlpha = 1;
@@ -1405,7 +1432,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     context.fillStyle = OCEAN.outer;
     context.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
     if (state) {
-      paintVoronoi(state, ensureProjection(state));
+      const proj = ensureProjection(state);
+      paintVoronoi(state, proj);
+      drawTradeLanes(proj);
       drawArmies(state);
       drawRipples(state);
       if (minimap) drawMinimap(state);
@@ -1680,17 +1709,19 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       }
     }
 
-    // On a dense province map (the Hanseatic World's 74 regions) the small
-    // labels pile up at fit zoom, so reveal them progressively — capitals and
-    // the selected region always read, the rest appear as you zoom in. Sparse
-    // maps (procedural realms, small scenarios) always label everything.
+    // On the dense province map (the Hanseatic World's 74 regions) the small
+    // labels would pile up at fit zoom, so region/city names fade in as you zoom
+    // (drawNameplates fades the realm names out over the same window). The
+    // selected region always reads; sparse maps always label everything.
     const denseMap = (state?.regions.length ?? 0) > 30;
-    const showDetail = !denseMap || cam.s >= 1.25 || capitals.has(region.id) || region.id === selected;
+    const nameAlpha = !denseMap || region.id === selected ? 1 : regionLabelAlpha();
+    const showDetail = nameAlpha > 0.02;
 
     // Region name below, with a dark halo so it reads on bright terrain too.
     // A touch of tracking gives the labels a cartographic voice where the
     // browser supports canvas letterSpacing (harmless no-op elsewhere).
     if (showDetail) {
+      context.globalAlpha = nameAlpha;
       const label = context as CanvasRenderingContext2D & { letterSpacing?: string };
       if ("letterSpacing" in label) label.letterSpacing = "0.4px";
       context.font = "600 11px system-ui, sans-serif";
@@ -1703,6 +1734,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       context.fillStyle = "#e6eaf3";
       context.fillText(region.name, p.x, p.y + NODE_RADIUS + 4);
       if ("letterSpacing" in label) label.letterSpacing = "0px";
+      context.globalAlpha = 1;
     }
 
     // Status row: one slot per active signal, centred under the name. Each
@@ -1796,6 +1828,50 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         markerHits.push({ x, y: rowY, r: 9.5, text: slot.tip });
       });
     }
+  }
+
+  /**
+   * Merchant lines for the trade lens: each route's lane drawn as a polyline
+   * through its regions' sites to the Kontor, amber for a live route and dashed
+   * red for a severed one, the player's a touch bolder. A soft underlay makes the
+   * lines read over any terrain. Drawn live (routes change with war and capture).
+   */
+  function drawTradeLanes(proj: Projection): void {
+    const routes = tradeLanes;
+    if (!routes || routes.length === 0) return;
+    context.save();
+    context.lineJoin = "round";
+    context.lineCap = "round";
+    for (const route of routes) {
+      const pts = route.lane.map((id) => proj.sites[id]).filter(Boolean) as { x: number; y: number }[];
+      if (pts.length < 2) continue;
+      const mine = route.ownerId === PLAYER_ID;
+      const disrupted = !!route.disrupted;
+      const trace = (): void => {
+        context.beginPath();
+        context.moveTo(pts[0]!.x, pts[0]!.y);
+        for (let i = 1; i < pts.length; i++) context.lineTo(pts[i]!.x, pts[i]!.y);
+      };
+      // Soft underlay.
+      trace();
+      context.strokeStyle = disrupted ? "rgba(200, 70, 60, 0.28)" : "rgba(232, 145, 58, 0.30)";
+      context.lineWidth = mine ? 7 : 5;
+      context.stroke();
+      // Crisp line (severed routes dashed).
+      trace();
+      context.setLineDash(disrupted ? [5, 5] : []);
+      context.strokeStyle = disrupted ? "#c8463c" : mine ? "#f4c04a" : "#e8913a";
+      context.lineWidth = mine ? 2.4 : 1.6;
+      context.stroke();
+      context.setLineDash([]);
+      // A dot at the Kontor end (goods flow *to* the market).
+      const end = pts[pts.length - 1]!;
+      context.beginPath();
+      context.arc(end.x, end.y, mine ? 4.5 : 3.5, 0, Math.PI * 2);
+      context.fillStyle = disrupted ? "#c8463c" : "#f0b35a";
+      context.fill();
+    }
+    context.restore();
   }
 
   function drawArmies(s: GameState): void {
@@ -2083,6 +2159,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       lensColors = colors;
       lensSig = sig;
       needsPaint = true;
+    },
+    setTradeLanes(routes: TradeRoute[] | null): void {
+      tradeLanes = routes && routes.length ? routes : null;
     },
     setColourblind(on: boolean): void {
       colourblind = on;
