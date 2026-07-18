@@ -6,6 +6,40 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-18 — F1: Steam Coming-Soon package + two bugs the screenshots caught (v0.51.0)
+
+Prepared everything a human needs to stand up a **Coming Soon** page and start
+collecting wishlists (roadmap F1) — and, capturing the marketing screenshots,
+found and fixed two real issues visual verification had missed.
+
+**Store package (`docs/press/steam-store.md`).** Rewrote the copy (short
+description, About, features, tags) to lead with the new differentiator — the
+character/story layer the advisor said was missing — instead of the generic 4X
+pitch. Corrected stale facts (nine units not five, 30-tech tree, four victory
+paths) and added a "what needs a human" note (Steamworks account + $100 fee +
+key art). Everything else is paste-ready.
+
+**Three new screenshots** (`docs/press/screenshots/`, 1920×1080), the shots that
+sell the game: `08-diplomacy-rulers` (rivals led by named rulers), `09-chronicle`
+(a run's wars, a revolt, two betrayals and its fall, in prose), and
+`10-army-commander` (a stack with its commander, entrenchment and fortify).
+
+**Bug — raw HTML in the army panel (fix).** The M3/M4/E5 commander and
+entrenchment hint lines passed markup (glyph SVG + `<b>`) to `line()`, which sets
+`textContent` — so they rendered as literal `<span class="ico…` gibberish in both
+the army panel and the enemy-region panel. Added an `htmlLine()` helper and
+switched those lines to it. The screenshot caught what the log/click checks
+hadn't — exactly why the visual pass matters.
+
+**Chronicle quality (fixes).** Re-declaring an already-active war no longer writes
+a beat; consecutive identical beats are collapsed; and every beat is sentence-cased
+("your realm" → "Your realm"). A recurring grudge now reads once and cleanly.
+
+595 tests green, typecheck + build clean; every screenshot re-verified in the
+running app after each fix.
+
+---
+
 ## 2026-07-18 — Stress / bug-bash harness (roadmap A4)
 
 A permanent self-play regression net now that the army/character stack is

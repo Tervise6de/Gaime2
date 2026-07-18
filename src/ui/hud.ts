@@ -2572,14 +2572,14 @@ function renderEnemyRegion(
       const c = garrison.commander;
       const rebel = garrison.ownerId === BARBARIAN_ID;
       box.append(
-        line(
+        htmlLine(
           `${glyphHtml("attack", "⚔")} ${rebel ? "Pretender" : "Led by"}: <b>${escapeHtml(commanderTitle(c))}</b> — martial ${c.martial}`,
           "hud-hint",
         ),
       );
     }
     if ((garrison.entrenchment ?? 0) > 0) {
-      box.append(line(`${glyphHtml("shield", "🛡")} Dug in — entrenchment ${garrison.entrenchment}/${MAX_ENTRENCH}`, "hud-hint"));
+      box.append(htmlLine(`${glyphHtml("shield", "🛡")} Dug in — entrenchment ${garrison.entrenchment}/${MAX_ENTRENCH}`, "hud-hint"));
     }
   } else {
     box.append(line("Undefended — an army walking in captures it."));
@@ -2652,7 +2652,7 @@ function renderArmySection(
       const t = COMMANDER_TRAITS[c.trait];
       const disloyal = c.loyalty <= COMMANDER_DISLOYAL;
       section.append(
-        line(
+        htmlLine(
           `${glyphHtml("attack", "⚔")} Led by <b>${escapeHtml(commanderTitle(c))}</b> — ` +
             `martial ${c.martial}, ${escapeHtml(t.label)}, loyalty ${c.loyalty}` +
             (disloyal ? ' <span class="bad">(disloyal — foments unrest)</span>' : ""),
@@ -2663,7 +2663,7 @@ function renderArmySection(
     const entrench = army.entrenchment ?? 0;
     if (army.fortifying || entrench > 0) {
       section.append(
-        line(
+        htmlLine(
           `${glyphHtml("shield", "🛡")} Dug in — entrenchment ${entrench}/${MAX_ENTRENCH}` +
             (army.fortifying && entrench < MAX_ENTRENCH ? " (deepening)" : ""),
           "hud-hint",
@@ -3990,6 +3990,13 @@ function unrestColor(unrest: number): string {
 function line(text: string, className = ""): HTMLElement {
   const p = el("p", className || "hud-line");
   p.textContent = text;
+  return p;
+}
+
+/** Like `line`, but the content is trusted HTML (glyphs, <b>) rather than text. */
+function htmlLine(html: string, className = ""): HTMLElement {
+  const p = el("p", className || "hud-line");
+  p.innerHTML = html;
   return p;
 }
 

@@ -261,6 +261,8 @@ export function casusBelli(state: GameState, a: number, b: number): CasusBelli {
  */
 export function declareWar(state: GameState, a: number, b: number, cb?: CasusBelli): GameState {
   const reason = cb ?? casusBelli(state, a, b);
+  // A genuinely new war is a chronicle beat; re-affirming an active war is not.
+  const newWar = getTreaty(state, a, b) !== "war";
   let next = setTreaty(state, a, b, "war");
   next = clearPeaceSince(next, a, b); // swords drawn — the peace clock stops
   next = recordOpinion(next, a, b, -RELATION_WAR_HIT, "war");
@@ -274,6 +276,7 @@ export function declareWar(state: GameState, a: number, b: number, cb?: CasusBel
   }
   const note = CASUS_BELLI[reason].justified ? ` (${CASUS_BELLI[reason].label.toLowerCase()})` : "";
   next = { ...next, log: [...next.log, `${name(next, a)} declared war on ${name(next, b)}${note}!`].slice(-50) };
+  if (!newWar) return next;
   // Chronicle beat (E2): a war is a spine of the story.
   const called = reason === "ally_call" ? " — answering the call" : "";
   return recordChronicle(

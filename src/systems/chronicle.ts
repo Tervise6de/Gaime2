@@ -24,10 +24,15 @@ export interface ChronicleEntry {
 /** Keep the chronicle bounded even in a pathological game. */
 const CHRONICLE_MAX = 200;
 
-/** Append a beat to the chronicle (stamped with the current turn). Pure. */
+/** Append a beat to the chronicle (stamped with the current turn). Pure.
+ *  Skips a beat identical in text to the one before it, so a recurring event
+ *  (e.g. a realm that keeps warring the same rival) never reads as a stutter. */
 export function recordChronicle(state: GameState, kind: ChronicleKind, text: string): GameState {
-  const entry: ChronicleEntry = { turn: state.turn, kind, text };
-  const chronicle = [...(state.chronicle ?? []), entry].slice(-CHRONICLE_MAX);
+  const prose = text.charAt(0).toUpperCase() + text.slice(1); // sentence-case ("your" → "Your")
+  const prev = state.chronicle;
+  if (prev && prev.length > 0 && prev[prev.length - 1]!.text === prose) return state;
+  const entry: ChronicleEntry = { turn: state.turn, kind, text: prose };
+  const chronicle = [...(prev ?? []), entry].slice(-CHRONICLE_MAX);
   return { ...state, chronicle };
 }
 
