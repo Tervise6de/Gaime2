@@ -6,6 +6,45 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-18 — C4: treaty-breaking with a reputation cost (v0.52.0)
+
+Diplomacy/AI depth II (roadmap C4): a NAP or an alliance is now a *given word*
+that can be broken — treachery — at a price paid to every court.
+
+**The price of a broken word (`systems/diplomacy.ts`).** `declareWar` now detects
+when the war breaks a standing NAP or alliance and, instead of the light
+casus-belli censure, applies a **treachery cost**: a steep extra wound to the
+betrayed party (`betrayal` opinion) *and* a broad standing hit with **every other
+realm** (`broken_word` opinion) — the reputation term that makes coalitions gather
+against a serial oath-breaker. An alliance is more sacred than a NAP, so betraying
+one costs more (`TREATY_BREAK`: nap 15/10, alliance 30/18). Honouring an ally's
+call to a war they are already in is a higher duty, explicitly *not* treachery. A
+broken pact is a `betrayal` chronicle beat, distinct from an honest war.
+
+**Who betrays (`wouldBreakTreaty`, pure).** Only a realm whose word is cheap — the
+bottom tier of trustworthiness (< 0.3 for a NAP, < 0.18 for an alliance) — breaks
+it, and only for a *tempting* strike: a foe caught **reeling** (famine / revolt /
+bankruptcy) with a solid edge, or an overwhelming power edge outright. High-trust
+Hansa realms keep their word; a treacherous Warlord or Opportunist will stab a
+lukewarm NAP partner when it is down. The player is never auto-betrayed into
+anything — their pacts are theirs to break through the UI.
+
+**AI wiring (`systems/ai.ts`).** The opportunistic-war test is now treaty-aware:
+no pact → hostility + a power edge as before; a NAP/alliance → only if the realm
+`wouldBreakTreaty` *and* the partnership has cooled below friendly. The new opinion
+reasons surface automatically in the diplomacy "Why they feel this way" breakdown
+(the renderer was already generic).
+
+**Balance (probe: 36 all-AI games across proc-large / Baltic / Europe).** Treaty-
+breaking adds ≈1 betrayal per game beyond the existing commander-defection beats —
+present in a meaningful share of games, never the everyday route to war — and lifts
+war frequency (3.6 → 5.9 wars/game) without shifting pacing or the victory spread.
+No archetype dominates; the stress matrix's invariants all hold.
+
+606 tests green (+11 for C4), typecheck clean.
+
+---
+
 ## 2026-07-18 — F1: Steam Coming-Soon package + two bugs the screenshots caught (v0.51.0)
 
 Prepared everything a human needs to stand up a **Coming Soon** page and start

@@ -34,6 +34,8 @@ import {
   foreignRelations,
   casusBelli,
   CASUS_BELLI,
+  wouldBreakTreaty,
+  TREATY_BREAK,
   keptPeaceTurns,
   keptPeaceGoodwill,
   PEACE_GOODWILL_MAX,
@@ -606,5 +608,112 @@ describe("casus belli — how justified a war is", () => {
     const before = getRelation(game(), PLAYER_ID, RIVAL_B);
     const g = declareWar(game(), PLAYER_ID, RIVAL_A, "reclaim");
     expect(getRelation(g, PLAYER_ID, RIVAL_B)).toBe(before); // unchanged
+  });
+});
+
+describe("treaty-breaking with a reputation cost (C4)", () => {
+  // Give `id` a large host so power ratios are lopsided and deterministic.
+  const arm = (g: GameState, id: number, n: number): GameState => ({
+    ...g,
+    armies: [
+      ...g.armies,
+      { id: 900 + id, ownerId: id, regionId: g.regions.find((r) => r.ownerId === id)!.id, units: { ...emptyUnits(), infantry: n }, movesLeft: 0 },
+    ],
+  });
+  // Set an AI nation's trustworthiness (keeping it a scheming opportunist).
+  const setTrust = (g: GameState, id: number, trustworthiness: number): GameState => ({
+    ...g,
+    nations: g.nations.map((n) =>
+      n.id === id
+        ? { ...n, personality: { archetype: "opportunist", aggression: 0.6, expansion: 0.6, economy: 0.5, trustworthiness } }
+        : n,
+    ),
+  });
+  // Strip a nation to a rump (regions to barbarian, armies gone) so it reads as
+  // far weaker — a huge, deterministic power edge for whoever eyes it.
+  const rump = (g: GameState, id: number): GameState => ({
+    ...g,
+    regions: g.regions.map((r) => (r.ownerId === id ? { ...r, ownerId: 1 } : r)),
+    armies: g.armies.filter((a) => a.ownerId !== id),
+  });
+
+  it("orders the price of a broken word: an alliance costs more than a NAP", () => {
+    expect(TREATY_BREAK.alliance.bilateral).toBeGreaterThan(TREATY_BREAK.nap.bilateral);
+    expect(TREATY_BREAK.alliance.thirdParty).toBeGreaterThan(TREATY_BREAK.nap.thirdParty);
+  });
+
+  describe("wouldBreakTreaty (the AI's willingness to betray)", () => {
+    it("is always free to strike where no pact stands", () => {
+      const g = arm(setTrust(game(), RIVAL_A, 0.1), RIVAL_A, 40);
+      expect(wouldBreakTreaty(g, RIVAL_A, RIVAL_B)).toBe(true);
+    });
+
+    it("a low-trust realm breaks a NAP for an overwhelming strike", () => {
+      let g = arm(rump(setTrust(game(), RIVAL_A, 0.15), RIVAL_B), RIVAL_A, 20);
+      g = setPact(g, RIVAL_A, RIVAL_B, "nap");
+      expect(wouldBreakTreaty(g, RIVAL_A, RIVAL_B)).toBe(true);
+    });
+
+    it("a trustworthy realm keeps its NAP even with the edge to break it", () => {
+      let g = arm(rump(setTrust(game(), RIVAL_A, 0.8), RIVAL_B), RIVAL_A, 20);
+      g = setPact(g, RIVAL_A, RIVAL_B, "nap");
+      expect(wouldBreakTreaty(g, RIVAL_A, RIVAL_B)).toBe(false);
+    });
+
+    it("won't break a NAP without a real power edge", () => {
+      // Arm the *target*, so the schemer is the weaker party — treachery not worth it.
+      let g = arm(setTrust(game(), RIVAL_A, 0.1), RIVAL_B, 40);
+      g = setPact(g, RIVAL_A, RIVAL_B, "nap");
+      expect(wouldBreakTreaty(g, RIVAL_A, RIVAL_B)).toBe(false);
+    });
+
+    it("an alliance is more sacred than a NAP: the same low trust breaks one, not the other", () => {
+      const trust = 0.25; // below the NAP ceiling (0.3), above the alliance ceiling (0.18)
+      const edge = (g: GameState) => arm(rump(setTrust(g, RIVAL_A, trust), RIVAL_B), RIVAL_A, 20);
+      const napped = setPact(edge(game()), RIVAL_A, RIVAL_B, "nap");
+      const allied = setPact(edge(game()), RIVAL_A, RIVAL_B, "alliance");
+      expect(wouldBreakTreaty(napped, RIVAL_A, RIVAL_B)).toBe(true);
+      expect(wouldBreakTreaty(allied, RIVAL_A, RIVAL_B)).toBe(false);
+    });
+
+    it("never auto-betrays on the player's behalf", () => {
+      let g = arm(rump(game(), RIVAL_A), PLAYER_ID, 20);
+      g = setPact(g, PLAYER_ID, RIVAL_A, "nap");
+      expect(wouldBreakTreaty(g, PLAYER_ID, RIVAL_A)).toBe(false);
+    });
+  });
+
+  it("breaking a NAP wounds the betrayed and stains standing with every court", () => {
+    const beforeThird = getRelation(game(), PLAYER_ID, RIVAL_B);
+    const napped = setPact(game(), PLAYER_ID, RIVAL_A, "nap");
+    const relBefore = getRelation(napped, PLAYER_ID, RIVAL_A);
+    const g = declareWar(napped, PLAYER_ID, RIVAL_A);
+    const pair = g.opinions?.[pairKey(PLAYER_ID, RIVAL_A)] ?? [];
+    expect(pair.some((e) => e.reason === "betrayal")).toBe(true);
+    // Steeper than an ordinary war: the betrayed party's relations fall further.
+    expect(getRelation(g, PLAYER_ID, RIVAL_A)).toBeLessThan(relBefore - 45);
+    // Third-party reputation cost: a bystander's opinion sours too.
+    expect(getRelation(g, PLAYER_ID, RIVAL_B)).toBeLessThan(beforeThird);
+    expect((g.opinions?.[pairKey(PLAYER_ID, RIVAL_B)] ?? []).some((e) => e.reason === "broken_word")).toBe(true);
+  });
+
+  it("breaking an alliance stains standing harder than breaking a NAP", () => {
+    const napThird = getRelation(declareWar(setPact(game(), PLAYER_ID, RIVAL_A, "nap"), PLAYER_ID, RIVAL_A), PLAYER_ID, RIVAL_B);
+    const allyThird = getRelation(declareWar(setPact(game(), PLAYER_ID, RIVAL_A, "alliance"), PLAYER_ID, RIVAL_A), PLAYER_ID, RIVAL_B);
+    expect(allyThird).toBeLessThan(napThird);
+  });
+
+  it("records a betrayal as a chronicle beat", () => {
+    const g = declareWar(setPact(game(), RIVAL_A, RIVAL_B, "alliance"), RIVAL_A, RIVAL_B);
+    expect((g.chronicle ?? []).some((e) => e.kind === "betrayal")).toBe(true);
+  });
+
+  it("honouring an ally's call is a duty, not treachery — even breaking a NAP with the foe", () => {
+    // RIVAL_A holds a NAP with RIVAL_B but answers a call against it (ally_call).
+    const napped = setPact(game(), RIVAL_A, RIVAL_B, "nap");
+    const g = declareWar(napped, RIVAL_A, RIVAL_B, "ally_call");
+    const pair = g.opinions?.[pairKey(RIVAL_A, RIVAL_B)] ?? [];
+    expect(pair.some((e) => e.reason === "betrayal")).toBe(false);
+    expect(pair.some((e) => e.reason === "war")).toBe(true);
   });
 });

@@ -45,6 +45,7 @@ import {
   setPact,
   sharedBorders,
   wouldAccept,
+  wouldBreakTreaty,
   wouldJoinWar,
 } from "@/systems/diplomacy";
 import { researchFrontier, selectTech, isBuildingUnlockedFor } from "@/systems/tech";
@@ -400,7 +401,17 @@ function doDiplomacy(state: GameState, nationId: number, rng: Rng): GameState {
     // `overstretched` restraint: strike weakness, don't compound your own.)
     const targetUnstable = nationInstability(state, o.id).reeling;
     const warThreshold = 1.5 - aggression - (targetUnstable ? 0.3 : 0);
-    if (border && rel < -25 && ratio > warThreshold && !earlyGraceForPlayer && !overstretched) {
+    // A realm we hold no pact with can be struck on hostility + a power edge. A
+    // NAP or alliance is a given word: only a low-trust realm breaks it, and only
+    // for a tempting strike (`wouldBreakTreaty` — a real power edge, worse odds
+    // only against a reeling foe), branding itself with every court (declareWar's
+    // reputation cost). A warm partnership (rel ≥ friendly) is safe even from a
+    // schemer. This is C4's treaty-breaking: characterful betrayal, self-punished.
+    const pact = treaty === "nap" || treaty === "alliance";
+    const mayStrike = pact
+      ? rel < FRIENDLY_THRESHOLD && wouldBreakTreaty(s, nationId, o.id)
+      : rel < -25;
+    if (border && mayStrike && ratio > warThreshold && !earlyGraceForPlayer && !overstretched) {
       s = openWar(s, nationId, o);
       actions++;
       continue;

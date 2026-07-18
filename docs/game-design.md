@@ -708,6 +708,20 @@ opinion breakdown shows it as a standing "Kept the peace (N turns)" level. The A
 benefits automatically — the lifted `relations` scalar makes enduring-peace
 neighbours likelier to trade and ally. **§9.1 is now complete.**
 
+**Treaty-breaking — SHIPPED (v0.52, roadmap C4).** A NAP or an alliance can now be
+*broken* — treachery — at a reputation price. `declareWar` detects a war that
+violates a standing pact and applies, in place of the light casus-belli censure, a
+steep bilateral wound (`betrayal`) plus a broad standing hit with **every other
+realm** (`broken_word`, `TREATY_BREAK`) — so serial oath-breakers become pariahs and
+coalitions gather against them (the anti-snowball, self-punishing by design).
+Alliances cost more to break than NAPs; answering an ally's call is a duty, not
+treachery. The rival AI (`wouldBreakTreaty`, pure) only breaks a pact when its word
+is cheap (bottom-tier trustworthiness) *and* the strike is tempting (a reeling foe
+with an edge, or an overwhelming edge) — high-trust Hansa realms keep their word;
+a treacherous Warlord/Opportunist stabs a cooled NAP partner when it is down. The
+player is never auto-betrayed. A broken pact is a `betrayal` chronicle beat. Probed
+balance-neutral on pacing/victories while adding ≈1 betrayal per game.
+
 ### 9.2 Combat model + unit roles — SHIPPED v2 (`systems/combat.ts`)
 Combat is now **phased**: an opening volley (ranged + siege fire first; siege
 strips fortification) then up to `MAX_COMBAT_ROUNDS` of melee attrition, with the

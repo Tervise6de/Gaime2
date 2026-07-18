@@ -60,6 +60,8 @@ export const OPINION_LABEL: Record<string, string> = {
   gift: "Gifts given",
   trade: "Our trade route",
   aggression: "Your wars of aggression",
+  betrayal: "You broke your word to me",
+  broken_word: "Their broken pacts",
 };
 
 /**
@@ -251,33 +253,114 @@ export function casusBelli(state: GameState, a: number, b: number): CasusBelli {
   return "none";
 }
 
+// --- treaty-breaking: the price of a broken word (C4) -----------------------
+
+/**
+ * What it costs to break a given pact by declaring war on the partner. A NAP is
+ * a promise; an alliance is a bond — so betraying an alliance wounds the
+ * betrayed party more (`bilateral`, on top of the ordinary war hit) and brands
+ * the oath-breaker harder with *every other* court (`thirdParty`, the reputation
+ * cost that makes coalitions form against a serial betrayer). See `declareWar`.
+ */
+export const TREATY_BREAK: Record<"nap" | "alliance", { bilateral: number; thirdParty: number }> = {
+  nap: { bilateral: 15, thirdParty: 10 },
+  alliance: { bilateral: 30, thirdParty: 18 },
+};
+
+/**
+ * Whether AI nation `aggressor` would break its standing pact with `target` to
+ * strike now. With no pact in place it is always free to attack. Breaking one is
+ * treachery, so only a realm whose word is *cheap* (low trustworthiness) does
+ * it, and only for a genuinely tempting prize (a clear power edge, lower still
+ * against a reeling target) — because the broken word is punished by every court
+ * (`TREATY_BREAK.thirdParty`). Alliances are far more sacred than NAPs: betraying
+ * one needs both lower trust and a bigger opportunity. Deterministic and pure;
+ * the player is never auto-betrayed into anything (their pacts are their own to
+ * break through the UI). Used by the rival AI's opportunistic-war logic.
+ */
+export function wouldBreakTreaty(state: GameState, aggressor: number, target: number): boolean {
+  const treaty = getTreaty(state, aggressor, target);
+  if (treaty !== "nap" && treaty !== "alliance") return true; // no word to keep
+  const me = state.nations.find((n) => n.id === aggressor);
+  if (!me || me.isPlayer || me.isBarbarian) return false;
+  const trust = me.personality?.trustworthiness ?? 0.5;
+  // Only the genuinely faithless break their word — the bottom tier of trust, and
+  // an alliance is far more sacred than a NAP.
+  const trustCeil = treaty === "alliance" ? 0.18 : 0.3;
+  if (trust >= trustCeil) return false; // keeps its word
+  const ratio = nationPower(state, aggressor) / (nationPower(state, target) || 1);
+  // A *tempting* strike, not a routine one: either a foe caught reeling (famine,
+  // revolt, bankruptcy — a real vulnerability window) with a solid edge, or an
+  // overwhelming edge outright. Both bars sit high enough that treachery is an
+  // occasional, memorable act rather than the everyday route to war.
+  const reeling = nationInstability(state, target).reeling;
+  const reelNeed = treaty === "alliance" ? 2.0 : 1.5;
+  const bigNeed = treaty === "alliance" ? 3.0 : 2.2;
+  return (reeling && ratio >= reelNeed) || ratio >= bigNeed;
+}
+
 // --- actions ----------------------------------------------------------------
 
 /**
- * Declare war. Beyond the direct relation hit, an *unjustified* war costs the
- * declarer standing with every other realm (a light reputation term, so naked
- * aggression draws coalitions while a justified war — ally's call, reclaiming
- * lost land — does not). The casus belli is auto-detected unless passed.
+ * Declare war. Beyond the direct relation hit, war carries a reputation term
+ * with every *other* realm:
+ *  - **Treachery** — breaking a standing NAP or alliance (C4) — is the gravest:
+ *    a steep extra wound to the betrayed party and a broad standing hit with all
+ *    other courts (`TREATY_BREAK`), so oath-breakers become pariahs and
+ *    coalitions gather against them. It supersedes any casus belli (you cannot
+ *    "justify" stabbing a partner) — except honouring an ally's call, which is a
+ *    deeper duty, not treachery.
+ *  - Otherwise an *unjustified* war (naked aggression / a border pretext) draws
+ *    the lighter casus-belli censure, while a justified war — ally's call,
+ *    reclaiming lost land — draws none.
+ * The casus belli is auto-detected unless passed.
  */
 export function declareWar(state: GameState, a: number, b: number, cb?: CasusBelli): GameState {
   const reason = cb ?? casusBelli(state, a, b);
+  const prevTreaty = getTreaty(state, a, b);
+  // Breaking a pact is treachery — unless it is to answer an ally's call to a
+  // war they are already in (a higher obligation, kept justified).
+  const broke =
+    (prevTreaty === "nap" || prevTreaty === "alliance") && reason !== "ally_call"
+      ? prevTreaty
+      : null;
   // A genuinely new war is a chronicle beat; re-affirming an active war is not.
-  const newWar = getTreaty(state, a, b) !== "war";
+  const newWar = prevTreaty !== "war";
   let next = setTreaty(state, a, b, "war");
   next = clearPeaceSince(next, a, b); // swords drawn — the peace clock stops
   next = recordOpinion(next, a, b, -RELATION_WAR_HIT, "war");
   next = severTrade(next, a, b); // war ends commerce
-  const penalty = CASUS_BELLI[reason].thirdPartyPenalty;
-  if (penalty > 0) {
+  if (broke) {
+    const cost = TREATY_BREAK[broke];
+    next = recordOpinion(next, a, b, -cost.bilateral, "betrayal");
     for (const c of next.nations) {
       if (c.isBarbarian || !c.alive || c.id === a || c.id === b) continue;
-      next = recordOpinion(next, a, c.id, -penalty, "aggression");
+      next = recordOpinion(next, a, c.id, -cost.thirdParty, "broken_word");
+    }
+  } else {
+    const penalty = CASUS_BELLI[reason].thirdPartyPenalty;
+    if (penalty > 0) {
+      for (const c of next.nations) {
+        if (c.isBarbarian || !c.alive || c.id === a || c.id === b) continue;
+        next = recordOpinion(next, a, c.id, -penalty, "aggression");
+      }
     }
   }
-  const note = CASUS_BELLI[reason].justified ? ` (${CASUS_BELLI[reason].label.toLowerCase()})` : "";
-  next = { ...next, log: [...next.log, `${name(next, a)} declared war on ${name(next, b)}${note}!`].slice(-50) };
+  const suffix = broke
+    ? `, breaking ${broke === "alliance" ? "their alliance" : "a non-aggression pact"}!`
+    : CASUS_BELLI[reason].justified
+      ? ` (${CASUS_BELLI[reason].label.toLowerCase()})!`
+      : "!";
+  next = { ...next, log: [...next.log, `${name(next, a)} declared war on ${name(next, b)}${suffix}`].slice(-50) };
   if (!newWar) return next;
-  // Chronicle beat (E2): a war is a spine of the story.
+  // Chronicle beat (E2): a betrayal and an honest war are different stories.
+  if (broke) {
+    return recordChronicle(
+      next,
+      "betrayal",
+      `${chronicleName(next, a)} betrayed ${chronicleName(next, b)}, breaking ${broke === "alliance" ? "a sworn alliance" : "a pact of peace"}.`,
+    );
+  }
   const called = reason === "ally_call" ? " — answering the call" : "";
   return recordChronicle(
     next,
