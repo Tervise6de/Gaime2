@@ -104,6 +104,10 @@ const CONFIGS: Array<{ name: string; opts: (seed: number) => NewGameOptions }> =
   { name: "europe", opts: (seed) => ({ seed, mapId: "europe" }) },
 ];
 
+// Each of these plays many full games; give them plenty of headroom so a slow
+// CI box never trips the default 5s per-test timeout.
+const STRESS_TIMEOUT_MS = 60_000;
+
 describe("stress: self-play across configs holds every invariant and terminates", () => {
   it("plays a matrix of full games with no invariant violation", () => {
     let played = 0;
@@ -117,7 +121,7 @@ describe("stress: self-play across configs holds every invariant and terminates"
       }
     }
     expect(played).toBe(CONFIGS.length * 4);
-  });
+  }, STRESS_TIMEOUT_MS);
 
   it("actually exercises conflict across the matrix (coverage guard)", () => {
     let games = 0;
@@ -145,7 +149,7 @@ describe("stress: self-play across configs holds every invariant and terminates"
     expect(sawWar).toBe(true);
     expect(sawRevoltOrBetrayal).toBe(true);
     expect(peakArmies).toBeGreaterThan(0);
-  });
+  }, STRESS_TIMEOUT_MS);
 
   it("is deterministic — the same seed + config replays identically", () => {
     for (const cfg of ["proc-large", "baltic"] as const) {
@@ -158,5 +162,5 @@ describe("stress: self-play across configs holds every invariant and terminates"
       expect(JSON.stringify(a.armies)).toBe(JSON.stringify(b.armies));
       expect(JSON.stringify(a.chronicle ?? [])).toBe(JSON.stringify(b.chronicle ?? []));
     }
-  });
+  }, STRESS_TIMEOUT_MS);
 });
