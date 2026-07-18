@@ -104,6 +104,12 @@ export interface Renderer {
   zoomBy(factor: number): void;
   /** Reset the camera to the fitted full-map view. */
   resetView(): void;
+  /**
+   * Attach (or detach with null) a HUD-owned minimap canvas. While attached the
+   * renderer paints it each frame with the baked map composite and a rectangle
+   * for the current camera view; clicking it recentres the camera there.
+   */
+  setMinimap(target: HTMLCanvasElement | null): void;
 }
 
 export function createRenderer(canvas: HTMLCanvasElement): Renderer {
@@ -284,6 +290,12 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   // costs nothing per frame (and stops forcing the browser to recomposite the
   // blurred HUD panels above the canvas every frame).
   let needsPaint = true;
+
+  // Optional minimap (CK3-style): a HUD-owned canvas the renderer redraws each
+  // frame with the baked map composite + a rectangle for the current view.
+  let minimap: HTMLCanvasElement | null = null;
+  // The composite's fitted sub-rect inside the minimap, so clicks map back to the map.
+  let minimapFit: { ox: number; oy: number; fw: number; fh: number } | null = null;
 
   /** Live-camera projection: hit paths, marker anchors, dynamics. Cheap to
       rebuild (a few thousand point transforms), so it follows every camera
@@ -1373,9 +1385,82 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       paintVoronoi(state, ensureProjection(state));
       drawArmies(state);
       drawRipples(state);
+      if (minimap) drawMinimap(state);
     }
     tick += 1;
     frame = window.requestAnimationFrame(render);
+  }
+
+  /**
+   * Redraw the minimap: the baked map composite fitted into the small HUD canvas,
+   * plus a rectangle marking the slice the camera currently shows. Reuses the
+   * same cached composite the main view blits, so it's ~one extra drawImage per
+   * painted frame and always reflects the active lens.
+   */
+  function drawMinimap(s: GameState): void {
+    const mm = minimap;
+    if (!mm) return;
+    const mctx = mm.getContext("2d");
+    if (!mctx) return;
+    const st = ensureStatic(s);
+    const dpr = window.devicePixelRatio || 1;
+    const cw = mm.clientWidth || 168;
+    const ch = mm.clientHeight || 116;
+    const bw = Math.max(1, Math.round(cw * dpr));
+    const bh = Math.max(1, Math.round(ch * dpr));
+    if (mm.width !== bw || mm.height !== bh) {
+      mm.width = bw;
+      mm.height = bh;
+    }
+    mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    mctx.clearRect(0, 0, cw, ch);
+    mctx.fillStyle = OCEAN.outer;
+    mctx.fillRect(0, 0, cw, ch);
+    // Contain-fit the composite (its aspect matches the main canvas), letterboxed.
+    const aw = Math.max(1, canvas.clientWidth);
+    const ah = Math.max(1, canvas.clientHeight);
+    const scale = Math.min(cw / aw, ch / ah);
+    const fw = aw * scale;
+    const fh = ah * scale;
+    const ox = (cw - fw) / 2;
+    const oy = (ch - fh) / 2;
+    mctx.drawImage(st, 0, 0, st.width, st.height, ox, oy, fw, fh);
+    minimapFit = { ox, oy, fw, fh };
+    // Current-view rectangle: the base-normalised slice the camera shows (clamped
+    // to the fitted map so it never spills into the letterbox).
+    const vw = Math.min(fw, fw / cam.s);
+    const vh = Math.min(fh, fh / cam.s);
+    // Candidate top-left ≥ (ox,oy) by construction; clamp the right/bottom edge in.
+    const vx = Math.min(ox + Math.max(0, -cam.tx / (aw * cam.s)) * fw, ox + fw - vw);
+    const vy = Math.min(oy + Math.max(0, -cam.ty / (ah * cam.s)) * fh, oy + fh - vh);
+    mctx.strokeStyle = "rgba(255, 242, 207, 0.92)";
+    mctx.lineWidth = 1.5;
+    mctx.strokeRect(vx, vy, vw, vh);
+  }
+
+  /**
+   * Recenter the camera so (nx,ny) in normalised map space sits at the viewport
+   * centre — the player clicked that spot on the minimap. Clamped to bounds, so
+   * clicking at fit-zoom (pan locked) is a harmless no-op.
+   */
+  function centerOnNorm(nx: number, ny: number): void {
+    const aw = canvas.clientWidth;
+    const ah = canvas.clientHeight;
+    cam.tx = aw * (0.5 - nx * cam.s);
+    cam.ty = ah * (0.5 - ny * cam.s);
+    clampCam();
+    needsPaint = true;
+  }
+
+  function onMinimapPointerDown(ev: PointerEvent): void {
+    const mm = minimap;
+    if (!mm || !minimapFit) return;
+    const rect = mm.getBoundingClientRect();
+    const nx = (ev.clientX - rect.left - minimapFit.ox) / minimapFit.fw;
+    const ny = (ev.clientY - rect.top - minimapFit.oy) / minimapFit.fh;
+    if (nx < 0 || nx > 1 || ny < 0 || ny > 1) return; // clicked the letterbox
+    centerOnNorm(nx, ny);
+    ev.preventDefault();
   }
 
   /** Draw and age the capture ripples: a quick flash, then an expanding fading ring. */
@@ -1986,6 +2071,18 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     },
     resetView(): void {
       fitView();
+    },
+    setMinimap(target: HTMLCanvasElement | null): void {
+      if (minimap === target) return;
+      if (minimap) minimap.removeEventListener("pointerdown", onMinimapPointerDown);
+      minimap = target;
+      if (minimap) {
+        minimap.style.cursor = "pointer";
+        minimap.addEventListener("pointerdown", onMinimapPointerDown);
+      } else {
+        minimapFit = null;
+      }
+      needsPaint = true;
     },
   };
 }

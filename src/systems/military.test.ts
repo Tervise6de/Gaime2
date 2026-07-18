@@ -342,8 +342,9 @@ describe("moveArmy", () => {
     expect(armySize(merged.units)).toBe(5);
     expect(merged.units.infantry).toBe(2);
     expect(merged.units.militia).toBe(3);
+    // Army display scale is ×250: 2 + 3 units = 500 + 750 = 1,250 soldiers.
     expect(
-      next.log.some((l) => l.includes("merged") && l.includes("2,000 + 3,000 = 5,000 soldiers")),
+      next.log.some((l) => l.includes("merged") && l.includes("500 + 750 = 1,250 soldiers")),
     ).toBe(true);
   });
 });

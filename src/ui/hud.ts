@@ -155,10 +155,6 @@ export interface HudCallbacks {
   onAcceptOffer(offerId: number): void;
   onRejectOffer(offerId: number): void;
   onChooseResearch(tech: TechId): void;
-  /** Append a tech to the research queue (auto-starts after the current). */
-  onQueueResearch(tech: TechId): void;
-  /** Clear the research queue. */
-  onClearResearchQueue(): void;
   /** Select a region on the map (e.g. from a clicked log entry); null deselects. */
   onSelectRegion(regionId: number | null): void;
   /** Resolve the pending choice event by picking one of its options. */
@@ -212,6 +208,8 @@ export interface Hud {
   showTurnReport(turn: number, summary: TurnSummary | null, state: GameState): void;
   /** Replay a battle blow-by-blow (a player-involved fight). */
   showBattleReport(report: BattleReport): void;
+  /** The HUD-owned minimap canvas (in the Map panel), handed to renderer.setMinimap. */
+  minimapCanvas: HTMLCanvasElement;
 }
 
 const RESOURCE_META: Record<ResourceKey, { label: string; icon: string; tip: string }> = {
@@ -253,7 +251,6 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   for (const key of RESOURCE_KEYS) {
     const meta = RESOURCE_META[key];
     const cell = el("div", "hud-resource");
-    cell.title = `${meta.label} — ${meta.tip}`;
     const icon = resourceIconEl(key, meta.icon, "hud-resource-icon");
     const body = el("div", "hud-resource-body");
     const label = el("span", "hud-resource-label");
@@ -264,8 +261,41 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     cell.append(icon, body);
     barLeft.append(cell);
     resourceEls[key] = { stock, flow };
+    // Hovering a resource chip floats a per-region income breakdown (CK3-style),
+    // so "where does my materials come from?" is answered without opening a panel.
+    cell.addEventListener("mouseenter", (ev) => showResourceTip(key, ev.clientX, ev.clientY));
+    cell.addEventListener("mousemove", (ev) => positionResourceTip(ev.clientX, ev.clientY));
+    cell.addEventListener("mouseleave", hideResourceTip);
   }
   topBar.append(barLeft);
+
+  // Floating resource-income tooltip (per-region breakdown), shown on chip hover.
+  const resourceTipEl = el("div", "hud-restip");
+  resourceTipEl.style.display = "none";
+  root.append(resourceTipEl);
+  function showResourceTip(key: ResourceKey, x: number, y: number): void {
+    if (!lastState || !lastPlayer) return;
+    resourceTipEl.innerHTML = resourceTipHtml(lastState, lastPlayer, key);
+    resourceTipEl.style.display = "block";
+    positionResourceTip(x, y);
+  }
+  function positionResourceTip(x: number, y: number): void {
+    if (resourceTipEl.style.display === "none") return;
+    const pad = 14;
+    let left = x + pad;
+    let top = y + pad;
+    if (left + resourceTipEl.offsetWidth > window.innerWidth - 8) {
+      left = window.innerWidth - resourceTipEl.offsetWidth - 8;
+    }
+    if (top + resourceTipEl.offsetHeight > window.innerHeight - 8) {
+      top = y - resourceTipEl.offsetHeight - pad;
+    }
+    resourceTipEl.style.left = `${Math.max(8, left)}px`;
+    resourceTipEl.style.top = `${Math.max(8, top)}px`;
+  }
+  function hideResourceTip(): void {
+    resourceTipEl.style.display = "none";
+  }
 
   // Resource-count tweening: the displayed stock eases toward the live value so the
   // numbers count up/down instead of snapping. Skipped (snaps) under reduce-motion.
@@ -437,8 +467,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const diploRail = railBtn("flag", "⚑", t("nav.diplomacy"), t("nav.diplomacy.tip"), () =>
     toggleScreen("diplo"),
   );
+  // D5 keeps the label/​tip localised; the fixes make the button open the tree
+  // directly (it is the sole research page now) instead of the old list screen.
   const researchRail = railBtn("book", "📖", t("nav.research"), t("nav.research.tip"), () =>
-    toggleScreen("research"),
+    toggleTechTree(),
   );
   researchRail.btn.classList.add("hud-railbtn-research");
   const productionRail = railBtn(
@@ -494,20 +526,18 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     root.append(overlay);
     return { overlay, panel, body };
   }
+  // Diplomacy is the one remaining big-screen tab here; Research now opens the
+  // tech-tree overlay directly (see toggleTechTree), so the tree is its sole page.
   const diploScreen = buildScreen("Diplomacy", "hud-diplo-panel", () => setScreen(null));
-  const researchScreen = buildScreen("Research", "hud-research-panel", () => setScreen(null));
 
-  type ScreenId = "diplo" | "research";
+  type ScreenId = "diplo";
   let openScreenId: ScreenId | null = null;
   function setScreen(id: ScreenId | null): void {
     openScreenId = id;
     diploScreen.overlay.style.display = id === "diplo" ? "flex" : "none";
-    researchScreen.overlay.style.display = id === "research" ? "flex" : "none";
     diploRail.btn.classList.toggle("active", id === "diplo");
-    researchRail.btn.classList.toggle("active", id === "research");
     // A freshly opened screen always starts at its top.
     if (id === "diplo") diploScreen.panel.scrollTop = 0;
-    if (id === "research") researchScreen.panel.scrollTop = 0;
   }
   function toggleScreen(id: ScreenId): void {
     setScreen(openScreenId === id ? null : id);
@@ -515,8 +545,6 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
   const diploBody = el("div", "hud-diplo-body");
   diploScreen.body.append(diploBody);
-  const researchBody = el("div", "hud-research-body");
-  researchScreen.body.append(researchBody);
 
   // --- Bottom-left: commit the turn, and what still wants orders -------------
   // Fiscal policy (tax) now lives on the Politics page (P); this cluster keeps
@@ -560,7 +588,8 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   advisorBox.style.display = "none";
 
   actions.append(taxJump, advisorBox, endTurnBtn);
-  root.append(actions);
+  // `actions` is parented into the bottom-left stack below (beneath the Map
+  // panel), so End turn keeps the corner while the minimap sits just above it.
 
   // --- Politics page: taxes, fiscal policy and the victory race --------------
   // Governance in one place: the tax lever (moved off the End-turn cluster) and
@@ -594,48 +623,59 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     politicsOverlay.style.display = "none";
   }
 
-  // --- Map lenses: recolour the board by a metric (CIV5-style overlays) ------
-  // A compact strip of view buttons floats at the bottom of the map; the active
-  // lens is echoed by main.ts into the renderer, which bakes the heat in.
+  // --- Map panel (CK3-style): a small minimap + a map-mode dropdown ----------
+  // Bottom-left corner. The minimap is painted by the renderer (setMinimap, wired
+  // in main.ts); the dropdown picks the overlay lens, echoed by main.ts into the
+  // renderer which bakes the heat into the political layer.
   let activeLens: LensId = "none";
-  const lensBar = el("div", "hud-lensbar");
-  const lensLabel = el("span", "hud-lens-title");
-  lensLabel.textContent = "Map";
-  lensBar.append(lensLabel);
-  const lensBtns = new Map<LensId, HTMLButtonElement>();
+  const mapPanel = el("div", "hud-panel hud-mappanel");
+  const mapPanelHead = el("div", "hud-mappanel-head");
+  const mapPanelTitle = el("span", "hud-mappanel-title");
+  mapPanelTitle.textContent = "Map";
+  mapPanelHead.append(mapPanelTitle);
+  const minimapCanvas = document.createElement("canvas");
+  minimapCanvas.className = "hud-minimap";
+  minimapCanvas.title = "Minimap — click to jump the camera there.";
+  const lensRow = el("div", "hud-lens-row");
+  const lensSelectLabel = el("span", "hud-lens-select-label");
+  lensSelectLabel.textContent = "View";
+  const lensSelect = document.createElement("select");
+  lensSelect.className = "hud-lens-select";
   for (const lens of LENSES) {
-    const b = document.createElement("button");
-    b.className = "hud-lens-btn";
-    // Resource lenses use the resource icon; the rest use a map glyph.
-    const isResource = lens.id === "gold" || lens.id === "materials" || lens.id === "food";
-    const icon = isResource
-      ? resourceIconHtml(lens.id as "gold" | "materials" | "food", lens.fallback)
-      : glyphHtml(lens.glyph as Parameters<typeof glyphHtml>[0], lens.fallback);
-    b.innerHTML = `${icon}<span class="ico-label">${escapeHtml(lens.label)}</span>`;
-    b.title = lens.hint;
-    b.addEventListener("click", () => setLens(lens.id));
-    lensBtns.set(lens.id, b);
-    lensBar.append(b);
+    const opt = document.createElement("option");
+    opt.value = lens.id;
+    opt.textContent = lens.label;
+    opt.title = lens.hint;
+    lensSelect.append(opt);
   }
+  lensSelect.value = "none";
+  lensSelect.addEventListener("change", () => setLens(lensSelect.value as LensId));
+  lensRow.append(lensSelectLabel, lensSelect);
   const lensScale = el("div", "hud-lens-scale");
   lensScale.style.display = "none";
   lensScale.innerHTML = `<span>low</span><i class="hud-lens-ramp"></i><span>high</span>`;
-  lensBar.append(lensScale);
-  root.append(lensBar);
-  lensBtns.get("none")?.classList.add("active"); // political is the default view
+  mapPanel.append(mapPanelHead, minimapCanvas, lensRow, lensScale);
+
+  // Bottom-left column: the Map panel (minimap + filter) sits above the actions
+  // cluster, so End turn stays in the corner and the two never overlap however
+  // many advisor chips the actions cluster grows.
+  const bottomLeft = el("div", "hud-bottomleft");
+  bottomLeft.append(mapPanel, actions);
+  root.append(bottomLeft);
 
   function setLens(id: LensId): void {
     activeLens = id;
-    for (const [lid, b] of lensBtns) b.classList.toggle("active", lid === id);
+    if (lensSelect.value !== id) lensSelect.value = id;
     const grad = lensGradient(id);
     lensScale.style.display = grad ? "flex" : "none";
     if (grad) {
       const ramp = lensScale.querySelector<HTMLElement>(".hud-lens-ramp");
       if (ramp) ramp.style.background = grad;
     }
+    lensSelect.title = LENSES.find((l) => l.id === id)?.hint ?? "";
     callbacks.onLensChange(id);
   }
-  /** Step to the next lens (keyboard M) — cycles Political → … → Unrest → back. */
+  /** Step to the next lens (keyboard M) — cycles Political → … → Military → back. */
   function cycleLens(): void {
     const i = LENSES.findIndex((l) => l.id === activeLens);
     setLens(LENSES[(i + 1) % LENSES.length]!.id);
@@ -1048,14 +1088,24 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   });
   root.append(techOverlay);
   let lastPlayer: Nation | null = null;
+  // Latest player knowledge/turn, so the tech tree can show turns-to-complete.
+  let lastKnowledgeFlow = 0;
 
   function openTechTree(): void {
     if (!lastPlayer) return;
-    renderTechTree(techOverlay, lastPlayer, eraIndexForTurn(lastState?.turn ?? 1), callbacks, closeTechTree);
+    renderTechTree(techOverlay, lastPlayer, eraIndexForTurn(lastState?.turn ?? 1), lastKnowledgeFlow, callbacks, closeTechTree);
     techOverlay.style.display = "flex";
+    techOverlay.scrollTop = 0;
+    researchRail.btn.classList.add("active");
   }
   function closeTechTree(): void {
     techOverlay.style.display = "none";
+    researchRail.btn.classList.remove("active");
+  }
+  /** The Research button / R key toggle the tree (it is the research page now). */
+  function toggleTechTree(): void {
+    if (techOverlay.style.display === "none") openTechTree();
+    else closeTechTree();
   }
 
   // --- Standings overlay (mid-game rankings + score race, opened from the top) -
@@ -1952,7 +2002,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       toggleScreen("diplo");
     } else if (key === "r") {
       ev.preventDefault();
-      toggleScreen("research");
+      toggleTechTree();
     } else if (key === "n") {
       ev.preventDefault();
       toggleLog();
@@ -2037,7 +2087,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
             ? glyphHtml("hammer", "🔨")
             : glyphHtml("flag", "⚑");
       const chip = btn("", "hud-advice-chip " + item.kind, () => {
-        if (item.kind === "research") setScreen("research");
+        if (item.kind === "research") openTechTree();
         else if (item.kind === "build") openProduction();
         else openArmies();
       });
@@ -2061,15 +2111,21 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     setBadge(armiesRail.badge, readyArmies);
     if (armiesOverlay.style.display !== "none") renderArmies();
 
+    // National flow (knowledge feeds the research ETA below; gold/food/etc. the chips).
+    const flow = nationalProduction(state, PLAYER_ID);
+    const upkeep = totalUpkeep(state, PLAYER_ID);
+    lastKnowledgeFlow = flow.knowledge;
+
     // Rail badges: offers awaiting your answer; a research choice waiting.
     setBadge(diploRail.badge, state.offers.filter((o) => o.to === PLAYER_ID).length);
     const mustChoose =
       !player.research.current && researchFrontier(player.research.done, eraIndexForTurn(state.turn)).length > 0;
     setBadge(researchRail.badge, mustChoose ? 1 : 0);
     researchRail.btn.classList.toggle("attention", mustChoose);
-    // Keep an open tech tree in sync with the latest research state.
+    // Keep an open tech tree in sync with the latest research state (it's now the
+    // sole research page — opened straight from the Research button).
     if (techOverlay.style.display !== "none") {
-      renderTechTree(techOverlay, player, eraIndexForTurn(state.turn), callbacks, closeTechTree);
+      renderTechTree(techOverlay, player, eraIndexForTurn(state.turn), flow.knowledge, callbacks, closeTechTree);
     }
     // Keep an open standings overlay live as turns resolve.
     if (standingsOverlay.style.display !== "none") renderStandingsOverlay();
@@ -2087,8 +2143,6 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     }
     // Keep the save-slot labels' turn markers current (e.g. after autosave/load).
     refreshSlotLabels();
-    const flow = nationalProduction(state, PLAYER_ID);
-    const upkeep = totalUpkeep(state, PLAYER_ID);
     for (const key of RESOURCE_KEYS) {
       targetStock[key] = player.stocks[key];
       const f = key === "gold" ? round1(flow.gold - upkeep) : flow[key];
@@ -2194,7 +2248,6 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       renderAttack(selectedRegionId);
     }
     renderDiplomacy(diploBody, state, callbacks);
-    renderResearch(researchBody, player, flow.knowledge, eraIndexForTurn(state.turn), callbacks, openTechTree);
 
     if (state.outcome === "playing") {
       endDismissed = false; // re-arm the recap for the next decided game
@@ -2247,7 +2300,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     }
   }
 
-  return { update, toast: flashToast, openOptions, openRecords, mapTip, openRegionScreen, showTurnReport, showBattleReport };
+  return { update, toast: flashToast, openOptions, openRecords, mapTip, openRegionScreen, showTurnReport, showBattleReport, minimapCanvas };
 }
 
 function renderRegion(
@@ -2474,6 +2527,59 @@ function flowTooltip(key: ResourceKey, player: Nation, region: Region): string {
   if (uMult !== 1) parts.push(`Unrest ${pct(uMult)}`);
   const base = RESOURCE_META[key].tip;
   return parts.length ? `${base}\n\nMultipliers: ${parts.join(" · ")}.` : base;
+}
+
+/**
+ * Per-region income breakdown for a resource, sorted high→low. Uses the same
+ * `regionProduction` the sim's flow does, so the hover tooltip can never drift
+ * from the /turn figure on the chip. Pure.
+ */
+function resourceBreakdown(
+  state: GameState,
+  player: Nation,
+  key: ResourceKey,
+): { name: string; value: number }[] {
+  const mult = nationYieldMult(player);
+  return state.regions
+    .filter((r) => r.ownerId === player.id)
+    .map((r) => ({ name: r.name, value: regionProduction(r, player.taxRate, mult)[key] }))
+    .sort((a, b) => b.value - a.value);
+}
+
+/**
+ * The floating resource tooltip's HTML: a per-region income list (highest
+ * first), and — for gold — the army-upkeep deduction and the net the chip
+ * shows. Long empires collapse the tail into a "+N more" row so the tip never
+ * overruns the screen.
+ */
+function resourceTipHtml(state: GameState, player: Nation, key: ResourceKey): string {
+  const meta = RESOURCE_META[key];
+  const rows = resourceBreakdown(state, player, key);
+  const gross = round1(rows.reduce((s, r) => s + r.value, 0));
+  const upkeep = key === "gold" ? round1(totalUpkeep(state, player.id)) : 0;
+  const net = round1(gross - upkeep);
+  const icon = resourceIconHtml(key, meta.icon);
+  const MAX = 16;
+  const shown = rows.slice(0, MAX);
+  const rest = rows.slice(MAX);
+  const rowHtml = (name: string, value: number, extraClass = ""): string =>
+    `<div class="hud-restip-row ${extraClass}"><span class="hud-restip-name">${escapeHtml(name)}</span>` +
+    `<span class="hud-restip-val${value < 0 ? " neg" : ""}">${fmt(value)}</span></div>`;
+  let body = shown.map((r) => rowHtml(r.name, r.value)).join("");
+  if (rest.length) {
+    const more = round1(rest.reduce((s, r) => s + r.value, 0));
+    body += rowHtml(`+${rest.length} more region${rest.length === 1 ? "" : "s"}`, more, "muted");
+  }
+  if (!rows.length) body = `<div class="hud-restip-row muted"><span class="hud-restip-name">No regions producing yet.</span></div>`;
+  const upkeepBlock = key === "gold" ? rowHtml("Army upkeep", -upkeep, "hud-restip-upkeep") : "";
+  const totalVal = key === "gold" ? net : gross;
+  return (
+    `<div class="hud-restip-head">${icon} ${escapeHtml(meta.label)} — income by region</div>` +
+    `<div class="hud-restip-rows">${body}</div>` +
+    upkeepBlock +
+    `<div class="hud-restip-total"><span class="hud-restip-name">${key === "gold" ? "Net / turn" : "Total / turn"}</span>` +
+    `<span class="hud-restip-val${totalVal < 0 ? " neg" : " pos"}">${totalVal >= 0 ? "+" : ""}${fmt(totalVal)}</span></div>`
+  );
 }
 
 function renderOwnedRegion(
@@ -3669,153 +3775,86 @@ function renderDiplomacy(
   }
 }
 
-/**
- * Research drawer (left rail, like Diplomacy). Leads with the state — current
- * technology + progress bar, or a loud "choose" prompt when a pick is due —
- * then the counts, the tech-tree button, and the frontier cards stacked
- * vertically. Cards mark the in-progress tech; clicking one sets research.
- */
-function renderResearch(
-  container: HTMLElement,
-  player: Nation,
-  knowledgeFlow: number,
-  era: number,
-  callbacks: HudCallbacks,
-  onOpenTree: () => void,
-): void {
-  container.innerHTML = "";
-  const research = player.research;
-  const frontier = researchFrontier(research.done, era);
-  const mustChoose = !research.current && frontier.length > 0;
-  const countText = `${research.done.length}/${Object.keys(TECHS).length} techs · ${player.wonders}/${WONDER_GOAL} wonders`;
-
-  const header = el("div", "hud-research-head");
-  const title = el("span", "hud-research-title");
-  if (research.current) {
-    const def = TECHS[research.current];
-    const pct = Math.min(100, (research.progress / def.cost) * 100);
-    // Progress can overshoot the cost mid-turn (completion lands at resolve);
-    // clamp the display so it never reads "32/20".
-    const shown = Math.min(Math.floor(research.progress), def.cost);
-    // Research is never instant: knowledge income flows into the current tech
-    // each End turn — show the pace so "how long?" always has an answer.
-    const remaining = Math.max(0, def.cost - research.progress);
-    const eta = knowledgeFlow > 0 ? Math.max(1, Math.ceil(remaining / knowledgeFlow)) : null;
-    title.innerHTML =
-      `${resourceIconHtml("knowledge", "📖")} ${def.name} — ${shown}/${def.cost}` +
-      (eta !== null
-        ? ` · ~${eta} turn${eta === 1 ? "" : "s"}`
-        : ` · stalled`);
-    title.title =
-      eta !== null
-        ? `Your ${fmt(knowledgeFlow)} knowledge/turn flows into this technology at each End turn.`
-        : "No knowledge income — build Libraries or work hills/mountains to research at all.";
-    const bar = el("div", "hud-research-bar");
-    const fill = el("div", "hud-research-fill");
-    fill.style.width = `${pct}%`;
-    fill.style.background = BRANCH_COLOR[def.branch];
-    bar.append(fill);
-    header.append(title, bar);
-  } else if (mustChoose) {
-    title.textContent = "Choose a technology to research:";
-    header.append(title);
-  } else {
-    title.innerHTML = `${resourceIconHtml("knowledge", "📖")} All technologies researched`;
-    header.append(title);
-  }
-  container.append(header);
-
-  const count = el("p", "hud-research-count");
-  count.textContent = countText;
-  container.append(count);
-  container.append(btn("Open tech tree ▤", "hud-techtree-open", onOpenTree));
-
-  // Recommended pick: cheapest available tech in the realm's trait branch.
-  const branch: TechBranch =
-    player.trait === "martial" ? "military" : player.trait === "scholarly" ? "civics" : "economy";
-  const rec = recommendedTech(research.done, era, branch);
-
-  const menu = el("div", "hud-tech-menu");
-  for (const id of frontier) {
-    const def = TECHS[id];
-    const row = el("div", "hud-tech-row");
-    const b = document.createElement("button");
-    b.className = "hud-tech-btn" + (research.current === id ? " active" : "") + (id === rec ? " recommended" : "");
-    b.title = def.blurb + (id === rec ? " — recommended for your realm." : "");
-    b.style.borderLeftColor = BRANCH_COLOR[def.branch];
-    b.innerHTML =
-      `<span class="hud-tech-name">${def.name}${id === rec ? ' <span class="hud-tech-rec">★ recommended</span>' : ""}</span>` +
-      `<span class="hud-tech-blurb">${def.blurb}</span>` +
-      `<span class="hud-tech-cost">${def.cost}${resourceIconHtml("knowledge", "📖")} · ${iconHtml(BRANCH_ART[def.branch], "")} ${def.branch}</span>`;
-    b.addEventListener("click", () => callbacks.onChooseResearch(id));
-    // Queue button: research this after the current tech (auto-starts on completion).
-    const q = btn("＋", "hud-tech-queue-btn", () => callbacks.onQueueResearch(id));
-    q.title = "Queue this technology to research after the current one.";
-    row.append(b, q);
-    menu.append(row);
-  }
-  container.append(menu);
-
-  // The research queue — the path you've lined up.
-  if (research.queue && research.queue.length) {
-    const qbox = el("div", "hud-tech-queue-list");
-    const qhead = el("div", "hud-tech-queue-head");
-    const qlabel = el("span", "");
-    qlabel.textContent = `Queued (${research.queue.length})`;
-    qhead.append(qlabel, btn("Clear", "hud-tech-queue-clear", () => callbacks.onClearResearchQueue()));
-    qbox.append(qhead);
-    research.queue.forEach((tid, i) => {
-      const row = el("div", "hud-tech-queue-row");
-      row.innerHTML = `<span class="muted">${i + 1}.</span> ${escapeHtml(TECHS[tid].name)}`;
-      qbox.append(row);
-    });
-    container.append(qbox);
-  }
-
-  // The road ahead: a preview of the next age's techs, so the player sees what
-  // dawns when the age turns (and why they can't be picked yet).
-  const nextEraTechs = TECH_IDS.filter((t) => TECHS[t].era === era + 1 && !research.done.includes(t));
-  if (nextEraTechs.length) {
-    const nextEra = eraByIndex(era + 1);
-    const box = el("div", "hud-tech-locked");
-    const head = el("p", "hud-tech-locked-head");
-    head.innerHTML = `${glyphHtml("lock", "🔒")} Awaiting the ${escapeHtml(nextEra.name)}`;
-    box.append(head);
-    for (const id of nextEraTechs.slice(0, 6)) {
-      const def = TECHS[id];
-      const row = el("div", "hud-tech-locked-row");
-      row.innerHTML = `<span>${escapeHtml(def.name)}</span><span class="muted">${escapeHtml(def.blurb)}</span>`;
-      box.append(row);
-    }
-    container.append(box);
-  }
-}
-
 const TECH_BRANCHES: TechBranch[] = ["economy", "military", "civics", "wonders"];
 
 /**
- * Full tech-tree overlay: every tech laid out by branch (row) and tier, marked
- * done / in-progress / available / locked. Available techs are clickable to set
- * research; locked nodes tooltip their missing prerequisites. Read-only apart
- * from the research-selection intent.
+ * The tech tree — the sole research page (opened straight from the Research
+ * button). Leads with the live research status: the current study's progress
+ * bar and its turns-to-complete (cost remaining ÷ knowledge income), or a
+ * prompt to pick when none is set. Then every tech laid out by branch (row) ×
+ * tier, each node tagged done / in-progress / available / age-locked / locked
+ * and — for the ones you could study now — its ETA in turns. Clicking an
+ * available node sets research (the page stays open so its bar starts filling).
+ * Read-only otherwise.
  */
 function renderTechTree(
   container: HTMLElement,
   player: Nation,
   era: number,
+  knowledgeFlow: number,
   callbacks: HudCallbacks,
   onClose: () => void,
 ): void {
   container.innerHTML = "";
-  const done = new Set(player.research.done);
-  const current = player.research.current;
+  const research = player.research;
+  const done = new Set(research.done);
+  const current = research.current;
+  const total = Object.keys(TECHS).length;
+
+  // Turns to finish a tech at the current knowledge income (null = no income → stalled).
+  const etaTurns = (cost: number, progress = 0): number | null =>
+    knowledgeFlow > 0 ? Math.max(1, Math.ceil((cost - progress) / knowledgeFlow)) : null;
 
   const panel = el("div", "hud-techtree-panel");
   const head = el("div", "hud-techtree-head");
   const ttTitle = el("h2", "hud-techtree-title");
-  ttTitle.textContent = "Technology tree";
+  ttTitle.textContent = "Research — Technology tree";
   head.append(ttTitle, closeButton(onClose));
   panel.append(head);
+
+  // --- Live research status: what's studying now and how long it has left ----
+  const frontier = researchFrontier(research.done, era);
+  const mustChoose = !current && frontier.length > 0;
+  const status = el("div", "hud-research-status" + (mustChoose ? " choose" : ""));
+  if (current) {
+    const def = TECHS[current];
+    const pct = Math.min(100, (research.progress / def.cost) * 100);
+    // Progress can overshoot the cost mid-turn (completion lands at resolve).
+    const shown = Math.min(Math.floor(research.progress), def.cost);
+    const eta = etaTurns(def.cost, research.progress);
+    const l = el("div", "hud-research-status-line");
+    l.innerHTML =
+      `<span class="hud-research-status-label">Researching</span>` +
+      `<span class="hud-research-status-tech">${resourceIconHtml("knowledge", "📖")} ${escapeHtml(def.name)}</span>` +
+      `<span class="hud-research-status-eta">${shown}/${def.cost} · ` +
+      (eta !== null ? `~${eta} turn${eta === 1 ? "" : "s"} left` : "stalled — no knowledge income") +
+      `</span>`;
+    const bar = el("div", "hud-research-bar");
+    const fill = el("div", "hud-research-fill");
+    fill.style.width = `${pct}%`;
+    fill.style.background = BRANCH_COLOR[def.branch];
+    bar.append(fill);
+    status.append(l, bar);
+    status.title =
+      eta !== null
+        ? `Your ${fmt(knowledgeFlow)} knowledge/turn flows into this technology each End turn.`
+        : "No knowledge income — build Libraries or work hills/mountains to research at all.";
+  } else {
+    const l = el("div", "hud-research-status-line");
+    l.innerHTML = mustChoose
+      ? `<span class="hud-research-status-tech">${glyphHtml("book", "📖")} Pick a technology below — knowledge income is wasted without one.</span>`
+      : `<span class="hud-research-status-tech">${resourceIconHtml("knowledge", "📖")} All technologies researched.</span>`;
+    status.append(l);
+  }
+  const counts = el("span", "hud-research-status-counts");
+  counts.textContent = `${done.size}/${total} techs · ${player.wonders}/${WONDER_GOAL} wonders · +${fmt(knowledgeFlow)} 📖/turn`;
+  status.append(counts);
+  panel.append(status);
+
+  // Recommended next pick — the cheapest available tech in the realm's branch.
+  const recBranch: TechBranch =
+    player.trait === "martial" ? "military" : player.trait === "scholarly" ? "civics" : "economy";
+  const rec = recommendedTech(research.done, era, recBranch);
 
   const grid = el("div", "hud-techtree-grid");
   for (const branch of TECH_BRANCHES) {
@@ -3839,23 +3878,27 @@ function renderTechTree(
       // A tech of a future age reads as age-locked (whether or not its prereqs
       // are met), so the whole tree is legible by age at a glance.
       const ageLocked = !isDone && !isCurrent && !ageReached;
+      const isRec = available && id === rec;
       const state = isDone ? "done" : isCurrent ? "current" : available ? "available" : ageLocked ? "agelocked" : "locked";
 
-      const node = el("div", "hud-tt-node " + state);
+      const node = el("div", "hud-tt-node " + state + (isRec ? " recommended" : ""));
       node.style.borderColor = BRANCH_COLOR[branch];
       const missing = def.requires.filter((r) => !done.has(r)).map((r) => TECHS[r].name);
+      // Turns-to-complete shown for the current study (remaining) and anything
+      // you could pick right now, so cost reads as time, not just a raw number.
+      const eta = isCurrent ? etaTurns(def.cost, research.progress) : available ? etaTurns(def.cost) : null;
       node.title =
         def.blurb +
+        (eta !== null ? ` — ~${eta} turn${eta === 1 ? "" : "s"} at your current knowledge income` : "") +
         (missing.length ? ` (needs ${missing.join(", ")})` : "") +
-        (ageLocked ? ` — awaits the ${eraByIndex(def.era).name}` : "");
+        (ageLocked ? ` — awaits the ${eraByIndex(def.era).name}` : "") +
+        (isRec ? " — recommended for your realm." : "");
       node.innerHTML =
-        `<span class="hud-tt-name">${isDone ? "✓ " : ""}${ageLocked ? "🔒 " : ""}${def.name}</span>` +
-        `<span class="hud-tt-meta">${eraByIndex(def.era).name.replace("Age of ", "")} · ${def.cost}${resourceIconHtml("knowledge", "📖")} · ${iconHtml(BRANCH_ART[def.branch], "")}</span>`;
+        `<span class="hud-tt-name">${isDone ? "✓ " : ""}${ageLocked ? "🔒 " : ""}${escapeHtml(def.name)}${isRec ? ' <span class="hud-tt-rec">★</span>' : ""}</span>` +
+        `<span class="hud-tt-meta">${eraByIndex(def.era).name.replace("Age of ", "")} · ${def.cost}${resourceIconHtml("knowledge", "📖")}${eta !== null ? ` · ~${eta}t` : ""} · ${iconHtml(BRANCH_ART[def.branch], "")}</span>`;
       if (available) {
-        node.addEventListener("click", () => {
-          callbacks.onChooseResearch(id);
-          onClose();
-        });
+        // Selecting keeps the page open so its progress bar starts filling in.
+        node.addEventListener("click", () => callbacks.onChooseResearch(id));
       }
       track.append(node);
     }
@@ -3864,7 +3907,10 @@ function renderTechTree(
   }
   panel.append(grid);
   panel.append(
-    line("✓ researched · glowing = in progress · bright = available · 🔒 = awaits its age · dim = locked", "hud-techtree-legend"),
+    line(
+      "✓ researched · glowing = in progress · ★ recommended · bright = available (~Nt = turns to complete) · 🔒 = awaits its age · dim = locked",
+      "hud-techtree-legend",
+    ),
   );
   container.append(panel);
 }

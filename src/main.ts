@@ -9,8 +9,6 @@ import {
   cancelConstruction,
   setRegionFocus,
   chooseResearch,
-  queueResearch,
-  clearResearchQueue,
 } from "@/systems/turn";
 import { raiseUnit, moveArmy, moveDetachment, disbandUnits, fortifyArmy, appointCommander, reachableRegions } from "@/systems/military";
 import {
@@ -251,14 +249,6 @@ function main(): void {
       state = chooseResearch(state, tech);
       commit();
     },
-    onQueueResearch(tech) {
-      state = queueResearch(state, tech);
-      commit();
-    },
-    onClearResearchQueue() {
-      state = clearResearchQueue(state);
-      commit();
-    },
     onResolveChoice(optionId) {
       state = resolveChoice(state, optionId);
       commit();
@@ -284,6 +274,10 @@ function main(): void {
       refreshLens();
     },
   });
+
+  // Hand the renderer the HUD's minimap canvas — it paints it (composite + the
+  // current-view rectangle) each frame and recentres the camera on a click.
+  renderer.setMinimap(hud.minimapCanvas);
 
   // Map-marker hovers (shield, crest, pop chip…) surface as a HUD tooltip.
   renderer.onMarkerHover((tip) => hud.mapTip(tip));

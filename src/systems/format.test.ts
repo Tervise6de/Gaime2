@@ -18,10 +18,15 @@ describe("population display scale", () => {
     expect(popCompact(12.4)).toBe("12k");
   });
 
-  it("armies share the same scale (1 unit = a 1,000-strong regiment)", async () => {
+  it("armies scale smaller than population (1 unit = a ~250-strong company)", async () => {
     const { soldiersCompact, soldiersDisplay, SOLDIERS_PER_UNIT } = await import("@/systems/format");
-    expect(SOLDIERS_PER_UNIT).toBe(1000);
-    expect(soldiersDisplay(3)).toBe("3,000");
-    expect(soldiersCompact(12)).toBe("12k");
+    expect(SOLDIERS_PER_UNIT).toBe(250);
+    // A 3-unit stack is 750 soldiers, an 8-unit stack 2,000 — a believable
+    // garrison beside a 10,000-population province, not a nation-in-arms.
+    expect(soldiersDisplay(3)).toBe("750");
+    expect(soldiersDisplay(8)).toBe("2,000");
+    expect(soldiersDisplay(40)).toBe("10,000");
+    expect(soldiersCompact(8)).toBe("2k");
+    expect(soldiersCompact(1)).toBe("250");
   });
 });

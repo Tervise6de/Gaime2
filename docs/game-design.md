@@ -347,11 +347,15 @@ ages across the 150-turn game). Seed, difficulty and the realm trait live in
 the map legend's "This world" card instead of crowding the bar.
 
 **Population & army presentation.** The sim tracks population and army
-strength in abstract units (~1–20 per region/stack); the UI presents both as
-people at ×1,000 (`systems/format.ts`) — "4,300 / 10,000" population,
-"3,000 soldiers" armies ("3k" on badges, one unit = a 1,000-strong regiment;
-combat and merge log lines speak in soldiers too) — so the world reads as
-populated without touching the simulation's numbers.
+strength in abstract units (~1–20 per region/stack); the UI presents each at
+its own people-scale (`systems/format.ts`) so an army reads as a believable
+*fraction* of the population it stands among. **Population** is ×1,000 —
+"4,300 / 10,000". **Armies** are ×250 (one unit = a ~250-strong company/
+retinue): a 3-unit stack is "750 soldiers", an 8-unit stack "2,000" — a
+plausible garrison beside a 10,000-population province, not the old ×1,000
+scale that read "8,000" and made most of the populace look conscripted.
+Combat and merge log lines speak in soldiers too. Presentation only — the
+simulation's own numbers never change scale, so balance is untouched.
 
 **Nothing idle, ever (advisor + production overview).** One construction slot
 builds at a time per region, but you may now **queue** the builds that follow
@@ -751,12 +755,15 @@ round's loser always shedding ≥1 regiment so fights converge. Outcomes are
 
 ### 9.3 Map lenses (Civ-style overlays) — SHIPPED (`ui/lenses.ts`)
 Toggleable map filters so the board is readable at a glance without clicking
-each region. A floated lens strip (bottom-centre) offers **Political** (owners,
-the default), **Population**, **Gold / Materials / Food income**, **Unrest**, the
-**Faith** lens (§9.6, categorical — whose faith holds each province), and the
-**Relations** lens (v0.38) — each recolours every region; heat lenses use a
-normalised low→high ramp, the categorical ones tint by realm/standing; `M` cycles
-them. Colours are computed pure in `ui/lenses.ts` and baked into the renderer's
+each region. A **CK3-style Map panel** (bottom-left, v0.52) pairs a small
+**minimap** with a **map-mode dropdown** — the minimap is painted by the
+renderer (`setMinimap`: the baked map composite + a live current-view rectangle,
+click to recentre) and reflects the active lens; the dropdown offers
+**Political** (owners, the default), **Population**, **Gold / Materials / Food
+income**, **Unrest**, the **Faith** lens (§9.6, categorical — whose faith holds
+each province), and the **Relations** lens (v0.38) — each recolours every
+region; heat lenses use a normalised low→high ramp, the categorical ones tint by
+realm/standing; `M` cycles them. Colours are computed pure in `ui/lenses.ts` and baked into the renderer's
 political layer (`setLens`), so they read at any zoom.
 
 **Political-relations lens — SHIPPED (v0.38).** Reads the diplomatic map from *your*
@@ -818,16 +825,18 @@ rides through save/load as an optional field. **§9.4 is now complete.**
   printing house, cathedral), so a full game is a long arc of choices.
 - **Longer games** — turn limit **150 → 220**, eras re-spaced to span it
   (Founding 1, Banners 45, Crowns 90, Conquest 140, Legacy 185).
-- **A tree that reads by age** — the tech-tree overlay labels every node with its
-  age and marks future-age techs 🔒; the research drawer previews "Awaiting the
-  {next age}".
-- **A recommended next tech + a research queue** (v0.30) — the drawer stars the
-  cheapest frontier tech in the realm's natural branch (military/civics/economy by
-  trait) as ★ recommended, and every frontier tech carries a ＋ that appends it to
-  a **queue**. When the current study finishes, `dequeueResearch` auto-starts the
-  next queued tech that's valid for the age, skipping any that aren't yet. Queue up
-  a path before bed and the realm studies it in order. (`queueResearch` /
-  `dequeueResearch` / `clearQueue` / `recommendedTech`, all pure in `systems/tech.ts`.)
+- **The tree is the research page (v0.52)** — the Research button (and `R`) opens
+  the branching **tech tree directly**, not an intermediate list; it is the sole
+  research screen. A status banner leads it: the current study's progress bar and
+  its **turns-to-complete** (cost remaining ÷ knowledge income), or a prompt to
+  pick when none is set. Every node labels its age (future-age techs 🔒) and — for
+  the current study and anything you could pick now — its **ETA in turns** (`~Nt`),
+  so cost reads as *time*, not just a raw number. The cheapest frontier tech in the
+  realm's natural branch (military/civics/economy by trait) is starred **★
+  recommended**. Selecting a tech keeps the page open so its bar starts filling.
+  **Research queuing was removed** (v0.52) — one clear choice at a time. (The pure
+  `queueResearch`/`dequeueResearch`/`recommendedTech` helpers remain in
+  `systems/tech.ts` for the sim/tests; the UI no longer exposes the queue.)
 - **New unit types — SHIPPED (v0.42 → completed v0.43).** Four tech-gated premiums
   now give each counter role a basic + a heavy specialist (see §3.4 for the full
   table): **Pikemen** (Feudalism) and **Handgunners** (Gunpowder + iron) landed in
