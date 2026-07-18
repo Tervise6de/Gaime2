@@ -12,6 +12,7 @@
  */
 
 import type { BuildingId } from "@/data/buildings";
+import type { Commander } from "@/data/commanders";
 import type { FocusId } from "@/data/focuses";
 import type { ResourceYield, StrategicResource, TerrainId } from "@/data/terrain";
 import { UNIT_TYPES, type UnitType } from "@/data/units";
@@ -269,6 +270,11 @@ export interface Army {
    * `fortifying`. Undefined on legacy saves = 0.
    */
   entrenchment?: number;
+  /**
+   * The character leading this stack (M4). Their martial rating feeds the combat
+   * maths; low loyalty foments unrest where they stand. Undefined = unled.
+   */
+  commander?: Commander;
 }
 
 export interface ResourceStocks {

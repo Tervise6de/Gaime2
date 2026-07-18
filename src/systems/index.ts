@@ -49,6 +49,7 @@ export {
   reachableRegions,
   moveArmy,
   fortifyArmy,
+  appointCommander,
   inEnemyZoc,
   totalUpkeep,
 } from "@/systems/military";

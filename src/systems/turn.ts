@@ -30,7 +30,7 @@ import { advanceConstruction } from "@/systems/construction";
 import { stepFaith, seedFaith } from "@/systems/faith";
 import { nextPopulation } from "@/systems/population";
 import { nextUnrest } from "@/systems/stability";
-import { armyMoves, tickEntrenchment, totalUpkeep } from "@/systems/military";
+import { applyCommanderUnrest, armyMoves, tickEntrenchment, totalUpkeep } from "@/systems/military";
 import { driftRelations, decayOpinions, atWar, tradePartners, tradeIncome } from "@/systems/diplomacy";
 import { runNationTurn } from "@/systems/ai";
 import { advanceResearch, dequeueResearch, techUnrestReduction, isBuildingUnlockedFor, selectTech, queueResearch as queueResearchTech, clearQueue } from "@/systems/tech";
@@ -830,6 +830,9 @@ export function resolveTurn(state: GameState): GameState {
     ...s,
     armies: tickEntrenchment(s.armies).map((a) => ({ ...a, movesLeft: armyMoves(a.units) })),
   };
+
+  // 5.2. Disloyal commanders foment unrest where they stand (M4).
+  s = applyCommanderUnrest(s);
 
   // 5.5. Faith spreads: churches and rulers convert provinces (occupation alone
   // does not), so the religious map shifts before the victory check reads it.

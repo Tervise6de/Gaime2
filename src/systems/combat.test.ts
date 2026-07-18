@@ -58,6 +58,38 @@ describe("siegePower", () => {
   });
 });
 
+describe("commander bonus (M4)", () => {
+  const A = units({ infantry: 6 });
+  const D = units({ infantry: 6 });
+
+  it("an attacker's commander raises its win chance", () => {
+    const plain = previewCombat(A, D, NO_TERRAIN);
+    const led = previewCombat(A, D, { ...NO_TERRAIN, attackerCommand: 1.3 });
+    expect(led.attack).toBeGreaterThan(plain.attack);
+    expect(led.winChance).toBeGreaterThan(plain.winChance);
+  });
+
+  it("a defender's commander lowers the attacker's win chance", () => {
+    const plain = previewCombat(A, D, NO_TERRAIN);
+    const held = previewCombat(A, D, { ...NO_TERRAIN, defenderCommand: 1.3 });
+    expect(held.defense).toBeGreaterThan(plain.defense);
+    expect(held.winChance).toBeLessThan(plain.winChance);
+  });
+
+  it("a led attacker inflicts at least as many casualties on the same dice", () => {
+    const plain = resolveCombat(A, D, NO_TERRAIN, createRng(5));
+    const led = resolveCombat(A, D, { ...NO_TERRAIN, attackerCommand: 1.4 }, createRng(5));
+    expect(armySize(led.defenderLosses)).toBeGreaterThanOrEqual(armySize(plain.defenderLosses));
+  });
+
+  it("no command fields = an unchanged fight (backward compatible)", () => {
+    const a = resolveCombat(A, D, NO_TERRAIN, createRng(9));
+    const b = resolveCombat(A, D, { ...NO_TERRAIN, attackerCommand: 1, defenderCommand: 1 }, createRng(9));
+    expect(a.defenderLosses).toEqual(b.defenderLosses);
+    expect(a.attackerLosses).toEqual(b.attackerLosses);
+  });
+});
+
 describe("resolveCombat", () => {
   it("captures an undefended region with no losses", () => {
     const res = resolveCombat(units({ infantry: 2 }), emptyUnits(), NO_TERRAIN, createRng(1));

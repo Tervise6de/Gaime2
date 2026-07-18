@@ -22,6 +22,7 @@ import { TERRAIN, type TerrainId } from "@/data/terrain";
 import type { FocusId } from "@/data/focuses";
 import { sideStrength, type UnitCounts } from "@/systems/combat";
 import {
+  appointCommander,
   canRaiseUnit,
   fortifyArmy,
   moveArmy,
@@ -532,6 +533,14 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
 
   // Recruit: keep an army if aggressive/at war and it's affordable.
   s = recruit(s, nationId, rng);
+
+  // Phase 0 — appoint commanders to lead any sizeable unled stack (M4), so the
+  // rival armies benefit from the same martial bonus the player's can.
+  for (const a of s.armies) {
+    if (a.ownerId === nationId && !a.commander && armySize(a.units) >= 3) {
+      s = appointCommander(s, a.id);
+    }
+  }
 
   // Phase 1 — attack: strongest armies first take their best winnable target.
   const myArmies = () => s.armies.filter((a) => a.ownerId === nationId);

@@ -6,6 +6,39 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-18 — Army M4: commanders (v0.47.0)
+
+The last army step — characters who lead stacks, built as a pure army feature
+(the CK3 "Generals" track stays for the dynasty work later).
+
+- **`src/data/commanders.ts`** — a commander is a data row: name + epithet
+  (Baltic-crusades flavour), a 2–9 martial rating, one of six traits
+  (Brilliant/Bold/Cautious/Reckless/Ambitious/Steadfast), and loyalty.
+  `generateCommander(rng)` draws one deterministically; `commanderAttack` /
+  `commanderDefense` fold martial + trait into a strength multiplier.
+- **Combat (`combat.ts`).** `CombatContext` gains `attackerCommand` /
+  `defenderCommand` multipliers, applied to both the volley and the melee, and to
+  `combatStrengths` so the UI win-odds stay honest. Absent = an unchanged fight
+  (fully backward compatible).
+- **`military.ts`.** `appointCommander` attaches a fresh officer (advances the
+  RNG); `moveArmy` feeds both sides' commanders into the resolver.
+  `applyCommanderUnrest` — a disloyal commander (loyalty ≤ 30) foments unrest in
+  the home region it occupies (the seed of the roadmap's named-pretender revolts).
+- **AI.** Rivals appoint commanders to any sizeable unled stack (a new Phase 0 in
+  the army loop), so they benefit from the same martial edge.
+- **UI.** The army panel shows the commander (name, martial, trait, a loyalty
+  warning) and an Appoint/Replace button; the combat-odds preview now folds in
+  entrenchment (M3) and commanders (M4).
+- New optional `Army.commander` — legacy saves load clean.
+
+Verified: 580 tests green (+11: commander data, combat-bonus, appoint, loyalty).
+Typecheck + build clean. Browser end-to-end: a fresh game runs 8+ turns with zero
+console errors, and the player's Appoint-commander and Fortify buttons both work
+(panel + log update live). That closes the M2→M4 army arc; M5 (AI concentration
+of force) was already on `main`.
+
+---
+
 ## 2026-07-18 — Army M3: fortify + zone of control, and allied rally (v0.46.0)
 
 Third army step, plus the alliance extension of M2's combined defence.

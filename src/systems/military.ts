@@ -13,6 +13,13 @@
  */
 
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
+import {
+  COMMANDER_DISLOYAL,
+  commanderAttack,
+  commanderDefense,
+  commanderTitle,
+  generateCommander,
+} from "@/data/commanders";
 import { TERRAIN, type StrategicResource } from "@/data/terrain";
 import { traitUnitCostMult } from "@/data/traits";
 import { focusUnitCostMult, type FocusId } from "@/data/focuses";
@@ -188,6 +195,49 @@ export function fortifyArmy(state: GameState, armyId: number): GameState {
   return { ...state, armies, log: appendLog(state, [`${who} dug in at ${where}.`]) };
 }
 
+/**
+ * Appoint a commander to lead an army (M4). Draws a deterministic officer from
+ * the state RNG and attaches them; re-appointing replaces the incumbent. Their
+ * martial rating then feeds this army's combat, and a disloyal one foments
+ * unrest where it stands. No-op for an empty stack. Pure (advances rngState).
+ */
+export function appointCommander(state: GameState, armyId: number): GameState {
+  const army = state.armies.find((a) => a.id === armyId);
+  if (!army || armySize(army.units) === 0) return state;
+  const rng = createRng(state.rngState);
+  const commander = generateCommander(rng);
+  const armies = state.armies.map((a) => (a.id === armyId ? { ...a, commander } : a));
+  const owner = state.nations.find((n) => n.id === army.ownerId);
+  const where = state.regions[army.regionId]?.name ?? "the field";
+  const who = owner?.isPlayer ? "Your" : `${owner?.name ?? "A rival"}'s`;
+  const line = `${who} army at ${where} is now led by ${commanderTitle(commander)} (martial ${commander.martial}).`;
+  return { ...state, armies, rngState: rng.seed, log: appendLog(state, [line]) };
+}
+
+/** Unrest a disloyal commander foments each turn in the home region they occupy. */
+export const DISLOYAL_UNREST = 1;
+
+/**
+ * A disloyal commander (loyalty ≤ COMMANDER_DISLOYAL) standing in a region their
+ * own realm holds foments unrest there each turn — an ambitious general is a
+ * liability, the seed of the named-pretender revolts on the roadmap (E5). Pure.
+ */
+export function applyCommanderUnrest(state: GameState): GameState {
+  const bump = new Map<number, number>();
+  for (const a of state.armies) {
+    const c = a.commander;
+    if (!c || c.loyalty > COMMANDER_DISLOYAL) continue;
+    const r = state.regions[a.regionId];
+    if (!r || r.ownerId !== a.ownerId) continue; // only foments at home
+    bump.set(a.regionId, (bump.get(a.regionId) ?? 0) + DISLOYAL_UNREST);
+  }
+  if (bump.size === 0) return state;
+  const regions = state.regions.map((r) =>
+    bump.has(r.id) ? { ...r, unrest: Math.min(UNREST_MAX, r.unrest + bump.get(r.id)!) } : r,
+  );
+  return { ...state, regions };
+}
+
 /** Grow one turn's worth of entrenchment on every dug-in army (called by the turn pipeline). */
 export function tickEntrenchment(armies: Army[]): Army[] {
   return armies.map((a) =>
@@ -299,7 +349,13 @@ export function moveArmy(
   const result = resolveCombat(
     army.units,
     combinedDefender,
-    { terrainDefense: TERRAIN[target.terrain].defense, fortification: entrenchFort },
+    {
+      terrainDefense: TERRAIN[target.terrain].defense,
+      fortification: entrenchFort,
+      // Commanders lead their side (M4): the attacker's own, the defence's garrison.
+      attackerCommand: commanderAttack(army.commander),
+      defenderCommand: commanderDefense(enemyAtTarget.commander),
+    },
     rng,
   );
   const rngState = rng.seed;

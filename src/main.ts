@@ -12,7 +12,7 @@ import {
   queueResearch,
   clearResearchQueue,
 } from "@/systems/turn";
-import { raiseUnit, moveArmy, moveDetachment, disbandUnits, fortifyArmy, reachableRegions } from "@/systems/military";
+import { raiseUnit, moveArmy, moveDetachment, disbandUnits, fortifyArmy, appointCommander, reachableRegions } from "@/systems/military";
 import {
   declareWar,
   playerPropose,
@@ -194,6 +194,10 @@ function main(): void {
     },
     onFortifyArmy(armyId) {
       state = fortifyArmy(state, armyId);
+      commit();
+    },
+    onAppointCommander(armyId) {
+      state = appointCommander(state, armyId);
       commit();
     },
     onDeclareWar(targetId) {

@@ -73,9 +73,10 @@ export function combatStrengths(
   ctx: CombatContext,
 ): CombatStrengths {
   const effFort = Math.max(0, ctx.fortification - siegePower(attacker));
-  const attack = sideStrength(attacker, defender, "attack");
+  const attack = sideStrength(attacker, defender, "attack") * (ctx.attackerCommand ?? 1);
   const defense =
     sideStrength(defender, attacker, "defense") *
+    (ctx.defenderCommand ?? 1) *
     ctx.terrainDefense *
     (1 + effFort * FORT_PER_LEVEL);
   return { attack, defense };
@@ -222,6 +223,10 @@ export interface CombatResult {
 export interface CombatContext {
   terrainDefense: number;
   fortification: number;
+  /** Strength multiplier from the attacking army's commander (M4); 1 = unled. */
+  attackerCommand?: number;
+  /** Strength multiplier from the defending garrison's commander (M4); 1 = unled. */
+  defenderCommand?: number;
 }
 
 /** Opening-volley firepower: ranged attack + siege bombardment. */
@@ -294,14 +299,17 @@ export function resolveCombat(
   }
 
   const effFort = Math.max(0, ctx.fortification - siegePower(attacker));
+  const atkCommand = ctx.attackerCommand ?? 1;
+  const defCommand = ctx.defenderCommand ?? 1;
   let atk: UnitCounts = { ...attacker };
   let def: UnitCounts = { ...defender };
   const phases: BattlePhase[] = [];
   const jitter = (): number => 1 + (rng.next() * 2 - 1) * COMBAT_VARIANCE;
 
   // --- Opening volley: ranged + siege fire before the lines meet ---
-  const aVolley = volleyPower(atk, def);
-  const dVolley = volleyPower(def, atk);
+  // A commander's grip steadies the whole army, volley and melee alike.
+  const aVolley = volleyPower(atk, def) * atkCommand;
+  const dVolley = volleyPower(def, atk) * defCommand;
   if (aVolley > 0 || dVolley > 0) {
     const defHit = volleyLosses(def, aVolley, rng);
     const atkHit = volleyLosses(atk, dVolley, rng);
@@ -322,9 +330,9 @@ export function resolveCombat(
     if (armySize(atk) === 0) { outcome = "repelled"; break; }
     if (armySize(def) === 0) { outcome = "captured"; break; }
 
-    const atkPow = sideStrength(atk, def, "attack") * jitter();
+    const atkPow = sideStrength(atk, def, "attack") * atkCommand * jitter();
     const defPow =
-      sideStrength(def, atk, "defense") * ctx.terrainDefense * (1 + effFort * FORT_PER_LEVEL) * jitter();
+      sideStrength(def, atk, "defense") * defCommand * ctx.terrainDefense * (1 + effFort * FORT_PER_LEVEL) * jitter();
     const total = atkPow + defPow || 1;
     const defFrac = clamp((ROUND_LETHALITY * atkPow) / total, 0, MAX_ROUND_LOSS);
     const atkFrac = clamp((ROUND_LETHALITY * defPow) / total, 0, MAX_ROUND_LOSS);

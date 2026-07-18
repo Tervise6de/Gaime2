@@ -79,6 +79,13 @@ import { TRAITS } from "@/data/traits";
 import { TECHS, TECH_IDS, type TechId, type TechBranch } from "@/data/techs";
 import { WONDER_GOAL, DOMINATION_FRACTION, TURN_LIMIT, MODIFIER_LABEL, MAX_ENTRENCH } from "@/systems/state";
 import {
+  COMMANDER_TRAITS,
+  COMMANDER_DISLOYAL,
+  commanderAttack,
+  commanderDefense,
+  commanderTitle,
+} from "@/data/commanders";
+import {
   PLAYER_ID,
   RESOURCE_KEYS,
   TAX_MAX,
@@ -133,6 +140,8 @@ export interface HudCallbacks {
   onDisbandUnits(armyId: number, subset: Partial<Record<UnitType, number>>): void;
   /** Dig an army in where it stands to entrench (M3). */
   onFortifyArmy(armyId: number): void;
+  /** Appoint a commander to lead an army (M4). */
+  onAppointCommander(armyId: number): void;
   onDeclareWar(targetId: number): void;
   onMakePeace(targetId: number): void;
   onProposePact(targetId: number, kind: "nap" | "alliance"): void;
@@ -2613,6 +2622,20 @@ function renderArmySection(
   if (army && armySize(army.units) > 0) {
     section.append(compositionLine(army));
     section.append(line(`Moves left: ${army.movesLeft}`, "hud-hint"));
+    // Commander (M4): who leads, their martial and trait, and a loyalty warning.
+    if (army.commander) {
+      const c = army.commander;
+      const t = COMMANDER_TRAITS[c.trait];
+      const disloyal = c.loyalty <= COMMANDER_DISLOYAL;
+      section.append(
+        line(
+          `${glyphHtml("attack", "⚔")} Led by <b>${escapeHtml(commanderTitle(c))}</b> — ` +
+            `martial ${c.martial}, ${escapeHtml(t.label)}, loyalty ${c.loyalty}` +
+            (disloyal ? ' <span class="bad">(disloyal — foments unrest)</span>' : ""),
+          "hud-hint",
+        ),
+      );
+    }
     const entrench = army.entrenchment ?? 0;
     if (army.fortifying || entrench > 0) {
       section.append(
@@ -2646,6 +2669,17 @@ function renderArmySection(
         `${MAX_ENTRENCH}). Moving or attacking gives it up.`;
       fortBtn.addEventListener("click", () => callbacks.onFortifyArmy(army.id));
       section.append(fortBtn);
+    }
+    // Appoint (or replace) the army's commander (M4).
+    if (region.ownerId === PLAYER_ID) {
+      const cmdBtn = document.createElement("button");
+      cmdBtn.className = "hud-move-btn";
+      cmdBtn.textContent = army.commander ? "Replace commander" : "Appoint commander";
+      cmdBtn.title =
+        "Put a character in command — their martial rating sharpens this army's " +
+        "attack and defence. A disloyal one foments unrest where it stands.";
+      cmdBtn.addEventListener("click", () => callbacks.onAppointCommander(army.id));
+      section.append(cmdBtn);
     }
     if (moving) {
       section.append(line("Click a highlighted neighbour to move or attack.", "hud-hint"));
@@ -2806,7 +2840,10 @@ function renderCombatOdds(state: GameState, army: Army): HTMLElement {
     const defender = state.armies.find((a) => a.regionId === nid && a.ownerId !== PLAYER_ID);
     const preview = forecastCombat(army.units, defender?.units ?? emptyUnits(), {
       terrainDefense: TERRAIN[target.terrain].defense,
-      fortification: target.fortification,
+      // Honest odds: a dug-in defender's entrenchment (M3) and both commanders (M4).
+      fortification: target.fortification + (defender?.entrenchment ?? 0),
+      attackerCommand: commanderAttack(army.commander),
+      defenderCommand: commanderDefense(defender?.commander),
     });
 
     const row = el("div", "hud-odds-row");

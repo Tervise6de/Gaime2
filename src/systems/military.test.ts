@@ -11,8 +11,11 @@ import {
   fortifyArmy,
   tickEntrenchment,
   inEnemyZoc,
+  appointCommander,
+  applyCommanderUnrest,
   totalUpkeep,
 } from "@/systems/military";
+import type { Commander } from "@/data/commanders";
 import { createGame } from "@/systems/turn";
 import { UNITS } from "@/data/units";
 import {
@@ -558,6 +561,47 @@ describe("zone of control (M3)", () => {
     expect(inEnemyZoc(g, 1, PLAYER_ID)).toBe(true);
     g.treaties = { [pairKey(PLAYER_ID, RIVAL)]: "alliance" }; // now friends
     expect(inEnemyZoc(g, 1, PLAYER_ID)).toBe(false);
+  });
+});
+
+describe("commanders (M4)", () => {
+  const ACE: Commander = { name: "Visvaldis", epithet: "the Bold", martial: 9, trait: "reckless", loyalty: 70 };
+
+  it("appoints a deterministic commander and logs it", () => {
+    const g = realm({ infantry: 3 });
+    const a = appointCommander(g, 0);
+    const b = appointCommander(realm({ infantry: 3 }), 0);
+    expect(a.armies[0]!.commander).toBeDefined();
+    expect(a.armies[0]!.commander).toEqual(b.armies[0]!.commander); // same seed → same officer
+    expect(a.rngState).not.toBe(g.rngState); // stream advanced
+    expect(a.log.some((l) => /is now led by/.test(l))).toBe(true);
+    // Empty stack cannot be given a commander.
+    const empty = realm({});
+    expect(appointCommander(empty, 0)).toBe(empty);
+  });
+
+  it("threads the commander into the moveArmy combat path (a led attacker hits harder)", () => {
+    // A weak attacker is repelled either way, but a led one inflicts more — the
+    // commander bonus flows through moveArmy → resolveCombat. (Strict combat-math
+    // assertions live in combat.test.ts.)
+    const base = () => battlefield({ militia: 3 }, { infantry: 12 });
+    const unled = armySize(moveArmy(base(), 0, 1).battles!.at(-1)!.defenderLosses);
+    const l = base();
+    l.armies[0]!.commander = ACE;
+    const led = armySize(moveArmy(l, 0, 1).battles!.at(-1)!.defenderLosses);
+    expect(led).toBeGreaterThanOrEqual(unled);
+    expect(led).toBeGreaterThan(0);
+  });
+
+  it("a disloyal commander foments unrest in the home region it occupies", () => {
+    const g = realm({ infantry: 3 });
+    g.armies[0]!.commander = { name: "Skirgaila", epithet: "the Fox", martial: 4, trait: "ambitious", loyalty: 20 };
+    const before = g.regions[0]!.unrest;
+    const next = applyCommanderUnrest(g);
+    expect(next.regions[0]!.unrest).toBeGreaterThan(before);
+    // A loyal commander does not.
+    g.armies[0]!.commander!.loyalty = 80;
+    expect(applyCommanderUnrest(g).regions[0]!.unrest).toBe(before);
   });
 });
 
