@@ -66,9 +66,11 @@ export interface ScriptedMap {
 
 import { BALTIC_MAP } from "@/data/maps/baltic";
 import { EUROPE_MAP } from "@/data/maps/europe";
+import { HANSA_MAP } from "@/data/maps/hansa";
 
 /** All scripted maps, by id. */
 export const SCRIPTED_MAPS: Record<string, ScriptedMap> = {
+  [HANSA_MAP.id]: HANSA_MAP,
   [BALTIC_MAP.id]: BALTIC_MAP,
   [EUROPE_MAP.id]: EUROPE_MAP,
 };

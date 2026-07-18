@@ -8,9 +8,9 @@ import { BALTIC_MAP } from "@/data/maps/baltic";
 import { PLAYER_ID, playerNation } from "@/systems/state";
 
 describe("faction roster", () => {
-  it("offers a dozen realms with unique names, colours, valid traits and flavour", () => {
+  it("offers the realm roster with unique names, colours, valid traits and flavour", () => {
     expect(FACTIONS.length).toBeGreaterThanOrEqual(10);
-    expect(FACTIONS.length).toBeLessThanOrEqual(14);
+    expect(FACTIONS.length).toBeLessThanOrEqual(20);
     expect(new Set(FACTION_NAMES).size).toBe(FACTIONS.length); // unique names
     expect(new Set(FACTIONS.map((f) => f.color)).size).toBe(FACTIONS.length); // unique colours
     for (const f of FACTIONS) {
@@ -24,7 +24,9 @@ describe("faction roster", () => {
     const counts = new Map<string, number>();
     for (const f of FACTIONS) counts.set(f.trait, (counts.get(f.trait) ?? 0) + 1);
     expect(counts.size).toBeGreaterThanOrEqual(4); // at least 4 of the 5 traits used
-    for (const c of counts.values()) expect(c).toBeLessThanOrEqual(4);
+    // The trade-heavy Hansa roster leans mercantile, but no trait may run away
+    // with it — cap it below half the roster so the spread stays meaningful.
+    for (const c of counts.values()) expect(c).toBeLessThanOrEqual(6);
   });
 
   it("looks up by name (and misses cleanly)", () => {

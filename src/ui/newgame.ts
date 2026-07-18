@@ -180,19 +180,20 @@ export function buildNewGameForm(): NewGameForm {
   // size and shape, so the World-size field is hidden while one is selected.
   const worldSeg = segmented(
     [
+      ["hansa", "Hanseatic World"],
       ["", "Random"],
       ["baltic", "Baltic"],
       ["europe", "Europe"],
     ],
-    prefs.world ?? "",
-    "",
+    prefs.world ?? "hansa",
+    "hansa",
     () => {
       dropToCustom();
       syncWorld();
     },
   );
   worldSeg.root.title =
-    "Random realm (procedural, seeded) or a real-geography map — the Baltic or Europe.";
+    "The Hanseatic World (the whole North Sea and Baltic), a random realm (procedural, seeded), or a smaller real-geography map — the Baltic or Europe.";
 
   // Scenarios: hand-set openings. Picking one fills the config below (and may pin
   // an opening trait); editing the config by hand drops back to "Custom".

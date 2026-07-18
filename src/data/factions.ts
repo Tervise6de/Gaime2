@@ -68,11 +68,13 @@ export interface FactionDef {
 }
 
 /**
- * The roster (13). Colours are well-spaced hues kept clear of the player gold
- * and the Free Tribes' brown. Traits spread across the five so no realm feels
- * like a strict upgrade of another; each also carries a distinct opening bonus
- * of roughly comparable value (a free Age-of-Founding tech, ~35-55 gold, or a
- * regiment or two).
+ * The roster (18) — the eastern Baltic rim plus the western Hanseatic realms
+ * (England, Flanders, Cologne, Saxony, Norway) that join it on the Hansa map.
+ * Colours are well-spaced hues kept clear of the player gold and the Free
+ * Tribes' brown. Traits spread across the five so no realm feels like a strict
+ * upgrade of another; each also carries a distinct opening bonus of roughly
+ * comparable value (a free Age-of-Founding tech, ~35-55 gold, or a regiment or
+ * two). Trade-heavy world: mercantile is the commonest lean.
  */
 export const FACTIONS: FactionDef[] = [
   { name: "Sweden", color: "#5b8bd0", trait: "martial", disposition: "warlord", homeFocus: "garrison", blurb: "Northern warrior-kings — armies raised cheap and fierce.",
@@ -101,6 +103,19 @@ export const FACTIONS: FactionDef[] = [
     bonus: { label: "Pagan holdouts", detail: "Begin with an Infantry and a Militia regiment.", startUnits: { infantry: 1, militia: 1 } } },
   { name: "Lübeck", color: "#b0273b", trait: "mercantile", disposition: "merchant", homeFocus: "market", blurb: "Queen of the Hansa — the Wendish sea's chief town and the League's future head.",
     bonus: { label: "Queen of the Hansa", detail: "Begin with +50 gold from the burgher charters.", startGold: 50 } },
+  // The western Hanseatic world (the Hansa map): England and the Low Countries,
+  // the Rhineland, the German inland, and Norway. Colours are well-spaced and
+  // clear of the eastern roster above, the player gold and the Free Tribes' brown.
+  { name: "England", color: "#d83a2f", trait: "mercantile", disposition: "merchant", homeFocus: "market", blurb: "The island kingdom whose wool clothes the looms of the whole North Sea.",
+    bonus: { label: "Wool staple", detail: "Begin with +45 gold from the wool staple.", startGold: 45 } },
+  { name: "Flanders", color: "#7d4fa8", trait: "mercantile", disposition: "merchant", homeFocus: "market", blurb: "The cloth-towns of Bruges and Antwerp — the richest weavers in Christendom.",
+    bonus: { label: "Cloth of Flanders", detail: "Begin with +50 gold from the looms of the richest weavers.", startGold: 50 } },
+  { name: "Cologne", color: "#2f8f7f", trait: "industrious", disposition: "builder", homeFocus: "workshop", blurb: "The great Rhineland see — masons, founders and river-trade of the Empire.",
+    bonus: { label: "Rhineland forges", detail: "Begin with Bronze Working already known.", startTech: "bronze_working" } },
+  { name: "Saxony", color: "#4e9b45", trait: "industrious", disposition: "builder", homeFocus: "workshop", blurb: "The Saxon dukes of the inland towns, rich in Harz silver and hard labour.",
+    bonus: { label: "Harz silver", detail: "Begin with Currency already known.", startTech: "currency" } },
+  { name: "Norway", color: "#3877a0", trait: "fertile", disposition: "builder", homeFocus: "market", blurb: "The northern realm of fjord and fishery, its stockfish traded through Bergen.",
+    bonus: { label: "Stockfish of Bergen", detail: "Begin with +40 gold from the Bergen stockfish trade.", startGold: 40 } },
 ];
 
 export const FACTION_NAMES: string[] = FACTIONS.map((f) => f.name);
