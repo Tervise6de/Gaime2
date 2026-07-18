@@ -12,7 +12,7 @@ import {
   queueResearch,
   clearResearchQueue,
 } from "@/systems/turn";
-import { raiseUnit, moveArmy, reachableRegions } from "@/systems/military";
+import { raiseUnit, moveArmy, moveDetachment, disbandUnits, reachableRegions } from "@/systems/military";
 import {
   declareWar,
   playerPropose,
@@ -183,6 +183,14 @@ function main(): void {
         if (before.regions[after.id]?.ownerId !== after.ownerId) renderer.pulseCapture(after.id);
       }
       maybeShowBattle(battlesBefore);
+    },
+    onMoveDetachment(armyId, targetRegionId, subset) {
+      state = moveDetachment(state, armyId, targetRegionId, subset);
+      commit();
+    },
+    onDisbandUnits(armyId, subset) {
+      state = disbandUnits(state, armyId, subset);
+      commit();
     },
     onDeclareWar(targetId) {
       state = declareWar(state, PLAYER_ID, targetId);

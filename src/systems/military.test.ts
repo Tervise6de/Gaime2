@@ -6,6 +6,8 @@ import {
   canRaiseUnit,
   raiseUnit,
   moveArmy,
+  moveDetachment,
+  disbandUnits,
   totalUpkeep,
 } from "@/systems/military";
 import { createGame } from "@/systems/turn";
@@ -70,6 +72,105 @@ function battlefield(playerUnits: Partial<Record<string, number>>, barbUnits: Pa
     log: [],
   };
 }
+
+/** Three owned player regions in a line (0–1–2), one army in region 0. */
+function realm(r0Army: Partial<Record<string, number>>): GameState {
+  const r0 = region(0, { ownerId: PLAYER_ID, adjacency: [1] });
+  const r1 = region(1, { ownerId: PLAYER_ID, adjacency: [0, 2] });
+  const r2 = region(2, { ownerId: PLAYER_ID, adjacency: [1] });
+  const armies: Army[] = [
+    { id: 0, ownerId: PLAYER_ID, regionId: 0, units: { ...emptyUnits(), ...r0Army }, movesLeft: 2 },
+  ];
+  return {
+    seed: 1,
+    rngState: 123,
+    turn: 1,
+    nations: [
+      { id: PLAYER_ID, name: "Realm", color: "#000", isPlayer: true, isBarbarian: false, alive: true, stocks: { gold: 200, food: 20, materials: 50, knowledge: 0 }, taxRate: 0, research: { current: null, progress: 0, done: [] }, wonders: 0, famine: false, bankrupt: false },
+    ],
+    regions: [r0, r1, r2],
+    armies,
+    nextArmyId: 1,
+    relations: {},
+    treaties: {},
+    offers: [],
+    nextOfferId: 0,
+    difficulty: "normal",
+    outcome: "playing",
+    log: [],
+  };
+}
+
+describe("moveDetachment (split / detach / reinforce)", () => {
+  it("splits a subset into an empty own region, leaving the remainder in place", () => {
+    const g = realm({ infantry: 3, cavalry: 2 });
+    const next = moveDetachment(g, 0, 1, { cavalry: 2 });
+    const parent = armyAt(next, 0, PLAYER_ID)!;
+    const detach = armyAt(next, 1, PLAYER_ID)!;
+    expect(parent.units.infantry).toBe(3);
+    expect(parent.units.cavalry).toBe(0);
+    expect(detach.units.cavalry).toBe(2);
+    expect(detach.units.infantry).toBe(0);
+    expect(detach.movesLeft).toBe(1); // spent one step arriving
+    expect(parent.movesLeft).toBe(2); // the parent never moved
+  });
+
+  it("reinforces a friendly stack instead of creating a second one", () => {
+    const g = realm({ infantry: 3, cavalry: 2 });
+    g.armies.push({ id: 5, ownerId: PLAYER_ID, regionId: 1, units: { ...emptyUnits(), militia: 1 }, movesLeft: 1 });
+    g.nextArmyId = 6;
+    const next = moveDetachment(g, 0, 1, { cavalry: 2 });
+    const atR1 = next.armies.filter((a) => a.regionId === 1 && a.ownerId === PLAYER_ID);
+    expect(atR1).toHaveLength(1);
+    expect(atR1[0]!.units.militia).toBe(1);
+    expect(atR1[0]!.units.cavalry).toBe(2);
+  });
+
+  it("refuses to detach into foreign territory (attacking uses moveArmy)", () => {
+    const g = realm({ infantry: 3 });
+    g.regions[1]!.ownerId = 2; // a rival owns the neighbour
+    expect(moveDetachment(g, 0, 1, { infantry: 1 })).toBe(g);
+  });
+
+  it("selecting the whole stack degrades to a normal relocate", () => {
+    const g = realm({ infantry: 2 });
+    const next = moveDetachment(g, 0, 1, { infantry: 2 });
+    expect(next.armies.filter((a) => a.regionId === 0)).toHaveLength(0);
+    expect(armyAt(next, 1, PLAYER_ID)!.units.infantry).toBe(2);
+  });
+
+  it("clamps an over-request and no-ops an empty selection", () => {
+    const g = realm({ infantry: 2 });
+    expect(armyAt(moveDetachment(g, 0, 1, { infantry: 9 }), 1, PLAYER_ID)!.units.infantry).toBe(2);
+    expect(moveDetachment(g, 0, 1, { cavalry: 1 })).toBe(g); // no cavalry to send
+  });
+
+  it("no-ops without moves left and never mutates the input", () => {
+    const g = realm({ infantry: 3 });
+    g.armies[0]!.movesLeft = 0;
+    expect(moveDetachment(g, 0, 1, { infantry: 1 })).toBe(g);
+    const g2 = realm({ infantry: 3, cavalry: 2 });
+    const snap = JSON.stringify(g2);
+    moveDetachment(g2, 0, 1, { cavalry: 1 });
+    expect(JSON.stringify(g2)).toBe(snap);
+  });
+});
+
+describe("disbandUnits", () => {
+  it("disbands a subset and cuts upkeep", () => {
+    const g = realm({ infantry: 3, cavalry: 2 });
+    const before = totalUpkeep(g, PLAYER_ID);
+    const next = disbandUnits(g, 0, { cavalry: 2 });
+    expect(armyAt(next, 0, PLAYER_ID)!.units.cavalry).toBe(0);
+    expect(armyAt(next, 0, PLAYER_ID)!.units.infantry).toBe(3);
+    expect(totalUpkeep(next, PLAYER_ID)).toBe(before - 2 * UNITS.cavalry.upkeep);
+  });
+
+  it("removes the army when everything is disbanded (clamping an over-request)", () => {
+    const g = realm({ militia: 2 });
+    expect(disbandUnits(g, 0, { militia: 9 }).armies.filter((a) => a.ownerId === PLAYER_ID)).toHaveLength(0);
+  });
+});
 
 describe("armyMoves", () => {
   it("is the slowest unit's move rate", () => {

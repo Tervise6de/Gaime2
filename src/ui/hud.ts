@@ -126,6 +126,10 @@ export interface HudCallbacks {
   onCancelMove(): void;
   /** Attack a region with a specific one of your adjacent armies. */
   onAttackWith(armyId: number, regionId: number): void;
+  /** Split a chosen subset of an army off into an adjacent region you own. */
+  onMoveDetachment(armyId: number, targetRegionId: number, subset: Partial<Record<UnitType, number>>): void;
+  /** Disband a chosen subset of an army's units to cut upkeep. */
+  onDisbandUnits(armyId: number, subset: Partial<Record<UnitType, number>>): void;
   onDeclareWar(targetId: number): void;
   onMakePeace(targetId: number): void;
   onProposePact(targetId: number, kind: "nap" | "alliance"): void;
@@ -2616,6 +2620,9 @@ function renderArmySection(
       section.append(line("Click a highlighted neighbour to move or attack.", "hud-hint"));
       section.append(renderCombatOdds(state, army));
     }
+    // Split off part of the stack (send a detachment to an own neighbour) or
+    // stand regiments down to cut upkeep. Only meaningful for a real stack.
+    if (region.ownerId === PLAYER_ID) section.append(renderDetachPanel(state, region, army, callbacks));
   } else {
     section.append(line("No army stationed here.", "hud-hint"));
   }
@@ -2654,6 +2661,86 @@ function renderArmySection(
   }
   section.append(menu);
   return section;
+}
+
+/**
+ * Split / disband panel (M1). A collapsible under the Army section with a
+ * per-regiment stepper for each unit type in the stack; the running selection
+ * lives in the DOM (no app state), read on commit. "Send to {neighbour}" splits
+ * the selection into an adjacent owned region (a new stack, or reinforcing the
+ * one already there); "Disband" stands the selection down to cut upkeep.
+ */
+function renderDetachPanel(
+  state: GameState,
+  region: Region,
+  army: Army,
+  callbacks: HudCallbacks,
+): HTMLElement {
+  const sel = {} as Record<UnitType, number>;
+  for (const t of UNIT_TYPES) sel[t] = 0;
+
+  const details = document.createElement("details");
+  details.className = "hud-detach";
+  const summary = document.createElement("summary");
+  summary.className = "hud-detach-summary";
+  summary.textContent = "Split / disband ▸";
+  details.append(summary);
+
+  const labels: Partial<Record<UnitType, HTMLElement>> = {};
+  const setLabel = (t: UnitType) => {
+    if (labels[t]) labels[t]!.textContent = String(sel[t]);
+  };
+  for (const t of UNIT_TYPES) {
+    const have = army.units[t];
+    if (have <= 0) continue;
+    const row = el("div", "hud-detach-row");
+    const name = el("span", "hud-detach-name");
+    name.innerHTML = `${unitIconHtml(t, "")}${UNITS[t].short}`;
+    const minus = btn("−", "hud-detach-step", () => {
+      sel[t] = Math.max(0, sel[t] - 1);
+      setLabel(t);
+    });
+    const cnt = el("span", "hud-detach-cnt");
+    cnt.textContent = "0";
+    labels[t] = cnt;
+    const plus = btn("+", "hud-detach-step", () => {
+      sel[t] = Math.min(have, sel[t] + 1);
+      setLabel(t);
+    });
+    const of = el("span", "hud-detach-have");
+    of.textContent = `/ ${have}`;
+    row.append(name, minus, cnt, of, plus);
+    details.append(row);
+  }
+
+  // Destinations: adjacent regions you own (a detachment manoeuvres within the realm).
+  if (army.movesLeft > 0) {
+    const dests = region.adjacency
+      .map((id) => state.regions[id])
+      .filter((r): r is Region => !!r && r.ownerId === PLAYER_ID);
+    if (dests.length) {
+      details.append(line("Send selected to:", "hud-hint"));
+      const row = el("div", "hud-detach-dests");
+      for (const d of dests) {
+        const has = !!armyAt(state, d.id, PLAYER_ID);
+        const b = btn(`${d.name}${has ? " ⚔" : ""}`, "hud-detach-dest", () =>
+          callbacks.onMoveDetachment(army.id, d.id, sel),
+        );
+        b.title = has ? `Reinforce your army at ${d.name}.` : `Split a new stack into ${d.name}.`;
+        row.append(b);
+      }
+      details.append(row);
+    }
+  } else {
+    details.append(line("No moves left to split this turn.", "hud-hint"));
+  }
+
+  const disband = btn("Disband selected", "hud-detach-disband", () =>
+    callbacks.onDisbandUnits(army.id, sel),
+  );
+  disband.title = "Stand the selected regiments down to cut upkeep (no refund).";
+  details.append(disband);
+  return details;
 }
 
 /**

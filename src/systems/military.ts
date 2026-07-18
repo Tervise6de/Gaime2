@@ -12,7 +12,7 @@
  * advancing `rngState`, so resolution stays deterministic and reproducible.
  */
 
-import { UNITS, type UnitType } from "@/data/units";
+import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
 import { TERRAIN, type StrategicResource } from "@/data/terrain";
 import { traitUnitCostMult } from "@/data/traits";
 import { focusUnitCostMult, type FocusId } from "@/data/focuses";
@@ -280,7 +280,116 @@ export function moveArmy(
   return next;
 }
 
+/**
+ * Move a chosen SUBSET of an army's units to an adjacent region you own — the
+ * split / detach / reinforce primitive (M1). The remainder holds in place; the
+ * detachment either forms a new stack in an empty own region or merges into a
+ * friendly stack already standing there. Only your own territory is a legal
+ * destination — attacking still commits the whole stack via `moveArmy`, so this
+ * never resolves combat. Selecting the entire stack degrades to a normal
+ * `moveArmy`. Pure over `GameState`.
+ */
+export function moveDetachment(
+  state: GameState,
+  armyId: number,
+  targetRegionId: number,
+  subset: Partial<Record<UnitType, number>>,
+): GameState {
+  const army = state.armies.find((a) => a.id === armyId);
+  if (!army || army.movesLeft <= 0) return state;
+  const from = state.regions[army.regionId];
+  const target = state.regions[targetRegionId];
+  if (!from || !target || !from.adjacency.includes(targetRegionId)) return state;
+  // Detachments manoeuvre within your realm; capture/attack uses moveArmy.
+  if (target.ownerId !== army.ownerId) return state;
+
+  const take = clampSubset(army, subset);
+  if (!take) return state; // nothing selected
+  const remaining = subtractUnits(army.units, take);
+  // Selecting everything is just a whole-stack move — keep its id and merge logic.
+  if (armySize(remaining) === 0) return moveArmy(state, armyId, targetRegionId);
+
+  const arrivedMoves = Math.max(0, army.movesLeft - 1);
+  // The parent stays put with the remainder; only the detachment spends a move.
+  const withoutParent = state.armies.map((a) =>
+    a.id === army.id ? { ...a, units: remaining } : a,
+  );
+  const friendly = armyAt(state, targetRegionId, army.ownerId);
+
+  let armies: Army[];
+  let nextArmyId = state.nextArmyId;
+  let reinforced = false;
+  if (friendly && friendly.id !== army.id) {
+    // Reinforce the standing stack; the arriving detachment limits its moves.
+    reinforced = true;
+    armies = withoutParent.map((a) =>
+      a.id === friendly.id
+        ? { ...a, units: addUnits(a.units, take), movesLeft: Math.min(a.movesLeft, arrivedMoves) }
+        : a,
+    );
+  } else {
+    // Empty own region: the detachment becomes a new stack that can keep moving.
+    armies = [
+      ...withoutParent,
+      { id: nextArmyId, ownerId: army.ownerId, regionId: targetRegionId, units: take, movesLeft: arrivedMoves },
+    ];
+    nextArmyId += 1;
+  }
+
+  const owner = state.nations.find((n) => n.id === army.ownerId);
+  const who = owner?.isPlayer ? "Your" : `${owner?.name ?? "A rival"}'s`;
+  const line = `${who} ${soldiersDisplay(armySize(take))} soldiers ${reinforced ? "reinforced" : "detached to"} ${target.name}.`;
+  return { ...state, armies, nextArmyId, log: appendLog(state, [line]) };
+}
+
+/**
+ * Voluntarily disband a subset of an army's units, cutting future upkeep (no
+ * refund — you're standing them down, not selling them). Empties the stack if
+ * everything is disbanded. Pure.
+ */
+export function disbandUnits(
+  state: GameState,
+  armyId: number,
+  subset: Partial<Record<UnitType, number>>,
+): GameState {
+  const army = state.armies.find((a) => a.id === armyId);
+  if (!army) return state;
+  const take = clampSubset(army, subset);
+  if (!take) return state;
+  const remaining = subtractUnits(army.units, take);
+  const armies =
+    armySize(remaining) === 0
+      ? state.armies.filter((a) => a.id !== army.id)
+      : state.armies.map((a) => (a.id === army.id ? { ...a, units: remaining } : a));
+  const owner = state.nations.find((n) => n.id === army.ownerId);
+  const who = owner?.isPlayer ? "Your realm" : (owner?.name ?? "A rival");
+  const line = `${who} disbanded ${soldiersDisplay(armySize(take))} soldiers.`;
+  return { ...state, armies, log: appendLog(state, [line]) };
+}
+
 // --- internal helpers -------------------------------------------------------
+
+/** Clamp a requested unit subset to what the army actually holds; null if empty. */
+function clampSubset(
+  army: Army,
+  want: Partial<Record<UnitType, number>>,
+): UnitCounts | null {
+  const take = emptyUnits();
+  let any = false;
+  for (const t of UNIT_TYPES) {
+    const n = Math.max(0, Math.min(Math.floor(want[t] ?? 0), army.units[t]));
+    take[t] = n;
+    if (n > 0) any = true;
+  }
+  return any ? take : null;
+}
+
+/** Per-type difference a − b over all unit types. */
+function subtractUnits(a: UnitCounts, b: UnitCounts): UnitCounts {
+  const out = { ...a };
+  for (const t of UNIT_TYPES) out[t] = a[t] - b[t];
+  return out;
+}
 
 function relocateOrMerge(
   state: GameState,

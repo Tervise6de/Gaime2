@@ -894,9 +894,12 @@ from. Every one must land as a playable, testable, deterministic slice.
    deterministic data rows plugging into systems that already exist — stories
    from numbers, per the pillars. Itemised as section E of `TODO.md`; the first
    two slices (named rulers, chronicle) are cheap enough to land ahead of naval.
-3. **Army stacking / combined battles** (§9.2, still-open). When several friendly
-   armies sit adjacent to one fight, do they combine into a single battle, or stay
-   one-army-per-engagement as now? Changes how the map's front lines feel. Medium.
+3. **Army system completion — IN PROGRESS (started 2026-07-18), see §9.9.** Stacking
+   / combined battles plus the surrounding army instrument (split, stance, veterancy,
+   commanders, war AI). The chosen "complete" target is an AoE2 × CK3 × Civ5 blend;
+   the milestone plan lives in §9.9. (This overlaps item 2 at **commanders/generals**:
+   §9.9's M4 delivers the general-as-stack-buff; the broader named-rulers/governors/
+   succession layer is item 2's to own.)
 4. **Culture axis** (§9.6, still-open). A cultural identity *distinct from faith*:
    assimilation of conquered provinces, cultural unrest on mismatched rule, and maybe
    a culture victory. The setting's German/Baltic/Rus/Norse frictions are begging for
@@ -913,3 +916,55 @@ from. Every one must land as a playable, testable, deterministic slice.
    Content-heavy, low mechanical risk — a texture play, not a systems play.
 8. **Espionage** (§2 non-goal). Spies, sabotage, stolen tech, intel on rivals. Largest
    new-system scope and the least certain fit; parked at the back deliberately.
+
+### 9.9 Army system completion — the plan (in progress, from v0.44)
+
+**Target: an AoE2 × CK3 × Civ5 blend.** AoE2 gives the *tactics* (hard unit
+counters + combined arms — already the strongest pillar, §3.4). CK3 gives the army
+as an *instrument* (levy vs. men-at-arms, raise/rally/disband, commanders, supply).
+Civ5 gives *persistence & texture* (veterancy/promotions, zone of control, a Great
+General, ranged bombardment of forts).
+
+**Where we start (audit, 2026-07-18).** The engine models one merged stack per
+`(region, owner)`, enforced by construction (a region only ever holds one owner's
+armies; every raise/event/friendly-move folds into the standing stack). Combat is a
+deterministic phased volley→melee on *summed* `UnitCounts` — composition-agnostic,
+so combining stacks is mostly a matter of gathering participants and apportioning
+losses back. What's absent is the whole *control + persistence* layer: no split,
+partial move, disband, stance/fortify, waypoints, veterancy, or commanders; the AI
+decides attacks with a hand-rolled heuristic that ignores the real combat forecast.
+
+**Milestones** (each a playable, green-gated, deterministic slice; version bumps as
+usual):
+
+- **M1 · Stack command — SHIPPED (v0.44).** Split/detach and **partial
+  (choose-units) moves** — send cavalry ahead, peel off a garrison, reinforce a
+  friendly stack with a chosen subset — plus voluntary **disband** to cut upkeep.
+  `moveDetachment` / `disbandUnits` (pure, `systems/military.ts`) move a chosen
+  `UnitCounts` subset to an adjacent owned region: the remainder holds in place, the
+  detachment forms a new stack in an empty own region or reinforces the standing one;
+  selecting the whole stack degrades to a normal `moveArmy`. Only own territory is a
+  legal detachment target, so the one-stack-per-region invariant holds and no combat
+  is touched. The Army panel gains a "Split / disband" collapsible with a per-regiment
+  stepper for each unit type, "Send to {neighbour}" destinations, and a disband button.
+- **M2 · Combined battles** (the §9.2 "stacking" item). Attacking a region lets
+  friendly stacks in *adjacent* regions join the assault (spending their move); a
+  defender is joined by adjacent friendly stacks rallying to the defence. One battle,
+  losses apportioned across all participants (new `apportionLosses` in combat.ts).
+  Massing along a front finally matters — and doom-stacking stops being the only way
+  to concentrate force.
+- **M3 · Dig in & hold.** A **fortify/entrench** stance (defence bonus + a clear
+  "hold here" signal) and **zone of control** (a stack exerts pull on its neighbours,
+  so mobile enemies can't freely walk past a defended front). Forts gain teeth: an
+  empty fortified region no longer falls for free.
+- **M4 · Veterans & captains.** Battle **XP → promotions** carried on the stack
+  (Civ5) so a blooded army is worth preserving, and an optional **commander/leader**
+  that buffs the stack (CK3 knights / Civ Great General).
+- **M5 · War AI.** The AI decides attacks by the **real forecast** (win chance +
+  expected losses, not the divergent heuristic), coordinates **combined assaults**,
+  **garrisons/fortifies** frontiers, and values stacks by strength, not headcount —
+  so the opponent actually plays the new systems.
+
+**Hardening folded in across the slices:** the empty-but-fortified free-capture, the
+"ghost army" of an eliminated nation, `winChance` drifting from the real resolver,
+and dead constants (`CASUALTY_SCALE`).
