@@ -869,3 +869,38 @@ building monasteries and cathedrals. Pure and deterministic (no RNG).
 5. **Region focus + buildings** (9.4) and **research tree** (9.5) — the Civ depth.
 6. **Victory-type pass** (9.6) — once focus/culture exist to hang a path on.
 Each remains a playable, testable slice, per the M1–M6 discipline above.
+
+### 9.8 Open design decisions — the decision queue
+
+The roadmap items above (9.0–9.6) are shipped. What remains are **larger design
+calls**, each a subsystem rather than a tweak, listed in rough priority order.
+None is committed; this is the queue the next "what do we build?" decision draws
+from. Every one must land as a playable, testable, deterministic slice.
+
+1. **Naval / sea power — TO BE DECIDED (flagged 2026-07-18).** Today the sea is
+   economic-only: coasts give yields and cross-water *adjacency* (dashed sea lanes),
+   with no naval combat (an explicit v1 non-goal, §2). The Baltic *is* a sea, so this
+   is the highest-leverage thematic gap — Hanseatic trade lanes, coastal raids,
+   blockades, and island hops (Gotland, Ösel). Open sub-questions: do we add ship
+   *units* that fight over sea lanes, or an abstract "naval control" of lanes? Does
+   losing a lane cut trade/reinforcement? Is there a naval-power victory or just
+   leverage? Biggest scope of the queue; the setting rewards it most.
+2. **Army stacking / combined battles** (§9.2, still-open). When several friendly
+   armies sit adjacent to one fight, do they combine into a single battle, or stay
+   one-army-per-engagement as now? Changes how the map's front lines feel. Medium.
+3. **Culture axis** (§9.6, still-open). A cultural identity *distinct from faith*:
+   assimilation of conquered provinces, cultural unrest on mismatched rule, and maybe
+   a culture victory. The setting's German/Baltic/Rus/Norse frictions are begging for
+   it. Medium–large; pairs naturally with faith.
+4. **Religion blocs / coalitions** (§9.6, still-open). Shared-faith realms cooperating
+   — crusader coalitions, joint wars, a bloc's combined victory pressure. The Crusades
+   were coalitions; this makes faith a *diplomatic* force, not just a per-realm race.
+   Medium.
+5. **Vassalage / deeper diplomacy** (§9.1, beyond casus belli). Tributaries, vassal
+   states, defensive pacts with teeth, an alliance/diplomatic victory. Casus belli
+   already ships (v0.27); this is the layer above it. Medium.
+6. **Event chains / branching questlines** (§2 non-goal today). Events are single-beat;
+   this would add multi-step storylines with consequences that carry across turns.
+   Content-heavy, low mechanical risk — a texture play, not a systems play.
+7. **Espionage** (§2 non-goal). Spies, sabotage, stolen tech, intel on rivals. Largest
+   new-system scope and the least certain fit; parked at the back deliberately.
