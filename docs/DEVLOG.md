@@ -6,6 +6,42 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-18 — D4: performance profiling harness + findings (partial) (v0.56.0)
+
+Roadmap D4 (profile at the largest configs; optimise hot paths *only if measured
+slow*). Built the harness, measured, and — per the rule — changed no hot path,
+because none is slow.
+
+**The harness (`systems/profile.ts`, tree-shaken from the app bundle).** Tooling,
+not sim logic: it observes the pure pipeline from the outside with
+`performance.now()` and never feeds timing back into state, so determinism is
+untouched. Two views: `profileGame`/`summarizeGame` — per-turn `resolveTurn` cost
+across a full game with an early-vs-late split (a superlinear-growth probe); and
+`profilePhases` — a micro-benchmark of the individually-exported hot phases on one
+representative state, to attribute the cost without instrumenting `resolveTurn`
+(which would risk its shared AI/event RNG stream). `profile.test.ts` guards it:
+structural checks plus a *very* generous catastrophe-only wall-clock ceiling.
+
+**Findings (30 regions × 6 nations, this box).**
+- **≈1.1–1.5 ms/turn**; a full 219-turn game resolves in **~250 ms** end to end.
+- **No superlinear growth** — early- and late-game ms/turn are flat (often
+  *decreasing* as nations are eliminated); the O(n)-per-turn shape holds.
+- **The rival AI is the dominant term** (≈60–80% of a turn): a single nation's
+  `runNationTurn` (~0.08 ms) is 3–4× the next phase (`applyTradeIncome` ~0.026,
+  `advanceNationEconomy` ~0.020, `driftRelations` ~0.014). Everything else is
+  noise by comparison.
+
+**Verdict: no optimisation warranted.** At ~1.3 ms/turn the largest game is
+~250 ms of compute — orders of magnitude inside any interactive budget — so
+touching the (correct, deterministic, well-tested) hot paths would only add risk.
+The harness stays as the instrument to re-check after any future sim change, and
+the perf integration test keeps its own catastrophe ceiling.
+
+624 tests green (+4 for the harness), typecheck + build clean; app bundle
+unchanged (harness tree-shaken out).
+
+---
+
 ## 2026-07-18 — D5: localisation scaffolding — a string catalogue + a live Estonian locale (v0.55.0)
 
 Roadmap D5 (extract UI strings). Stood up the i18n foundation and wired a
