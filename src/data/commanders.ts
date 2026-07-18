@@ -49,8 +49,15 @@ export const COMMANDER_TRAITS: Record<CommanderTrait, CommanderTraitDef> = {
 /** Per-point-of-martial multiplier bonus (martial 9 ≈ +18% before the trait). */
 export const COMMANDER_MARTIAL_SCALE = 0.02;
 
-/** Loyalty at or below this foments unrest where the army stands (a liability). */
+/** Loyalty at or below this foments unrest where the army stands, and — in a
+ *  region already in open revolt — tips the commander into defection (a liability). */
 export const COMMANDER_DISLOYAL = 30;
+
+/** Loyalty lost per turn a commander sits in a high-unrest province (it erodes them). */
+export const COMMANDER_LOYALTY_EROSION = 3;
+
+/** Loyalty regained per turn a commander sits in a calm province (a contented officer). */
+export const COMMANDER_LOYALTY_RECOVERY = 1;
 
 export interface Commander {
   name: string;

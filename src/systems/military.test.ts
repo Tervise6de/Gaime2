@@ -12,7 +12,8 @@ import {
   tickEntrenchment,
   inEnemyZoc,
   appointCommander,
-  applyCommanderUnrest,
+  applyCommanderEffects,
+  applyDefection,
   totalUpkeep,
 } from "@/systems/military";
 import type { Commander } from "@/data/commanders";
@@ -597,11 +598,49 @@ describe("commanders (M4)", () => {
     const g = realm({ infantry: 3 });
     g.armies[0]!.commander = { name: "Skirgaila", epithet: "the Fox", martial: 4, trait: "ambitious", loyalty: 20 };
     const before = g.regions[0]!.unrest;
-    const next = applyCommanderUnrest(g);
+    const next = applyCommanderEffects(g);
     expect(next.regions[0]!.unrest).toBeGreaterThan(before);
     // A loyal commander does not.
     g.armies[0]!.commander!.loyalty = 80;
-    expect(applyCommanderUnrest(g).regions[0]!.unrest).toBe(before);
+    expect(applyCommanderEffects(g).regions[0]!.unrest).toBe(before);
+  });
+
+  it("loyalty erodes in an unstable province and recovers in a calm one", () => {
+    const g = realm({ infantry: 3 });
+    g.armies[0]!.commander = { name: "Otto", epithet: "the Grim", martial: 5, trait: "steadfast", loyalty: 50 };
+    // Calm home region → recovers.
+    g.regions[0]!.unrest = 0;
+    expect(applyCommanderEffects(g).armies[0]!.commander!.loyalty).toBe(51);
+    // High-unrest home region → erodes.
+    g.regions[0]!.unrest = 40;
+    expect(applyCommanderEffects(g).armies[0]!.commander!.loyalty).toBe(47);
+  });
+});
+
+describe("commander defection (E5)", () => {
+  it("a disloyal commander in a region in open revolt turns his coat and seizes it", () => {
+    const g = realm({ infantry: 4 });
+    g.regions[0]!.unrest = 90; // open revolt (>= UNREST_REVOLT)
+    g.armies[0]!.commander = { name: "Skirgaila", epithet: "the Fox", martial: 6, trait: "ambitious", loyalty: 15 };
+    const next = applyDefection(g);
+    expect(next.regions[0]!.ownerId).toBe(BARBARIAN_ID); // region lost
+    expect(next.armies[0]!.ownerId).toBe(BARBARIAN_ID);  // the army defected...
+    expect(next.armies[0]!.commander!.name).toBe("Skirgaila"); // ...still led by the pretender
+    expect(next.log.some((l) => /turns his coat, seizing/.test(l))).toBe(true);
+  });
+
+  it("a loyal commander holds the line even in open revolt", () => {
+    const g = realm({ infantry: 4 });
+    g.regions[0]!.unrest = 90;
+    g.armies[0]!.commander = { name: "Otto", epithet: "the Iron", martial: 7, trait: "steadfast", loyalty: 70 };
+    expect(applyDefection(g)).toBe(g); // no defection → same state
+  });
+
+  it("a disloyal commander in a calm region does not defect", () => {
+    const g = realm({ infantry: 4 });
+    g.regions[0]!.unrest = 10; // not in revolt
+    g.armies[0]!.commander = { name: "Skirgaila", epithet: "the Fox", martial: 6, trait: "ambitious", loyalty: 10 };
+    expect(applyDefection(g)).toBe(g);
   });
 });
 

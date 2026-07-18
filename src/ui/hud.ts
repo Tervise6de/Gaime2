@@ -86,6 +86,7 @@ import {
   commanderTitle,
 } from "@/data/commanders";
 import {
+  BARBARIAN_ID,
   PLAYER_ID,
   RESOURCE_KEYS,
   TAX_MAX,
@@ -2559,6 +2560,19 @@ function renderEnemyRegion(
   const box = el("div", "hud-enemy");
   if (garrison && armySize(garrison.units) > 0) {
     box.append(line(`Enemy garrison: ${soldiersDisplay(armySize(garrison.units))} soldiers (${composition(garrison)})`));
+    if (garrison.commander) {
+      const c = garrison.commander;
+      const rebel = garrison.ownerId === BARBARIAN_ID;
+      box.append(
+        line(
+          `${glyphHtml("attack", "⚔")} ${rebel ? "Pretender" : "Led by"}: <b>${escapeHtml(commanderTitle(c))}</b> — martial ${c.martial}`,
+          "hud-hint",
+        ),
+      );
+    }
+    if ((garrison.entrenchment ?? 0) > 0) {
+      box.append(line(`${glyphHtml("shield", "🛡")} Dug in — entrenchment ${garrison.entrenchment}/${MAX_ENTRENCH}`, "hud-hint"));
+    }
   } else {
     box.append(line("Undefended — an army walking in captures it."));
   }
@@ -2584,7 +2598,9 @@ function renderEnemyRegion(
   } else if (attackers.length === 1) {
     const preview = forecastCombat(attackers[0]!.units, garrison?.units ?? emptyUnits(), {
       terrainDefense: TERRAIN[region.terrain].defense,
-      fortification: region.fortification,
+      fortification: region.fortification + (garrison?.entrenchment ?? 0),
+      attackerCommand: commanderAttack(attackers[0]!.commander),
+      defenderCommand: commanderDefense(garrison?.commander),
     });
     const oddsText = preview.undefended ? "capture" : `${Math.round(preview.winChance * 100)}%`;
     attackBtn.innerHTML = `${glyphHtml("attack", "⚔")} Attack (${oddsText})`;

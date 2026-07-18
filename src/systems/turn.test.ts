@@ -181,7 +181,8 @@ describe("secession (revolt → break away)", () => {
     expect(s.regions[0]!.construction).toBeNull();
     const rebels = s.armies.find((a) => a.regionId === 0 && a.ownerId === BARBARIAN_ID);
     expect(rebels && armySize(rebels.units)).toBe(REBEL_GARRISON);
-    expect(s.log.some((l) => /secedes/.test(l))).toBe(true);
+    expect(rebels!.commander).toBeDefined(); // led by a named pretender (E5)
+    expect(s.log.some((l) => /seceding from/.test(l))).toBe(true);
   });
 
   it("a friendly garrison holds the region — it never secedes while troops stand there", () => {

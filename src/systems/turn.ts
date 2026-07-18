@@ -30,7 +30,8 @@ import { advanceConstruction } from "@/systems/construction";
 import { stepFaith, seedFaith } from "@/systems/faith";
 import { nextPopulation } from "@/systems/population";
 import { nextUnrest } from "@/systems/stability";
-import { applyCommanderUnrest, armyMoves, tickEntrenchment, totalUpkeep } from "@/systems/military";
+import { applyCommanderEffects, applyDefection, armyMoves, tickEntrenchment, totalUpkeep } from "@/systems/military";
+import { commanderTitle, generateCommander } from "@/data/commanders";
 import { driftRelations, decayOpinions, atWar, tradePartners, tradeIncome } from "@/systems/diplomacy";
 import { runNationTurn } from "@/systems/ai";
 import { advanceResearch, dequeueResearch, techUnrestReduction, isBuildingUnlockedFor, selectTech, queueResearch as queueResearchTech, clearQueue } from "@/systems/tech";
@@ -442,22 +443,26 @@ export function applySecession(state: GameState): GameState {
   });
   if (secededIds.length === 0) return { ...state, regions };
 
+  // A revolt throws up a named pretender to lead the rebels (E5) — deterministic
+  // from the state RNG, so the same game always raises the same figurehead.
+  const rng = createRng(state.rngState);
   let armies = state.armies;
   let nextArmyId = state.nextArmyId;
   let log = state.log;
   for (const id of secededIds) {
+    const pretender = generateCommander(rng);
     armies = [
       ...armies,
-      { id: nextArmyId, ownerId: BARBARIAN_ID, regionId: id, units: { ...emptyUnits(), militia: REBEL_GARRISON }, movesLeft: 0 },
+      { id: nextArmyId, ownerId: BARBARIAN_ID, regionId: id, units: { ...emptyUnits(), militia: REBEL_GARRISON }, movesLeft: 0, commander: pretender },
     ];
     nextArmyId += 1;
     const former = state.nations.find((n) => n.id === state.regions[id]!.ownerId);
     log = [
       ...log,
-      `${state.regions[id]!.name} rises in revolt and secedes from ${former?.isPlayer ? "your realm" : (former?.name ?? "its ruler")}.`,
+      `${state.regions[id]!.name} rises in revolt under ${commanderTitle(pretender)}, seceding from ${former?.isPlayer ? "your realm" : (former?.name ?? "its ruler")}.`,
     ].slice(-50);
   }
-  return { ...state, regions, armies, nextArmyId, log };
+  return { ...state, regions, armies, nextArmyId, log, rngState: rng.seed };
 }
 
 /** Count a nation's temporary modifiers down one turn, dropping any that expire. */
@@ -796,6 +801,13 @@ export function resolveTurn(state: GameState): GameState {
     s = advanceNationEconomy(s, nation.id);
   }
 
+  // 1.45. Commanders (M4/E5): loyalty drifts with each province's mood and a
+  // disloyal officer foments unrest; then any disloyal commander garrisoning a
+  // region already in open revolt turns his coat and seizes it as a named
+  // pretender — the slow fuse of a neglected province.
+  s = applyCommanderEffects(s);
+  s = applyDefection(s);
+
   // 1.5. Secession: regions held in prolonged, ungarrisoned revolt break away —
   // a territorial brake on overexpansion. Runs before the AI so rivals can react
   // (e.g. move to reconquer a region that just seceded).
@@ -830,9 +842,6 @@ export function resolveTurn(state: GameState): GameState {
     ...s,
     armies: tickEntrenchment(s.armies).map((a) => ({ ...a, movesLeft: armyMoves(a.units) })),
   };
-
-  // 5.2. Disloyal commanders foment unrest where they stand (M4).
-  s = applyCommanderUnrest(s);
 
   // 5.5. Faith spreads: churches and rulers convert provinces (occupation alone
   // does not), so the religious map shifts before the victory check reads it.

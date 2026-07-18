@@ -6,6 +6,39 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-18 — E5: named pretender revolts + commander defection (v0.48.0)
+
+Deepening the army systems: commanders become a *threat*, not just a combat
+bonus — the CK3 "your own appointments turn on you" beat, built on M4's loyalty.
+
+- **Loyalty now drifts** (`applyCommanderEffects`, replacing the old
+  unrest-only hook). A commander's loyalty erodes each turn it sits in a
+  high-unrest province (≥ `UNREST_PENALTY_START`) and recovers in a calm one —
+  so neglect radicalises your officers, good governance settles them. A
+  disloyal one (≤ 30) still foments unrest where it stands.
+- **Defection** (`applyDefection`, new pipeline step before secession). A
+  disloyal commander garrisoning one of its realm's own regions that has fallen
+  into open revolt (unrest ≥ `UNREST_REVOLT`) **turns his coat** — the region
+  and the whole army pass to the Free Tribes with the commander still at their
+  head. A normally-loyal garrison would have *held* that province; a disloyal
+  one seizes it instead, and as a *led* stack it's harder to retake.
+- **Named pretenders on secession.** Ordinary ungarrisoned revolts now throw up
+  a generated pretender to lead the rebel militia ("…rises in revolt under
+  Visvaldis the Bold, seceding from your realm"), deterministic from the seed.
+- **UI.** The enemy-region panel names the pretender/commander and shows a
+  dug-in note; its attack forecast folds in entrenchment + commanders like the
+  main odds preview.
+
+The slow fuse: a disloyal commander foments unrest → the province tips into
+revolt → their loyalty erodes → they defect and take it. All telegraphed (the
+army panel shows loyalty + a "disloyal" warning) and fully deterministic.
+
+Verified: 584 tests green (+4 E5 + drift/defection coverage). Typecheck + build
+clean. Browser: 12 turns run with zero console errors (the new pipeline steps
+fire every turn). New optional `Army.commander` on rebel stacks — saves load clean.
+
+---
+
 ## 2026-07-18 — Army M4: commanders (v0.47.0)
 
 The last army step — characters who lead stacks, built as a pure army feature

@@ -15,6 +15,8 @@
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
 import {
   COMMANDER_DISLOYAL,
+  COMMANDER_LOYALTY_EROSION,
+  COMMANDER_LOYALTY_RECOVERY,
   commanderAttack,
   commanderDefense,
   commanderTitle,
@@ -32,7 +34,10 @@ import {
   CONQUEST_UNREST,
   MAX_ENTRENCH,
   PLAYER_ID,
+  UNREST_BASE,
   UNREST_MAX,
+  UNREST_PENALTY_START,
+  UNREST_REVOLT,
   armySize,
   emptyUnits,
   type Army,
@@ -218,24 +223,76 @@ export function appointCommander(state: GameState, armyId: number): GameState {
 export const DISLOYAL_UNREST = 1;
 
 /**
- * A disloyal commander (loyalty ≤ COMMANDER_DISLOYAL) standing in a region their
- * own realm holds foments unrest there each turn — an ambitious general is a
- * liability, the seed of the named-pretender revolts on the roadmap (E5). Pure.
+ * Per-turn commander effects (M4/E5), all at "home" (a region the army's own realm
+ * holds): loyalty drifts with the province's mood — eroding amid unrest, recovering
+ * when calm — and a commander who has slipped to disloyal (≤ COMMANDER_DISLOYAL)
+ * foments extra unrest where they stand. This is the slow fuse: neglect a province
+ * and its garrison's officer turns against you (see `applyDefection`). Pure.
  */
-export function applyCommanderUnrest(state: GameState): GameState {
+export function applyCommanderEffects(state: GameState): GameState {
   const bump = new Map<number, number>();
-  for (const a of state.armies) {
+  const armies = state.armies.map((a) => {
     const c = a.commander;
-    if (!c || c.loyalty > COMMANDER_DISLOYAL) continue;
+    if (!c) return a;
     const r = state.regions[a.regionId];
-    if (!r || r.ownerId !== a.ownerId) continue; // only foments at home
-    bump.set(a.regionId, (bump.get(a.regionId) ?? 0) + DISLOYAL_UNREST);
-  }
-  if (bump.size === 0) return state;
-  const regions = state.regions.map((r) =>
-    bump.has(r.id) ? { ...r, unrest: Math.min(UNREST_MAX, r.unrest + bump.get(r.id)!) } : r,
+    if (!r || r.ownerId !== a.ownerId) return a; // effects only apply at home
+    const loyalty =
+      r.unrest >= UNREST_PENALTY_START
+        ? Math.max(0, c.loyalty - COMMANDER_LOYALTY_EROSION)
+        : Math.min(100, c.loyalty + COMMANDER_LOYALTY_RECOVERY);
+    if (loyalty <= COMMANDER_DISLOYAL) {
+      bump.set(a.regionId, (bump.get(a.regionId) ?? 0) + DISLOYAL_UNREST);
+    }
+    return loyalty === c.loyalty ? a : { ...a, commander: { ...c, loyalty } };
+  });
+  const regions =
+    bump.size === 0
+      ? state.regions
+      : state.regions.map((r) =>
+          bump.has(r.id) ? { ...r, unrest: Math.min(UNREST_MAX, r.unrest + bump.get(r.id)!) } : r,
+        );
+  return { ...state, armies, regions };
+}
+
+/**
+ * Defection (E5): a disloyal commander (loyalty ≤ COMMANDER_DISLOYAL) whose army
+ * garrisons one of its realm's own regions that has fallen into open revolt
+ * (unrest ≥ UNREST_REVOLT) turns his coat — seizing the region for himself as a
+ * *named pretender*. The region and the army pass to the Free Tribes with the
+ * commander still at their head (a led rebel stack, harder to retake), and the
+ * province settles under its new master. Your own appointment becomes the threat.
+ * Pure — runs before secession so a defected region is not also processed there.
+ */
+export function applyDefection(state: GameState): GameState {
+  const defectors = state.armies.filter((a) => {
+    const c = a.commander;
+    if (!c || c.loyalty > COMMANDER_DISLOYAL || a.ownerId === BARBARIAN_ID) return false;
+    const r = state.regions[a.regionId];
+    return !!r && r.ownerId === a.ownerId && r.unrest >= UNREST_REVOLT;
+  });
+  if (defectors.length === 0) return state;
+  const defectArmyIds = new Set(defectors.map((a) => a.id));
+  const defectRegionIds = new Set(defectors.map((a) => a.regionId));
+  const armies = state.armies.map((a) =>
+    defectArmyIds.has(a.id)
+      ? { ...a, ownerId: BARBARIAN_ID, fortifying: false, entrenchment: 0 }
+      : a,
   );
-  return { ...state, regions };
+  const regions = state.regions.map((r) =>
+    defectRegionIds.has(r.id)
+      ? { ...r, ownerId: BARBARIAN_ID, unrest: UNREST_BASE, construction: null, revoltTurns: 0 }
+      : r,
+  );
+  let log = state.log;
+  for (const a of defectors) {
+    const r = state.regions[a.regionId]!;
+    const former = state.nations.find((n) => n.id === a.ownerId);
+    log = [
+      ...log,
+      `${commanderTitle(a.commander!)} turns his coat, seizing ${r.name} from ${former?.isPlayer ? "your realm" : (former?.name ?? "its ruler")}!`,
+    ].slice(-50);
+  }
+  return { ...state, armies, regions, log };
 }
 
 /** Grow one turn's worth of entrenchment on every dug-in army (called by the turn pipeline). */
