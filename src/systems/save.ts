@@ -82,6 +82,12 @@ export function deserializeGame(json: string): GameState | null {
       s.sound.tollRate = Number.isFinite(rate) ? Math.max(0, Math.min(SOUND.maxRate, rate)) : SOUND.defaultRate;
       s.sound.embargoes = Array.isArray(s.sound.embargoes) ? s.sound.embargoes.filter((n) => typeof n === "number") : [];
     }
+    // The Hanseatic League is optional (founded mid-game); coerce its lists if present.
+    if (s.league) {
+      s.league.members = Array.isArray(s.league.members) ? s.league.members.filter((n) => typeof n === "number") : [];
+      s.league.boycotts = Array.isArray(s.league.boycotts) ? s.league.boycotts.filter((n) => typeof n === "number") : [];
+      if (s.league.members.length === 0) s.league = undefined; // an empty League is no League
+    }
     // Forward-migrate army unit records: a save from before a unit type existed
     // lacks that key, which would read as `undefined` (→ NaN) in armySize/combat.
     // Backfill every unit slot to 0 so older saves load cleanly.

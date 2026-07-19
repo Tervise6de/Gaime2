@@ -50,6 +50,7 @@ import {
 } from "@/systems/diplomacy";
 import { researchFrontier, selectTech, isBuildingUnlockedFor } from "@/systems/tech";
 import { createRoute, laneFor, regionSources, distanceFactor } from "@/systems/trade";
+import { foundLeague, joinLeague, canFoundLeague, canJoinLeague, kontoreHeldBy } from "@/systems/league";
 import { GOODS, GOOD_IDS } from "@/data/goods";
 import { KONTORE } from "@/data/kontore";
 import { eraIndexForTurn } from "@/data/eras";
@@ -85,9 +86,28 @@ export function runNationTurn(state: GameState, nationId: number, rng: Rng): Gam
   let s = state;
   s = manageEconomy(s, nationId);
   s = manageTrade(s, nationId);
+  s = manageLeague(s, nationId);
   s = doDiplomacy(s, nationId, rng);
   s = doMilitary(s, nationId, rng);
   return s;
+}
+
+/**
+ * The Hanseatic League decision: a trading power founds it if none exists; a trader
+ * outside an existing League joins to win its Kontor privileges (only while at peace
+ * with the members). Warlike, trade-poor realms stay out — keeping the freedom to
+ * war fellow traders. Hansa board only. Pure.
+ */
+function manageLeague(state: GameState, nationId: number): GameState {
+  if (nationId === BARBARIAN_ID || state.mapId !== "hansa") return state;
+  if (!state.league) {
+    return canFoundLeague(state, nationId) ? foundLeague(state, nationId) : state;
+  }
+  if (!state.league.members.includes(nationId) && canJoinLeague(state, nationId)) {
+    const trader = (state.routes ?? []).some((r) => r.ownerId === nationId) || kontoreHeldBy(state, nationId) >= 1;
+    if (trader) return joinLeague(state, nationId);
+  }
+  return state;
 }
 
 /**

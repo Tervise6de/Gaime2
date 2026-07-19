@@ -32,6 +32,7 @@ import { nationalProduction, round1 } from "@/systems/economy";
 import { advanceConstruction } from "@/systems/construction";
 import { stepFaith, seedFaith } from "@/systems/faith";
 import { stepTrade, seedKontore } from "@/systems/trade";
+import { stepLeague } from "@/systems/league";
 import { scheduleEpochs, stepEpochs } from "@/systems/epochs";
 import { nextPopulation } from "@/systems/population";
 import { nextUnrest } from "@/systems/stability";
@@ -926,6 +927,10 @@ export function resolveTurn(state: GameState): GameState {
   // Kontore, turning goods into gold. Sits beside applyTradeIncome — a parallel
   // stream that never touches the four-resource economy.
   s = stepTrade(s);
+
+  // 1.66. The Hanseatic League: pay members their Kontor dividend and let the
+  // League's enmity cool relations with anyone warring a member (systems/league.ts).
+  s = stepLeague(s);
 
   // 1.7. March orders: armies travelling under a standing order advance a step
   // toward their destination (fighting whatever they meet), BEFORE the rivals

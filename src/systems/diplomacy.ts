@@ -28,6 +28,7 @@ import {
   armySize,
   nationInstability,
   pairKey,
+  inLeague,
   type GameState,
   type OpinionEvent,
   type TreatyStatus,
@@ -318,6 +319,9 @@ export function wouldBreakTreaty(state: GameState, aggressor: number, target: nu
  * The casus belli is auto-detected unless passed.
  */
 export function declareWar(state: GameState, a: number, b: number, cb?: CasusBelli): GameState {
+  // Fellow Hanseatic League members keep the peace — a member must leave the League
+  // before it can war another member (hansa-alignment-plan.md, Plan 3 A5).
+  if (inLeague(state, a) && inLeague(state, b)) return state;
   const reason = cb ?? casusBelli(state, a, b);
   const prevTreaty = getTreaty(state, a, b);
   // Breaking a pact is treachery — unless it is to answer an ally's call to a

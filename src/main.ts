@@ -23,6 +23,7 @@ import {
 } from "@/systems/diplomacy";
 import { resolveChoice } from "@/systems/events";
 import { createRoute, closeRoute, setSoundToll, setSoundEmbargo } from "@/systems/trade";
+import { foundLeague, joinLeague, leaveLeague, setLeagueBoycott } from "@/systems/league";
 import { saveToLocal, loadFromLocal, hasLocalSave, clearLocalSave, serializeGame, deserializeGame } from "@/systems/save";
 import { summarizeTurn, type TurnSummary } from "@/systems/summary";
 import { PLAYER_ID, BARBARIAN_ID, type GameState } from "@/systems/state";
@@ -164,6 +165,25 @@ function main(): void {
     },
     onSetSoundEmbargo(targetId, on) {
       state = setSoundEmbargo(state, PLAYER_ID, targetId, on);
+      play("build");
+      commit();
+    },
+    onFoundLeague() {
+      state = foundLeague(state, PLAYER_ID);
+      play("build");
+      commit();
+    },
+    onJoinLeague() {
+      state = joinLeague(state, PLAYER_ID);
+      play("build");
+      commit();
+    },
+    onLeaveLeague() {
+      state = leaveLeague(state, PLAYER_ID);
+      commit();
+    },
+    onSetBoycott(targetId, on) {
+      state = setLeagueBoycott(state, PLAYER_ID, targetId, on);
       play("build");
       commit();
     },

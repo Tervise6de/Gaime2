@@ -354,6 +354,8 @@ export interface TradeRoute {
   tollPaid?: number;
   /** Set when the Sound holder closed the strait to this route's owner (war/embargo) — paid 0. */
   soundBlocked?: boolean;
+  /** Set when the Hanseatic League shut this route's owner out of the Kontor (no access / boycott) — paid 0. */
+  leagueBlocked?: boolean;
 }
 
 /**
@@ -375,6 +377,28 @@ export interface SoundState {
    * (a conqueror doesn't inherit the last holder's grudges). The toll rate persists.
    */
   embargoBy?: number;
+}
+
+/**
+ * The Hanseatic League (systems/league.ts) — the collective-trade institution,
+ * present only on the Hansa board once a realm *forms* it. Members draw a dividend
+ * from the League's Kontore, monopolise Kontor access, keep peace with one another,
+ * and can collectively boycott a rival. The Alderman (leader) is derived — the
+ * member holding the most Kontore — not stored. Optional (absent until founded).
+ */
+export interface LeagueState {
+  /** Nation ids in the League (the founder first). */
+  members: number[];
+  /** Turn the League was founded. */
+  foundedTurn: number;
+  /** Non-member realms the League has boycotted — their trade to member Kontore is severed. */
+  boycotts: number[];
+}
+
+/** Whether `id` belongs to the League. A trivial accessor kept here so both the
+    diplomacy and league systems can read it without importing each other. Pure. */
+export function inLeague(state: GameState, id: number): boolean {
+  return state.league?.members.includes(id) ?? false;
 }
 
 /**
@@ -568,6 +592,11 @@ export interface GameState {
    * taxes/closes. Seeded on the Hansa map at game start; absent elsewhere.
    */
   sound?: SoundState;
+  /**
+   * The Hanseatic League (systems/league.ts) — the collective-trade institution.
+   * Absent until a realm founds it (Hansa board only).
+   */
+  league?: LeagueState;
   /**
    * The rolled timeline of historical epoch events still to fire (systems/epochs.ts).
    * Set once at game start; entries are removed as they fire. Optional so legacy

@@ -74,6 +74,8 @@ import { EPOCH_EVENTS } from "@/data/epochEvents";
 import { KONTORE, type KontorId } from "@/data/kontore";
 import { SOUND } from "@/data/sound";
 import { routeOptions, regionGoodOutput, soundHolderId, activeEmbargoes, soundPreview, marketOutlook } from "@/systems/trade";
+import { canFoundLeague, canJoinLeague, leagueLeader, leagueDividendPool, isBoycotted, FOUND_MIN_ROUTES } from "@/systems/league";
+import { inLeague } from "@/systems/state";
 import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
 import type { TurnSummary } from "@/systems/summary";
 import { deriveAlerts, type Alert } from "@/ui/alerts";
@@ -144,6 +146,14 @@ export interface HudCallbacks {
   onSetSoundToll(rate: number): void;
   /** Open or close the Sound to a rival realm (embargo) — only while you hold it. */
   onSetSoundEmbargo(targetId: number, on: boolean): void;
+  /** Found the Hanseatic League (you become its first member and Alderman). */
+  onFoundLeague(): void;
+  /** Join the existing Hanseatic League. */
+  onJoinLeague(): void;
+  /** Leave the Hanseatic League. */
+  onLeaveLeague(): void;
+  /** Open or close a League boycott of a rival realm — only as the Alderman. */
+  onSetBoycott(targetId: number, on: boolean): void;
   onRaiseUnit(regionId: number, unit: UnitType): void;
   onBeginMove(armyId: number): void;
   onCancelMove(): void;
@@ -2619,9 +2629,11 @@ function tradeSection(state: GameState, region: Region, callbacks: HudCallbacks)
       : "";
     const worth = rt.soundBlocked
       ? `<span class="hud-trade-severed" title="The Sound holder has closed the strait to you (war or embargo).">closed at the Sound</span>`
-      : rt.disrupted
-        ? `<span class="hud-trade-severed">severed</span>`
-        : `<span class="hud-trade-income">+${fmt(rt.lastIncome ?? 0)}g</span>${toll}`;
+      : rt.leagueBlocked
+        ? `<span class="hud-trade-severed" title="The Hanseatic League has shut you out of this Kontor — join the League, or it is boycotting you.">shut out (League)</span>`
+        : rt.disrupted
+          ? `<span class="hud-trade-severed">severed</span>`
+          : `<span class="hud-trade-income">+${fmt(rt.lastIncome ?? 0)}g</span>${toll}`;
     label.innerHTML = `${g.glyph} ${escapeHtml(g.name)} → ${escapeHtml(k.name)} ${worth}`;
     const close = btn("✕", "hud-trade-close", () => callbacks.onCloseRoute(rt.id));
     close.title = `Close this ${g.name} route to ${k.name}.`;
@@ -3617,15 +3629,95 @@ function renderSummary(box: HTMLElement, summary: TurnSummary | null): void {
   }
 }
 
+/**
+ * The Hanseatic League panel atop the Diplomacy page (Hansa board only): found it,
+ * join/leave it, read the Alderman + members + your dividend, and — as Alderman —
+ * declare boycotts. Reads/writes only through callbacks + the sim.
+ */
+function leagueSection(state: GameState, callbacks: HudCallbacks): HTMLElement | null {
+  if (state.mapId !== "hansa") return null;
+  const nameOf = (id: number) => state.nations.find((n) => n.id === id)?.name ?? "A realm";
+  const box = el("div", "hud-league");
+  const title = el("div", "hud-league-title");
+  title.textContent = "The Hanseatic League";
+  box.append(title);
+
+  const league = state.league;
+  if (!league) {
+    const p = el("p", "hud-hint");
+    if (canFoundLeague(state, PLAYER_ID)) {
+      p.textContent =
+        "Its members share the Kontore's wealth, alone may trade at the Kontore they hold, and keep the peace among themselves. As a leading trading power, you may found it.";
+      box.append(p, btn("Found the Hanseatic League", "hud-league-btn primary", () => callbacks.onFoundLeague()));
+    } else {
+      p.textContent = `No League has formed yet. Found it once you run ${FOUND_MIN_ROUTES}+ trade routes — or wait for a rival to found it, then join for its Kontor privileges.`;
+      box.append(p);
+    }
+    return box;
+  }
+
+  const leader = leagueLeader(state);
+  const member = inLeague(state, PLAYER_ID);
+  const memberNames = league.members
+    .map((id) => `${id === PLAYER_ID ? "You" : escapeHtml(nameOf(id))}${id === leader ? " ★" : ""}`)
+    .join(", ");
+  const summary = el("p", "hud-league-summary");
+  summary.innerHTML =
+    `<b>Alderman:</b> ${leader === PLAYER_ID ? "You" : escapeHtml(nameOf(leader ?? -1))} · <b>Members:</b> ${memberNames}`;
+  box.append(summary);
+
+  if (member) {
+    const share = round1(leagueDividendPool(state) / Math.max(1, league.members.length));
+    const div = el("p", "hud-hint");
+    div.innerHTML = `You are a member — dividend <span class="hud-trade-income">+${fmt(share)}g/turn</span> from the League's Kontore.`;
+    box.append(div);
+    if (leader === PLAYER_ID) {
+      const rivals = state.nations.filter((n) => !n.isPlayer && !n.isBarbarian && n.alive && !inLeague(state, n.id));
+      if (rivals.length) {
+        const row = el("div", "hud-sound-embargoes");
+        const lab = el("span", "hud-sound-label");
+        lab.textContent = "Boycott";
+        row.append(lab);
+        for (const n of rivals) {
+          const on = isBoycotted(state, n.id);
+          const b = btn(escapeHtml(n.name), "hud-embargo-chip" + (on ? " on" : ""), () => callbacks.onSetBoycott(n.id, !on));
+          b.title = on
+            ? `The League boycotts ${n.name} — all their trade is cut off. Click to lift it.`
+            : `Boycott ${n.name} — the League severs every trade route they run (each member levies a Pfundzoll).`;
+          row.append(b);
+        }
+        box.append(row);
+      }
+    }
+    box.append(btn("Leave the League", "hud-league-btn", () => callbacks.onLeaveLeague()));
+  } else {
+    const p = el("p", "hud-hint");
+    p.textContent =
+      "You are outside the League — the Kontore its members hold are closed to your trade. Join to regain access; you must then keep the peace with every member.";
+    box.append(p);
+    if (canJoinLeague(state, PLAYER_ID)) {
+      box.append(btn("Join the League", "hud-league-btn primary", () => callbacks.onJoinLeague()));
+    } else {
+      const note = el("p", "hud-hint muted");
+      note.textContent = "You cannot join while at war with a member — make peace first.";
+      box.append(note);
+    }
+  }
+  return box;
+}
+
 function renderDiplomacy(
   container: HTMLElement,
   state: GameState,
   callbacks: HudCallbacks,
 ): void {
   container.innerHTML = "";
+  // The Hanseatic League panel leads the page (Hansa board only).
+  const lp = leagueSection(state, callbacks);
+  if (lp) container.append(lp);
   const rivals = state.nations.filter((n) => !n.isPlayer && !n.isBarbarian && n.alive);
   if (!rivals.length) {
-    container.append(line("No rival powers remain.", "hud-hint"));
+    if (!lp) container.append(line("No rival powers remain.", "hud-hint"));
     return;
   }
 

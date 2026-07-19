@@ -1626,6 +1626,48 @@ body {
   opacity: 0.85;
 }
 
+/* The Hanseatic League panel atop the Diplomacy page. */
+.hud-league {
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: rgba(232, 178, 74, 0.06);
+  border: 1px solid rgba(232, 178, 74, 0.32);
+  border-radius: 8px;
+}
+.hud-league-title {
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: #e8b24a;
+  margin-bottom: 4px;
+}
+.hud-league-summary {
+  font-size: 12px;
+  margin: 4px 0;
+}
+.hud-league-btn {
+  margin-top: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.hud-league-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.hud-league-btn.primary {
+  color: #12100b;
+  background: #e8b24a;
+  border-color: #e8b24a;
+}
+.hud-league-btn.primary:hover {
+  background: #f0c25f;
+}
+
 /* Population vs. cap, as a labelled bar. */
 .hud-popblock {
   margin: 2px 0 10px;
