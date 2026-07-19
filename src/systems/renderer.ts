@@ -1077,79 +1077,54 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       x1: number;
       y1: number;
     }
-    // Obstacles: per region a marker-cluster disc (pop chip, crest, status row)
-    // approximated as a rect, plus the name label rect beneath it.
-    const obstacles: Rect[] = [];
-    context.font = "600 11px system-ui, sans-serif";
-    for (const region of s.regions) {
-      const p = proj.sites[region.id]!;
-      obstacles.push({ x0: p.x - 30, y0: p.y - 14, x1: p.x + 30, y1: p.y + NODE_RADIUS + 2 });
-      const half = context.measureText(region.name).width / 2 + 3;
-      obstacles.push({
-        x0: p.x - half,
-        y0: p.y + NODE_RADIUS + 2,
-        x1: p.x + half,
-        y1: p.y + NODE_RADIUS + 36, // name + status row beneath it
-      });
-    }
+    // Only dodge OTHER realm plates — the per-region markers/names are hidden at
+    // this (zoomed-out) view, so avoiding them just shoved each realm's name off
+    // its own land. Bigger realms place first and claim their centre; the packed
+    // small realms (the German coast) shuffle a little to clear the big names.
+    const placed: Rect[] = [];
     const overlaps = (a: Rect): boolean =>
-      obstacles.some((b) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0);
+      placed.some((b) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0);
+    const clampX = (vx: number, half: number): number =>
+      Math.min(canvas.clientWidth - half - 10, Math.max(half + 10, vx));
 
     const plate = context as CanvasRenderingContext2D & { letterSpacing?: string };
-    for (const nation of s.nations) {
-      if (nation.isBarbarian || !nation.alive) continue;
-      const owned = s.regions.filter((r) => r.ownerId === nation.id);
-      if (owned.length === 0) continue;
-      let cx = 0;
-      let cy = 0;
-      for (const r of owned) {
-        const p = proj.sites[r.id]!;
-        cx += p.x;
-        cy += p.y;
-      }
-      cx /= owned.length;
-      cy /= owned.length;
-      let anchor = proj.sites[owned[0]!.id]!;
-      let best = Infinity;
-      for (const r of owned) {
+    const nations = s.nations
+      .filter((n) => !n.isBarbarian && n.alive && s.regions.some((r) => r.ownerId === n.id))
+      .map((n) => ({ n, held: s.regions.filter((r) => r.ownerId === n.id) }))
+      .sort((a, b) => b.held.length - a.held.length);
+
+    for (const { n: nation, held } of nations) {
+      // Realm centre = mean of its region points, nudged toward the nearest owned
+      // region so a coastal/disjoint realm's name still lands on its land.
+      let cx = 0, cy = 0;
+      for (const r of held) { const p = proj.sites[r.id]!; cx += p.x; cy += p.y; }
+      cx /= held.length; cy /= held.length;
+      let ax = cx, ay = cy, best = Infinity;
+      for (const r of held) {
         const p = proj.sites[r.id]!;
         const d = (p.x - cx) ** 2 + (p.y - cy) ** 2;
-        if (d < best) {
-          best = d;
-          anchor = p;
-        }
+        if (d < best) { best = d; ax = (cx + p.x) / 2; ay = (cy + p.y) / 2; }
       }
       const label = (nation.isPlayer ? "You" : nation.name).toUpperCase();
-      const size = Math.min(21, 12.5 + owned.length * 1.2);
+      const size = Math.min(21, 12.5 + held.length * 1.2);
       if ("letterSpacing" in plate) plate.letterSpacing = "2px";
       context.font = `800 ${size}px system-ui, sans-serif`;
       context.textAlign = "center";
       context.textBaseline = "middle";
       const half = context.measureText(label).width / 2;
-      const x = Math.min(canvas.clientWidth - half - 10, Math.max(half + 10, anchor.x));
-      // Candidate slots above the anchor first (the classic map look), then
-      // below; take the first collision-free one, else the least intrusive
-      // default. Every candidate stays clear of the top HUD strip.
-      let y = Math.max(58, anchor.y - 46);
+      // Sit on the realm centre; only shuffle a little to clear another plate.
+      const step = size + 5;
+      let x = clampX(ax, half);
+      let y = Math.max(58, ay);
       let placedRect: Rect | null = null;
-      for (const dy of [-46, -74, -102, 40, 68, -46]) {
-        const cyCand = Math.max(58, anchor.y + dy);
-        const rect: Rect = {
-          x0: x - half - 6,
-          y0: cyCand - size / 2 - 3,
-          x1: x + half + 6,
-          y1: cyCand + size / 2 + 3,
-        };
-        if (!overlaps(rect)) {
-          y = cyCand;
-          placedRect = rect;
-          break;
-        }
+      for (const [dx, dy] of [[0, 0], [0, -step], [0, step], [-half, 0], [half, 0], [0, -2 * step], [0, 2 * step]]) {
+        const rx = clampX(ax + dx, half);
+        const ry = Math.max(58, ay + dy);
+        const rect: Rect = { x0: rx - half - 6, y0: ry - size / 2 - 3, x1: rx + half + 6, y1: ry + size / 2 + 3 };
+        if (!overlaps(rect)) { x = rx; y = ry; placedRect = rect; break; }
       }
-      if (!placedRect) {
-        placedRect = { x0: x - half - 6, y0: y - size / 2 - 3, x1: x + half + 6, y1: y + size / 2 + 3 };
-      }
-      obstacles.push(placedRect); // later plates must dodge this one too
+      if (!placedRect) placedRect = { x0: x - half - 6, y0: y - size / 2 - 3, x1: x + half + 6, y1: y + size / 2 + 3 };
+      placed.push(placedRect); // later plates must dodge this one too
       context.globalAlpha = realmFade;
       context.lineWidth = 4;
       context.lineJoin = "round";
