@@ -129,7 +129,9 @@ Larger design calls, none committed; rough priority order (post-advisor):
   the X-factor; E1–E2 are cheap enough to start ahead of naval)
 - ⬜ G3. Army stacking / combined battles
 - ⬜ G4. Culture axis (assimilation, cultural unrest, maybe culture victory)
-- ⬜ G5. Religion blocs / crusader coalitions
+- ⬜ G5. Trade-bloc diplomacy — the old "religion blocs" idea is dropped with faith
+  (removed v0.79); its coalition core shipped as the **Hanseatic League** (§9.10).
+  Open: league wars, combined trade-victory pressure, rival leagues.
 - ⬜ G6. Vassalage / deeper diplomacy (tributaries, pacts with teeth)
 - ⬜ G7. Event chains / branching questlines
 - ⬜ G8. Espionage (parked last deliberately)

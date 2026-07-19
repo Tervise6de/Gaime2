@@ -12,6 +12,25 @@
 **growing, defending, and researching**, against opponents that react to what
 you do. Depth from interacting numbers, not from content volume or art.
 
+> **Current direction — the Hanseatic world (v0.80).** This document grew from a
+> generic 4X spec ("Petty Kingdoms" / the Baltic-rim origin in §9.0) into one
+> specific game: the **Hanseatic League era** (c. 1250–1550, see
+> [`hansa times.md`](../hansa%20times.md)). Three consolidations set the current
+> shape, and where older sections below conflict with them, **these win**:
+> - **One board.** The game ships a single authored world — the **Hanseatic
+>   World** (74 real provinces, `data/maps/hansa.ts`). The old procedural/random
+>   and generic-Baltic worlds are retired; the New-Game world picker offers only
+>   the Hansa (§9.0's "Random / Baltic / Europe" picker is history).
+> - **Trade is the central power axis**, not a cut corner. Spatial **trade
+>   routes to the Kontore**, the **Øresund Sound toll**, **market pricing**, and
+>   the **Hanseatic League** are the game's spine — documented in **§9.10**. This
+>   supersedes §2's "spatial trade routes CUT" line.
+> - **Faith was removed (v0.79).** A religion/faith-conversion victory shipped
+>   (v0.33) and was then cut entirely — it isn't a competitive axis in the
+>   Hansa. Wherever a section below still describes faith (§6, §9.3, §9.6, §9.8),
+>   treat it as removed; the live victory paths are **Domination / Great Works /
+>   Prestige**.
+
 ---
 
 ## 1. Core Loop
@@ -85,9 +104,15 @@ regions that all matter beats a bloated one with 20 resources nobody tracks.
   math; armies are icons + numbers on the map.
 - **SimCity-style in-city building placement** — cities/regions are abstracted
   to a small set of slots and modifiers, not spatial layouts.
-- **Spatial trade routes, caravans, roads-as-objects** — trade is abstracted
-  into diplomatic deals and coastal/adjacency bonuses.
+- **Spatial trade routes, caravans, roads-as-objects** — *(superseded post-v1.)*
+  This was the v1 cut; the Hanseatic refocus made spatial trade the game's core.
+  Real routes now run from a producing province to a **Kontor**, cross the tolled
+  **Øresund Sound**, and set **market prices** — see §9.10. Trade is no longer
+  abstracted into adjacency bonuses.
 - **Full culture / religion / espionage systems** — at most light flavor later.
+  *(A faith/conversion system shipped in v0.33 and was removed in v0.79 — it is
+  not a competitive axis in the Hansa; trade carries the flavour instead.
+  Culture and espionage remain uncut and parked, §9.8.)*
 - **Naval and air layers** — coasts give economic bonuses and adjacency only;
   no separate naval combat in v1.
 - **Deep treaty webs** (defensive pacts chains, guarantees, world congress).
@@ -135,9 +160,14 @@ knowledge_out  = buildings + specialists
   a rising unrest cost. The central fiscal lever.
 - **Core resources (4):** **Gold** (currency/upkeep), **Food** (feeds pop),
   **Materials** (builds units & buildings), **Knowledge** (research).
-- **Strategic resources (1–2):** e.g., **Iron** / **Horses**, present only on
-  certain terrains. Required to build advanced units → makes *specific territory*
-  worth fighting for and enables resource-driven diplomacy/trade.
+- **Strategic resources:** **Iron / Horses** (advanced units) plus **Salt / Amber**
+  (trade goods), present only on certain terrains. They make *specific territory*
+  worth fighting for and feed the trade layer.
+
+> **Note (post-v1):** beside this four-resource economy runs the **Hanseatic trade
+> layer** — goods carried along spatial routes to the Kontore, the Øresund Sound
+> toll, market pricing, and the Hanseatic League. It is the game's central power
+> axis and is documented in full in **§9.10**.
 
 ### 3.3 Population
 
@@ -448,14 +478,13 @@ is large without hand-authored content:
   (a Warlord neighbor is a very different game than two Merchants).
 - **Branching tech tree:** you can't unlock everything, so tech order becomes a
   build identity (rush military tech vs. economy vs. diplomacy tools).
-- **Bounded random events** for texture: good harvest, plague, ore discovery,
-  migration wave, local uprising, wandering mercenaries for hire, and — tying the
-  religious layer (§9.6) into the event stream (v0.34) — a **wandering preacher**
-  who wins a nearby province to your faith, a **saint's relic** that firms a
-  wavering province, and **heresy** that slips a border province to a rival creed.
-  Many events are player **decisions** (the AI auto-resolves its own). **Low
+- **Bounded random events** for texture: good harvest, plague (the 1350 Black
+  Death), ore discovery, migration wave, local uprising, wandering mercenaries
+  for hire, a hard winter, a coastal ship-launch windfall, and a royal-wedding
+  NAP. Many events are player **decisions** (the AI auto-resolves its own). **Low
   variance by design** — events add color and small adaptations, never coin-flip
-  the game.
+  the game. *(The three faith events — wandering preacher, saint's relic, heresy,
+  added v0.34 — were removed with the faith system in v0.79.)*
 - **Multiple victory paths** (choose your own goal each game):
   1. **Domination** — control ≥ ~60% of regions, or eliminate all rivals.
   2. **Economic / Great Works** — build a set of prestige projects (or reach a
@@ -587,7 +616,7 @@ Baltic rim** (~900 AD onward — the era the game already opens in). Rival power
 are real: **Lithuania, Novgorod, Denmark, Prussia, Livonia, Poland, Sweden,
 Curonia** (a mix of pagan tribal confederations, Rus republics and Christian
 kingdoms). Regions carry real Baltic toponyms (Riga, Reval, Dorpat, Danzig,
-Novgorod, Visby, …). Neutral holders are **Free Tribes**. Map sizes widened
+Novgorod, Visby, …). Neutral holders are the **Free Towns**. Map sizes widened
 (Small 18 / Medium 30 / Large 40 / Grand 48; default Medium) and up to 6 rivals.
 
 **Shipped (v0.15) — real geographic maps.** A scripted-map format
@@ -760,10 +789,11 @@ each region. A **CK3-style Map panel** (bottom-left, v0.52) pairs a small
 renderer (`setMinimap`: the baked map composite + a live current-view rectangle,
 click to recentre) and reflects the active lens; the dropdown offers
 **Political** (owners, the default), **Population**, **Gold / Materials / Food
-income**, **Unrest**, the **Faith** lens (§9.6, categorical — whose faith holds
-each province), and the **Relations** lens (v0.38) — each recolours every
+income**, **Unrest**, the **Trade** lens (§9.10 — trade goods and the routes that
+carry them), and the **Relations** lens (v0.38) — each recolours every
 region; heat lenses use a normalised low→high ramp, the categorical ones tint by
-realm/standing; `M` cycles them. Colours are computed pure in `ui/lenses.ts` and baked into the renderer's
+realm/standing; `M` cycles them. *(A Faith lens shipped in v0.33 and was removed
+with the faith system in v0.79.)* Colours are computed pure in `ui/lenses.ts` and baked into the renderer's
 political layer (`setLens`), so they read at any zoom.
 
 **Political-relations lens — SHIPPED (v0.38).** Reads the diplomatic map from *your*
@@ -774,7 +804,7 @@ toward you is legible at a glance — where the coalitions and the threats are.
 
 **Military lens — SHIPPED (v0.39).** The board's forces at a glance: each province
 tints by the army strength standing in it — **your and allied garrisons green** (by
-strength), **hostile forces (at war + the Free Tribes) red**, and any **undefended
+strength), **hostile forces (at war + the Free Towns) red**, and any **undefended
 province of yours with a hostile army next door amber** ("exposed"), the rest muted.
 So you can read your defensive posture and where a blow is coming without hunting
 army markers. Presentation-only and pure (`armySize` + treaties), like the other
@@ -869,30 +899,31 @@ Metallurgy era 2 military → 32 techs). Three events join the pool: `hard_winte
 pact C4 lets a schemer later break). Probed balance-neutral (a touch more conquest);
 the AI builds the works in most games.
 
-### 9.6 Victory types — SHIPPED v2 (v0.26, faith v0.33)
-The paths (Domination / Great Works / **Faith** / Prestige) are a **legible race**.
+### 9.6 Victory types — SHIPPED v2 (v0.26; faith path removed v0.79)
+The paths (**Domination / Great Works / Prestige**) are a **legible race**.
 `victoryRaces()` (pure, in `systems/victory.ts`) reports, per path, *your* standing
 and the **leading rival's**, each 0..1 toward the win, plus an `alarm` when a rival
-is dangerously close. The Politics page renders all four as paired bars — you (gold)
+is dangerously close. The Politics page renders them as paired bars — you (gold)
 vs the top rival (red) — with the goal, live values, and a "⚠ {rival} is closing on
 this victory" warning. No path is won or lost invisibly.
 
-**Faith — SHIPPED (v0.33), fitting the Northern Crusades.** Every settled province
-holds a **faith** (`region.faith`, `systems/faith.ts`) — *not* the same as who rules
-it. Influence is summed per realm each turn: **inertia** (the standing faith resists,
-so conquest occupies but never instantly converts), the **ruler's** promotion at home,
-and **holy sites** — temples (2), monasteries (3), cathedrals (5) — that radiate to
-their region in full and to *neighbours* at half, so a border cathedral converts
-across the frontier. A province flips to whoever leads its current faith by a clear
-margin. The upshot: taking land is not enough — you must plant churches to win hearts,
-and a missionary realm can hold the faith of lands it does not rule (and convert pagan
-frontier). Hold **60% of the settled world's faith** and you win. Wired into
-`checkVictory` and the four-way race; the **Faith map lens** tints every province by
-the faith that holds it (pagan land muted), the region panel flags a province whose
-faith differs from its ruler, and scholarly AI realms press the religious race by
-building monasteries and cathedrals. Pure and deterministic (no RNG).
-- Still open (future): shared-religion *blocs* (crusader realms cooperating) and a
-  distinct **culture** axis; today faith is per-realm, the cleaner single-winner model.
+- **Domination** — hold a clear majority of the world's provinces (or eliminate
+  every rival).
+- **Great Works** — the builder/economy path: raise the set of prestige Wonders
+  (needs the Architecture tech line, §9.5).
+- **Prestige (score)** — highest `nationScore` at the turn limit, the fallback so
+  every game ends decisively.
+
+**Faith victory — SHIPPED (v0.33), REMOVED (v0.79).** A fourth path once shipped:
+every settled province held a **faith** distinct from who ruled it, spread by holy
+sites and a missionary ruler, and holding 60% of the settled world's faith won the
+game (`systems/faith.ts`, a Faith map lens, faith events, AI missionaries). It was
+**removed wholesale in v0.79**: in the Hanseatic setting religion is Reformation/
+Baltic-crusade *flavour*, not a competitive victory axis, and the mechanic pulled the
+game away from its trade spine. `systems/faith.ts` and its tests are deleted;
+`region.faith`, the Faith lens, the three faith events and the faith race are gone.
+The **trade & Hanseatic-League layer (§9.10)** is the economic-power axis that
+replaced it.
 
 ### 9.7 Suggested build sequence
 1. ✅ **Real Baltic map** (9.0 scripted-map mode) — shipped: scripted Baltic +
@@ -936,14 +967,15 @@ from. Every one must land as a playable, testable, deterministic slice.
    the milestone plan lives in §9.9. (This overlaps item 2 at **commanders/generals**:
    §9.9's M4 delivers the general-as-stack-buff; the broader named-rulers/governors/
    succession layer is item 2's to own.)
-4. **Culture axis** (§9.6, still-open). A cultural identity *distinct from faith*:
-   assimilation of conquered provinces, cultural unrest on mismatched rule, and maybe
-   a culture victory. The setting's German/Baltic/Rus/Norse frictions are begging for
-   it. Medium–large; pairs naturally with faith.
-5. **Religion blocs / coalitions** (§9.6, still-open). Shared-faith realms cooperating
-   — crusader coalitions, joint wars, a bloc's combined victory pressure. The Crusades
-   were coalitions; this makes faith a *diplomatic* force, not just a per-realm race.
-   Medium.
+4. **Culture axis** (still-open). A cultural identity for provinces: assimilation of
+   conquered land, cultural unrest on mismatched rule, and maybe a culture victory.
+   The setting's German/Baltic/Rus/Norse frictions are begging for it. Medium–large.
+   (Stands alone now that faith is removed — this is the remaining identity axis.)
+5. **Trade-bloc diplomacy — partly SHIPPED as the Hanseatic League (§9.10).** The old
+   "religion blocs" item (shared-faith crusader coalitions) is **dropped with faith**;
+   its coalition idea landed instead as the **League** — members trade freely, share a
+   Kontor dividend, and can call a collective boycott. What remains open is deepening
+   it: league *wars*, a combined trade-victory pressure, rival leagues. Medium.
 6. **Vassalage / deeper diplomacy** (§9.1, beyond casus belli). Tributaries, vassal
    states, defensive pacts with teeth, an alliance/diplomatic victory. Casus belli
    already ships (v0.27); this is the layer above it. Medium.
@@ -1004,3 +1036,86 @@ usual):
 **Hardening folded in across the slices:** the empty-but-fortified free-capture, the
 "ghost army" of an eliminated nation, `winChance` drifting from the real resolver,
 and dead constants (`CASUALTY_SCALE`).
+
+### 9.10 Trade as power — the Hanseatic layer — SHIPPED (v0.6x–0.79)
+
+The refocus's central system, and the one the top-of-doc banner points to. Trade is
+no longer the abstracted adjacency bonus §2 once cut it down to: it is a spatial,
+priceable, contestable network that sits **beside** the four-resource economy
+(`regionProduction` is untouched — goods are a parallel derived quantity that only
+*adds* gold, so the core economy and its tests are unaffected). Four layers, each a
+pure, deterministic, tested slice, built bottom-up:
+
+**1 · Goods & the Kontore (`data/goods.ts`, `data/kontore.ts`, `systems/trade.ts`).**
+Eight tradeable wares — the terrain/resource staples **grain, timber, furs, iron**
+plus the Hansa's signatures **salt** ("white gold"), **herring** (the staple
+fishery), **amber** (the Baltic luxury) and hopped **beer** (the Wendish export).
+A province's terrain or strategic resource makes it *able to source* a good
+(`regionSources`); the quantity scales with the same unrest penalty the economy
+uses, so a revolting province ships nothing. Goods only become gold when carried to
+one of the four historical **Kontore** that *demand* them — the **Steelyard**
+(London), **Kontor of Bruges**, **Bryggen** (Bergen) and the **Peterhof**
+(Novgorod), anchoring the four corners of the trading world. Goods↔Kontor demand is
+cross-checked by a test so the two tables can never drift.
+
+**2 · Trade routes & market pricing (`systems/trade.ts`).** A route ships one good
+from a province you hold to a Kontor that demands it, along the shortest **lane** of
+regions (a deterministic BFS with a lowest-id tie-break), capped per nation. Each
+turn `stepTrade` pays `routeIncome = good value × distance factor × scarcity ×
+monopoly`. **Distance** pays a bounded premium for a longer reach; **scarcity** is a
+gentle glut penalty — each extra supplier of the *same good into the same Kontor*
+shaves the price toward a 75% floor, so spreading wares across markets beats
+dogpiling one; **monopoly** rewards cornering a good's trade into a Kontor (sole
+supplier +25%, or the League collectively +10%). Only routes that actually **flow**
+are priced in — a war-severed, boycotted, or Sound-blocked rival delivers nothing,
+so it neither gluts a price nor denies a de-facto sole supplier its premium. A route
+whose owner loses the producing region (or is eliminated) is void — it pays nothing
+and is struck from the book, so no phantom gold and no lingering against the cap.
+The player opens routes from the region panel; the **AI opens routes each turn**;
+the **Trade map lens** (§9.3) paints goods and lanes.
+
+**3 · The Øresund Sound toll (`data/sound.ts`, `systems/trade.ts`).** Whoever holds
+Zealand/Copenhagen commands the narrows and levies a toll on every Baltic ship
+carrying goods **west** to London or Bruges (decided by *endpoints* — Atlantic
+ports and Bergen/Novgorod trade never cross). The holder skims a default **25%**
+(raisable to **40%**) of a crossing route's income, may **embargo** a rival to shut
+the strait to them, and war closes it outright; your own Sound passes your goods
+free. It is the League-vs-Denmark flashpoint made mechanical: a chokepoint you can
+*tax*, *close*, or *seize*. The toll panel lives on Copenhagen; a conqueror inherits
+an empty embargo slate.
+
+**4 · The Hanseatic League (`systems/league.ts`).** The collective-trade institution
+— the trade layer's capstone and the successor to the removed faith race as the
+game's second power axis. **Founding is earned, not dated** (design gate #2): a realm
+must research **Lübeck Law** (a civics tech, `data/techs.ts`) to unlock the **Hanse
+Hall** building (`data/buildings.ts`) and raise one — founding is the payoff of a
+research + construction investment, a mid-game milestone rather than a calendar
+unlock or an instant opening move. There is **one League**; it is Hansa-board-only.
+Its mechanics, each grounded in the history (see the file header and `hansa
+times.md`):
+- **Kontor access** — the Kontore were exclusive Hanseatic privileges; the League
+  shuts **non-members out of Kontore it holds**, the great pull to join.
+- **The Alderman** — the leader is *derived*, never stored: the member holding the
+  most Kontore (ties to the founder). It shifts as Kontore change hands.
+- **Trade dividend** — each turn members split, equally, the `leagueIncome` of every
+  Kontor the League holds. Eliminated members are pruned from the roll before payout
+  (no leak to the dead, no diluted share, no ghost Alderman).
+- **The collective boycott** — the League's "ultimate weapon was economic". Only the
+  Alderman may call one; it levies the **Pfundzoll** (a flat 8g from every member —
+  the League keeps *no standing treasury*), cuts the target off from League Kontore
+  **entirely**, and earns their lasting resentment.
+- **Peace among members** (Verhansung) — a member cannot war a fellow member; it must
+  **leave** first (which cools relations with those left behind), and attacking any
+  member slides your standing with the whole League (mutual defence, short of a formal
+  call-to-arms).
+The AI plays all of it — Kontor-holders beeline Lübeck Law, raise a Hall, found or
+join, and the Alderman calls boycotts. A Diplomacy-screen **League panel** exposes
+found/join/leave/boycott to the player. Pure and deterministic throughout (no RNG,
+no DOM); every helper no-ops on a non-Hansa map (`state.league` absent).
+
+**Why it's the spine, not decoration.** The four layers interlock into real
+decisions: *which* good into *which* Kontor (scarcity vs. monopoly), whether to hold
+Zealand for the toll or take it to free your own trade, and whether to found/join the
+League for Kontor access and the dividend or stay independent to dodge its boycott and
+its no-war-among-members constraint. Open threads (§9.8 item 5): league *wars*, a
+combined trade-victory pressure, and rival leagues.

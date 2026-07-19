@@ -39,13 +39,13 @@ export function recordChronicle(state: GameState, kind: ChronicleKind, text: str
 /**
  * How a nation is named in prose: its ruler if it has one ("Visvaldis the Cruel
  * of Lithuania"), else just the realm. The player reads as "your realm". Rebels
- * (barbarians) read as "the Free Tribes".
+ * (barbarians) read as "the Free Towns".
  */
 export function chronicleName(state: GameState, nationId: number | null): string {
   if (nationId === null) return "the wilds";
   const n = state.nations.find((x) => x.id === nationId);
   if (!n) return "an unknown power";
-  if (n.isBarbarian) return "the Free Tribes";
+  if (n.isBarbarian) return "the Free Towns";
   if (n.isPlayer) return "your realm";
   return n.ruler ? `${rulerTitle(n.ruler)} of ${n.name}` : n.name;
 }

@@ -105,7 +105,7 @@ export const FACTIONS: FactionDef[] = [
     bonus: { label: "Queen of the Hansa", detail: "Begin with +50 gold from the burgher charters.", startGold: 50 } },
   // The western Hanseatic world (the Hansa map): England and the Low Countries,
   // the Rhineland, the German inland, and Norway. Colours are well-spaced and
-  // clear of the eastern roster above, the player gold and the Free Tribes' brown.
+  // clear of the eastern roster above, the player gold and the Free Towns' brown.
   { name: "England", color: "#d83a2f", trait: "mercantile", disposition: "merchant", homeFocus: "market", blurb: "The island kingdom whose wool clothes the looms of the whole North Sea.",
     bonus: { label: "Wool staple", detail: "Begin with +45 gold from the wool staple.", startGold: 45 } },
   { name: "Flanders", color: "#7d4fa8", trait: "mercantile", disposition: "merchant", homeFocus: "market", blurb: "The cloth-towns of Bruges and Antwerp — the richest weavers in Christendom.",

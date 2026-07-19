@@ -77,7 +77,7 @@ import {
 
 const BARBARIAN_NATION: Nation = {
   id: BARBARIAN_ID,
-  name: "Free Tribes",
+  name: "Free Towns",
   color: "#9a5b53",
   isPlayer: false,
   isBarbarian: true,
@@ -298,7 +298,7 @@ export function createGame(options: NewGameOptions): GameState {
  * Start a game on a scripted map: every historical realm is seated on its own
  * home ground (no random capitals). The human plays the chosen faction (or one
  * picked from the seed), rendered in the player gold; the rest are AI. Regions
- * not owned by any faction fall to the Free Tribes.
+ * not owned by any faction fall to the Free Towns.
  */
 function createScriptedGame(map: ScriptedMap, regions: Region[], options: NewGameOptions): GameState {
   const rng = createRng((options.seed ^ 0x9e3779b9) >>> 0);
@@ -307,7 +307,7 @@ function createScriptedGame(map: ScriptedMap, regions: Region[], options: NewGam
   const named = map.factions.findIndex((f) => f.name === options.playerFaction);
   const playerIdx = named >= 0 ? named : options.seed % map.factions.length;
 
-  // Nation 0 = player, 1 = Free Tribes, 2.. = the other realms (author order).
+  // Nation 0 = player, 1 = Free Towns, 2.. = the other realms (author order).
   const nations: Nation[] = [
     {
       id: PLAYER_ID,

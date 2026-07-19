@@ -259,7 +259,7 @@ export function applyCommanderEffects(state: GameState): GameState {
  * Defection (E5): a disloyal commander (loyalty ≤ COMMANDER_DISLOYAL) whose army
  * garrisons one of its realm's own regions that has fallen into open revolt
  * (unrest ≥ UNREST_REVOLT) turns his coat — seizing the region for himself as a
- * *named pretender*. The region and the army pass to the Free Tribes with the
+ * *named pretender*. The region and the army pass to the Free Towns with the
  * commander still at their head (a led rebel stack, harder to retake), and the
  * province settles under its new master. Your own appointment becomes the threat.
  * Pure — runs before secession so a defected region is not also processed there.
@@ -456,7 +456,7 @@ export function moveArmy(
     terrainName: TERRAIN[target.terrain].name,
     attackerName: attackerNation?.isPlayer ? "Your realm" : atkName,
     defenderName: defenderNation?.isBarbarian
-      ? "Free Tribes"
+      ? "Free Towns"
       : defenderNation?.isPlayer
         ? "Your realm"
         : (defenderNation?.name ?? "the garrison"),
