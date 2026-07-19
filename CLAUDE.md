@@ -34,3 +34,21 @@ skip ahead. Each milestone must leave the game runnable and testable.
 - `npm run dev` — dev server at http://localhost:5173
 - `npm test` — unit suite
 - `npm run typecheck` / `npm run build` — types / production build
+
+## Historical setting reference: the Hanseatic League ("Hansa times")
+The game's economy/trade/diplomacy flavour draws on the **Hanseatic League era**.
+A full, fact-checked, **sourced** reference lives in
+**[`hansa times.md`](./hansa%20times.md)** — covering roughly **1150–1700**
+(the League's life plus ~100 years either side), focus on **c. 1250–1550**.
+
+Use it for content and balancing: origins & organisation (no state/navy/treasury),
+the Kontore (Novgorod/Bergen/London/Bruges), trade goods (salt, herring/stockfish,
+grain, furs, wax, amber, cloth, hopped beer), Brick-Gothic buildings, real people
+(Henry the Lion, Valdemar IV, Margaret I, Störtebeker — *flagged as legend*,
+Wullenwever), ships (cog → hulk → carrack → fluyt), wars (Stralsund 1370, Grunwald,
+Anglo-Hanseatic, Count's Feud), the military-tech ladder (mail→plate→crossbow→pike→
+arquebus→pike-and-shot; star forts), and economy/society (Lübeck Mark, Wendish
+Coinage Union, town law, the 1350 plague). Every historical claim is cited; the
+final **§13 Game-Design Hooks** section (and only that section) maps the facts onto
+this game's resources, buildings, units, factions, and events — keep interpretation
+there, not mixed into the history.
