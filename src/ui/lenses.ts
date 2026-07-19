@@ -15,9 +15,9 @@ import { regionSources } from "@/systems/trade";
 import { KONTORE, KONTOR_IDS } from "@/data/kontore";
 import type { GoodId } from "@/data/goods";
 
-/** Heat lenses colour by a normalised scalar; faith/relations/military/trade are categorical. */
+/** Heat lenses colour by a normalised scalar; relations/military/trade are categorical. */
 type HeatLens = "population" | "gold" | "materials" | "food" | "unrest";
-export type LensId = "none" | HeatLens | "faith" | "relations" | "military" | "trade";
+export type LensId = "none" | HeatLens | "relations" | "military" | "trade";
 
 export interface LensDef {
   id: LensId;
@@ -37,7 +37,6 @@ export const LENSES: LensDef[] = [
   { id: "materials", label: "Materials", glyph: "materials", fallback: "⛏", hint: "Materials produced per turn." },
   { id: "food", label: "Food", glyph: "food", fallback: "🌾", hint: "Food produced per turn." },
   { id: "unrest", label: "Unrest", glyph: "warning", fallback: "🔥", hint: "How restless each region is (red = revolt risk)." },
-  { id: "faith", label: "Faith", glyph: "faith", fallback: "🛐", hint: "Whose faith each province holds — win by converting the world." },
   { id: "relations", label: "Relations", glyph: "diplomacy", fallback: "🤝", hint: "How each realm stands with you — allies green, enemies red." },
   { id: "military", label: "Military", glyph: "attack", fallback: "⚔", hint: "Where the armies are — your forces green, hostiles red, exposed land amber." },
   { id: "trade", label: "Trade", glyph: "gold", fallback: "⚓", hint: "The merchant world — what each land exports (grain, timber, furs, iron, salt, herring, amber, beer) and the Kontore that buy it." },
@@ -67,9 +66,6 @@ const RAMPS: Record<HeatLens, string[]> = {
   unrest: ["#33503c", "#d7a53f", "#e8776b"],
 };
 
-/** Muted neutral for pagan / unconverted land under the faith lens. */
-const PAGAN_COLOR = "#3a3f45";
-
 /** Relations lens: a diverging enemy→neutral→ally ramp, plus fixed treaty/self tints. */
 const RELATIONS_RAMP = ["#d0685e", "#5a616e", "#5faa74"]; // hostile → neutral → warm
 const RELATIONS_SELF = "#e6c874"; // your own realm (the player gold)
@@ -84,10 +80,10 @@ const MIL_EXPOSED = "#d99a4f"; // your own land, ungarrisoned, with a hostile fo
 const MIL_QUIET = "#33383f"; // no forces in or beside it
 
 /** CSS gradient for a lens's ramp (low → high), for the picker's scale legend.
-    Faith/Relations/Military are categorical from the player's view — the map speaks;
+    Relations/Military are categorical from the player's view — the map speaks;
     only Relations carries a meaningful single-axis (enemy→ally) legend. */
 export function lensGradient(id: LensId): string | null {
-  if (id === "none" || id === "faith" || id === "military" || id === "trade") return null;
+  if (id === "none" || id === "military" || id === "trade") return null;
   if (id === "relations") return `linear-gradient(90deg, ${RELATIONS_RAMP.join(", ")})`;
   return `linear-gradient(90deg, ${RAMPS[id].join(", ")})`;
 }
@@ -143,18 +139,6 @@ function rampColor(ramp: string[], t: number): string {
  */
 export function lensColorsFor(state: GameState, id: LensId): (string | null)[] | null {
   if (id === "none") return null;
-  // Faith is categorical: tint each province by the *faith* that holds it (its
-  // realm's colour), pagan land muted — so an occupied-but-unconverted frontier
-  // reads as the old faith's colour, not the conqueror's. Not a heat ramp.
-  if (id === "faith") {
-    const colorOf = (nid: number): string =>
-      state.nations.find((n) => n.id === nid)?.color ?? PAGAN_COLOR;
-    const out: (string | null)[] = [];
-    for (const r of state.regions) {
-      out[r.id] = r.faith !== undefined ? colorOf(r.faith) : PAGAN_COLOR;
-    }
-    return out;
-  }
   // Relations is categorical from the *player's* view: your land gold, allies
   // green, enemies red, and everyone else on a diverging warmth ramp by standing.
   if (id === "relations") {

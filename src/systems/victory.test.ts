@@ -41,18 +41,6 @@ describe("checkVictory", () => {
     expect(checkVictory(g)?.kind).toBe("great works");
   });
 
-  it("declares a faith victory when the player's faith holds ≥60% of settled land", () => {
-    const g = createGame({ seed: 1, rivals: 2 });
-    // Convert 65% of settled regions to the player's faith (ownership untouched).
-    const settled = g.regions.filter((r) => r.ownerId !== null);
-    settled.forEach((r, i) => {
-      if (i < Math.ceil(settled.length * 0.65)) r.faith = PLAYER_ID;
-    });
-    const v = checkVictory(g);
-    expect(v?.outcome).toBe("victory");
-    expect(v?.kind).toBe("faith");
-  });
-
   it("resolves by prestige score at the turn limit", () => {
     const g = { ...createGame({ seed: 1, rivals: 2 }), turn: TURN_LIMIT };
     const v = checkVictory(g);
@@ -67,26 +55,6 @@ describe("checkVictory", () => {
       r.ownerId = i < Math.ceil(owned.length * 0.7) ? 2 : r.ownerId;
     });
     expect(checkVictory(g)?.outcome).toBe("defeat");
-  });
-});
-
-describe("faith in the standings", () => {
-  it("victoryRaces reports a faith path with a live player fraction", () => {
-    const races = victoryRaces(createGame({ seed: 1, rivals: 2 }));
-    const faith = races.find((r) => r.kind === "faith");
-    expect(faith).toBeTruthy();
-    expect(faith!.you.fraction).toBeGreaterThan(0); // a realm holds its own lands' faith at start
-  });
-
-  it("victoryProgress surfaces faith only once it outruns territory", () => {
-    const g = createGame({ seed: 1, rivals: 2 });
-    // At the start faith == ownership, so the gauge should NOT read faith yet.
-    expect(victoryProgress(g, PLAYER_ID).kind).not.toBe("faith");
-    // Convert the whole settled world to the player's faith → faith now leads.
-    g.regions.forEach((r) => {
-      if (r.ownerId !== null) r.faith = PLAYER_ID;
-    });
-    expect(victoryProgress(g, PLAYER_ID).kind).toBe("faith");
   });
 });
 
@@ -171,7 +139,7 @@ import { victoryRaces } from "@/systems/victory";
 describe("victoryRaces (the legible victory-path readout)", () => {
   it("reports every path with you and the leading rival", () => {
     const races = victoryRaces(createGame({ seed: 3, rivals: 3 }));
-    expect(races.map((r) => r.kind)).toEqual(["domination", "great works", "faith", "prestige"]);
+    expect(races.map((r) => r.kind)).toEqual(["domination", "great works", "prestige"]);
     for (const r of races) {
       expect(r.you.fraction).toBeGreaterThanOrEqual(0);
       expect(r.you.fraction).toBeLessThanOrEqual(1);

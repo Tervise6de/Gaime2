@@ -198,48 +198,6 @@ function bestMarriageRival(state: GameState, nationId: number): number | null {
   return best;
 }
 
-/**
- * A province a preacher could win to `nationId`'s faith: first one of the realm's
- * own regions whose people still hold another faith (the conversion sticks — you
- * rule them), else a bordering province of any owner not yet of your faith. Lowest
- * id for determinism. Null if there is nothing to convert. See systems/faith.ts.
- */
-function faithConversionTarget(state: GameState, nationId: number): Region | null {
-  const ownUnconverted = state.regions.filter((r) => r.ownerId === nationId && r.faith !== nationId);
-  if (ownUnconverted.length) return ownUnconverted.reduce((a, r) => (r.id < a.id ? r : a));
-  let best: Region | null = null;
-  const seen = new Set<number>();
-  for (const r of state.regions) {
-    if (r.ownerId !== nationId) continue;
-    for (const nb of r.adjacency) {
-      if (seen.has(nb)) continue;
-      seen.add(nb);
-      const n = state.regions[nb];
-      if (!n || n.faith === nationId) continue;
-      if (!best || n.id < best.id) best = n;
-    }
-  }
-  return best;
-}
-
-/**
- * A faithful province of `nationId` that borders a *different* living faith — the
- * seam where heresy can take root. Returns the region and the rival faith it slips
- * to (which sticks, via inertia, until you win it back). Lowest id. Null if none.
- */
-function heresyTarget(state: GameState, nationId: number): { region: Region; toFaith: number } | null {
-  const faithful = state.regions
-    .filter((r) => r.ownerId === nationId && r.faith === nationId)
-    .sort((a, b) => a.id - b.id);
-  for (const r of faithful) {
-    for (const nb of r.adjacency) {
-      const n = state.regions[nb];
-      if (n && n.faith !== undefined && n.faith !== nationId) return { region: r, toFaith: n.faith };
-    }
-  }
-  return null;
-}
-
 const EVENTS: EventDef[] = [
   {
     id: "good_harvest",
@@ -1003,78 +961,6 @@ const EVENTS: EventDef[] = [
         const avg = owned.length ? owned.reduce((a, r) => a + r.unrest, 0) / owned.length : 0;
         return n && n.stocks.materials >= 40 && avg > 15 ? "commission" : "defer";
       },
-    },
-  },
-
-  {
-    // DECISION (faith): fund a missionary to carry your faith to a nearby people —
-    // a direct lever toward the religious victory (systems/faith.ts). Offered only
-    // when there is a province to win over.
-    id: "wandering_preacher",
-    weight: 2,
-    eligible: (state, nationId) => faithConversionTarget(state, nationId) !== null,
-    choice: {
-      prompt: "A zealous preacher offers to carry your faith to a neighbouring people — fund the mission for 25 gold?",
-      options: [
-        {
-          id: "send",
-          label: "Send the preacher (−25g)",
-          detail: "Spend 25 gold; win a nearby province to your faith.",
-          apply: (state, nationId) => {
-            const n = state.nations.find((x) => x.id === nationId);
-            if (!n || n.stocks.gold < 25) return { state, message: "Too little gold to fund the mission." };
-            const target = faithConversionTarget(state, nationId);
-            if (!target) return { state, message: "No nearby people to preach to." };
-            const paid = addStock(state, nationId, "gold", -25);
-            const regions = paid.regions.map((r) => (r.id === target.id ? { ...r, faith: nationId } : r));
-            return { state: { ...paid, regions }, message: `Your preacher wins ${target.name} to your faith.` };
-          },
-        },
-        {
-          id: "stay",
-          label: "Keep them home",
-          detail: "Leave the mission unfunded.",
-          apply: (state) => ({ state, message: "The preacher stays within your own borders." }),
-        },
-      ],
-      // A funded realm spreads the word; the cash-poor keep the preacher home.
-      aiPick: (state, nationId) => {
-        const n = state.nations.find((x) => x.id === nationId);
-        return n && n.stocks.gold >= 45 ? "send" : "stay";
-      },
-    },
-  },
-  {
-    // WINDFALL (faith): a saint's relic calms the realm and firms your faith in one
-    // wavering province you rule but had not yet converted.
-    id: "saints_relic",
-    weight: 1,
-    apply: (state, nationId) => {
-      const owned = state.regions.filter((r) => r.ownerId === nationId);
-      if (!owned.length) return null;
-      let regions = state.regions.map((r) =>
-        r.ownerId === nationId ? { ...r, unrest: Math.max(0, round1(r.unrest - 5)) } : r,
-      );
-      const waver = owned.find((r) => r.faith !== nationId);
-      if (waver) regions = regions.map((r) => (r.id === waver.id ? { ...r, faith: nationId } : r));
-      return { state: { ...state, regions }, message: "A saint's relic arrives — the faithful rejoice and devotion firms." };
-    },
-  },
-  {
-    // SETBACK (faith): heresy takes a border province from your faith to a rival's —
-    // and it sticks (their creed has inertia) until you win it back with a church.
-    id: "heresy",
-    weight: 2,
-    eligible: (state, nationId) => heresyTarget(state, nationId) !== null,
-    apply: (state, nationId) => {
-      const t = heresyTarget(state, nationId);
-      if (!t) return null;
-      const regions = state.regions.map((r) =>
-        r.id === t.region.id
-          ? { ...r, faith: t.toFaith, unrest: Math.min(UNREST_MAX, round1(r.unrest + 8)) }
-          : r,
-      );
-      return { state: { ...state, regions }, message: `Heresy spreads in ${t.region.name} — its people forsake your faith.` };
     },
   },
 

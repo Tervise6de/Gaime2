@@ -30,7 +30,6 @@ import { SOUND } from "@/data/sound";
 import type { StrategicResource } from "@/data/terrain";
 import { nationalProduction, round1 } from "@/systems/economy";
 import { advanceConstruction } from "@/systems/construction";
-import { stepFaith, seedFaith } from "@/systems/faith";
 import { stepTrade, seedKontore } from "@/systems/trade";
 import { stepLeague } from "@/systems/league";
 import { scheduleEpochs, stepEpochs } from "@/systems/epochs";
@@ -267,7 +266,7 @@ export function createGame(options: NewGameOptions): GameState {
     rngState: rng.seed,
     turn: 1,
     nations,
-    regions: seedFaith(laidOut),
+    regions: laidOut,
     armies,
     nextArmyId,
     routes: [],
@@ -287,7 +286,7 @@ export function createGame(options: NewGameOptions): GameState {
   };
   // Seed the score graph with the opening position (one sample per nation).
   game.scoreHistory = appendScores(game);
-  // Open the four Kontore (holder = host region's owner), mirroring seedFaith.
+  // Open the four Kontore (holder = host region's owner).
   game.kontore = seedKontore(game);
   // Roll the historical timeline (plague, monopolies, a lost Kontor…) from a
   // dedicated, salted RNG so scheduling never perturbs the game's own stream.
@@ -454,7 +453,7 @@ function createScriptedGame(map: ScriptedMap, regions: Region[], options: NewGam
     rngState: rng.seed,
     turn: 1,
     nations,
-    regions: seedFaith(laidOut),
+    regions: laidOut,
     armies,
     nextArmyId,
     routes: [],
@@ -473,7 +472,7 @@ function createScriptedGame(map: ScriptedMap, regions: Region[], options: NewGam
     scoreHistory: {},
   };
   game.scoreHistory = appendScores(game);
-  // Open the four Kontore (holder = host region's owner), mirroring seedFaith.
+  // Open the four Kontore (holder = host region's owner).
   game.kontore = seedKontore(game);
   // The Øresund Sound toll — the strait-holder's chokepoint on Baltic→western
   // trade (data/sound.ts). Hansa board only; other maps carry no Sound.
@@ -969,11 +968,7 @@ export function resolveTurn(state: GameState): GameState {
     armies: tickEntrenchment(s.armies).map((a) => ({ ...a, movesLeft: armyMoves(a.units) })),
   };
 
-  // 5.5. Faith spreads: churches and rulers convert provinces (occupation alone
-  // does not), so the religious map shifts before the victory check reads it.
-  s = stepFaith(s);
-
-  // 6. Outcome: elimination, then domination / great works / faith / turn score.
+  // 6. Outcome: elimination, then domination / great works / turn score.
   s = updateOutcome(s);
 
   // 7. Sample every nation's prestige score for the end-game graph.
@@ -988,7 +983,6 @@ function victoryChronicle(outcome: string, kind: string): string {
   const how =
     kind === "domination" ? "by dominion over the land"
     : kind === "great works" ? "through its Great Works"
-    : kind === "faith" ? "by carrying the faith across the world"
     : "on the ledger of prestige when the age closed";
   return won
     ? `Your realm was judged the greatest power ${how}. The chronicle is complete.`

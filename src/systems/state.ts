@@ -168,9 +168,6 @@ export const MAX_ROUTES_PER_NATION = 6;
  */
 /** Fraction of all regions a nation must hold for a domination victory. */
 export const DOMINATION_FRACTION = 0.6;
-/** Fraction of all settled regions whose *faith* a nation must hold to win the
-    religious victory (converting hearts, not just taking land — see systems/faith.ts). */
-export const FAITH_VICTORY_FRACTION = 0.6;
 /** Great Works needed for an economic victory. */
 export const WONDER_GOAL = 5;
 /** The game ends at this turn on a prestige-score tiebreak. A full campaign is
@@ -259,14 +256,6 @@ export interface Region {
    * Absent/undefined = balanced (no lean). Only owned regions carry one.
    */
   focus?: FocusId;
-  /**
-   * The nation whose *faith* holds sway here (systems/faith.ts) — not the same as
-   * `ownerId`: conquest occupies, but a region keeps its faith until a rival's
-   * religious influence (rulers + holy sites, radiating across borders) overcomes
-   * it. Undefined = pagan / unconverted (barbarian and neutral land). Drives the
-   * religious victory. Optional so legacy saves load as "pagan" and re-seed.
-   */
-  faith?: number;
   /** What's under construction here, if anything. */
   construction: ConstructionOrder | null;
   /**
@@ -404,7 +393,7 @@ export function inLeague(state: GameState, id: number): boolean {
 /**
  * The live state of a Kontor (the merchant network): who holds it and whether it
  * trades. Seeded open for all four Kontore at game start (systems/trade.ts
- * `seedKontore`), mirroring how faith is seeded. Serialisable data only.
+ * `seedKontore`). Serialisable data only.
  */
 export interface KontorState {
   id: KontorId;

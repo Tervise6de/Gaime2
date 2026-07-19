@@ -69,12 +69,6 @@ export interface BuildingDef {
   unrest: number;
   /** Fortification levels added to the region on completion (one-time). */
   fortification?: number;
-  /**
-   * How strongly this building projects its owner's faith (systems/faith.ts) —
-   * the holy sites of a religious campaign. 0/undefined = secular. Radiates to the
-   * region and, at a fraction, its neighbours, so churches convert across borders.
-   */
-  faith?: number;
   /** Tech that must be researched before this can be built. */
   requiresTech?: TechId;
   /** Terrain the region must have — hidden entirely elsewhere (not just locked). */
@@ -163,8 +157,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     yield: {},
     popCapacity: 0,
     unrest: 12,
-    faith: 2,
-    blurb: "-12 unrest, and preaches your faith locally — a Brick-Gothic church keeps a taxed town in order.",
+    blurb: "-12 unrest — a Brick-Gothic church keeps a taxed town in order.",
   },
   aqueduct: {
     id: "aqueduct",
@@ -277,8 +270,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     popCapacity: 0,
     unrest: 6,
     requiresTech: "scholasticism",
-    faith: 3,
-    blurb: "+3 knowledge, -6 unrest, and spreads your faith — scholars and quiet order. (Scholasticism)",
+    blurb: "+3 knowledge, -6 unrest — scholars and quiet order. (Scholasticism)",
   },
   watchtower: {
     id: "watchtower",
@@ -319,8 +311,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     popCapacity: 0,
     unrest: 10,
     requiresTech: "theology",
-    faith: 5,
-    blurb: "+2 knowledge, +1 gold, -10 unrest, and projects your faith far — a great brick Dom. (Theology)",
+    blurb: "+2 knowledge, +1 gold, -10 unrest — a great brick Dom. (Theology)",
   },
 
   // --- Strategic-resource works ----------------------------------------------

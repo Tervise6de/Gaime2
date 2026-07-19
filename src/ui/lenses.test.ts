@@ -53,16 +53,15 @@ describe("map lenses", () => {
   });
 });
 
-describe("categorical lenses (faith, relations)", () => {
-  it("offers a Relations lens with a diverging legend; Faith is categorical (no ramp)", () => {
+describe("categorical lenses (relations)", () => {
+  it("offers a Relations lens with a diverging legend", () => {
     expect(LENSES.map((l) => l.id)).toContain("relations");
     expect(lensGradient("relations")).toMatch(/^linear-gradient\(90deg,/);
-    expect(lensGradient("faith")).toBeNull();
   });
 
-  it("colours every region as valid hex under faith and relations", () => {
+  it("colours every region as valid hex under relations", () => {
     const g = createGame({ seed: 9 });
-    for (const id of ["faith", "relations"] as LensId[]) {
+    for (const id of ["relations"] as LensId[]) {
       const colors = lensColorsFor(g, id);
       expect(colors).not.toBeNull();
       for (const r of g.regions) expect(colors![r.id]).toMatch(HEX);

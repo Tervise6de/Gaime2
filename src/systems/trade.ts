@@ -10,7 +10,7 @@
  *
  * The seam in the turn pipeline is `stepTrade`, inserted beside `applyTradeIncome`
  * (the older bilateral trade). Both credit gold identically and log the player's
- * total. `seedKontore` opens the four Kontore at game start, mirroring `seedFaith`.
+ * total. `seedKontore` opens the four Kontore at game start.
  *
  * Pure over `GameState` — no RNG (fully deterministic), no DOM. The same lane
  * BFS as turn.ts `graphDistance`, but returning the path with a lowest-id
@@ -548,7 +548,7 @@ export function stepTrade(state: GameState): GameState {
 /**
  * Open the four Kontore at game start: each takes the owner of its host region as
  * holder (null if the host is unowned, barbarian, or off this map), opens for
- * trade, and stamps the current turn. Mirrors `seedFaith`. Pure — returns fresh state.
+ * trade, and stamps the current turn. Pure — returns fresh state.
  */
 export function seedKontore(state: GameState): KontorState[] {
   return KONTOR_IDS.map((id) => {
