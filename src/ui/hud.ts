@@ -2843,7 +2843,7 @@ function renderEnemyRegion(
     attackBtn.title = preview.undefended
       ? `Strike with your ${soldiersDisplay(armySize(attackers[0]!.units))}-soldier army from ${from} — undefended, walking in captures it.`
       : `Strike with your ${soldiersDisplay(armySize(attackers[0]!.units))}-soldier army from ${from} — ${oddsText} to win.\n` +
-        `Likely cost: you ~${armySize(preview.attackerLosses)} (${lossBreakdown(preview.attackerLosses)}), them ~${armySize(preview.defenderLosses)} (${lossBreakdown(preview.defenderLosses)}).`;
+        `Likely cost: you ~${soldiersDisplay(armySize(preview.attackerLosses))} (${lossBreakdown(preview.attackerLosses)}), them ~${soldiersDisplay(armySize(preview.defenderLosses))} (${lossBreakdown(preview.defenderLosses)}).`;
     attackBtn.addEventListener("click", () => openAttack(region.id));
   } else {
     attackBtn.innerHTML = `${glyphHtml("attack", "⚔")} Attack (${attackers.length} armies)`;
@@ -3132,8 +3132,8 @@ function renderCombatOdds(state: GameState, army: Army): HTMLElement {
       chip.title = "Undefended — your army walks in and takes it at no cost.";
       row.append(chip);
     } else {
-      const youLost = armySize(preview.attackerLosses);
-      const themLost = armySize(preview.defenderLosses);
+      const youLost = soldiersCompact(armySize(preview.attackerLosses));
+      const themLost = soldiersCompact(armySize(preview.defenderLosses));
       const detail = el("span", "hud-odds-detail");
       detail.innerHTML =
         `${glyphHtml("attack", "⚔")}${Math.round(preview.attack)} · ` +
@@ -3183,10 +3183,13 @@ function attackWarning(army: Army, target: Region): string {
   return "The defender is simply the stronger force — mass more troops before you strike.";
 }
 
-/** Compact per-unit casualty list for a forecast tooltip, e.g. "2 Infantry, 1 Ranged". */
+/** Per-type casualty list in *soldiers* for a forecast tooltip, e.g. "500 Militia, 250 Ranged".
+ *  Losses are tracked internally in abstract units; the forecast must speak the same
+ *  soldier scale as the army strength beside it (1 unit = SOLDIERS_PER_UNIT men), or a
+ *  wiped 750-soldier stack misreads as "3 lost". */
 function lossBreakdown(losses: Record<UnitType, number>): string {
   const parts: string[] = [];
-  for (const t of UNIT_TYPES) if (losses[t] > 0) parts.push(`${losses[t]} ${UNITS[t].name}`);
+  for (const t of UNIT_TYPES) if (losses[t] > 0) parts.push(`${soldiersDisplay(losses[t])} ${UNITS[t].name}`);
   return parts.length ? parts.join(", ") : "no losses";
 }
 
@@ -3204,8 +3207,8 @@ function combatForecastTip(
 ): string {
   return (
     `${pct}% to win — likely ${outcomeWord(outcome)}.\n` +
-    `You lose ~${armySize(attackerLosses)} (${lossBreakdown(attackerLosses)}); ` +
-    `they lose ~${armySize(defenderLosses)} (${lossBreakdown(defenderLosses)}).`
+    `You lose ~${soldiersDisplay(armySize(attackerLosses))} (${lossBreakdown(attackerLosses)}); ` +
+    `they lose ~${soldiersDisplay(armySize(defenderLosses))} (${lossBreakdown(defenderLosses)}).`
   );
 }
 
