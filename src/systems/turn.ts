@@ -30,6 +30,7 @@ import { nationalProduction, round1 } from "@/systems/economy";
 import { advanceConstruction } from "@/systems/construction";
 import { stepFaith, seedFaith } from "@/systems/faith";
 import { stepTrade, seedKontore } from "@/systems/trade";
+import { scheduleEpochs, stepEpochs } from "@/systems/epochs";
 import { nextPopulation } from "@/systems/population";
 import { nextUnrest } from "@/systems/stability";
 import { advanceMarches, applyCommanderEffects, applyDefection, armyMoves, tickEntrenchment, totalUpkeep } from "@/systems/military";
@@ -285,6 +286,9 @@ export function createGame(options: NewGameOptions): GameState {
   game.scoreHistory = appendScores(game);
   // Open the four Kontore (holder = host region's owner), mirroring seedFaith.
   game.kontore = seedKontore(game);
+  // Roll the historical timeline (plague, monopolies, a lost Kontor…) from a
+  // dedicated, salted RNG so scheduling never perturbs the game's own stream.
+  game.epochs = scheduleEpochs(createRng((options.seed ^ 0x2545f491) >>> 0));
   return game;
 }
 
@@ -454,6 +458,9 @@ function createScriptedGame(map: ScriptedMap, regions: Region[], options: NewGam
   game.scoreHistory = appendScores(game);
   // Open the four Kontore (holder = host region's owner), mirroring seedFaith.
   game.kontore = seedKontore(game);
+  // Roll the historical timeline (plague, monopolies, a lost Kontor…) from a
+  // dedicated, salted RNG so scheduling never perturbs the game's own stream.
+  game.epochs = scheduleEpochs(createRng((options.seed ^ 0x2545f491) >>> 0));
   return game;
 }
 
@@ -923,6 +930,11 @@ export function resolveTurn(state: GameState): GameState {
 
   // 4. Bounded random events (low probability, low variance).
   s = fireEvents(s, rng);
+
+  // 4.5. Epoch events: the scheduled historical beats (plague, the herring
+  // monopoly, pirates, a great fire, the Novgorod Peterhof's fall) fire when
+  // their rolled turn arrives — dated history, not a per-turn coin-flip.
+  s = stepEpochs(s, rng);
 
   // 5. Refresh army moves for the coming turn, and deepen entrenchment for
   //    every army still dug in (M3).

@@ -367,6 +367,17 @@ export interface KontorState {
   sinceTurn?: number;
 }
 
+/**
+ * A scheduled historical "epoch" event (systems/epochs.ts, data/epochEvents.ts):
+ * which event, and the turn it fires. The timeline is rolled once at game start —
+ * each event fires at its anchor year ± a window, if it happens at all — so no two
+ * games share a schedule. Fired events are removed. Serialisable data only.
+ */
+export interface ScheduledEpoch {
+  id: string;
+  fireTurn: number;
+}
+
 export interface ResourceStocks {
   gold: number;
   food: number;
@@ -513,6 +524,12 @@ export interface GameState {
    * Optional so legacy saves load (back-filled to [] on deserialize).
    */
   kontore?: KontorState[];
+  /**
+   * The rolled timeline of historical epoch events still to fire (systems/epochs.ts).
+   * Set once at game start; entries are removed as they fire. Optional so legacy
+   * saves load (undefined = no scheduled history, the events simply never fire).
+   */
+  epochs?: ScheduledEpoch[];
   /** Pairwise relations, keyed by pairKey(a,b): −100..+100. */
   relations: Record<string, number>;
   /**
