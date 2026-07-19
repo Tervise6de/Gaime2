@@ -22,7 +22,6 @@
  */
 
 import { KONTORE, KONTOR_IDS, type KontorId } from "@/data/kontore";
-import { eraIndexForTurn } from "@/data/eras";
 import { atWar, adjustRelation } from "@/systems/diplomacy";
 import { round1 } from "@/systems/economy";
 import {
@@ -35,13 +34,7 @@ import {
   type TradeRoute,
 } from "@/systems/state";
 
-// Tuning (docs/hansa-alignment-plan.md). Founding wants a real trading power, so the
-// League is a mid-game institution rather than a turn-1 lock-in.
-export const FOUND_MIN_ROUTES = 3; // routes that mark a realm as a trading power fit to found
-// The League cannot form before its historical era. The game opens ~900 AD, but the
-// Hansa proper coheres only once "The League Rises" (data/eras.ts era 2, turn 90 —
-// "Lübeck is founded and the towns swear common cause") dawns.
-export const FOUND_MIN_ERA = 2;
+// Tuning (docs/hansa-alignment-plan.md).
 const BOYCOTT_LEVY = 8; // Pfundzoll — each member's ad-hoc contribution when a boycott is called
 const BOYCOTT_RELATION_HIT = -12; // the cut-off realm's resentment of each member
 const LEAVE_PENALTY = -14; // relations hit with each member on leaving
@@ -79,19 +72,20 @@ export function leagueLeader(state: GameState): number | null {
   return best;
 }
 
-/** Trade routes `nationId` currently runs. */
-function routeCount(state: GameState, nationId: number): number {
-  return (state.routes ?? []).filter((r) => r.ownerId === nationId).length;
+/** Whether `nationId` has built a Hanse Hall — the League's seat and founding prerequisite. Pure. */
+export function hasHanseHall(state: GameState, nationId: number): boolean {
+  return state.regions.some((r) => r.ownerId === nationId && r.buildings.includes("hanse_hall"));
 }
 
-/** A realm is a real trading power — fit to found the League — once it runs enough
-    routes AND its own age has come. Trade-gated (not mere Kontor ownership) and
-    era-gated (not before "The League Rises"), so the League is a mid-game institution,
-    not a turn-1 lock-in. Joining an already-formed League is *not* era-gated. Pure. */
+/**
+ * A realm may found the League once it has built a **Hanse Hall** — which needs the
+ * Lübeck Law tech (data/techs.ts) to build. So founding is the payoff of a research +
+ * construction investment (research the charter → raise the Hall → found), a mid-game
+ * milestone rather than a calendar unlock. One League only; Hansa board. Pure.
+ */
 export function canFoundLeague(state: GameState, nationId: number): boolean {
   if (state.league || nationId === BARBARIAN_ID || state.mapId !== "hansa") return false;
-  if (eraIndexForTurn(state.turn) < FOUND_MIN_ERA) return false; // too early — the Hansa has not yet risen
-  return routeCount(state, nationId) >= FOUND_MIN_ROUTES;
+  return hasHanseHall(state, nationId);
 }
 
 /** A realm may join an existing League if it is real and at peace with every member. Pure. */

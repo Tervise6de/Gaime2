@@ -74,7 +74,7 @@ import { EPOCH_EVENTS } from "@/data/epochEvents";
 import { KONTORE, type KontorId } from "@/data/kontore";
 import { SOUND } from "@/data/sound";
 import { routeOptions, regionGoodOutput, soundHolderId, activeEmbargoes, soundPreview, marketOutlook } from "@/systems/trade";
-import { canFoundLeague, canJoinLeague, leagueLeader, leagueDividendPool, isBoycotted, FOUND_MIN_ROUTES } from "@/systems/league";
+import { canFoundLeague, canJoinLeague, leagueLeader, leagueDividendPool, isBoycotted } from "@/systems/league";
 import { inLeague } from "@/systems/state";
 import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
 import type { TurnSummary } from "@/systems/summary";
@@ -3640,10 +3640,11 @@ function leagueSection(state: GameState, callbacks: HudCallbacks): HTMLElement |
     const p = el("p", "hud-hint");
     if (canFoundLeague(state, PLAYER_ID)) {
       p.textContent =
-        "Its members share the Kontore's wealth, alone may trade at the Kontore they hold, and keep the peace among themselves. As a leading trading power, you may found it.";
+        "Its members share the Kontore's wealth, alone may trade at the Kontore they hold, and keep the peace among themselves. Your Hanse Hall lets you found it.";
       box.append(p, btn("Found the Hanseatic League", "hud-league-btn primary", () => callbacks.onFoundLeague()));
     } else {
-      p.textContent = `No League has formed yet. Found it once you run ${FOUND_MIN_ROUTES}+ trade routes — or wait for a rival to found it, then join for its Kontor privileges.`;
+      p.innerHTML =
+        "No League has formed yet. To found it, research <b>Lübeck Law</b> and raise a <b>Hanse Hall</b> — or wait for a rival to found it, then join for its Kontor privileges.";
       box.append(p);
     }
     return box;

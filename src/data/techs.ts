@@ -45,6 +45,7 @@ export type TechId =
   | "castles"
   | "common_law"
   | "guilds"
+  | "lubeck_law"
   // Age of Conquest (era 3)
   | "architecture"
   | "nationalism"
@@ -187,6 +188,11 @@ export const TECHS: Record<TechId, TechDef> = {
     id: "guilds", name: "Guilds", branch: "economy", tier: 2, era: 2, cost: 48,
     requires: ["banking"], yieldMult: { gold: 0.15, materials: 0.1 },
     blurb: "+15% gold, +10% materials — chartered trade guilds.",
+  },
+  lubeck_law: {
+    id: "lubeck_law", name: "Lübeck Law", branch: "civics", tier: 2, era: 1, cost: 44,
+    requires: ["civil_service"], unlockBuilding: "hanse_hall",
+    blurb: "The towns' shared charter (Lübeck Law) — unlocks the Hanse Hall, from which the Hanseatic League is founded.",
   },
 
   // --- Age of Conquest (era 3) ---------------------------------------------

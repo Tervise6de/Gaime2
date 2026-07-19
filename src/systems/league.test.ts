@@ -52,34 +52,23 @@ const route = (id: number, owner: number, kontor: "london" | "bruges" | "bergen"
 });
 
 describe("founding & joining the League", () => {
-  // Founding is era-gated to "The League Rises" (era 2, turn 90). Route/eligibility
-  // fixtures therefore set a turn in that era; the gate itself is exercised below.
-  const LEAGUE_ERA = 100;
+  // Founding is gated on a built Hanse Hall (which needs the Lübeck Law tech).
+  const withHall = (owner: number, over: Partial<GameState> = {}) =>
+    state(regionsOf(63, { 10: { ownerId: owner, buildings: ["hanse_hall"] } }), over);
 
-  it("only a trading power (enough routes) may found it, once, on the Hansa map", () => {
-    const twoRoutes = state(regionsOf(63), { turn: LEAGUE_ERA, routes: [route(0, A, "london"), route(1, A, "bruges")] });
-    expect(canFoundLeague(twoRoutes, A)).toBe(false); // under the route threshold
-    const threeRoutes = state(regionsOf(63), { turn: LEAGUE_ERA, routes: [route(0, A, "london"), route(1, A, "bruges"), route(2, A, "bergen")] });
-    expect(canFoundLeague(threeRoutes, A)).toBe(true);
-    const founded = foundLeague(threeRoutes, A);
+  it("requires the founder's own Hanse Hall — not routes or a date (design gate #2)", () => {
+    // A trading power with no Hanse Hall cannot found the League, however many routes…
+    const noHall = state(regionsOf(63), { routes: [route(0, A, "london"), route(1, A, "bruges"), route(2, A, "bergen")] });
+    expect(canFoundLeague(noHall, A)).toBe(false);
+    // …but a realm that has raised one can, at any turn.
+    const s = withHall(A, { turn: 1 });
+    expect(canFoundLeague(s, A)).toBe(true);
+    const founded = foundLeague(s, A);
     expect(founded.league!.members).toEqual([A]);
     expect(canFoundLeague(founded, B)).toBe(false); // only one League
-    // Not on a procedural map.
-    expect(canFoundLeague({ ...threeRoutes, mapId: undefined }, A)).toBe(false);
-  });
-
-  it("cannot be founded before 'The League Rises' era, however many routes (design gate #2)", () => {
-    const routes = [route(0, A, "london"), route(1, A, "bruges"), route(2, A, "bergen")];
-    // Era 0 (Trade Dawn, turn 1) and era 1 (Gotland Age, turns 45–89) are too early…
-    expect(canFoundLeague(state(regionsOf(63), { turn: 1, routes }), A)).toBe(false);
-    expect(canFoundLeague(state(regionsOf(63), { turn: 45, routes }), A)).toBe(false);
-    expect(canFoundLeague(state(regionsOf(63), { turn: 89, routes }), A)).toBe(false);
-    // …era 2 (turn 90) opens founding, and it stays open thereafter.
-    expect(canFoundLeague(state(regionsOf(63), { turn: 90, routes }), A)).toBe(true);
-    expect(canFoundLeague(state(regionsOf(63), { turn: 200, routes }), A)).toBe(true);
-    // foundLeague itself honours the gate: a no-op before the era, a real founding after.
-    expect(foundLeague(state(regionsOf(63), { turn: 1, routes }), A).league).toBeUndefined();
-    expect(foundLeague(state(regionsOf(63), { turn: 90, routes }), A).league!.members).toEqual([A]);
+    expect(canFoundLeague({ ...s, mapId: undefined }, A)).toBe(false); // Hansa board only
+    // A rival's Hall does not qualify you.
+    expect(canFoundLeague(withHall(B), A)).toBe(false);
   });
 
   it("a realm joins only at peace with every member", () => {

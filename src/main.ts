@@ -55,7 +55,7 @@ function main(): void {
   if (!hudRoot) throw new Error("HUD element #hud not found");
 
   // Resume the last autosave if one exists, otherwise start a fresh game.
-  let state: GameState = (hasLocalSave("auto") && loadFromLocal("auto")) || createGame({ seed: 12345 });
+  let state: GameState = (hasLocalSave("auto") && loadFromLocal("auto")) || createGame({ seed: 12345, mapId: "hansa" });
   let selectedRegion: number | null = null;
   let moveArmyId: number | null = null;
   let lastSummary: TurnSummary | null = null;

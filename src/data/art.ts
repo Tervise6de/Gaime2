@@ -345,6 +345,10 @@ export const BUILDING_ART: Record<BuildingId, string | null> = {
   roland: ico(
     '<path d="M10.8 14.3L12 4.6l1.2 9.7z"/><path d="M9.2 16.9h5.6M8 19.5h8"/><path d="M5.3 7.8c-.6 3.6.3 6.7 2.4 9.3M18.7 7.8c.6 3.6-.3 6.7-2.4 9.3"/><path d="M5.3 7.8l1.9.5M18.7 7.8l-1.9.5"/>',
   ),
+  // Hanse Hall — a gabled Brick-Gothic merchant hall (facade + peaked roof + door).
+  hanse_hall: ico(
+    '<path d="M12 4.4L4.6 9v11h14.8V9z"/><path d="M4.6 9L12 4.4 19.4 9"/><path d="M9.7 20v-5.1h4.6V20"/><path d="M7.7 11.6h2.1M14.2 11.6h2.1"/>',
+  ),
 };
 
 // ---------------------------------------------------------------------------

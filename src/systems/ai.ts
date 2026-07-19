@@ -50,7 +50,7 @@ import {
 } from "@/systems/diplomacy";
 import { researchFrontier, selectTech, isBuildingUnlockedFor } from "@/systems/tech";
 import { createRoute, laneFor, regionSources, distanceFactor } from "@/systems/trade";
-import { foundLeague, joinLeague, canFoundLeague, canJoinLeague, kontoreHeldBy } from "@/systems/league";
+import { foundLeague, joinLeague, canFoundLeague, canJoinLeague, kontoreHeldBy, hasHanseHall } from "@/systems/league";
 import { GOODS, GOOD_IDS } from "@/data/goods";
 import { KONTORE } from "@/data/kontore";
 import { eraIndexForTurn } from "@/data/eras";
@@ -92,20 +92,40 @@ export function runNationTurn(state: GameState, nationId: number, rng: Rng): Gam
   return s;
 }
 
+/** A realm with the trade to want the League's leadership — routes or a Kontor. */
+function wantsLeagueSeat(state: GameState, nationId: number): boolean {
+  return (state.routes ?? []).some((r) => r.ownerId === nationId) || kontoreHeldBy(state, nationId) >= 1;
+}
+
 /**
- * The Hanseatic League decision: a trading power founds it if none exists; a trader
- * outside an existing League joins to win its Kontor privileges (only while at peace
- * with the members). Warlike, trade-poor realms stay out — keeping the freedom to
- * war fellow traders. Hansa board only. Pure.
+ * The Hanseatic League decision. If none exists: found it when ready (a Hanse Hall
+ * is built), else a trading power works toward it — raising a Hanse Hall in its
+ * capital once it holds the Lübeck Law charter (the research nudge lives in
+ * manageEconomy). If one exists: a trader outside it joins for the Kontor privileges
+ * (only at peace with every member). Warlike, trade-poor realms stay out. Hansa
+ * board only. Pure.
  */
 function manageLeague(state: GameState, nationId: number): GameState {
   if (nationId === BARBARIAN_ID || state.mapId !== "hansa") return state;
+  const nation = state.nations.find((n) => n.id === nationId);
+  if (!nation) return state;
+
   if (!state.league) {
-    return canFoundLeague(state, nationId) ? foundLeague(state, nationId) : state;
+    if (canFoundLeague(state, nationId)) return foundLeague(state, nationId);
+    // Hold the charter but no seat yet → raise a Hanse Hall (in the capital if free).
+    if (nation.research.done.includes("lubeck_law") && wantsLeagueSeat(state, nationId) && !hasHanseHall(state, nationId)) {
+      const building = state.regions.some((r) => r.ownerId === nationId && r.construction?.building === "hanse_hall");
+      if (!building) {
+        const seat =
+          state.regions.find((r) => r.ownerId === nationId && r.id === nation.capitalRegionId && !r.construction) ??
+          state.regions.find((r) => r.ownerId === nationId && !r.construction);
+        if (seat) return queueFor(state, seat.id, "hanse_hall", nationId);
+      }
+    }
+    return state;
   }
-  if (!state.league.members.includes(nationId) && canJoinLeague(state, nationId)) {
-    const trader = (state.routes ?? []).some((r) => r.ownerId === nationId) || kontoreHeldBy(state, nationId) >= 1;
-    if (trader) return joinLeague(state, nationId);
+  if (!state.league.members.includes(nationId) && canJoinLeague(state, nationId) && wantsLeagueSeat(state, nationId)) {
+    return joinLeague(state, nationId);
   }
   return state;
 }
@@ -164,9 +184,18 @@ function manageEconomy(state: GameState, nationId: number): GameState {
 
   let s = state;
 
-  // Research: keep a tech in progress, chosen by personality branch.
+  // Research: keep a tech in progress, chosen by personality branch — but a would-be
+  // League founder (no League yet, a trading power) prioritises Lübeck Law, the
+  // charter that unlocks the Hanse Hall, once it is reachable.
   if (!nation.research.current) {
-    const pick = pickTech(nation.research.done, nation, eraIndexForTurn(s.turn));
+    // A Kontor-holder with no League beelines the charter chain toward Lübeck Law
+    // (which unlocks the Hanse Hall) — the natural League seats work toward founding.
+    const era = eraIndexForTurn(s.turn);
+    const charterStep =
+      s.mapId === "hansa" && !s.league && kontoreHeldBy(s, nationId) >= 1 && !nation.research.done.includes("lubeck_law")
+        ? nextTechToward("lubeck_law", nation.research.done, era)
+        : null;
+    const pick = charterStep ?? pickTech(nation.research.done, nation, era);
     if (pick) s = chooseTech(s, nationId, pick);
   }
 
@@ -288,6 +317,22 @@ export function preferredTechBranch(nation: Nation): TechBranch {
     default:
       return personalityBranch(nation);
   }
+}
+
+/**
+ * The next researchable step toward `target`: the target itself once its prereqs are
+ * done and its era has come, else the first missing prerequisite that is researchable
+ * now (walking the requires chain). null if nothing on the path can be taken yet.
+ */
+function nextTechToward(target: TechId, done: TechId[], era: number): TechId | null {
+  if (done.includes(target)) return null;
+  const missing = TECHS[target].requires.filter((r) => !done.includes(r));
+  for (const r of missing) {
+    const step = nextTechToward(r, done, era); // research prereqs first (their own eras permitting)
+    if (step) return step;
+  }
+  if (missing.length > 0) return null; // a prerequisite isn't researchable yet
+  return era >= TECHS[target].era ? target : null;
 }
 
 function pickTech(done: TechId[], nation: Nation, era: number): TechId | null {

@@ -176,24 +176,18 @@ export function buildNewGameForm(): NewGameForm {
   gameLengthSeg.root.title =
     "Game length: how many turns before the score decides it — Short 150, Standard 220, Long 300. Endless has no deadline; play until a decisive victory or you stop.";
 
-  // World: a random realm, or a real-geography map. A real map fixes its own
-  // size and shape, so the World-size field is hidden while one is selected.
+  // World: the Hanseatic World is the game (the old generic/procedural worlds were
+  // retired). A real map fixes its own size, so the World-size field stays hidden.
   const worldSeg = segmented(
-    [
-      ["hansa", "Hanseatic World"],
-      ["", "Random"],
-      ["baltic", "Baltic"],
-      ["europe", "Europe"],
-    ],
-    prefs.world ?? "hansa",
+    [["hansa", "Hanseatic World"]],
+    "hansa",
     "hansa",
     () => {
       dropToCustom();
       syncWorld();
     },
   );
-  worldSeg.root.title =
-    "The Hanseatic World (the whole North Sea and Baltic), a random realm (procedural, seeded), or a smaller real-geography map — the Baltic or Europe.";
+  worldSeg.root.title = "The Hanseatic World — the whole North Sea and Baltic, c. 900–1500.";
 
   // Scenarios: hand-set openings. Picking one fills the config below (and may pin
   // an opening trait); editing the config by hand drops back to "Custom".

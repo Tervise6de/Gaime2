@@ -54,7 +54,8 @@ export type BuildingId =
   | "salzspeicher"
   | "brewery"
   | "canal"
-  | "roland";
+  | "roland"
+  | "hanse_hall";
 
 export interface BuildingDef {
   id: BuildingId;
@@ -198,6 +199,16 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     unrest: 0,
     requiresTech: "economics",
     blurb: "+3 gold, +3 materials — the economy branch's workshop-and-market in one. (Economics)",
+  },
+  hanse_hall: {
+    id: "hanse_hall",
+    name: "Hanse Hall",
+    cost: 24,
+    yield: { gold: 2 },
+    popCapacity: 0,
+    unrest: 5,
+    requiresTech: "lubeck_law",
+    blurb: "+2 gold, -5 unrest — the merchant guild's seat. Build it to found the Hanseatic League. (Lübeck Law)",
   },
   forum: {
     id: "forum",
