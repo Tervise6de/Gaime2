@@ -180,7 +180,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   // them, so gestures stay hitch-free; only the light projection (hit paths,
   // marker anchors) follows the live camera.
   const CAM_MIN = 0.8; // zoom out past fit — the whole island with extra sea room
-  const CAM_MAX = 2.75;
+  const CAM_MAX = 4.5; // zoom deep into the Baltic — the sea-trade heart of the map
   /** How far (fraction of the viewport) the map may pan beyond its fitted
       bounds — so dragging always answers, even at fit zoom. */
   const PAN_SLACK = 0.22;
@@ -223,6 +223,15 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     cam.ty = clampAxis(cam.ty, h);
   }
 
+  // While the camera is actively moving we drop the per-region label/marker text
+  // (74 measured+stroked strings a frame) and keep only the cheap baked map +
+  // armies, so pan/zoom stays smooth; the labels snap back a few frames after the
+  // gesture settles. Set on every camera mutation, counted down in render().
+  let interactFrames = 0;
+  const NUDGE_INTERACT = (): void => {
+    interactFrames = 6;
+  };
+
   /** Zoom to `next` about the screen point (mx, my), keeping it fixed. */
   function setZoom(next: number, mx: number, my: number): void {
     const s0 = cam.s;
@@ -232,6 +241,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     cam.ty = my - ((my - cam.ty) * s1) / s0;
     cam.s = s1;
     clampCam();
+    NUDGE_INTERACT();
     needsPaint = true;
   }
 
@@ -239,6 +249,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     cam.tx += dx;
     cam.ty += dy;
     clampCam();
+    NUDGE_INTERACT();
     needsPaint = true;
   }
 
@@ -1395,18 +1406,6 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     return { x: bx * c.s + c.tx, y: by * c.s + c.ty };
   }
 
-  /** Inverse of projectXY — pixel position back to normalised map space. */
-  function unprojectXY(px: number, py: number): Point {
-    const { clientWidth, clientHeight } = canvas;
-    const m = frameMargins();
-    const c = camOverride ?? cam;
-    const bx = (px - c.tx) / c.s;
-    const by = (py - c.ty) / c.s;
-    return {
-      x: (bx - m.x) / Math.max(1, clientWidth - m.x * 2),
-      y: (by - m.top) / Math.max(1, clientHeight - m.top - m.bottom),
-    };
-  }
 
   function project(region: Region): Point {
     return projectXY(region.x, region.y);
@@ -1424,9 +1423,14 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
   function render(): void {
     if (!running) return;
+    if (interactFrames > 0) interactFrames -= 1;
+    // Busy = a live pan/pinch or the brief settle window after a zoom. While busy
+    // the label pass is dropped for a smooth camera; we keep repainting until it
+    // settles, so the final frame lands with the labels back.
+    const busy = pointers.size > 0 || interactFrames > 0;
     // Idle skip: nothing animating and no repaint requested — keep the last
     // frame on screen and do no work at all.
-    if (!needsPaint && ripples.length === 0) {
+    if (!needsPaint && ripples.length === 0 && !busy) {
       tick += 1;
       frame = window.requestAnimationFrame(render);
       return;
@@ -1438,12 +1442,13 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     context.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
     if (state) {
       const proj = ensureProjection(state);
-      paintVoronoi(state, proj);
+      paintVoronoi(state, proj, busy);
       drawTradeLanes(proj);
       drawArmies(state);
       drawRipples(state);
       if (minimap) drawMinimap(state);
     }
+    if (busy) needsPaint = true; // keep draining the settle counter → labelled final frame
     tick += 1;
     frame = window.requestAnimationFrame(render);
   }
@@ -1604,7 +1609,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
    * live camera, then the per-frame dynamics — selection, highlights, markers,
    * realm nameplates — crisp at the current zoom.
    */
-  function paintVoronoi(s: GameState, proj: Projection): void {
+  function paintVoronoi(s: GameState, proj: Projection, busy = false): void {
     markerHits = []; // the marker passes below re-register this frame's tips
     const st = ensureStatic(s);
     context.drawImage(
@@ -1644,13 +1649,18 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     }
     context.restore();
 
-    // Markers at each region's site (guaranteed inside its own cell).
-    for (const region of s.regions) {
-      drawMarkers(region, proj.sites[region.id]!, capitals);
+    // Markers + nameplates carry the frame's text — the expensive pass — so skip
+    // them entirely while the camera is moving (the baked map + armies still show).
+    if (!busy) {
+      // Markers at each region's site (guaranteed inside its own cell).
+      for (const region of s.regions) {
+        drawMarkers(region, proj.sites[region.id]!, capitals);
+      }
+      // Realm nameplates last: placed to dodge the labels just drawn.
+      drawNameplates(s, proj);
+    } else {
+      markerHits = []; // no hover targets while the labels are hidden
     }
-
-    // Realm nameplates last: placed to dodge the labels just drawn.
-    drawNameplates(s, proj);
   }
 
   /**
@@ -2010,13 +2020,18 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   function hitTest(px: number, py: number): number | null {
     if (!state) return null;
     ensureCells(state);
-    // Ocean clicks select nothing — the sea deselects.
-    const n = unprojectXY(px, py);
-    if (!shape || !pointInIsland(shape, n.x, n.y)) return null;
-    // Hit-test against the *organic* polygons — exactly what is drawn.
+    // Hit-test against the *organic* polygons — exactly what is drawn — testing
+    // EVERY ring of a multipart province, so a small offshore part (Hiiumaa,
+    // Öland, the Danish isles) selects its realm just like the mainland does.
+    // A click that lands in no cell (open sea) returns null and deselects.
     for (let i = 0; i < organic.length; i++) {
-      const poly = organic[i]!.poly.map((v) => projectXY(v.x, v.y));
-      if (pointInPolygon(poly, px, py)) return state.regions[i]?.id ?? i;
+      const cell = organic[i]!;
+      const rings = cell.rings ?? [cell.poly];
+      for (const ring of rings) {
+        if (ring.length < 3) continue;
+        const poly = ring.map((v) => projectXY(v.x, v.y));
+        if (pointInPolygon(poly, px, py)) return state.regions[i]?.id ?? i;
+      }
     }
     return null;
   }

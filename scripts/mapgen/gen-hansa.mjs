@@ -47,6 +47,46 @@ function pip(pt, rings) {
   return inside;
 }
 function centroid(ring) { let x = 0, y = 0; for (const p of ring) { x += p[0]; y += p[1]; } return [x / ring.length, y / ring.length]; }
+// distance from a point to a segment
+function segDist(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy || 1e-12;
+  let t = ((px - ax) * dx + (py - ay) * dy) / L2; t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+function minEdgeDist(pt, rings) {
+  let m = Infinity;
+  for (const ring of rings) for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const d = segDist(pt[0], pt[1], ring[j][0], ring[j][1], ring[i][0], ring[i][1]);
+    if (d < m) m = d;
+  }
+  return m;
+}
+// Pole of inaccessibility: the interior point farthest from every edge — the
+// province's true VISUAL centre (unlike a vertex-average centroid, which a
+// detailed coastline drags off toward the busy side, stranding the label).
+function visualCenter(rings) {
+  let x0 = 1, y0 = 1, x1 = 0, y1 = 0;
+  for (const [x, y] of rings[0]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  let best = centroid(rings[0]), bestD = -1;
+  const N = 22;
+  for (let gy = 0; gy <= N; gy++) for (let gx = 0; gx <= N; gx++) {
+    const p = [x0 + (x1 - x0) * gx / N, y0 + (y1 - y0) * gy / N];
+    if (!pip(p, rings)) continue;
+    const d = minEdgeDist(p, rings);
+    if (d > bestD) { bestD = d; best = p; }
+  }
+  let step = Math.max(x1 - x0, y1 - y0) / N;
+  for (let it = 0; it < 5; it++) {
+    step *= 0.5;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+      const p = [best[0] + dx * step, best[1] + dy * step];
+      if (!pip(p, rings)) continue;
+      const d = minEdgeDist(p, rings);
+      if (d > bestD) { bestD = d; best = p; }
+    }
+  }
+  return [r4(best[0]), r4(best[1])];
+}
 // biggest-part outer rings of a multipolygon, dropping specks -> island blobs
 function landBlobs(g, minA) {
   const blobs = [];
@@ -190,19 +230,9 @@ for (const R of REALMS) {
     if (!geom) { dropped.push(`${R.realm}/${reg.name} (no geometry for "${reg.key}")`); continue; }
     const rings = ringsOf(geom);
     if (!rings.length || area(rings[0]) < MINAREA) { dropped.push(`${R.realm}/${reg.name} (degenerate)`); continue; }
-    // town point: centroid of largest ring, nudged inside if needed
-    let [tx, ty] = centroid(rings[0]);
-    tx = r4(tx); ty = r4(ty);
-    if (!pip([tx, ty], rings)) {
-      const c = centroid(rings[0]);
-      // sample a grid inside the bbox of ring0 to find an interior point
-      let bx0 = 1, by0 = 1, bx1 = 0, by1 = 0;
-      for (const [x, y] of rings[0]) { if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (y < by0) by0 = y; if (y > by1) by1 = y; }
-      outer: for (let gy = 1; gy <= 6; gy++) for (let gx = 1; gx <= 6; gx++) {
-        const px = r4(bx0 + (bx1 - bx0) * gx / 7), py = r4(by0 + (by1 - by0) * gy / 7);
-        if (pip([px, py], rings)) { tx = px; ty = py; break outer; }
-      }
-    }
+    // town/label point: the province's visual centre (pole of inaccessibility),
+    // so the name and markers sit ON the land, not dragged to a coastline.
+    const [tx, ty] = visualCenter(rings);
     const idx = provinces.length;
     const prov = { name: reg.name, x: tx, y: ty, terrain: reg.t, resource: reg.r ?? null, polygon: rings, _key: reg.key };
     provinces.push(prov);
