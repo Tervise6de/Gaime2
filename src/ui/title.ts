@@ -20,6 +20,12 @@ import { isReduceMotion } from "@/ui/settings";
 import { t } from "@/ui/i18n";
 import { buildNewGameForm, type NewGameConfig } from "@/ui/newgame";
 
+const LOADING_ART = [
+  "/key-art/loading-map-table.jpg",
+  "/key-art/loading-harbor-dark.jpg",
+  "/key-art/loading-cog-arrival.jpg",
+] as const;
+
 export interface MainMenuHooks {
   /** An autosave exists — label the primary entry "Continue". */
   hasSave: boolean;
@@ -37,10 +43,12 @@ export interface MainMenuHooks {
 export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
   if (!TITLE_ART) return Promise.resolve(); // registry fallback: boot straight in
   const keyArt = TITLE_ART;
+  preloadKeyArt();
 
   return new Promise((resolve) => {
     const overlay = document.createElement("div");
     overlay.className = "title-overlay";
+    setLoadingArt(overlay, 0);
 
     const art = document.createElement("div");
     art.className = "title-art";
@@ -61,13 +69,26 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
     version.textContent =
       `v${typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev"} · GAIME Studio`;
 
+    const loading = document.createElement("div");
+    loading.className = "title-loading";
+    loading.setAttribute("aria-live", "polite");
+    const loadingMark = document.createElement("div");
+    loadingMark.className = "title-loading-mark";
+    loadingMark.textContent = t("menu.wordmark");
+    const loadingText = document.createElement("div");
+    loadingText.className = "title-loading-text";
+    loadingText.textContent = t("menu.loading");
+    const loadingBar = document.createElement("div");
+    loadingBar.className = "title-loading-bar";
+    loading.append(loadingMark, loadingText, loadingBar);
+
     // Two screens sharing the column: the main list, and the New-game setup
     // that *replaces* it (Start game ▶ / ← Back) — never both at once.
     const menu = document.createElement("div");
     menu.className = "title-menu";
 
     const primary = menuBtn(hooks.hasSave ? t("menu.continue") : t("menu.begin"), "primary");
-    primary.addEventListener("click", dismiss);
+    primary.addEventListener("click", () => dismiss());
 
     const newGameBtn = menuBtn(t("menu.newGame"));
     const optionsBtn = menuBtn(t("menu.options"));
@@ -100,7 +121,9 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
         startBtn.classList.add("armed");
         return;
       }
-      hooks.onNewGame(form.readConfig());
+      const config = form.readConfig();
+      setLoadingArt(overlay, config.seed);
+      hooks.onNewGame(config);
       dismiss();
     });
     const backBtn = menuBtn(t("menu.back"));
@@ -111,6 +134,7 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
     const hint = document.createElement("p");
     hint.className = "title-hint";
     hint.textContent = t("menu.escContinue");
+    let closing = false;
 
     function showSetup(open: boolean): void {
       menu.style.display = open ? "none" : "flex";
@@ -126,7 +150,7 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
       }
     }
 
-    overlay.append(art, studio, wordmark, menu, setup, hint, version);
+    overlay.append(art, studio, wordmark, menu, setup, hint, version, loading);
     // Mount inside #hud so the HUD's own overlays (Options/Records, z 250 while
     // the menu is up) share this stacking context and can render above the menu
     // — #hud is position:fixed, which traps its children's z-index otherwise.
@@ -138,8 +162,15 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
     primary.focus();
 
     function dismiss(): void {
+      if (closing) return;
+      closing = true;
       window.removeEventListener("keydown", onKey, true);
       hudRoot.classList.remove("title-open");
+      overlay.classList.add("loading");
+      window.setTimeout(finishDismiss, isReduceMotion() ? 90 : 620);
+    }
+
+    function finishDismiss(): void {
       if (isReduceMotion()) {
         overlay.remove();
       } else {
@@ -207,6 +238,20 @@ function trapFocus(container: HTMLElement, ev: KeyboardEvent): void {
   } else if (!ev.shiftKey && (active === last || !container.contains(active))) {
     ev.preventDefault();
     first.focus();
+  }
+}
+
+function setLoadingArt(overlay: HTMLElement, seed: number): void {
+  const idx = Math.abs(seed) % LOADING_ART.length;
+  overlay.style.setProperty("--title-loading-image", `url("${LOADING_ART[idx]}")`);
+}
+
+function preloadKeyArt(): void {
+  if (typeof Image === "undefined") return;
+  for (const src of ["/key-art/main-harbor.jpg", ...LOADING_ART]) {
+    const img = new Image();
+    img.decoding = "async";
+    img.src = src;
   }
 }
 

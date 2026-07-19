@@ -76,7 +76,7 @@ body {
   right: 0;
   display: flex;
   gap: 14px;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   padding: 5px 14px;
   background: linear-gradient(180deg, rgba(17, 22, 31, 0.97), rgba(12, 16, 23, 0.92));
@@ -4345,18 +4345,52 @@ a:focus-visible,
   justify-content: flex-start;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 24px 16px;
+  padding: 7vh clamp(18px, 7vw, 96px) 24px;
   /* Default background-attachment keeps the vignette pinned to the border box
      while only the CONTENT scrolls on its own composited layer — repaint-free.
      (No fixed-position descendants here: those can force main-thread scrolling.) */
-  background: radial-gradient(ellipse at 50% 40%, #171d29, #0b0e14 75%);
+  background: #0b0e14;
   opacity: 1;
   transition: opacity 0.45s ease;
   gap: 10px;
+  isolation: isolate;
+  --title-loading-image: url("/key-art/loading-map-table.jpg");
 }
 
 .title-overlay > * {
   flex-shrink: 0; /* children scroll rather than squash */
+}
+
+.title-overlay::before,
+.title-overlay::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.title-overlay::before {
+  z-index: -2;
+  background-image: url("/key-art/main-harbor.jpg");
+  background-size: cover;
+  background-position: 50% 50%;
+  transform: scale(1.015);
+}
+
+.title-overlay::after {
+  z-index: -1;
+  background:
+    linear-gradient(90deg, rgba(6, 8, 12, 0.28), rgba(6, 8, 12, 0.38) 35%, rgba(6, 8, 12, 0.78) 77%, rgba(6, 8, 12, 0.92)),
+    linear-gradient(180deg, rgba(6, 8, 12, 0.2), rgba(6, 8, 12, 0.58) 72%, rgba(6, 8, 12, 0.86));
+}
+
+.title-overlay > :not(.title-loading) {
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+.title-overlay.loading > :not(.title-loading) {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 
 .title-art {
@@ -4373,21 +4407,21 @@ a:focus-visible,
 }
 
 .title-art svg {
-  width: clamp(110px, 18vmin, 150px);
+  width: clamp(82px, 14vmin, 118px);
   height: auto;
   display: block;
-  filter: drop-shadow(0 6px 24px rgba(216, 162, 74, 0.25));
+  filter: drop-shadow(0 8px 26px rgba(0, 0, 0, 0.45)) drop-shadow(0 0 18px rgba(216, 162, 74, 0.2));
 }
 
 .title-wordmark {
   margin-top: 14px;
-  font-size: clamp(30px, 6vmin, 46px);
+  font-size: clamp(42px, 7vmin, 74px);
   font-weight: 700;
-  letter-spacing: 0.32em;
+  letter-spacing: 0.26em;
   /* Centre every line (the name wraps to two on narrow screens); padding-left
      offsets the trailing letter-spacing so tracked text reads optically centred. */
-  text-align: center;
-  padding-left: 0.32em;
+  text-align: right;
+  padding-left: 0.26em;
   text-transform: uppercase;
   background: linear-gradient(180deg, #efd694, #d8a24a 70%, #b0812f);
   -webkit-background-clip: text;
@@ -4402,9 +4436,10 @@ a:focus-visible,
   font-weight: 600;
   letter-spacing: 0.5em;
   padding-left: 0.5em;
-  text-align: center;
+  text-align: right;
   text-transform: uppercase;
   color: rgba(230, 200, 116, 0.65);
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.7);
 }
 
 /* Version + studio stamp, tucked into the splash corner (fixed so it stays
@@ -4439,9 +4474,82 @@ a:focus-visible,
 }
 
 .title-hint {
+  width: min(340px, 84vw);
+  text-align: right;
   font-size: 11px;
   color: var(--muted);
   opacity: 0.7;
+}
+
+.title-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-end;
+  padding: clamp(24px, 7vw, 96px);
+  background:
+    linear-gradient(90deg, rgba(6, 8, 12, 0.18), rgba(6, 8, 12, 0.44) 52%, rgba(6, 8, 12, 0.92)),
+    linear-gradient(180deg, rgba(6, 8, 12, 0.1), rgba(6, 8, 12, 0.82)),
+    var(--title-loading-image);
+  background-size: cover;
+  background-position: 50% 50%;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(1.01);
+  transition: opacity 0.22s ease, transform 0.5s ease;
+}
+
+.title-overlay.loading .title-loading {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.title-loading-mark {
+  font-size: clamp(28px, 5vmin, 54px);
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  padding-left: 0.24em;
+  text-transform: uppercase;
+  color: #e6c874;
+  text-shadow: 0 3px 24px rgba(0, 0, 0, 0.8);
+}
+
+.title-loading-text {
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(247, 244, 234, 0.74);
+}
+
+.title-loading-bar {
+  position: relative;
+  width: min(360px, 72vw);
+  height: 2px;
+  margin-top: 18px;
+  overflow: hidden;
+  background: rgba(247, 244, 234, 0.14);
+}
+
+.title-loading-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transform: scaleX(0);
+  background: linear-gradient(90deg, #d8a24a, #efd694);
+}
+
+.title-overlay.loading .title-loading-bar::after {
+  animation: titleLoad 0.62s ease-out forwards;
+}
+
+@keyframes titleLoad {
+  to { transform: scaleX(1); }
 }
 
 /* --- Moment medallions: end-cards + event vignettes ------------------------ */
@@ -4503,6 +4611,7 @@ a:focus-visible,
 /* --- Main-menu entries (title screen) --------------------------------------- */
 .title-menu {
   margin-top: 24px;
+  align-self: flex-end;
   display: flex;
   flex-direction: column;
   gap: 9px;
@@ -4514,7 +4623,8 @@ a:focus-visible,
   font-size: 14.5px;
   font-weight: 600;
   color: var(--fg);
-  background: rgba(23, 28, 38, 0.85);
+  background: rgba(15, 19, 26, 0.68);
+  backdrop-filter: blur(10px);
   border: 1px solid rgba(230, 200, 116, 0.28);
   border-radius: 8px;
   cursor: pointer;
@@ -4524,7 +4634,7 @@ a:focus-visible,
 .title-menu-btn:hover,
 .title-menu-btn:focus-visible {
   border-color: #e6c874;
-  background: rgba(30, 36, 49, 0.95);
+  background: rgba(29, 35, 46, 0.88);
 }
 
 .title-menu-btn.primary {
@@ -4548,9 +4658,11 @@ a:focus-visible,
   flex-direction: column;
   gap: 12px;
   width: min(400px, 92vw);
+  align-self: flex-end;
   margin-top: 24px;
   padding: 16px;
-  background: rgba(17, 21, 28, 0.9);
+  background: rgba(12, 16, 23, 0.84);
+  backdrop-filter: blur(14px);
   border: 1px solid rgba(230, 200, 116, 0.2);
   border-radius: 10px;
 }
@@ -4608,6 +4720,50 @@ a:focus-visible,
 }
 
 /* Chronicle (E2) — the run's story beats, in the standings + end screens. */
+@media (max-width: 760px) {
+  .title-overlay {
+    align-items: center;
+    padding: 8vh 18px 22px;
+  }
+
+  .title-overlay::after {
+    background:
+      linear-gradient(180deg, rgba(6, 8, 12, 0.18), rgba(6, 8, 12, 0.74) 45%, rgba(6, 8, 12, 0.94)),
+      linear-gradient(90deg, rgba(6, 8, 12, 0.24), rgba(6, 8, 12, 0.24));
+  }
+
+  .title-art,
+  .title-studio,
+  .title-wordmark,
+  .title-menu,
+  .title-setup,
+  .title-hint {
+    align-self: center;
+  }
+
+  .title-wordmark,
+  .title-studio,
+  .title-hint {
+    text-align: center;
+  }
+
+  .title-loading {
+    align-items: center;
+    text-align: center;
+    padding: 24px 18px 54px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .title-overlay,
+  .title-overlay > :not(.title-loading),
+  .title-loading,
+  .title-loading-bar::after {
+    transition: none;
+    animation: none;
+  }
+}
+
 .hud-chronicle {
   margin-top: 14px;
 }

@@ -1,6 +1,6 @@
-# Art agent brief — Gaime2 visual identity (Phase D1)
+# Art agent brief — Hansa visual identity (Phase D1)
 
-**You are a fresh agent taking over Gaime2 to give it a real visual identity.** The
+**You are a fresh agent taking over Hansa to give it a real visual identity.** The
 autonomous *code* development loop is finished and has been stopped: the game is
 feature-complete and testing-ready (~90+), 368 tests green, dependencies `{}`, fully
 offline. What it lacks is art — today it is flat colours, emoji, and CSS. Your job is
@@ -55,7 +55,7 @@ colour-blind + reduce-motion toggles on. Append a dated `docs/DEVLOG.md` entry.
 | **Resources** (`RESOURCE_META` in `ui/hud.ts`; `RESOURCE_ICON` in renderer) | emoji: 🪙 gold, 🌾 food, ⛏️ materials, 📖 knowledge, ⚒ iron, 🐎 horses | 6 custom resource icons (emoji render inconsistently — highest-visibility swap) |
 | **UI glyphs** | emoji chips: 🏆 👑 ⚔ ⚠ 🎓 💡 📊 🗺 ⚙ 🏅 🔊 🎵 | ~12–15 matching UI icons (one designed set, not an emoji grab-bag) |
 | **Nation identity** (nation `color` in `data/*`) | player + 5 rivals = **just a colour** | 6+ faction crests/banners (diplomacy panel, standings, capitals); optionally themed to the personality archetypes |
-| **Title / menu** | **none** — boots straight into a match; `<title>` = "Gaime2 — Kingdom Management" | title screen / key art + a real logo-wordmark (the name "Gaime2" is itself a placeholder — propose a real one) |
+| **Title / menu** | Hansa key-art splash with DOM wordmark/menu | Extend the key-art set and keep logo/menu text as real UI, not baked into images |
 | **App/store icons** | one basic `assets/icons/favicon.svg` | favicon + PWA icons (192/512) + store icon sizes |
 | **Moment art** (optional) | events/victory/defeat are text-only | victory/defeat end-cards; a few reusable event vignettes (plague, festival, war, harvest) |
 
@@ -85,7 +85,7 @@ registry, browser-verify it renders at both breakpoints and under the a11y toggl
 commit, push, DEVLOG.
 
 ## What needs a human decision (surface these, don't guess)
-- Final **game name** and logo direction ("Gaime2" is a placeholder).
+- Final **game name** and logo direction (the current working title is "Hansa").
 - Overall **art style** (painterly vs. flat-vector vs. pixel) — commit to one and
   keep everything consistent with it.
 - Whether any asset is **commissioned/generated** vs. hand-authored (licence + budget),

@@ -1,7 +1,7 @@
 {
   "name": "gaime2",
   "version": "0.80.0",
-  "description": "Kingdom Management / 4X-lite strategy game (browser-based).",
+  "description": "Browser strategy game about Hanseatic trade power.",
   "type": "module",
   "author": "GAIME Studio",
   "license": "MIT",
