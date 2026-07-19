@@ -8,6 +8,7 @@
  */
 
 import { emptyUnits, TURN_LIMIT, type GameState } from "@/systems/state";
+import { SOUND } from "@/data/sound";
 
 const SAVE_VERSION = 1;
 /**
@@ -71,6 +72,16 @@ export function deserializeGame(json: string): GameState | null {
     if (s.routes === undefined) s.routes = [];
     if (s.nextRouteId === undefined) s.nextRouteId = 0;
     if (s.kontore === undefined) s.kontore = [];
+    // The Øresund Sound toll arrived after the merchant layer: back-fill a Hansa
+    // save that predates it (default rate, no embargoes), and coerce the fields of
+    // any present Sound so a hand-edited save can't smuggle a bad rate/list.
+    if (s.sound === undefined && s.mapId === "hansa") {
+      s.sound = { regionId: SOUND.regionId, tollRate: SOUND.defaultRate, embargoes: [] };
+    } else if (s.sound) {
+      const rate = Number(s.sound.tollRate);
+      s.sound.tollRate = Number.isFinite(rate) ? Math.max(0, Math.min(SOUND.maxRate, rate)) : SOUND.defaultRate;
+      s.sound.embargoes = Array.isArray(s.sound.embargoes) ? s.sound.embargoes.filter((n) => typeof n === "number") : [];
+    }
     // Forward-migrate army unit records: a save from before a unit type existed
     // lacks that key, which would read as `undefined` (→ NaN) in armySize/combat.
     // Backfill every unit slot to 0 so older saves load cleanly.

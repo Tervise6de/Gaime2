@@ -11,7 +11,14 @@ import {
   routeDisrupted,
   stepTrade,
   seedKontore,
+  crossesSound,
+  soundHolderId,
+  setSoundToll,
+  setSoundEmbargo,
+  activeEmbargoes,
 } from "@/systems/trade";
+import { declareWar } from "@/systems/diplomacy";
+import { SOUND } from "@/data/sound";
 import { GOODS } from "@/data/goods";
 import { KONTORE, KONTOR_IDS } from "@/data/kontore";
 import {
@@ -395,5 +402,95 @@ describe("goods ⇄ kontore host ids", () => {
     expect(KONTORE.bruges.regionId).toBe(5);
     expect(KONTORE.bergen.regionId).toBe(30);
     expect(KONTORE.novgorod.regionId).toBe(62);
+  });
+});
+
+describe("the Øresund Sound toll (trade as power)", () => {
+  const SOUND_REGION = SOUND.regionId; // Zealand / Copenhagen
+  const BALTIC_SRC = 68; // Königsberg — a Baltic port (not in SOUND.westRegions)
+  const WEST_SRC = 6; // Brabant — an Atlantic region
+  const BRUGES_ID = KONTORE.bruges.regionId; // western Kontor host
+
+  // A 70-region world: the Sound held by `holder`, the Bruges host left neutral so
+  // only the Sound (never the host) can sever a crossing route in these tests.
+  function soundState(holder: number, routes: TradeRoute[]): GameState {
+    const regions = regionsOf(70, {
+      [SOUND_REGION]: { ownerId: holder },
+      [BALTIC_SRC]: { ownerId: RIVAL },
+      [BRUGES_ID]: { ownerId: BARBARIAN_ID },
+    });
+    return state(regions, {
+      sound: { regionId: SOUND_REGION, tollRate: SOUND.defaultRate, embargoes: [] },
+      routes,
+    });
+  }
+  const crossing = (owner: number): TradeRoute => ({
+    id: 0, ownerId: owner, good: "amber", fromRegionId: BALTIC_SRC, toKontorId: "bruges", lane: [BALTIC_SRC, BRUGES_ID],
+  });
+
+  it("crossesSound: only Baltic→western routes cross the strait", () => {
+    const s = soundState(PLAYER_ID, []);
+    expect(crossesSound(s, crossing(RIVAL))).toBe(true);
+    expect(crossesSound(s, { ...crossing(RIVAL), fromRegionId: WEST_SRC })).toBe(false); // Atlantic source
+    expect(crossesSound(s, { ...crossing(RIVAL), toKontorId: "bergen" })).toBe(false); // not a western market
+    expect(crossesSound(s, { ...crossing(RIVAL), toKontorId: "novgorod" })).toBe(false);
+  });
+
+  it("soundHolderId is the strait's owner, null when unheld/barbarian", () => {
+    expect(soundHolderId(soundState(PLAYER_ID, []))).toBe(PLAYER_ID);
+    expect(soundHolderId(soundState(BARBARIAN_ID, []))).toBe(null);
+  });
+
+  it("skims the toll from a crossing route to the strait-holder", () => {
+    const route = crossing(RIVAL);
+    const gross = routeIncome(soundState(PLAYER_ID, []), route);
+    const after = stepTrade(soundState(PLAYER_ID, [route]));
+    const r = after.routes![0]!;
+    expect(r.tollPaid!).toBeGreaterThan(0);
+    expect(r.tollPaid!).toBeLessThan(r.lastIncome!); // 25% skim < 75% kept
+    expect(r.tollPaid! + r.lastIncome!).toBeCloseTo(gross, 5);
+    const player = after.nations.find((n) => n.id === PLAYER_ID)!;
+    const rival = after.nations.find((n) => n.id === RIVAL)!;
+    expect(player.stocks.gold).toBeCloseTo(100 + r.tollPaid!, 5); // holder pockets the toll
+    expect(rival.stocks.gold).toBeCloseTo(50 + r.lastIncome!, 5); // owner keeps the rest
+  });
+
+  it("passes the holder's own crossing trade free of toll", () => {
+    const after = stepTrade(soundState(PLAYER_ID, [crossing(PLAYER_ID)]));
+    const r = after.routes![0]!;
+    expect(r.tollPaid).toBe(0);
+    expect(r.lastIncome!).toBeGreaterThan(0);
+  });
+
+  it("closes the strait to a realm at war with the holder", () => {
+    let s = soundState(PLAYER_ID, [crossing(RIVAL)]);
+    s = declareWar(s, RIVAL, PLAYER_ID);
+    const r = stepTrade(s).routes![0]!;
+    expect(r.soundBlocked).toBe(true);
+    expect(r.lastIncome).toBe(0);
+  });
+
+  it("closes the strait to an embargoed realm", () => {
+    let s = soundState(PLAYER_ID, [crossing(RIVAL)]);
+    s = setSoundEmbargo(s, PLAYER_ID, RIVAL, true);
+    expect(activeEmbargoes(s)).toContain(RIVAL);
+    const r = stepTrade(s).routes![0]!;
+    expect(r.soundBlocked).toBe(true);
+    expect(r.lastIncome).toBe(0);
+  });
+
+  it("only the holder sets the toll rate, clamped to the ceiling", () => {
+    const s = soundState(PLAYER_ID, []);
+    expect(setSoundToll(s, RIVAL, 0.1).sound!.tollRate).toBe(SOUND.defaultRate); // non-holder: no-op
+    expect(setSoundToll(s, PLAYER_ID, 0.99).sound!.tollRate).toBe(SOUND.maxRate); // clamped up to ceiling
+    expect(setSoundToll(s, PLAYER_ID, 0).sound!.tollRate).toBe(0);
+  });
+
+  it("embargoes fall dormant when the strait changes hands", () => {
+    let s = soundState(PLAYER_ID, []);
+    s = setSoundEmbargo(s, PLAYER_ID, RIVAL, true);
+    expect(activeEmbargoes(s)).toEqual([RIVAL]);
+    s = { ...s, regions: s.regions.map((r) => (r.id === SOUND_REGION ? { ...r, ownerId: RIVAL } : r)) };
+    expect(activeEmbargoes(s)).toEqual([]); // the conqueror inherits no grudges
   });
 });

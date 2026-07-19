@@ -1535,6 +1535,77 @@ body {
   color: #e8a24a;
   font-variant-numeric: tabular-nums;
 }
+/* The Øresund toll skimmed off a crossing route, shown beside its income. */
+.hud-trade-toll {
+  color: #d9a441;
+  font-weight: 600;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The Øresund Sound toll panel (the strait region only). */
+.hud-sound {
+  border-top: 1px solid var(--panel-border);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+.hud-sound-label {
+  display: inline-block;
+  min-width: 62px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.hud-sound-rates,
+.hud-sound-embargoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+}
+.hud-sound-rate {
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.hud-sound-rate:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.hud-sound-rate.on {
+  color: #12100b;
+  background: #e8b24a;
+  border-color: #e8b24a;
+}
+/* A rival chip: close the Sound to them. Lit red when shut (embargo or war). */
+.hud-embargo-chip {
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.hud-embargo-chip:hover {
+  border-color: rgba(214, 120, 108, 0.6);
+}
+.hud-embargo-chip.on {
+  color: #f0d3ce;
+  background: rgba(214, 120, 108, 0.24);
+  border-color: rgba(214, 120, 108, 0.7);
+}
+.hud-embargo-chip[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.85;
+}
 
 /* Population vs. cap, as a labelled bar. */
 .hud-popblock {

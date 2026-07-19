@@ -26,6 +26,7 @@ import { generateMap, type MapGenOptions } from "@/systems/mapgen";
 import { scriptedMap } from "@/data/maps/types";
 import type { ScriptedMap } from "@/data/maps/types";
 import { KONTORE } from "@/data/kontore";
+import { SOUND } from "@/data/sound";
 import type { StrategicResource } from "@/data/terrain";
 import { nationalProduction, round1 } from "@/systems/economy";
 import { advanceConstruction } from "@/systems/construction";
@@ -473,6 +474,11 @@ function createScriptedGame(map: ScriptedMap, regions: Region[], options: NewGam
   game.scoreHistory = appendScores(game);
   // Open the four Kontore (holder = host region's owner), mirroring seedFaith.
   game.kontore = seedKontore(game);
+  // The Øresund Sound toll — the strait-holder's chokepoint on Baltic→western
+  // trade (data/sound.ts). Hansa board only; other maps carry no Sound.
+  if (map.id === "hansa") {
+    game.sound = { regionId: SOUND.regionId, tollRate: SOUND.defaultRate, embargoes: [] };
+  }
   // Roll the historical timeline (plague, monopolies, a lost Kontor…) from a
   // dedicated, salted RNG so scheduling never perturbs the game's own stream.
   game.epochs = scheduleEpochs(createRng((options.seed ^ 0x2545f491) >>> 0));

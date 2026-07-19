@@ -640,3 +640,16 @@ describe("hansa strategic resources (Plan 3B)", () => {
     expect(resources.has("amber")).toBe(false);
   });
 });
+
+describe("the Øresund Sound toll seeding (Plan 3B / trade-as-power)", () => {
+  it("seeds the Sound on the Hansa board (Zealand as the tollhouse), not on procedural maps", () => {
+    const hansa = createGame({ seed: 5, mapId: "hansa" });
+    expect(hansa.sound).toBeDefined();
+    expect(hansa.sound!.regionId).toBe(23); // Copenhagen / Zealand
+    expect(hansa.sound!.embargoes).toEqual([]);
+    expect(hansa.sound!.tollRate).toBeGreaterThan(0);
+
+    const procedural = createGame({ seed: 5, rivals: 3 });
+    expect(procedural.sound).toBeUndefined();
+  });
+});

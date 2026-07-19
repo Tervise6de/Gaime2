@@ -19,6 +19,7 @@
 
 import { GOODS, GOOD_IDS, type GoodId } from "@/data/goods";
 import { KONTORE, KONTOR_IDS, type KontorId } from "@/data/kontore";
+import { SOUND } from "@/data/sound";
 import { round1, unrestPenalty } from "@/systems/economy";
 import { atWar } from "@/systems/diplomacy";
 import {
@@ -250,6 +251,108 @@ export function routeDisrupted(state: GameState, route: TradeRoute): boolean {
   return false;
 }
 
+// --- the Øresund Sound toll (trade as power) --------------------------------
+
+/**
+ * The nation that levies the Sound toll — the holder of the strait region — or
+ * null if the Sound is absent (non-Hansa map) or its host is unheld/barbarian
+ * (the strait lies open). Pure.
+ */
+export function soundHolderId(state: GameState): number | null {
+  if (!state.sound) return null;
+  const owner = state.regions[state.sound.regionId]?.ownerId ?? null;
+  return owner !== null && owner !== BARBARIAN_ID ? owner : null;
+}
+
+/**
+ * Whether a route must pass the Øresund: a Baltic port's goods bound for a western
+ * market (London/Bruges). Decided by endpoints — the source is *not* an Atlantic
+ * region (SOUND.westRegions) and the Kontor is a western one. Bergen/Novgorod
+ * trade, and Atlantic-port trade, never crosses. Pure.
+ */
+export function crossesSound(state: GameState, route: TradeRoute): boolean {
+  if (!state.sound) return false;
+  if (!SOUND.tolledKontore.includes(route.toKontorId)) return false;
+  return !SOUND.westRegions.includes(route.fromRegionId);
+}
+
+/**
+ * The Sound's effect on one route this turn: the gold the holder skims (`toll`),
+ * whether the strait is closed to the route's owner (`blocked` — at war with, or
+ * embargoed by, the holder), and who holds it. Your own Sound passes your goods
+ * free. A route that does not cross the Sound is unaffected. Pure.
+ */
+export function soundEffect(
+  state: GameState,
+  route: TradeRoute,
+  grossIncome: number,
+): { toll: number; blocked: boolean; holderId: number | null } {
+  const holderId = soundHolderId(state);
+  if (holderId === null || !crossesSound(state, route)) return { toll: 0, blocked: false, holderId: null };
+  if (holderId === route.ownerId) return { toll: 0, blocked: false, holderId }; // your strait — free passage
+  const closed = atWar(state, route.ownerId, holderId) || activeEmbargoes(state).includes(route.ownerId);
+  if (closed) return { toll: 0, blocked: true, holderId };
+  return { toll: round1(grossIncome * (state.sound?.tollRate ?? SOUND.defaultRate)), blocked: false, holderId };
+}
+
+/**
+ * The Sound's effect on a *prospective* route (for the open-route preview): the
+ * toll it would pay and whether the strait is shut to `ownerId`. Thin wrapper over
+ * `soundEffect` for a not-yet-founded route. Pure.
+ */
+export function soundPreview(
+  state: GameState,
+  ownerId: number,
+  fromRegionId: number,
+  toKontorId: KontorId,
+  gross: number,
+): { toll: number; blocked: boolean } {
+  const { toll, blocked } = soundEffect(
+    state,
+    { id: -1, ownerId, good: GOOD_IDS[0], fromRegionId, toKontorId, lane: [] },
+    gross,
+  );
+  return { toll, blocked };
+}
+
+/**
+ * The embargoes currently in force: the Sound's `embargoes`, but only while the
+ * realm that set them still holds the strait (`embargoBy` matches the holder). A
+ * conqueror inherits an empty slate. Pure.
+ */
+export function activeEmbargoes(state: GameState): number[] {
+  const s = state.sound;
+  if (!s || s.embargoes.length === 0) return [];
+  return s.embargoBy === soundHolderId(state) ? s.embargoes : [];
+}
+
+/**
+ * Set the Sound toll rate — only the strait-holder may, clamped to [0, maxRate]
+ * and rounded to whole percents. A no-op if `ownerId` does not hold the Sound. Pure.
+ */
+export function setSoundToll(state: GameState, ownerId: number, rate: number): GameState {
+  if (!state.sound || soundHolderId(state) !== ownerId) return state;
+  const clamped = Math.max(0, Math.min(SOUND.maxRate, Math.round(rate * 100) / 100));
+  if (clamped === state.sound.tollRate) return state;
+  return { ...state, sound: { ...state.sound, tollRate: clamped } };
+}
+
+/**
+ * Open or close the Sound to a rival — only the holder may. Closing (`on`) blocks
+ * that realm's Baltic→western trade until lifted. A no-op if `ownerId` does not
+ * hold the strait, or the target is the holder itself or the barbarians. Records
+ * `embargoBy` so the list falls dormant if the strait changes hands. Pure.
+ */
+export function setSoundEmbargo(state: GameState, ownerId: number, targetId: number, on: boolean): GameState {
+  if (!state.sound || soundHolderId(state) !== ownerId) return state;
+  if (targetId === ownerId || targetId === BARBARIAN_ID) return state;
+  const current = activeEmbargoes(state);
+  const has = current.includes(targetId);
+  if (on === has) return state;
+  const embargoes = on ? [...current, targetId] : current.filter((id) => id !== targetId);
+  return { ...state, sound: { ...state.sound, embargoes, embargoBy: ownerId } };
+}
+
 // --- the turn seam ----------------------------------------------------------
 
 /**
@@ -263,11 +366,27 @@ export function stepTrade(state: GameState): GameState {
   if (!routes || routes.length === 0) return state;
 
   const gain = new Map<number, number>();
+  const tollGain = new Map<number, number>(); // Sound-toll income, tracked apart for the log
   const nextRoutes = routes.map((route) => {
     const disrupted = routeDisrupted(state, route);
-    const income = disrupted ? 0 : routeIncome(state, route);
+    let income = disrupted ? 0 : routeIncome(state, route);
+
+    // The Øresund toll: the strait-holder skims a crossing route, or closes it.
+    const eff = income > 0 ? soundEffect(state, route, income) : { toll: 0, blocked: false, holderId: null };
+    let tollPaid = 0;
+    let soundBlocked = false;
+    if (eff.blocked) {
+      income = 0;
+      soundBlocked = true;
+    } else if (eff.toll > 0 && eff.holderId !== null) {
+      tollPaid = eff.toll;
+      income = round1(income - eff.toll);
+      gain.set(eff.holderId, round1((gain.get(eff.holderId) ?? 0) + eff.toll));
+      tollGain.set(eff.holderId, round1((tollGain.get(eff.holderId) ?? 0) + eff.toll));
+    }
+
     if (income > 0) gain.set(route.ownerId, round1((gain.get(route.ownerId) ?? 0) + income));
-    return { ...route, lastIncome: income, disrupted };
+    return { ...route, lastIncome: income, disrupted: disrupted || soundBlocked, tollPaid, soundBlocked };
   });
 
   const nations =
@@ -278,12 +397,15 @@ export function stepTrade(state: GameState): GameState {
           return g ? { ...n, stocks: { ...n.stocks, gold: round1(n.stocks.gold + g) } } : n;
         });
 
-  const playerGain = gain.get(PLAYER_ID);
-  const log = playerGain
-    ? [...state.log, `Trade routes carried +${playerGain}g to the Kontore.`].slice(-50)
-    : state.log;
+  // Log the player's take: route income (minus any toll they paid) and, separately,
+  // any Sound toll they gathered as strait-holder — the reward for holding Zealand.
+  const log = [...state.log];
+  const playerToll = tollGain.get(PLAYER_ID) ?? 0;
+  const playerGain = round1((gain.get(PLAYER_ID) ?? 0) - playerToll); // route income only
+  if (playerGain > 0) log.push(`Trade routes carried +${playerGain}g to the Kontore.`);
+  if (playerToll > 0) log.push(`The Øresund Sound toll gathered +${playerToll}g from passing trade.`);
 
-  return { ...state, routes: nextRoutes, nations, log };
+  return { ...state, routes: nextRoutes, nations, log: log.slice(-50) };
 }
 
 // --- setup ------------------------------------------------------------------

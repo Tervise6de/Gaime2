@@ -67,12 +67,13 @@ import {
   totalUpkeep,
   unitCost,
 } from "@/systems/military";
-import { getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, nationPower, hasTrade, tradeIncome, opinionReasons, foreignRelations, casusBelli, CASUS_BELLI, TRIBUTE_DEMAND } from "@/systems/diplomacy";
+import { getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, nationPower, hasTrade, tradeIncome, opinionReasons, foreignRelations, casusBelli, CASUS_BELLI, TRIBUTE_DEMAND, atWar } from "@/systems/diplomacy";
 import { nationScore, victoryProgress, victoryRaces, endGameSummary } from "@/systems/victory";
 import { GOODS, type GoodId } from "@/data/goods";
 import { EPOCH_EVENTS } from "@/data/epochEvents";
 import { KONTORE, type KontorId } from "@/data/kontore";
-import { routeOptions, regionGoodOutput } from "@/systems/trade";
+import { SOUND } from "@/data/sound";
+import { routeOptions, regionGoodOutput, soundHolderId, activeEmbargoes, soundPreview } from "@/systems/trade";
 import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
 import type { TurnSummary } from "@/systems/summary";
 import { deriveAlerts, type Alert } from "@/ui/alerts";
@@ -139,6 +140,10 @@ export interface HudCallbacks {
   onOpenRoute(regionId: number, good: GoodId, kontorId: KontorId): void;
   /** Close one of your trade routes by id. */
   onCloseRoute(routeId: number): void;
+  /** Set the Øresund Sound toll rate (only while you hold the strait). */
+  onSetSoundToll(rate: number): void;
+  /** Open or close the Sound to a rival realm (embargo) — only while you hold it. */
+  onSetSoundEmbargo(targetId: number, on: boolean): void;
   onRaiseUnit(regionId: number, unit: UnitType): void;
   onBeginMove(armyId: number): void;
   onCancelMove(): void;
@@ -2557,6 +2562,9 @@ function renderRegion(
     renderOwnedRegion(container, state, region, moveArmyId, callbacks);
   } else {
     renderEnemyRegion(container, state, region, openAttack);
+    // The Øresund toll is worth knowing about even on a rival's Zealand.
+    const sound = soundSection(state, region, callbacks);
+    if (sound) container.append(sound);
   }
 }
 
@@ -2606,9 +2614,14 @@ function tradeSection(state: GameState, region: Region, callbacks: HudCallbacks)
     const k = KONTORE[rt.toKontorId];
     const row = el("div", "hud-trade-route");
     const label = el("span", "hud-trade-route-label");
-    const worth = rt.disrupted
-      ? `<span class="hud-trade-severed">severed</span>`
-      : `<span class="hud-trade-income">+${fmt(rt.lastIncome ?? 0)}g</span>`;
+    const toll = rt.tollPaid
+      ? ` <span class="hud-trade-toll" title="The Øresund Sound toll skims this Baltic→western route.">−${fmt(rt.tollPaid)}g Sound</span>`
+      : "";
+    const worth = rt.soundBlocked
+      ? `<span class="hud-trade-severed" title="The Sound holder has closed the strait to you (war or embargo).">closed at the Sound</span>`
+      : rt.disrupted
+        ? `<span class="hud-trade-severed">severed</span>`
+        : `<span class="hud-trade-income">+${fmt(rt.lastIncome ?? 0)}g</span>${toll}`;
     label.innerHTML = `${g.glyph} ${escapeHtml(g.name)} → ${escapeHtml(k.name)} ${worth}`;
     const close = btn("✕", "hud-trade-close", () => callbacks.onCloseRoute(rt.id));
     close.title = `Close this ${g.name} route to ${k.name}.`;
@@ -2631,13 +2644,21 @@ function tradeSection(state: GameState, region: Region, callbacks: HudCallbacks)
         for (const o of opts) {
           const g = GOODS[o.good];
           const k = KONTORE[o.toKontorId];
+          // Net the Øresund toll into the preview so the shown gold is the gold you keep.
+          const sp = soundPreview(state, PLAYER_ID, region.id, o.toKontorId, o.income);
+          const net = round1(o.income - sp.toll);
           const b = btn("", "hud-trade-open-btn", () => callbacks.onOpenRoute(region.id, o.good, o.toKontorId));
+          const worth = sp.blocked
+            ? `<span class="hud-trade-severed">Sound shut</span>`
+            : `<span class="hud-trade-open-inc">+${fmt(net)}g${sp.toll > 0 ? ` <span class="hud-trade-toll">−${fmt(sp.toll)}g Sound</span>` : ""}</span>`;
           b.innerHTML =
-            `<span class="hud-trade-open-name">${g.glyph} ${escapeHtml(g.name)} → ${escapeHtml(k.name)}</span>` +
-            `<span class="hud-trade-open-inc">+${fmt(o.income)}g</span>`;
-          b.title =
-            `Ship ${g.name} to ${k.name} — about ${o.hops} stop${o.hops === 1 ? "" : "s"} away, ` +
-            `paying ~${fmt(o.income)} gold a turn while the road stays open (a war astride the lane severs it).`;
+            `<span class="hud-trade-open-name">${g.glyph} ${escapeHtml(g.name)} → ${escapeHtml(k.name)}</span>${worth}`;
+          b.title = sp.blocked
+            ? `The Sound holder has shut the strait to you — this ${g.name} route to ${k.name} would earn nothing until the Sound reopens.`
+            : `Ship ${g.name} to ${k.name} — about ${o.hops} stop${o.hops === 1 ? "" : "s"} away, ` +
+              `paying ~${fmt(net)} gold a turn you keep` +
+              (sp.toll > 0 ? ` (after a ${fmt(sp.toll)}g Øresund toll)` : "") +
+              ` while the road stays open (a war astride the lane severs it).`;
           menu.append(b);
         }
         wrap.append(menu);
@@ -2649,6 +2670,95 @@ function tradeSection(state: GameState, region: Region, callbacks: HudCallbacks)
         wrap.append(none);
       }
     }
+  }
+  return wrap;
+}
+
+/**
+ * The Øresund Sound toll panel — shown only on the strait region (Zealand). If the
+ * player holds it: the toll gathered, a rate lever (Free…High), and per-rival
+ * embargo toggles (close the Sound to a realm; war closes it automatically). If a
+ * rival holds it: who commands the strait, the toll on your Baltic→western trade,
+ * and whether it is shut to you. Reads/writes only through callbacks + the sim.
+ */
+function soundSection(state: GameState, region: Region, callbacks: HudCallbacks): HTMLElement | null {
+  if (!state.sound || region.id !== state.sound.regionId) return null;
+  const wrap = el("div", "hud-region-trade hud-sound");
+  wrap.append(regionSubhead("The Øresund Sound"));
+  const holderId = soundHolderId(state);
+  const rate = state.sound.tollRate;
+  const pct = (r: number) => `${Math.round(r * 100)}%`;
+
+  // A rival (or nobody) holds the strait: an information + incitement block.
+  if (holderId !== PLAYER_ID) {
+    const info = el("p", "hud-hint");
+    if (holderId === null) {
+      info.innerHTML = "The strait lies open — no realm holds Zealand to levy the toll. <b>Take it</b> to tax the Baltic's trade to the west.";
+    } else {
+      const holder = state.nations.find((n) => n.id === holderId);
+      const closed = atWar(state, PLAYER_ID, holderId) || activeEmbargoes(state).includes(PLAYER_ID);
+      info.innerHTML =
+        `<b>${escapeHtml(holder?.name ?? "A rival")}</b> commands the Øresund and skims <b>${pct(rate)}</b> of every ` +
+        `Baltic cargo bound for London or Bruges. ` +
+        (closed ? "<span class=\"hud-trade-severed\">The Sound is shut to your ships.</span> " : "") +
+        "Seize Zealand to command the strait yourself.";
+    }
+    wrap.append(info);
+    return wrap;
+  }
+
+  // The player holds the strait: the control panel.
+  const gathered = (state.routes ?? []).reduce((s, r) => s + (r.tollPaid ?? 0), 0);
+  const intro = el("p", "hud-hint");
+  intro.innerHTML =
+    "You command the strait. Every Baltic cargo bound for the western markets (London, Bruges) pays your toll — " +
+    "and you may shut the Sound to a rival entirely." +
+    (gathered > 0 ? ` <span class="hud-trade-income">Gathered last turn: +${fmt(gathered)}g.</span>` : "");
+  wrap.append(intro);
+
+  // Toll-rate lever.
+  const rateRow = el("div", "hud-sound-rates");
+  const label = el("span", "hud-sound-label");
+  label.textContent = "Toll rate";
+  rateRow.append(label);
+  const presets: { name: string; rate: number }[] = [
+    { name: "Free", rate: 0 },
+    { name: "Low", rate: 0.15 },
+    { name: "Standard", rate: 0.25 },
+    { name: "High", rate: SOUND.maxRate },
+  ];
+  for (const p of presets) {
+    const on = Math.abs(p.rate - rate) < 0.001;
+    const b = btn(`${p.name} ${pct(p.rate)}`, "hud-sound-rate" + (on ? " on" : ""), () => callbacks.onSetSoundToll(p.rate));
+    b.title = `Set the Sound toll to ${pct(p.rate)} of a crossing route's income.`;
+    if (on) b.setAttribute("aria-pressed", "true");
+    rateRow.append(b);
+  }
+  wrap.append(rateRow);
+
+  // Embargo toggles — close the strait to a chosen rival (war closes it anyway).
+  const rivals = state.nations.filter((n) => !n.isPlayer && !n.isBarbarian && n.alive);
+  if (rivals.length) {
+    const embRow = el("div", "hud-sound-embargoes");
+    const eLabel = el("span", "hud-sound-label");
+    eLabel.textContent = "Close to";
+    embRow.append(eLabel);
+    const embargoed = activeEmbargoes(state);
+    for (const n of rivals) {
+      const war = atWar(state, PLAYER_ID, n.id);
+      const on = war || embargoed.includes(n.id);
+      const b = btn(escapeHtml(n.name), "hud-embargo-chip" + (on ? " on" : ""), () => {
+        if (!war) callbacks.onSetSoundEmbargo(n.id, !embargoed.includes(n.id));
+      });
+      b.title = war
+        ? `${n.name} is at war with you — the Sound is already shut to them.`
+        : on
+          ? `The Sound is closed to ${n.name}. Click to reopen it.`
+          : `Close the Sound to ${n.name} — their Baltic trade to the west stops cold (a hostile act).`;
+      if (war) b.setAttribute("aria-disabled", "true");
+      embRow.append(b);
+    }
+    wrap.append(embRow);
   }
   return wrap;
 }
@@ -2838,6 +2948,9 @@ function renderOwnedRegion(
 
   // Trade: exported goods (icon chips), standing routes and openable routes.
   left.append(tradeSection(state, region, callbacks));
+  // The Øresund Sound toll panel — only on the strait region (Zealand).
+  const sound = soundSection(state, region, callbacks);
+  if (sound) left.append(sound);
 
   // Construction — the main event: current build, queue, and the build grid.
   right.append(renderBuildSection(region, playerNation(state).research.done, callbacks));

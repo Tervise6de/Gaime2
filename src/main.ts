@@ -22,7 +22,7 @@ import {
   rejectOffer,
 } from "@/systems/diplomacy";
 import { resolveChoice } from "@/systems/events";
-import { createRoute, closeRoute } from "@/systems/trade";
+import { createRoute, closeRoute, setSoundToll, setSoundEmbargo } from "@/systems/trade";
 import { saveToLocal, loadFromLocal, hasLocalSave, clearLocalSave, serializeGame, deserializeGame } from "@/systems/save";
 import { summarizeTurn, type TurnSummary } from "@/systems/summary";
 import { PLAYER_ID, BARBARIAN_ID, type GameState } from "@/systems/state";
@@ -156,6 +156,15 @@ function main(): void {
     },
     onCloseRoute(routeId) {
       state = closeRoute(state, routeId, PLAYER_ID);
+      commit();
+    },
+    onSetSoundToll(rate) {
+      state = setSoundToll(state, PLAYER_ID, rate);
+      commit();
+    },
+    onSetSoundEmbargo(targetId, on) {
+      state = setSoundEmbargo(state, PLAYER_ID, targetId, on);
+      play("build");
       commit();
     },
     onRaiseUnit(regionId, unit) {

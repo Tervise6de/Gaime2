@@ -350,6 +350,31 @@ export interface TradeRoute {
   lastIncome?: number;
   /** Set when war on the lane or at the host severed the route last turn (paid 0). */
   disrupted?: boolean;
+  /** Gold skimmed by the Øresund Sound toll last turn (already netted out of lastIncome). */
+  tollPaid?: number;
+  /** Set when the Sound holder closed the strait to this route's owner (war/embargo) — paid 0. */
+  soundBlocked?: boolean;
+}
+
+/**
+ * The Øresund Sound toll's live state (data/sound.ts) — present only on the Hansa
+ * board. The holder of `regionId` skims `tollRate` of every Baltic→western route
+ * and may `embargoes`-close the strait to named rivals. Optional (absent on
+ * procedural maps and legacy saves).
+ */
+export interface SoundState {
+  /** Host region (Zealand) whose holder levies the toll. */
+  regionId: number;
+  /** Fraction of a crossing route's income skimmed (0..SOUND.maxRate). */
+  tollRate: number;
+  /** Nation ids the Sound holder has closed the strait to (their crossing trade pays 0). */
+  embargoes: number[];
+  /**
+   * The nation that set the current `embargoes`. If the strait is seized by another
+   * realm, `embargoBy` no longer matches the holder and the embargoes fall dormant
+   * (a conqueror doesn't inherit the last holder's grudges). The toll rate persists.
+   */
+  embargoBy?: number;
 }
 
 /**
@@ -538,6 +563,11 @@ export interface GameState {
    * Optional so legacy saves load (back-filled to [] on deserialize).
    */
   kontore?: KontorState[];
+  /**
+   * The Øresund Sound toll (systems/trade.ts) — the chokepoint the strait-holder
+   * taxes/closes. Seeded on the Hansa map at game start; absent elsewhere.
+   */
+  sound?: SoundState;
   /**
    * The rolled timeline of historical epoch events still to fire (systems/epochs.ts).
    * Set once at game start; entries are removed as they fire. Optional so legacy
