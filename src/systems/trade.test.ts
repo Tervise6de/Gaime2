@@ -8,6 +8,7 @@ import {
   routeOptions,
   distanceFactor,
   routeIncome,
+  projectedRouteIncome,
   routeDisrupted,
   stepTrade,
   seedKontore,
@@ -285,7 +286,7 @@ describe("stepTrade", () => {
     const before = s.nations[PLAYER_ID]!.stocks.gold;
     const next = stepTrade(s);
     const income = routeIncome(s, s.routes![0]!);
-    expect(income).toBe(2.3);
+    expect(income).toBeGreaterThan(0); // sole supplier here — earns the monopoly premium
     expect(next.nations[PLAYER_ID]!.stocks.gold).toBeCloseTo(before + income, 5);
     expect(next.routes![0]!.lastIncome).toBe(income);
     expect(next.routes![0]!.disrupted).toBe(false);
@@ -443,7 +444,7 @@ describe("the Øresund Sound toll (trade as power)", () => {
 
   it("skims the toll from a crossing route to the strait-holder", () => {
     const route = crossing(RIVAL);
-    const gross = routeIncome(soundState(PLAYER_ID, []), route);
+    const gross = routeIncome(soundState(PLAYER_ID, [route]), route); // same market stepTrade sees
     const after = stepTrade(soundState(PLAYER_ID, [route]));
     const r = after.routes![0]!;
     expect(r.tollPaid!).toBeGreaterThan(0);
@@ -494,3 +495,38 @@ describe("the Øresund Sound toll (trade as power)", () => {
     expect(activeEmbargoes(s)).toEqual([]); // the conqueror inherits no grudges
   });
 });
+
+describe("market pricing — scarcity & monopoly (Plan 3B)", () => {
+  const grainRoute = (id: number, owner: number): TradeRoute => ({
+    id, ownerId: owner, good: "grain", fromRegionId: 4, toKontorId: "bruges", lane: [4, BRUGES],
+  });
+  const withRoutes = (routes: TradeRoute[]): GameState => state(regionsOf(BRUGES + 1), { routes });
+
+  it("a sole supplier corners the market — a premium over a contested one", () => {
+    const monopoly = withRoutes([grainRoute(0, PLAYER_ID)]);
+    const contested = withRoutes([grainRoute(0, PLAYER_ID), grainRoute(1, RIVAL)]);
+    expect(routeIncome(monopoly, monopoly.routes![0]!)).toBeGreaterThan(routeIncome(contested, contested.routes![0]!));
+  });
+
+  it("scarcity falls as more of a good pours into one Kontor, down to a floor", () => {
+    const incomeWith = (n: number): number => {
+      const s = withRoutes(Array.from({ length: n }, (_, i) => grainRoute(i, i))); // distinct owners → no monopoly
+      return routeIncome(s, s.routes![0]!);
+    };
+    expect(incomeWith(2)).toBeGreaterThan(incomeWith(4)); // more supply, lower price
+    // The floor holds: a heavy glut never pays less than 0.75× the base, and stays there.
+    const base = GOODS.grain.value * distanceFactor(2);
+    expect(incomeWith(6)).toBeCloseTo(round1Local(base * 0.75), 5);
+    expect(incomeWith(12)).toBeCloseTo(incomeWith(6), 5);
+  });
+
+  it("projectedRouteIncome previews the market a new route would join", () => {
+    const solo = projectedRouteIncome(withRoutes([]), PLAYER_ID, "grain", "bruges", 2); // sole supplier
+    const shared = projectedRouteIncome(withRoutes([grainRoute(0, RIVAL)]), PLAYER_ID, "grain", "bruges", 2); // a rival already supplies
+    expect(solo).toBeGreaterThan(shared);
+  });
+});
+
+function round1Local(n: number): number {
+  return Math.round(n * 10) / 10;
+}

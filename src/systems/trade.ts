@@ -194,7 +194,7 @@ export function routeOptions(state: GameState, fromRegionId: number, ownerId: nu
       if (lane.length === 0) continue;
       const hostOwner = state.regions[KONTORE[toKontorId].regionId]?.ownerId ?? null;
       if (hostOwner !== null && hostOwner !== ownerId && atWar(state, ownerId, hostOwner)) continue;
-      out.push({ good, toKontorId, income: round1(GOODS[good].value * distanceFactor(lane.length)), hops: lane.length });
+      out.push({ good, toKontorId, income: projectedRouteIncome(state, ownerId, good, toKontorId, lane.length), hops: lane.length });
     }
   }
   out.sort((a, b) => b.income - a.income || a.good.localeCompare(b.good) || a.toKontorId.localeCompare(b.toKontorId));
@@ -212,16 +212,83 @@ export function distanceFactor(laneLength: number): number {
   return Math.min(TRADE_DIST_CAP, 1 + TRADE_DIST_COEF * Math.max(0, laneLength - 1));
 }
 
-// TODO(merchant layer): scarcity scales a good's price when supply into a demanding
-// Kontor is thin (a glut pays less). Stubbed at 1 until the Kontor demand model lands.
-function scarcityFactor(_state: GameState, _route: TradeRoute): number {
-  return 1;
+// Market pricing (docs/hansa-alignment-plan.md, Plan 3B) — a gentle ±25% swing so
+// *which* good you ship into *which* Kontor is a real choice, not a fixed payout.
+const SCARCITY_STEP = 0.12; // each extra supplier of the same good→Kontor shaves the price
+const SCARCITY_FLOOR = 0.75; // a glutted market still pays three-quarters
+const MONOPOLY_PREMIUM = 1.25; // cornering a good's trade into a Kontor pays a quarter more
+
+/** The market for a good into a Kontor: how many routes feed it, and the distinct realms supplying it. */
+function marketAt(state: GameState, good: GoodId, kontor: KontorId): { routes: number; owners: Set<number> } {
+  const owners = new Set<number>();
+  let routes = 0;
+  for (const r of state.routes ?? []) {
+    if (r.good === good && r.toKontorId === kontor) {
+      routes += 1;
+      owners.add(r.ownerId);
+    }
+  }
+  return { routes, owners };
 }
 
-// TODO(merchant layer): a monopoly premium when one realm holds all routes of a good
-// into a Kontor (privileges/monopolies, hansa-plan §6). Stubbed at 1 for this slice.
-function monopolyFactor(_state: GameState, _route: TradeRoute): number {
-  return 1;
+/** The scarcity multiplier for a market with `supply` routes feeding it (1 at one route, falling to the floor). */
+function scarcityFrom(supply: number): number {
+  return Math.max(SCARCITY_FLOOR, 1 - SCARCITY_STEP * Math.max(0, supply - 1));
+}
+
+/**
+ * Scarcity: a good gluts as more of it pours into the same Kontor — each route
+ * beyond the first shaves the price, down to a gentle floor. Rewards spreading
+ * goods across markets over dogpiling one. Pure.
+ */
+function scarcityFactor(state: GameState, route: TradeRoute): number {
+  return scarcityFrom(marketAt(state, route.good, route.toKontorId).routes);
+}
+
+/**
+ * Monopoly: cornering a good's trade into a Kontor pays a premium. Sole supplier
+ * — no other realm ships this good there — earns the full premium. Pure.
+ */
+function monopolyFactor(state: GameState, route: TradeRoute): number {
+  const { owners } = marketAt(state, route.good, route.toKontorId);
+  return owners.size === 1 && owners.has(route.ownerId) ? MONOPOLY_PREMIUM : 1;
+}
+
+/**
+ * A one-word read on the market a prospective route would join, for the UI:
+ * "monopoly" if `ownerId` would be the sole supplier of the good into the Kontor
+ * (the premium), "glut" if it is already crowded (the scarcity penalty bites), or
+ * "normal" in between. Pure.
+ */
+export function marketOutlook(
+  state: GameState,
+  ownerId: number,
+  good: GoodId,
+  kontor: KontorId,
+): "monopoly" | "glut" | "normal" {
+  const { routes, owners } = marketAt(state, good, kontor);
+  if (owners.size === 0 || (owners.size === 1 && owners.has(ownerId))) return "monopoly";
+  return routes >= 2 ? "glut" : "normal";
+}
+
+/**
+ * The gold a route `ownerId` would earn if founded now: base income times the
+ * market it would *join* (this route added to supply, and its owner counted as a
+ * supplier). Lets the open-route UI show the gold you'd actually keep, not a
+ * pre-market sticker price. Pure.
+ */
+export function projectedRouteIncome(
+  state: GameState,
+  ownerId: number,
+  good: GoodId,
+  kontor: KontorId,
+  laneLength: number,
+): number {
+  const { routes, owners } = marketAt(state, good, kontor);
+  const scar = scarcityFrom(routes + 1); // this route joins the market
+  const sole = owners.size === 0 || (owners.size === 1 && owners.has(ownerId));
+  const mono = sole ? MONOPOLY_PREMIUM : 1;
+  return round1(GOODS[good].value * distanceFactor(laneLength) * scar * mono);
 }
 
 /**

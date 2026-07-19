@@ -73,7 +73,7 @@ import { GOODS, type GoodId } from "@/data/goods";
 import { EPOCH_EVENTS } from "@/data/epochEvents";
 import { KONTORE, type KontorId } from "@/data/kontore";
 import { SOUND } from "@/data/sound";
-import { routeOptions, regionGoodOutput, soundHolderId, activeEmbargoes, soundPreview } from "@/systems/trade";
+import { routeOptions, regionGoodOutput, soundHolderId, activeEmbargoes, soundPreview, marketOutlook } from "@/systems/trade";
 import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
 import type { TurnSummary } from "@/systems/summary";
 import { deriveAlerts, type Alert } from "@/ui/alerts";
@@ -2647,12 +2647,19 @@ function tradeSection(state: GameState, region: Region, callbacks: HudCallbacks)
           // Net the Øresund toll into the preview so the shown gold is the gold you keep.
           const sp = soundPreview(state, PLAYER_ID, region.id, o.toKontorId, o.income);
           const net = round1(o.income - sp.toll);
+          const outlook = marketOutlook(state, PLAYER_ID, o.good, o.toKontorId);
+          const tag =
+            outlook === "monopoly"
+              ? ` <span class="hud-trade-corner" title="You would be the sole supplier of ${escapeHtml(g.name)} to ${escapeHtml(k.name)} — a monopoly premium.">★ corner</span>`
+              : outlook === "glut"
+                ? ` <span class="hud-trade-glut" title="${escapeHtml(k.name)} is already well supplied with ${escapeHtml(g.name)} — a glut pays less.">glut</span>`
+                : "";
           const b = btn("", "hud-trade-open-btn", () => callbacks.onOpenRoute(region.id, o.good, o.toKontorId));
           const worth = sp.blocked
             ? `<span class="hud-trade-severed">Sound shut</span>`
             : `<span class="hud-trade-open-inc">+${fmt(net)}g${sp.toll > 0 ? ` <span class="hud-trade-toll">−${fmt(sp.toll)}g Sound</span>` : ""}</span>`;
           b.innerHTML =
-            `<span class="hud-trade-open-name">${g.glyph} ${escapeHtml(g.name)} → ${escapeHtml(k.name)}</span>${worth}`;
+            `<span class="hud-trade-open-name">${g.glyph} ${escapeHtml(g.name)} → ${escapeHtml(k.name)}${tag}</span>${worth}`;
           b.title = sp.blocked
             ? `The Sound holder has shut the strait to you — this ${g.name} route to ${k.name} would earn nothing until the Sound reopens.`
             : `Ship ${g.name} to ${k.name} — about ${o.hops} stop${o.hops === 1 ? "" : "s"} away, ` +

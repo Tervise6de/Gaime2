@@ -1542,6 +1542,25 @@ body {
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
+/* Market outlook tags on the open-route options. */
+.hud-trade-corner,
+.hud-trade-glut {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.hud-trade-corner {
+  color: #12100b;
+  background: #e8b24a; /* gold — a monopoly premium to be had */
+}
+.hud-trade-glut {
+  color: #d3b48c;
+  background: rgba(150, 120, 70, 0.22); /* muted — the market is crowded */
+}
 
 /* The Øresund Sound toll panel (the strait region only). */
 .hud-sound {

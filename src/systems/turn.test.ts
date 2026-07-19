@@ -148,9 +148,9 @@ describe("trade layer (goods → Kontore)", () => {
     const route: TradeRoute = {
       id: 0, ownerId: PLAYER_ID, good: "iron", fromRegionId: pRegion.id, toKontorId: "london", lane: [pRegion.id, 0],
     };
-    const income = routeIncome(g, route);
-    expect(income).toBeGreaterThan(0);
     const withRoute: GameState = { ...g, routes: [route], nextRouteId: 1 };
+    const income = routeIncome(withRoute, route); // market includes the route (sole-supplier premium)
+    expect(income).toBeGreaterThan(0);
     // Same seed/flow either way; the only difference is the injected route, so the
     // gold delta after one turn is exactly the route income.
     const base = resolveTurn(g);
