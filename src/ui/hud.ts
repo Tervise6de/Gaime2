@@ -667,9 +667,14 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   // Bottom-left column: the Map panel (minimap + filter) sits above the actions
   // cluster, so End turn stays in the corner and the two never overlap however
   // many advisor chips the actions cluster grows.
+  // Actions cluster stays bottom-left; the Map panel (minimap + lens) moves to
+  // its own bottom-right corner, and the events log centres along the bottom
+  // (see the CSS) — so the middle of the board is clear and the minimap sits
+  // where the eye expects it (CK3/Civ-style).
   const bottomLeft = el("div", "hud-bottomleft");
-  bottomLeft.append(mapPanel, actions);
+  bottomLeft.append(actions);
   root.append(bottomLeft);
+  root.append(mapPanel);
 
   function setLens(id: LensId): void {
     activeLens = id;

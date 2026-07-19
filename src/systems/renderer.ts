@@ -1374,10 +1374,15 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
    */
   function frameMargins(): { x: number; top: number; bottom: number } {
     const f = ISLAND_FRAME[archetype];
-    // Context maps inset the play area so the surrounding outer-world land is
-    // visible as a framing border around it.
-    const mx = (f.marginX + outerMargin) * canvas.clientWidth;
-    const my = (f.marginY + outerMargin) * canvas.clientHeight;
+    // A context map frames itself with real outer-world land (which bleeds past
+    // the play area), so it needs only a thin inset — NOT the procedural island's
+    // big sea border. Using just `outerMargin` lets the playable land fill the
+    // canvas (the fix for the map reading small/cramped). A plain island keeps
+    // the archetype's generous framing.
+    const baseX = outerMargin > 0 ? outerMargin : f.marginX;
+    const baseY = outerMargin > 0 ? outerMargin : f.marginY;
+    const mx = baseX * canvas.clientWidth;
+    const my = baseY * canvas.clientHeight;
     return { x: mx + 8, top: my * 0.78 + 6, bottom: my * 1.22 + 30 };
   }
 
@@ -1656,34 +1661,47 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
    * own bottom-right corner (it belongs to an army, not the region).
    */
   function drawMarkers(region: Region, p: Point, capitals: Set<number>): void {
+    // The population chip, name and status ride the same zoom reveal on the dense
+    // province map, so a zoomed-out view stays clean (realm colours + names +
+    // capital crests + armies) and the detail appears as you zoom in.
+    const denseMap = (state?.regions.length ?? 0) > 30;
+    const detailA = !denseMap || region.id === selected ? 1 : regionLabelAlpha();
+    const showChip = detailA > 0.02;
+
     // Population count in a soft dark chip (same family as the icon chips), so
     // it reads identically over any terrain fill or political tint. Shown as
     // people ("4.3k"), not sim units — the world reads as populated.
-    const popText = popCompact(region.population);
-    context.font = "600 12px system-ui, sans-serif";
-    context.textAlign = "center";
-    context.textBaseline = "middle";
-    const popW = Math.max(19, context.measureText(popText).width + 11);
-    context.beginPath();
-    if (typeof context.roundRect === "function") {
-      context.roundRect(p.x - popW / 2, p.y - 9.5, popW, 19, 9.5);
-    } else {
-      context.arc(p.x, p.y, 9.5, 0, Math.PI * 2); // ancient-canvas fallback: a disc
+    let popW = 0;
+    if (showChip) {
+      const popText = popCompact(region.population);
+      context.font = "600 12px system-ui, sans-serif";
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      popW = Math.max(19, context.measureText(popText).width + 11);
+      context.globalAlpha = detailA;
+      context.beginPath();
+      if (typeof context.roundRect === "function") {
+        context.roundRect(p.x - popW / 2, p.y - 9.5, popW, 19, 9.5);
+      } else {
+        context.arc(p.x, p.y, 9.5, 0, Math.PI * 2); // ancient-canvas fallback: a disc
+      }
+      context.fillStyle = "rgba(13, 15, 20, 0.6)";
+      context.fill();
+      context.fillStyle = "#f2f5fa";
+      context.fillText(popText, p.x, p.y + 0.5);
+      context.globalAlpha = 1;
+      markerHits.push({
+        x: p.x,
+        y: p.y,
+        r: Math.max(11, popW / 2),
+        text: `Population ${popDisplay(region.population)} of ${popDisplay(regionCapacity(region))} — grows with food surplus, works the land.`,
+      });
     }
-    context.fillStyle = "rgba(13, 15, 20, 0.6)";
-    context.fill();
-    context.fillStyle = "#f2f5fa";
-    context.fillText(popText, p.x, p.y + 0.5);
-    markerHits.push({
-      x: p.x,
-      y: p.y,
-      r: Math.max(11, popW / 2),
-      text: `Population ${popDisplay(region.population)} of ${popDisplay(regionCapacity(region))} — grows with food surplus, works the land.`,
-    });
 
-    // Capital crest docked left of the population chip — the seat reads first.
+    // Capital crest — always shown so the seats read at any zoom. Docks left of
+    // the population chip when it's up, else sits on the site itself.
     if (capitals.has(region.id)) {
-      const cx = p.x - popW / 2 - 13;
+      const cx = showChip ? p.x - popW / 2 - 13 : p.x;
       const cy = p.y;
       const owner = region.ownerId;
       const ownerNation = state?.nations.find((n) => n.id === owner);
@@ -1709,13 +1727,11 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       }
     }
 
-    // On the dense province map (the Hanseatic World's 74 regions) the small
-    // labels would pile up at fit zoom, so region/city names fade in as you zoom
-    // (drawNameplates fades the realm names out over the same window). The
-    // selected region always reads; sparse maps always label everything.
-    const denseMap = (state?.regions.length ?? 0) > 30;
-    const nameAlpha = !denseMap || region.id === selected ? 1 : regionLabelAlpha();
-    const showDetail = nameAlpha > 0.02;
+    // Region/city name fades in with the same zoom reveal as the chip above
+    // (drawNameplates fades the realm names out over the same window), so a
+    // zoomed-out view reads by realm and a zoomed-in view by province.
+    const nameAlpha = detailA;
+    const showDetail = showChip;
 
     // Region name below, with a dark halo so it reads on bright terrain too.
     // A touch of tracking gives the labels a cartographic voice where the

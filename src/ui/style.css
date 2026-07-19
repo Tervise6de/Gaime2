@@ -784,8 +784,12 @@ body {
   pointer-events: auto;
 }
 
-/* --- Map panel: a CK3-style minimap + map-mode dropdown --------------------- */
+/* --- Map panel: a CK3-style minimap + map-mode dropdown (bottom-right) ------- */
 .hud-mappanel {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 216px;
   padding: 9px 10px 10px;
   display: flex;
   flex-direction: column;
@@ -1131,15 +1135,17 @@ body {
 /* Events & log: a roomy panel bottom-right — the latest lines always legible,
    expanding to the full scrollback on click. */
 .hud-log {
-  right: 12px;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
   bottom: 12px;
-  width: 352px;
+  width: 380px;
   max-width: calc(100vw - 24px);
   padding: 11px 13px;
 }
 
 .hud-log.open {
-  width: 404px;
+  width: 440px;
 }
 
 .hud-log-head {
