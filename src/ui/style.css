@@ -2819,25 +2819,28 @@ body {
   opacity: 0.7;
 }
 
-/* --- Region screen (Capital button / inspector ⛶) --------------------------- */
-/* The inspector's content, promoted to a wide modal: two balanced columns of
-   the same cards, each card kept whole so nothing tears across the fold. */
+/* --- Region screen (the region "big picture", opened by a map click) -------- */
+/* Buildings-centric and sized to one screen: a status header spanning the top,
+   then two columns — the settlement's economy at a glance (left) and
+   Construction (right, the main event). The modal itself never scrolls; the
+   build grid is the one tall element, so it owns any overflow inside its column. */
 .hud-capital-panel {
-  width: min(760px, 94vw);
-  max-height: 86vh;
+  width: min(940px, 95vw);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .hud-capital-body {
-  column-count: 2;
-  column-gap: 30px;
-}
-
-.hud-capital-body > * {
-  break-inside: avoid;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .hud-capital-body .hud-region-title {
-  font-size: 17px;
+  font-size: 18px;
 }
 
 .hud-capital-body .hud-region-meta {
@@ -2845,9 +2848,99 @@ body {
   line-height: 1.5;
 }
 
+.hud-capital-cols {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) 1fr;
+  gap: 22px;
+  min-height: 0;
+  flex: 1;
+}
+
+.hud-capital-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+/* The construction column fills the height; its build grid is the only scroller,
+   contained here rather than scrolling the whole modal. */
+.hud-capital-right .hud-build {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.hud-capital-right .hud-build-menu {
+  overflow-y: auto;
+  align-content: start;
+  /* Denser auto-fill grid so a building-rich province still fits without the
+     column scrolling — buildings are the focus, so show as many as possible. */
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
+}
+
+.hud-capital-right .hud-build-btn {
+  padding: 6px 8px;
+}
+
+/* Income as icon chips: icon + per-turn value, tinted red on a shortfall. */
+.hud-income-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hud-income-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--panel-border);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.hud-income-chip .hud-income-v {
+  color: #6fae7f;
+}
+
+.hud-income-chip.negative .hud-income-v {
+  color: #d9776b;
+}
+
+/* Muster picker in the Armies overview (raising moved here from the region panel). */
+.hud-muster {
+  margin: 4px 0 12px;
+}
+
+.hud-muster-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hud-muster-region {
+  flex: 1;
+  padding: 5px 8px;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.hud-muster-menu {
+  margin-top: 8px;
+}
+
 @media (max-width: 760px) {
-  .hud-capital-body {
-    column-count: 1;
+  .hud-capital-cols {
+    grid-template-columns: 1fr;
   }
 }
 

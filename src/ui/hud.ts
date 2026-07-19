@@ -12,7 +12,7 @@
  * highlighting via the parent.
  */
 
-import { BUILDINGS, BUILDING_IDS, BUILD_RATE, buildingFocusOk, buildingResourceOk, focusCapstone, type BuildingId } from "@/data/buildings";
+import { BUILDINGS, BUILDING_IDS, BUILD_RATE, buildingFocusOk, buildingResourceOk, type BuildingId } from "@/data/buildings";
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
 import { TERRAIN, TERRAIN_IDS } from "@/data/terrain";
 import { regionProduction, nationalProduction, nationYieldMult, yieldFactors, singleModifierMult, unrestPenalty } from "@/systems/economy";
@@ -34,7 +34,7 @@ import {
 } from "@/ui/settings";
 import type { BattleReport } from "@/systems/combat";
 import { LENSES, lensGradient, type LensId } from "@/ui/lenses";
-import { FOCUSES, FOCUS_IDS, type FocusId } from "@/data/focuses";
+import { FOCUSES, type FocusId } from "@/data/focuses";
 import { cbSafe } from "@/data/palette";
 import { OCEAN } from "@/data/mapstyle";
 import { badgeArt, BRANCH_ART, crestSvg, eventVignette, MOMENT_ART, safeColor, TERRAIN_ART, TREATY_ART } from "@/data/art";
@@ -60,11 +60,7 @@ import { previewCombat, forecastCombat } from "@/systems/combat";
 import {
   armyAt,
   anyArmyAt,
-  armyMoves,
   canRaiseUnit,
-  marchEta,
-  reachableRegions,
-  inEnemyZoc,
   strategicAccess,
   totalUpkeep,
   unitCost,
@@ -85,8 +81,6 @@ import { TRAITS } from "@/data/traits";
 import { TECHS, TECH_IDS, type TechId, type TechBranch } from "@/data/techs";
 import { WONDER_GOAL, DOMINATION_FRACTION, TURN_LIMIT, MODIFIER_LABEL, MAX_ENTRENCH } from "@/systems/state";
 import {
-  COMMANDER_TRAITS,
-  COMMANDER_DISLOYAL,
   commanderAttack,
   commanderDefense,
   commanderTitle,
@@ -1627,6 +1621,9 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     if (ev.target === armiesOverlay) closeArmies();
   });
   root.append(armiesOverlay);
+  // The muster picker's chosen region, kept across re-renders (raising re-renders
+  // the overview) so it doesn't snap back to the capital after each regiment.
+  let musterRegionId: number | null = null;
 
   function renderArmies(): void {
     if (!lastState) return;
@@ -1648,8 +1645,51 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       `upkeep ${fmt(upkeep)}g/turn. Moving onto your own army merges the stacks.`;
     panel.append(summaryLine);
 
+    // Muster troops — raising a regiment, moved here from the region screen.
+    // Pick one of your regions and raise (units gate on the region's tech /
+    // strategic resource, exactly as before).
+    const ownRegions = state.regions.filter((r) => r.ownerId === PLAYER_ID);
+    if (ownRegions.length) {
+      const muster = el("div", "hud-muster");
+      const mhead = el("div", "hud-muster-head");
+      mhead.append(regionSubhead("Muster troops"));
+      const select = document.createElement("select");
+      select.className = "hud-muster-region";
+      for (const r of ownRegions) {
+        const opt = document.createElement("option");
+        opt.value = String(r.id);
+        opt.textContent = r.name;
+        select.append(opt);
+      }
+      // Remember the last-picked region; default to the capital, else the first.
+      const cap = playerNation(state).capitalRegionId;
+      const preferred =
+        musterRegionId != null && ownRegions.some((r) => r.id === musterRegionId)
+          ? musterRegionId
+          : cap != null && ownRegions.some((r) => r.id === cap)
+            ? cap
+            : ownRegions[0]!.id;
+      select.value = String(preferred);
+      musterRegionId = preferred;
+      mhead.append(select);
+      muster.append(mhead);
+      const menuWrap = el("div", "hud-muster-menu");
+      const drawMenu = (): void => {
+        menuWrap.innerHTML = "";
+        const r = state.regions[Number(select.value)];
+        if (r) menuWrap.append(raiseUnitMenu(state, r, callbacks));
+      };
+      select.addEventListener("change", () => {
+        musterRegionId = Number(select.value);
+        drawMenu();
+      });
+      drawMenu();
+      muster.append(menuWrap);
+      panel.append(muster);
+    }
+
     if (mine.length === 0) {
-      panel.append(line("No armies — open one of your regions and raise units there.", "hud-hint"));
+      panel.append(line("No armies yet — muster your first regiment above, then move it from here.", "hud-hint"));
     }
     const list = el("div", "hud-prod-list");
     for (const army of mine) {
@@ -2257,9 +2297,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       `Temples and stationed garrisons lower it further per region. ` +
       `At ${UNREST_PENALTY_START}+ a region's output suffers; at ${UNREST_REVOLT}+ it revolts.`;
 
-    // The region inspector exists only while a region is selected.
-    rightPanel.style.display = selectedRegionId === null ? "none" : "block";
-    renderRegion(regionBody, state, selectedRegionId, moveArmyId, callbacks, openAttack);
+    // The narrow right-side inspector is retired: clicking a region now opens the
+    // full-screen region view (openRegionScreen) directly, so the panel stays hidden.
+    rightPanel.style.display = "none";
+    void regionBody;
     // Keep an open attack chooser live as the roster changes (a resolved
     // strike removes that army; a capture flips the region to yours).
     if (attackOverlay.style.display !== "none" && selectedRegionId !== null) {
@@ -2507,95 +2548,6 @@ function regionSubhead(text: string): HTMLElement {
   return h;
 }
 
-/** One building's effect, compact ("+3 food · +4 cap"). */
-function buildingEffect(def: (typeof BUILDINGS)[BuildingId]): string {
-  const parts: string[] = [];
-  for (const [k, v] of Object.entries(def.yield)) if (v) parts.push(`+${v} ${k}`);
-  if (def.popCapacity) parts.push(`+${def.popCapacity} cap`);
-  if (def.unrest) parts.push(`−${def.unrest} unrest`);
-  if (def.fortification) parts.push(`+${def.fortification} fort`);
-  return parts.join(" · ") || "prestige";
-}
-
-/**
- * The collapsible Buildings tab: every building this region has raised, with
- * its effect, and the region's fortification level. Duplicates (should they
- * ever occur) collapse to a ×N count — a light stand-in for building levels.
- * Collapsed by default so the panel stays short until you want the detail.
- */
-function buildingsSection(region: Region): HTMLElement {
-  const details = document.createElement("details");
-  details.className = "hud-buildings";
-  const summary = document.createElement("summary");
-  summary.className = "hud-buildings-summary";
-  const n = region.buildings.length;
-  summary.innerHTML =
-    `${glyphHtml("hammer", "🔨")} Buildings <span class="hud-buildings-count">${n}</span>`;
-  details.append(summary);
-
-  const list = el("div", "hud-buildings-list");
-  if (n === 0) {
-    const empty = el("p", "hud-hint");
-    empty.style.margin = "0";
-    empty.textContent = "No buildings yet — queue one below.";
-    list.append(empty);
-  } else {
-    const counts = new Map<BuildingId, number>();
-    for (const b of region.buildings) counts.set(b, (counts.get(b) ?? 0) + 1);
-    for (const [id, count] of counts) {
-      const def = BUILDINGS[id];
-      const row = el("div", "hud-building-row");
-      const name = el("span", "hud-building-name");
-      name.innerHTML =
-        `${buildingIconHtml(id, "▪")}${escapeHtml(def.name)}${count > 1 ? ` ×${count}` : ""}`;
-      const eff = el("span", "hud-building-eff");
-      eff.textContent = buildingEffect(def);
-      row.append(name, eff);
-      list.append(row);
-    }
-  }
-  // Fortification is a defensive "level" the region carries — show it here too.
-  if (region.fortification > 0) {
-    const row = el("div", "hud-building-row");
-    const name = el("span", "hud-building-name");
-    name.innerHTML = `${glyphHtml("shield", "🛡")}Fortification`;
-    const eff = el("span", "hud-building-eff");
-    eff.textContent = `level ${region.fortification}`;
-    row.append(name, eff);
-    list.append(row);
-  }
-  details.append(list);
-  return details;
-}
-
-/**
- * Region focus picker — the "what is this province for?" control. A dropdown of
- * the specialisations with the current one's effect below. Owned regions only.
- */
-function focusSection(region: Region, callbacks: HudCallbacks): HTMLElement {
-  const wrap = el("div", "hud-focus");
-  const current: FocusId = region.focus ?? "balanced";
-  const sel = document.createElement("select");
-  sel.className = "hud-select hud-focus-select";
-  for (const id of FOCUS_IDS) {
-    const opt = document.createElement("option");
-    opt.value = id;
-    opt.textContent = `${FOCUSES[id].icon} ${FOCUSES[id].label}`;
-    sel.append(opt);
-  }
-  sel.value = current;
-  sel.title = "Specialise this province — a cheap identity that biases its output.";
-  sel.addEventListener("change", () => callbacks.onSetFocus(region.id, sel.value as FocusId));
-  const blurb = el("p", "hud-hint hud-focus-blurb");
-  const capstone = focusCapstone(current);
-  const cap = capstone ? BUILDINGS[capstone] : undefined;
-  blurb.textContent = cap
-    ? `${FOCUSES[current].blurb} Unlocks the ${cap.name}${cap.requiresTech ? ` (with ${cap.requiresTech.replace(/_/g, " ")})` : ""}.`
-    : FOCUSES[current].blurb;
-  wrap.append(regionSubhead("Focus"), sel, blurb);
-  return wrap;
-}
-
 /**
  * A per-resource tooltip for the region breakdown: the base explanation plus,
  * when any apply, the tech / trait / active-modifier multipliers folded into
@@ -2747,42 +2699,39 @@ function renderOwnedRegion(
     container.append(warn);
   }
 
-  // Production breakdown — each row's tooltip attributes the yield to the tech,
-  // trait and modifier multipliers folded into this region's output. Icon +
-  // name + value, so the income reads at a glance.
-  container.append(regionSubhead("Income / turn"));
-  const table = el("div", "hud-region-flows");
+  // Two columns that fit one screen: the settlement's economy at a glance on the
+  // left, and Construction — the heart of this screen — on the right. Army
+  // management (raise / move / fortify) has moved to the Armies tab and Focus to
+  // politics; this screen is now about what the town *produces* and *builds*.
+  void moveArmyId; // army controls live in the Armies overview now
+  const cols = el("div", "hud-capital-cols");
+  const left = el("div", "hud-capital-col hud-capital-left");
+  const right = el("div", "hud-capital-col hud-capital-right");
+
+  // Income — compact icon chips (icon + per-turn value), one per resource.
+  const income = el("div", "hud-income-card");
+  income.append(regionSubhead("Income / turn"));
+  const chips = el("div", "hud-income-chips");
   for (const key of RESOURCE_KEYS) {
-    const row = el("div", "hud-region-flow");
-    row.title = flowTooltip(key, player, region);
-    const k = el("span", "hud-region-flow-name");
-    k.innerHTML = `${resourceIconHtml(key, RESOURCE_META[key].icon)}${RESOURCE_META[key].label}`;
-    const v = el("span", "hud-region-flow-val");
     const value = flow[key];
-    v.textContent = `${value >= 0 ? "+" : ""}${fmt(value)}`;
-    if (value < 0) v.classList.add("negative");
-    row.append(k, v);
-    table.append(row);
+    const chip = el("span", "hud-income-chip" + (value < 0 ? " negative" : ""));
+    chip.innerHTML =
+      `${resourceIconHtml(key, RESOURCE_META[key].icon)}` +
+      `<span class="hud-income-v">${value >= 0 ? "+" : ""}${fmt(value)}</span>`;
+    chip.title = flowTooltip(key, player, region);
+    chips.append(chip);
   }
-  container.append(table);
+  income.append(chips);
+  left.append(income);
 
-  // Trade: what this province exports, its standing routes, and the routes you
-  // could open to the Kontore (the merchant layer). Owned-region panel only.
-  container.append(tradeSection(state, region, callbacks));
+  // Trade: exported goods (icon chips), standing routes and openable routes.
+  left.append(tradeSection(state, region, callbacks));
 
-  // Buildings: a collapsed-by-default tab listing what's built and each one's
-  // effect (its "level" of benefit), plus the region's fortification level.
-  container.append(buildingsSection(region));
+  // Construction — the main event: current build, queue, and the build grid.
+  right.append(renderBuildSection(region, playerNation(state).research.done, callbacks));
 
-  // Focus: what this province is *for* — a cheap specialisation biasing output.
-  container.append(focusSection(region, callbacks));
-
-  // Army in the region.
-  const army = armyAt(state, region.id, PLAYER_ID);
-  container.append(renderArmySection(state, region, army, moveArmyId, callbacks));
-
-  // Construction.
-  container.append(renderBuildSection(region, playerNation(state).research.done, callbacks));
+  cols.append(left, right);
+  container.append(cols);
 }
 
 function renderEnemyRegion(
@@ -2860,116 +2809,14 @@ function renderEnemyRegion(
   container.append(box);
 }
 
-function renderArmySection(
-  state: GameState,
-  region: Region,
-  army: Army | undefined,
-  moveArmyId: number | null,
-  callbacks: HudCallbacks,
-): HTMLElement {
-  const section = el("div", "hud-military");
-  section.append(heading("Army"));
-
-  if (army && armySize(army.units) > 0) {
-    section.append(compositionLine(army));
-    const rate = armyMoves(army.units);
-    section.append(line(`Marches ${rate} region${rate === 1 ? "" : "s"} per turn.`, "hud-hint"));
-    // Commander (M4): who leads, their martial and trait, and a loyalty warning.
-    if (army.commander) {
-      const c = army.commander;
-      const t = COMMANDER_TRAITS[c.trait];
-      const disloyal = c.loyalty <= COMMANDER_DISLOYAL;
-      section.append(
-        htmlLine(
-          `${glyphHtml("attack", "⚔")} Led by <b>${escapeHtml(commanderTitle(c))}</b> — ` +
-            `martial ${c.martial}, ${escapeHtml(t.label)}, loyalty ${c.loyalty}` +
-            (disloyal ? ' <span class="bad">(disloyal — foments unrest)</span>' : ""),
-          "hud-hint",
-        ),
-      );
-    }
-    const entrench = army.entrenchment ?? 0;
-    if (army.fortifying || entrench > 0) {
-      section.append(
-        htmlLine(
-          `${glyphHtml("shield", "🛡")} Dug in — entrenchment ${entrench}/${MAX_ENTRENCH}` +
-            (army.fortifying && entrench < MAX_ENTRENCH ? " (deepening)" : ""),
-          "hud-hint",
-        ),
-      );
-    }
-    if (inEnemyZoc(state, region.id, PLAYER_ID)) {
-      section.append(line("In an enemy zone of control — moving here ends the march.", "hud-hint"));
-    }
-    // Standing march order: where it's headed and when it arrives.
-    if (army.dest != null) {
-      const destName = state.regions[army.dest]?.name ?? "its destination";
-      const eta = marchEta(state, army);
-      section.append(
-        htmlLine(
-          `${glyphHtml("flag", "⚑")} Marching to <b>${escapeHtml(destName)}</b>` +
-            (eta ? ` — about ${eta} turn${eta === 1 ? "" : "s"} away` : "") +
-            "; it advances each End turn.",
-          "hud-hint",
-        ),
-      );
-    }
-    const moving = moveArmyId === army.id;
-    const moveBtn = document.createElement("button");
-    moveBtn.className = "hud-move-btn" + (moving ? " active" : "");
-    moveBtn.textContent = moving
-      ? "Pick a destination…"
-      : army.dest != null
-        ? "Re-route march ▸"
-        : "March ▸";
-    moveBtn.addEventListener("click", () =>
-      moving ? callbacks.onCancelMove() : callbacks.onBeginMove(army.id),
-    );
-    section.append(moveBtn);
-    if (army.dest != null && !moving) {
-      const cancelBtn = document.createElement("button");
-      cancelBtn.className = "hud-move-btn";
-      cancelBtn.textContent = "Cancel march";
-      cancelBtn.addEventListener("click", () => callbacks.onCancelMarch(army.id));
-      section.append(cancelBtn);
-    }
-    // Dig in: hold this region to entrench (forgoes the rest of the turn's moves).
-    if (!army.fortifying) {
-      const fortBtn = document.createElement("button");
-      fortBtn.className = "hud-move-btn";
-      fortBtn.textContent = "Fortify (dig in)";
-      fortBtn.disabled = army.movesLeft <= 0;
-      fortBtn.title =
-        "Hold this region to entrench — defence climbs one level per turn held (up to " +
-        `${MAX_ENTRENCH}). Moving or attacking gives it up.`;
-      fortBtn.addEventListener("click", () => callbacks.onFortifyArmy(army.id));
-      section.append(fortBtn);
-    }
-    // Appoint (or replace) the army's commander (M4).
-    if (region.ownerId === PLAYER_ID) {
-      const cmdBtn = document.createElement("button");
-      cmdBtn.className = "hud-move-btn";
-      cmdBtn.textContent = army.commander ? "Replace commander" : "Appoint commander";
-      cmdBtn.title =
-        "Put a character in command — their martial rating sharpens this army's " +
-        "attack and defence. A disloyal one foments unrest where it stands.";
-      cmdBtn.addEventListener("click", () => callbacks.onAppointCommander(army.id));
-      section.append(cmdBtn);
-    }
-    if (moving) {
-      section.append(line("Click a highlighted neighbour to move or attack.", "hud-hint"));
-      section.append(renderCombatOdds(state, army));
-    }
-    // Split off part of the stack (send a detachment to an own neighbour) or
-    // stand regiments down to cut upkeep. Only meaningful for a real stack.
-    if (region.ownerId === PLAYER_ID) section.append(renderDetachPanel(state, region, army, callbacks));
-  } else {
-    section.append(line("No army stationed here.", "hud-hint"));
-  }
-
-  // Raise-unit menu. Strategic-resource gates surface right on the buttons:
-  // a unit whose resource you lack says "needs ⚒/🐎" — whatever else also
-  // blocks it — so the map's iron/horses markers stop being trivia.
+/**
+ * The muster menu — one button per unit type, gated by tech and strategic
+ * resource, with cost on the face. Strategic-resource gates surface right on the
+ * buttons: a unit whose resource you lack says "needs ⚒/🐎" — whatever else also
+ * blocks it — so the map's iron/horses markers stop being trivia. Shared by the
+ * region panel (legacy) and the Armies overview's "Muster troops" picker.
+ */
+function raiseUnitMenu(state: GameState, region: Region, callbacks: HudCallbacks): HTMLElement {
   const access = strategicAccess(state, PLAYER_ID);
   const menu = el("div", "hud-unit-menu");
   for (const t of UNIT_TYPES) {
@@ -2999,163 +2846,7 @@ function renderArmySection(
     if (check.ok) btn.addEventListener("click", () => callbacks.onRaiseUnit(region.id, t));
     menu.append(btn);
   }
-  section.append(menu);
-  return section;
-}
-
-/**
- * Split / disband panel (M1). A collapsible under the Army section with a
- * per-regiment stepper for each unit type in the stack; the running selection
- * lives in the DOM (no app state), read on commit. "Send to {neighbour}" splits
- * the selection into an adjacent owned region (a new stack, or reinforcing the
- * one already there); "Disband" stands the selection down to cut upkeep.
- */
-function renderDetachPanel(
-  state: GameState,
-  region: Region,
-  army: Army,
-  callbacks: HudCallbacks,
-): HTMLElement {
-  const sel = {} as Record<UnitType, number>;
-  for (const t of UNIT_TYPES) sel[t] = 0;
-
-  const details = document.createElement("details");
-  details.className = "hud-detach";
-  const summary = document.createElement("summary");
-  summary.className = "hud-detach-summary";
-  summary.textContent = "Split / disband ▸";
-  details.append(summary);
-
-  const labels: Partial<Record<UnitType, HTMLElement>> = {};
-  const setLabel = (t: UnitType) => {
-    if (labels[t]) labels[t]!.textContent = String(sel[t]);
-  };
-  for (const t of UNIT_TYPES) {
-    const have = army.units[t];
-    if (have <= 0) continue;
-    const row = el("div", "hud-detach-row");
-    const name = el("span", "hud-detach-name");
-    name.innerHTML = `${unitIconHtml(t, "")}${UNITS[t].short}`;
-    const minus = btn("−", "hud-detach-step", () => {
-      sel[t] = Math.max(0, sel[t] - 1);
-      setLabel(t);
-    });
-    const cnt = el("span", "hud-detach-cnt");
-    cnt.textContent = "0";
-    labels[t] = cnt;
-    const plus = btn("+", "hud-detach-step", () => {
-      sel[t] = Math.min(have, sel[t] + 1);
-      setLabel(t);
-    });
-    const of = el("span", "hud-detach-have");
-    of.textContent = `/ ${have}`;
-    row.append(name, minus, cnt, of, plus);
-    details.append(row);
-  }
-
-  // Destinations: adjacent regions you own (a detachment manoeuvres within the realm).
-  if (army.movesLeft > 0) {
-    const dests = region.adjacency
-      .map((id) => state.regions[id])
-      .filter((r): r is Region => !!r && r.ownerId === PLAYER_ID);
-    if (dests.length) {
-      details.append(line("Send selected to:", "hud-hint"));
-      const row = el("div", "hud-detach-dests");
-      for (const d of dests) {
-        const has = !!armyAt(state, d.id, PLAYER_ID);
-        const b = btn(`${d.name}${has ? " ⚔" : ""}`, "hud-detach-dest", () =>
-          callbacks.onMoveDetachment(army.id, d.id, sel),
-        );
-        b.title = has ? `Reinforce your army at ${d.name}.` : `Split a new stack into ${d.name}.`;
-        row.append(b);
-      }
-      details.append(row);
-    }
-  } else {
-    details.append(line("No moves left to split this turn.", "hud-hint"));
-  }
-
-  const disband = btn("Disband selected", "hud-detach-disband", () =>
-    callbacks.onDisbandUnits(army.id, sel),
-  );
-  disband.title = "Stand the selected regiments down to cut upkeep (no refund).";
-  details.append(disband);
-  return details;
-}
-
-/**
- * Combat-odds preview for the army's move/attack targets: for each reachable
- * hostile neighbour, the attacker vs. defender strength and a rough win chance,
- * so the player can weigh an attack before committing. Display only — the same
- * `previewCombat` maths the sim uses to resolve the fight.
- */
-function renderCombatOdds(state: GameState, army: Army): HTMLElement {
-  const box = el("div", "hud-odds");
-  box.append(heading("Targets in reach"));
-
-  const rows: HTMLElement[] = [];
-  for (const nid of reachableRegions(state, army)) {
-    const target = state.regions[nid];
-    if (!target) continue;
-    // A region holding another of your armies: moving there MERGES the stacks
-    // (CK3-style) — say so before the click, not after.
-    const friendly = armyAt(state, nid, PLAYER_ID);
-    if (friendly && friendly.id !== army.id) {
-      const row = el("div", "hud-odds-row");
-      const name = el("span", "hud-odds-name");
-      name.textContent = target.name;
-      const chip = el("span", "hud-odds-chip merge");
-      chip.textContent = `merge → ${soldiersCompact(armySize(army.units) + armySize(friendly.units))}`;
-      chip.title = `Moving here combines the two stacks into one army of ${soldiersDisplay(armySize(army.units) + armySize(friendly.units))} soldiers.`;
-      row.append(name, chip);
-      rows.push(row);
-      continue;
-    }
-    if (target.ownerId === PLAYER_ID) continue; // plain relocation — not listed
-    const defender = state.armies.find((a) => a.regionId === nid && a.ownerId !== PLAYER_ID);
-    const preview = forecastCombat(army.units, defender?.units ?? emptyUnits(), {
-      terrainDefense: TERRAIN[target.terrain].defense,
-      // Honest odds: a dug-in defender's entrenchment (M3) and both commanders (M4).
-      fortification: target.fortification + (defender?.entrenchment ?? 0),
-      attackerCommand: commanderAttack(army.commander),
-      defenderCommand: commanderDefense(defender?.commander),
-    });
-
-    const row = el("div", "hud-odds-row");
-    const name = el("span", "hud-odds-name");
-    name.textContent = target.name;
-    row.append(name);
-
-    if (preview.undefended) {
-      const chip = el("span", "hud-odds-chip win");
-      chip.textContent = "capture";
-      chip.title = "Undefended — your army walks in and takes it at no cost.";
-      row.append(chip);
-    } else {
-      const youLost = soldiersCompact(armySize(preview.attackerLosses));
-      const themLost = soldiersCompact(armySize(preview.defenderLosses));
-      const detail = el("span", "hud-odds-detail");
-      detail.innerHTML =
-        `${glyphHtml("attack", "⚔")}${Math.round(preview.attack)} · ` +
-        `${glyphHtml("shield", "🛡")}${Math.round(preview.defense)} · ` +
-        `<span class="hud-odds-cost">~−${youLost}/−${themLost}</span>`;
-      const pct = Math.round(preview.winChance * 100);
-      const chip = el("span", "hud-odds-chip " + oddsClass(preview.winChance));
-      chip.textContent = `${pct}%`;
-      const tip = combatForecastTip(pct, preview.likelyOutcome, preview.attackerLosses, preview.defenderLosses);
-      chip.title = tip;
-      detail.title = tip;
-      row.append(detail, chip);
-    }
-    rows.push(row);
-  }
-
-  if (rows.length === 0) {
-    box.append(line("Nothing to attack or merge with in reach — click any highlighted region to relocate.", "hud-hint"));
-  } else {
-    for (const r of rows) box.append(r);
-  }
-  return box;
+  return menu;
 }
 
 /** Bucket a win chance into good / even / poor for colour-coding. */
@@ -3193,24 +2884,6 @@ function lossBreakdown(losses: Record<UnitType, number>): string {
   return parts.length ? parts.join(", ") : "no losses";
 }
 
-/** The mean-case outcome as a short phrase for a tooltip. */
-function outcomeWord(o: "captured" | "repelled" | "held"): string {
-  return o === "captured" ? "you capture it" : o === "repelled" ? "your army is destroyed" : "a stalemate";
-}
-
-/** The full per-unit attack forecast tooltip: odds, likely outcome, and each side's price. */
-function combatForecastTip(
-  pct: number,
-  outcome: "captured" | "repelled" | "held",
-  attackerLosses: Record<UnitType, number>,
-  defenderLosses: Record<UnitType, number>,
-): string {
-  return (
-    `${pct}% to win — likely ${outcomeWord(outcome)}.\n` +
-    `You lose ~${soldiersDisplay(armySize(attackerLosses))} (${lossBreakdown(attackerLosses)}); ` +
-    `they lose ~${soldiersDisplay(armySize(defenderLosses))} (${lossBreakdown(defenderLosses)}).`
-  );
-}
 
 /** Colour a victory-progress gauge: closer to a win reads more alarming. */
 function vpClass(fraction: number): string {

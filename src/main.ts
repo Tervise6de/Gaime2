@@ -313,9 +313,9 @@ function main(): void {
     selectedRegion = regionId;
     moveArmyId = null;
     sync();
-    // A plain map click inspects the region in the right-side panel (the map
-    // stays visible for the next move); ⛶ or the Capital button open the
-    // full-size screen when more room is wanted. Ocean clicks just deselect.
+    // A plain map click opens the region's full-screen "big picture" straight away
+    // (buildings/economy). Ocean clicks (null) just deselect and open nothing.
+    if (regionId !== null) hud.openRegionScreen(regionId);
   });
 
   // Keyboard: Enter / Space ends the turn (unless typing in an input, or a modal
