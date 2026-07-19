@@ -15,7 +15,7 @@ import { ACHIEVEMENTS } from "@/data/achievements";
 export interface ProfileStats {
   gamesPlayed: number;
   gamesWon: number;
-  /** Wins keyed by victory kind ("domination", "great works", "prestige score", "conquest"). */
+  /** Wins keyed by victory kind ("domination", "prestige score", "conquest"). */
   winsByKind: Record<string, number>;
   /** Wins keyed by difficulty ("easy" | "normal" | "hard"). */
   winsByDifficulty: Record<string, number>;

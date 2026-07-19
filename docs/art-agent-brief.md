@@ -51,7 +51,7 @@ colour-blind + reduce-motion toggles on. Append a dated `docs/DEVLOG.md` entry.
 |------|--------------------|-------------|
 | **Terrain** (`data/terrain.ts`) | 5 flat colours: plains `#8fae5d`, forest `#3f7a4f`, hills `#a98b52`, mountains `#7c7f88`, coast `#569a87` (teal-green so it reads as coastal *land*, not a lake) | 5 tileable/shadeable terrain fills or textures + coastline/border treatment + a world background (replaces flat `#11151c`) |
 | **Units** (`data/units.ts`) | 5 types (militia, infantry, ranged, cavalry, siege) — **no icon**, just a count badge | 5 unit icons, legible at ~24–32px; consistent silhouettes so the counter-loop reads |
-| **Buildings** (`data/buildings.ts`) | 14 buildings shown as **text**; nothing on map | 14 building icons (~24px); a distinct **Wonder/Great Work** treatment (it's a victory path) |
+| **Buildings** (`data/buildings.ts`) | Building names shown as **text**; little map texture | Building icons (~24px) with stronger Hansa civic/trade identity |
 | **Resources** (`RESOURCE_META` in `ui/hud.ts`; `RESOURCE_ICON` in renderer) | emoji: 🪙 gold, 🌾 food, ⛏️ materials, 📖 knowledge, ⚒ iron, 🐎 horses | 6 custom resource icons (emoji render inconsistently — highest-visibility swap) |
 | **UI glyphs** | emoji chips: 🏆 👑 ⚔ ⚠ 🎓 💡 📊 🗺 ⚙ 🏅 🔊 🎵 | ~12–15 matching UI icons (one designed set, not an emoji grab-bag) |
 | **Nation identity** (nation `color` in `data/*`) | player + 5 rivals = **just a colour** | 6+ faction crests/banners (diplomacy panel, standings, capitals); optionally themed to the personality archetypes |

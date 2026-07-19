@@ -1,16 +1,15 @@
 /**
- * Renderer system — the island-world territory view.
+ * Renderer system — the Hanseatic territory view.
  *
- * Draws the region graph as an organic landmass floating in ocean: region
- * cells clipped to the coastline, terrain fills + political ink, borders and
- * war fronts on shared edges, and the shared marker set (population, name,
- * status row, capital crest, army badges). Read-only over state — the
- * renderer never mutates the sim — and deterministic: every shape derives
- * from the map seed (systems/island.ts), never Math.random or the clock.
+ * Draws the authored Hansa map: real province cells, coastline, terrain fills,
+ * political ink, borders, war fronts, and the shared marker set (population,
+ * name, status row, capital crest, army badges). Read-only over state — the
+ * renderer never mutates the sim — and presentation variation comes from
+ * stable hashes, never Math.random or the clock.
  *
  * Performance discipline: everything expensive is cached and rebuilt only when
  * its inputs change —
- *  - Voronoi cells + island silhouette: recomputed when the map changes.
+ *  - Province cells + coastline: recomputed when the map changes.
  *  - Projected geometry (pixel polygons, Path2Ds, land path): map ⊕ canvas
  *    size ⊕ settled camera.
  *  - Ocean / terrain / political layers: pre-rendered offscreens, blitted per
@@ -27,12 +26,10 @@ import { GLYPH_ART, RESOURCE_ART, TERRAIN_ART, TERRAIN_MOTIF, crestSvg } from "@
 import { cbSafe } from "@/data/palette";
 import {
   DEPTH,
-  ISLAND_FRAME,
   OCEAN,
   POLITICAL,
   TERRAIN_TEXTURE_ALPHA,
   TERRAIN_TEXTURE_DENSITY,
-  type IslandArchetype,
 } from "@/data/mapstyle";
 import { armySize, BARBARIAN_ID, PLAYER_ID, type TradeRoute } from "@/systems/state";
 import {
@@ -50,8 +47,6 @@ import { computeVoronoiCells, pointInPolygon, type Point, type VoronoiCell } fro
 import { scriptedMap } from "@/data/maps/types";
 import {
   hashFloat,
-  islandArchetype,
-  islandShape,
   organicCells,
   polygonCells,
   pointInIsland,
@@ -166,12 +161,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   let tick = 0;
   let ripples: { regionId: number; color: string; born: number }[] = [];
 
-  // Island archetype: pure function of the map (region count + seed), refreshed
-  // on every setState so the projection frame is always in step with the state.
-  let archetype: IslandArchetype = "medium";
   // Extra inset (fraction of canvas) around the [0,1] play area, so a context
-  // map's outer-world land shows as a framing border. 0 for non-context maps.
-  let outerMargin = 0;
+  // map's outer-world land shows as a framing border.
+  let outerMargin = 0.045;
 
   // --- Camera: pan/zoom over the fitted base projection ----------------------
   // screen = base * s + t. At s = 1 the map fits exactly (t clamps to 0), so
@@ -429,11 +421,10 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     if (sig !== cellSig) {
       cellSig = sig;
       const sites = s.regions.map((r) => ({ x: r.x, y: r.y }));
-      const smap = scriptedMap(s.mapId);
+      const smap = scriptedMap(s.mapId ?? "hansa") ?? scriptedMap("hansa");
       // Province cells: a scripted map whose every region carries a real
-      // boundary polygon draws those directly (adjacency recovered from shared
-      // segments); otherwise fall back to the Voronoi of the sites — the path
-      // that every existing map (baltic/europe/procedural) still takes.
+      // boundary polygon draws those directly; maps without polygons use the
+      // Voronoi sites while keeping the authored coastline.
       if (
         smap &&
         smap.regions.length &&
@@ -446,10 +437,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         cells = computeVoronoiCells(sites, ISLAND_BOUNDS);
         organic = organicCells(cells, s.seed);
       }
-      // Scripted maps supply their own coastline (real geography); procedural
-      // realms generate an organic island around the sites.
       if (smap) {
-        archetype = "large"; // tight framing — the authored land fills [0,1]
         // A context map insets the play area a touch so the outer-world land
         // frames it; kept small so the playable land stays large on screen (the
         // faded continent bleeds past [0,1] anyway, so it still shows).
@@ -457,9 +445,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         const toPoly = (poly: [number, number][]): Point[] => poly.map((v) => ({ x: v[0], y: v[1] }));
         shape = { blobs: smap.land.map(toPoly), islets: (smap.islets ?? []).map(toPoly) };
       } else {
-        archetype = islandArchetype(s.regions.length, s.seed);
-        outerMargin = 0;
-        shape = islandShape(sites, s.seed, archetype);
+        outerMargin = 0.045;
+        shape = null;
       }
       projSig = ""; // both projections derive from the cells — force rebuilds
       baseProjSig = "";
@@ -654,7 +641,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
    * layer under the active land. Scripted maps only.
    */
   function drawContextLand(g: CanvasRenderingContext2D, s: GameState): void {
-    const smap = scriptedMap(s.mapId);
+    const smap = scriptedMap(s.mapId ?? "hansa") ?? scriptedMap("hansa");
     const ctx = smap?.context;
     if (!ctx) return;
     for (const poly of ctx.land) {
@@ -1370,16 +1357,13 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
    * the frame biases the landmass slightly upward.
    */
   function frameMargins(): { x: number; top: number; bottom: number } {
-    const f = ISLAND_FRAME[archetype];
     // A context map frames itself with real outer-world land (which bleeds past
-    // the play area), so it needs only a thin inset — NOT the procedural island's
+    // the play area), so it needs only a thin inset — NOT the authored coastline's
     // big sea border. Using just `outerMargin` lets the playable land fill the
     // canvas (the fix for the map reading small/cramped). A plain island keeps
     // the archetype's generous framing.
-    const baseX = outerMargin > 0 ? outerMargin : f.marginX;
-    const baseY = outerMargin > 0 ? outerMargin : f.marginY;
-    const mx = baseX * canvas.clientWidth;
-    const my = baseY * canvas.clientHeight;
+    const mx = outerMargin * canvas.clientWidth;
+    const my = outerMargin * canvas.clientHeight;
     return { x: mx + 8, top: my * 0.78 + 6, bottom: my * 1.22 + 30 };
   }
 
@@ -2466,7 +2450,6 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     },
     setState(next: GameState): void {
       state = next;
-      archetype = islandArchetype(next.regions.length, next.seed);
       needsPaint = true;
     },
     setSelected(regionId: number | null): void {

@@ -125,7 +125,7 @@ function main(): void {
         commit(); // adopt the imported game as the live autosave
         hud.toast(`Imported game — turn ${state.turn}.`);
       } else {
-        hud.toast("Import failed — not a valid Petty Kingdoms save.");
+        hud.toast("Import failed — not a valid Hansa save.");
       }
     },
     onQueueBuilding(regionId, building) {
@@ -243,10 +243,6 @@ function main(): void {
     },
     onProposePact(targetId, kind) {
       state = playerPropose(state, targetId, kind);
-      commit();
-    },
-    onProposeTrade(targetId) {
-      state = playerPropose(state, targetId, "trade");
       commit();
     },
     onCallToArms(allyId, enemyId) {
@@ -513,7 +509,7 @@ function main(): void {
   });
 
   // eslint-disable-next-line no-console
-  console.info("Petty Kingdoms — v1 ready. Build, research, conquer, and outlast your rivals.");
+  console.info("Hansa — v1 ready. Build routes, steer the league, and outlast your rivals.");
 }
 
 /** A wall-clock stamp for saves. Kept out of the sim (which forbids Date). */

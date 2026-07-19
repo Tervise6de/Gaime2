@@ -67,7 +67,7 @@ import {
   totalUpkeep,
   unitCost,
 } from "@/systems/military";
-import { getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, nationPower, hasTrade, tradeIncome, opinionReasons, foreignRelations, casusBelli, CASUS_BELLI, TRIBUTE_DEMAND, atWar } from "@/systems/diplomacy";
+import { getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, nationPower, opinionReasons, foreignRelations, casusBelli, CASUS_BELLI, TRIBUTE_DEMAND, atWar } from "@/systems/diplomacy";
 import { nationScore, victoryProgress, victoryRaces, endGameSummary } from "@/systems/victory";
 import { GOODS, type GoodId } from "@/data/goods";
 import { EPOCH_EVENTS } from "@/data/epochEvents";
@@ -85,7 +85,7 @@ import { ARCHETYPE_LABEL } from "@/data/personalities";
 import { eraForTurn, yearForTurn } from "@/data/eras";
 import { TRAITS } from "@/data/traits";
 import { TECHS, TECH_IDS, type TechId, type TechBranch } from "@/data/techs";
-import { WONDER_GOAL, DOMINATION_FRACTION, TURN_LIMIT, MODIFIER_LABEL, MAX_ENTRENCH } from "@/systems/state";
+import { DOMINATION_FRACTION, TURN_LIMIT, MODIFIER_LABEL, MAX_ENTRENCH } from "@/systems/state";
 import {
   commanderAttack,
   commanderDefense,
@@ -172,7 +172,6 @@ export interface HudCallbacks {
   onDeclareWar(targetId: number): void;
   onMakePeace(targetId: number): void;
   onProposePact(targetId: number, kind: "nap" | "alliance"): void;
-  onProposeTrade(targetId: number): void;
   onCallToArms(allyId: number, enemyId: number): void;
   onGift(targetId: number, amount: number): void;
   onDemandTribute(targetId: number): void;
@@ -199,7 +198,6 @@ const BRANCH_COLOR: Record<string, string> = {
   economy: "#e0b74a",
   military: "#e8776b",
   civics: "#63c7d6",
-  wonders: "#b06ec0",
 };
 
 /** Fixed gift size the diplomacy panel offers. */
@@ -394,7 +392,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   // every turn by update().
   const victoryEl = el("div", "hud-victory hud-victory-politics");
   victoryEl.title = "Progress toward each victory: leading realm's territory share (domination at "
-    + `${Math.round(DOMINATION_FRACTION * 100)}%), Great Works, and the turn ${TURN_LIMIT} prestige deadline.`;
+    + `${Math.round(DOMINATION_FRACTION * 100)}%) and the turn ${TURN_LIMIT} prestige deadline.`;
   barCenter.append(crisisEl);
   topBar.append(barCenter);
 
@@ -934,7 +932,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       const sup = el("p", "hud-end-super");
       sup.innerHTML =
         `Your peak prestige: ${pr.peakScore} (turn ${pr.peakTurn}). Final: ${pr.score} · ` +
-        `${pr.regions}${glyphHtml("region", "⬢")} · ${pr.wonders}${glyphHtml("star", "★")} · ` +
+        `${pr.regions}${glyphHtml("region", "⬢")} · ` +
         `${pr.techs}${glyphHtml("book", "📖")}.`;
       panel.append(sup);
     }
@@ -1387,7 +1385,6 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     const paths: [string, string][] = [
       ["domination", "Domination"],
       ["conquest", "Conquest"],
-      ["great works", "Great Works"],
       ["prestige score", "Prestige"],
     ];
     for (const [key, label] of paths) panel.append(statRow(label, String(p.winsByKind[key] ?? 0)));
@@ -3370,7 +3367,7 @@ function vraceBar(name: string, value: string, fraction: number, isYou: boolean)
 
 /**
  * Final standings for the end-game screen: every non-barbarian nation ranked by
- * prestige score, with a compact regions/wonders/techs breakdown. The player row
+ * prestige score, with a compact regions/techs breakdown. The player row
  * is highlighted and eliminated nations are marked.
  */
 /**
@@ -3416,7 +3413,6 @@ function renderStandings(
     const detail = el("span", "hud-standings-detail");
     detail.innerHTML =
       `${row.regions}${glyphHtml("region", "⬢")} · ` +
-      `${row.n.wonders}${glyphHtml("star", "★")} · ` +
       `${row.n.research.done.length}${glyphHtml("book", "📖")}`;
     const score = el("span", "hud-standings-score");
     score.textContent = String(row.score);
@@ -3847,7 +3843,7 @@ function renderDiplomacy(
             : `You have no just cause (${cb.label.toLowerCase()}): every other realm's opinion of you will sour.`;
           void confirmAction({
             title: `Declare war on ${rival.name}?`,
-            body: `War severs any trade route and treaty between you, and can't be called off this turn. ${justification}`,
+            body: `War severs treaties, blocks hostile trade lanes, and can't be called off this turn. ${justification}`,
             confirmLabel: "Declare war",
             danger: true,
           }).then((ok) => {
@@ -3885,29 +3881,13 @@ function renderDiplomacy(
         : `${rival.name} would scorn the demand (needs to be far weaker).`;
       actions.append(demand);
 
-      // Trade: an active route earns gold each turn (severed by war); otherwise
-      // offer to open one, gated by relations.
-      const inc = tradeIncome(state, PLAYER_ID, rival.id);
-      if (hasTrade(state, PLAYER_ID, rival.id)) {
-        const badge = el("span", "hud-diplo-trade");
-        badge.textContent = `⇄ Trading +${inc}g`;
-        badge.title = `An active trade route earns you +${inc} gold each turn. Going to war would sever it.`;
-        actions.append(badge);
-      } else {
-        const willing = wouldAccept(state, PLAYER_ID, rival.id, "trade");
-        const tradeBtn = btn("Open trade", "hud-diplo-btn", () => callbacks.onProposeTrade(rival.id));
-        tradeBtn.title = willing
-          ? `Open a trade route — +${inc} gold/turn for each of you. ${rival.name} would accept.`
-          : `${rival.name} is too cool toward you to trade (improve relations first).`;
-        actions.append(tradeBtn);
-      }
     }
     card.append(actions);
     container.append(card);
   }
 }
 
-const TECH_BRANCHES: TechBranch[] = ["economy", "military", "civics", "wonders"];
+const TECH_BRANCHES: TechBranch[] = ["economy", "military", "civics"];
 
 /**
  * The tech tree — the sole research page (opened straight from the Research
@@ -3979,7 +3959,7 @@ function renderTechTree(
     status.append(l);
   }
   const counts = el("span", "hud-research-status-counts");
-  counts.textContent = `${done.size}/${total} techs · ${player.wonders}/${WONDER_GOAL} wonders · +${fmt(knowledgeFlow)} 📖/turn`;
+  counts.textContent = `${done.size}/${total} techs · +${fmt(knowledgeFlow)} 📖/turn`;
   status.append(counts);
   panel.append(status);
 

@@ -22,9 +22,6 @@ import {
   RELATION_MAX,
   RELATION_MIN,
   RELATION_WAR_HIT,
-  TRADE_INCOME_BASE,
-  TRADE_INCOME_MAX,
-  TRADE_INCOME_PER_REGION,
   armySize,
   nationInstability,
   pairKey,
@@ -61,7 +58,6 @@ export const OPINION_LABEL: Record<string, string> = {
   nap: "Non-aggression pact",
   alliance: "Our alliance",
   gift: "Gifts given",
-  trade: "Our trade route",
   aggression: "Your wars of aggression",
   betrayal: "You broke your word to me",
   broken_word: "Their broken pacts",
@@ -335,7 +331,6 @@ export function declareWar(state: GameState, a: number, b: number, cb?: CasusBel
   let next = setTreaty(state, a, b, "war");
   next = clearPeaceSince(next, a, b); // swords drawn — the peace clock stops
   next = recordOpinion(next, a, b, -RELATION_WAR_HIT, "war");
-  next = severTrade(next, a, b); // war ends commerce
   if (broke) {
     const cost = TREATY_BREAK[broke];
     next = recordOpinion(next, a, b, -cost.bilateral, "betrayal");
@@ -373,44 +368,6 @@ export function declareWar(state: GameState, a: number, b: number, cb?: CasusBel
     "war",
     `${chronicleName(next, a)} declared war on ${chronicleName(next, b)}${called}.`,
   );
-}
-
-// --- trade routes (economic diplomacy) --------------------------------------
-
-/** Whether an active trade route runs between `a` and `b`. */
-export function hasTrade(state: GameState, a: number, b: number): boolean {
-  return state.trades?.[pairKey(a, b)] === true;
-}
-
-/** Gold each partner earns per turn from a trade route between `a` and `b`. Pure. */
-export function tradeIncome(state: GameState, a: number, b: number): number {
-  const count = (id: number) => state.regions.filter((r) => r.ownerId === id).length;
-  const smaller = Math.min(count(a), count(b));
-  return Math.min(TRADE_INCOME_MAX, TRADE_INCOME_BASE + TRADE_INCOME_PER_REGION * smaller);
-}
-
-/** The living, non-barbarian nations `id` currently trades with. */
-export function tradePartners(state: GameState, id: number): number[] {
-  return state.nations
-    .filter((n) => !n.isBarbarian && n.alive && n.id !== id && hasTrade(state, id, n.id))
-    .map((n) => n.id);
-}
-
-/** Open a trade route between `a` and `b` (a small goodwill bump), logging it. */
-export function establishTrade(state: GameState, a: number, b: number): GameState {
-  if (hasTrade(state, a, b)) return state;
-  let next: GameState = { ...state, trades: { ...(state.trades ?? {}), [pairKey(a, b)]: true } };
-  next = recordOpinion(next, a, b, +8, "trade");
-  return { ...next, log: [...next.log, `${name(next, a)} and ${name(next, b)} opened a trade route.`].slice(-50) };
-}
-
-/** Sever any trade route between `a` and `b` (on war). Silent — the war line covers it. */
-export function severTrade(state: GameState, a: number, b: number): GameState {
-  const key = pairKey(a, b);
-  if (!state.trades?.[key]) return state;
-  const trades = { ...state.trades };
-  delete trades[key];
-  return { ...state, trades };
 }
 
 export function makePeace(state: GameState, a: number, b: number): GameState {
@@ -460,7 +417,7 @@ export function wouldAccept(
   state: GameState,
   proposer: number,
   target: number,
-  type: "peace" | "nap" | "alliance" | "tribute" | "trade",
+  type: "peace" | "nap" | "alliance" | "tribute",
 ): boolean {
   const targetNation = state.nations.find((n) => n.id === target);
   if (!targetNation) return false;
@@ -472,7 +429,6 @@ export function wouldAccept(
   const p = targetNation.personality;
   const trust = p?.trustworthiness ?? 0.5;
   const aggression = p?.aggression ?? 0.5;
-  const economy = p?.economy ?? 0.5;
 
   switch (type) {
     case "peace":
@@ -485,10 +441,6 @@ export function wouldAccept(
     case "tribute":
       // Pay tribute only when clearly weaker and not too proud.
       return powerRatio > 1.6 && aggression < 0.7;
-    case "trade":
-      // Trade is mutually profitable: accept unless relations are hostile, and
-      // never with someone you're at war with. Economic realms are keener.
-      return !atWar(state, proposer, target) && rel > -20 + (economy >= 0.6 ? -10 : 0);
   }
 }
 
@@ -519,7 +471,7 @@ export function addOffer(
   state: GameState,
   from: number,
   to: number,
-  type: "peace" | "nap" | "alliance" | "tribute" | "trade",
+  type: "peace" | "nap" | "alliance" | "tribute",
   gold?: number,
 ): GameState {
   // Avoid duplicate pending offers of the same kind.
@@ -565,9 +517,6 @@ export function acceptOffer(state: GameState, offerId: number): GameState {
       // The player pays the demanding nation to avoid conflict.
       next = gift(next, offer.to, offer.from, offer.gold ?? 0);
       break;
-    case "trade":
-      next = establishTrade(next, offer.from, offer.to);
-      break;
   }
   return next;
 }
@@ -592,16 +541,14 @@ function removeOffer(state: GameState, offerId: number): GameState {
 export function playerPropose(
   state: GameState,
   target: number,
-  type: "peace" | "nap" | "alliance" | "trade",
+  type: "peace" | "nap" | "alliance",
 ): GameState {
   const proposer = state.nations.find((n) => n.isPlayer)!.id;
   if (wouldAccept(state, proposer, target, type)) {
     if (type === "peace") return makePeace(state, proposer, target);
-    if (type === "trade") return establishTrade(state, proposer, target);
     return setPact(state, proposer, target, type);
   }
-  const label = type === "trade" ? "trade offer" : type;
-  return { ...state, log: [...state.log, `${name(state, target)} refused your ${label}.`].slice(-50) };
+  return { ...state, log: [...state.log, `${name(state, target)} refused your ${type}.`].slice(-50) };
 }
 
 /** Gold a player tribute demand asks for (mirrors the fixed gift size). */

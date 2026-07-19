@@ -8,7 +8,7 @@
  *
  * Each names a host region on the Hansa map (region indices below), but this
  * table is map-independent content: the sim looks the host up by id and copes if
- * it is absent (a smaller/procedural map), so nothing here couples to hansa.ts.
+ * it is absent, so older saves remain loadable.
  *
  * Serialisable content only — no logic, no DOM.
  */

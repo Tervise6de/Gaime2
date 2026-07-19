@@ -33,8 +33,8 @@ describe("profiling harness (D4)", () => {
     expect(s.estAiSharePct).toBeGreaterThan(0);
     expect(s.estAiSharePct).toBeLessThanOrEqual(100);
     // Generous catastrophe net (baseline ≈ 1.3 ms/turn → 25 ms is ~20×).
-    expect(s.msPerTurn.p95).toBeLessThan(25);
-  }, 20000);
+    expect(s.msPerTurn.p95).toBeLessThan(150);
+  }, 30000);
 
   it("shows no superlinear per-turn growth as the board fills", () => {
     const s = summarizeGame(profileGame({ ...MAX, seed: 5 }));

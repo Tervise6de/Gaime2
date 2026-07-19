@@ -15,7 +15,7 @@
  *     expected dominant term).
  */
 
-import { createGame, resolveTurn, advanceNationEconomy, applySecession, applyTradeIncome, type NewGameOptions } from "@/systems/turn";
+import { createGame, resolveTurn, advanceNationEconomy, applySecession, type NewGameOptions } from "@/systems/turn";
 import { runNationTurn } from "@/systems/ai";
 import { driftRelations, decayOpinions } from "@/systems/diplomacy";
 import { resolveChoice } from "@/systems/events";
@@ -152,6 +152,5 @@ export function profilePhases(state: GameState, iters = 200): Record<string, num
     driftRelations: time(() => driftRelations(state)),
     decayOpinions: time(() => decayOpinions(state)),
     applySecession: time(() => applySecession(state)),
-    applyTradeIncome: time(() => applyTradeIncome(state)),
   };
 }

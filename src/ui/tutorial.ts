@@ -19,7 +19,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     target: null,
     title: "Welcome, ruler",
-    body: "You lead one realm among rivals. Grow your economy, keep your people content, and win by conquest, Great Works, or prestige. This quick tour points out the essentials — you can skip it any time.",
+    body: "You lead one realm among rivals. Grow your economy, keep your people content, and win by conquest or prestige. This quick tour points out the essentials — you can skip it any time.",
   },
   {
     target: ".hud-topbar",

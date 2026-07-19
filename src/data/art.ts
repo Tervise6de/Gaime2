@@ -33,7 +33,7 @@ export type GlyphId =
   | "records" // 🏅 toolbar
   | "options" // ⚙
   | "victory" // 🏆
-  | "star" // ⭐ / ★ (wonders)
+  | "star"
   | "hourglass" // ⏳ (turn deadline)
   | "crown" // 👑 (capitals)
   | "hammer" // 🔨 (construction)
@@ -265,10 +265,6 @@ export const BUILDING_ART: Record<BuildingId, string | null> = {
   fortress: ico(
     '<path d="M6.4 19.5V8h2.1V6.1h2.2V8h2.6V6.1h2.2V8h2.1v11.5z"/><path d="M10.4 19.5v-3.7h3.2v3.7"/><path d="M4.6 19.5h14.8"/>',
   ),
-  // Great Work: laurelled monument, always in the brand gold.
-  wonder: ico(
-    '<path d="M10.8 14.3L12 4.6l1.2 9.7z"/><path d="M9.2 16.9h5.6M8 19.5h8"/><path d="M5.3 7.8c-.6 3.6.3 6.7 2.4 9.3M18.7 7.8c.6 3.6-.3 6.7-2.4 9.3"/><path d="M5.3 7.8l1.9.5M18.7 7.8l-1.9.5"/>',
-  ).replaceAll("currentColor", "#e6c874"),
   // Barn with a grain silo (reuses the farm read).
   granary: ico(
     '<path d="M4.5 19.5v-8.5L12 5.3l7.5 5.7v8.5z"/><path d="M9.8 19.5v-5.3h4.4v5.3"/><path d="M3.4 19.5h17.2"/>',
@@ -341,7 +337,7 @@ export const BUILDING_ART: Record<BuildingId, string | null> = {
   canal: ico(
     '<path d="M3.4 5.4h17.2M4.6 5.4v2.4M19.4 5.4v2.4M3.4 7.8h17.2"/><path d="M5.2 19.5v-8.1a3.2 3.2 0 016.4 0v8.1M12.4 19.5v-8.1a3.2 3.2 0 016.4 0v8.1"/><path d="M3 19.5h18"/>',
   ),
-  // Roland statue — a civic-freedom monument (reuses the Great Work monument read).
+  // Roland statue — a civic-freedom monument.
   roland: ico(
     '<path d="M10.8 14.3L12 4.6l1.2 9.7z"/><path d="M9.2 16.9h5.6M8 19.5h8"/><path d="M5.3 7.8c-.6 3.6.3 6.7 2.4 9.3M18.7 7.8c.6 3.6-.3 6.7-2.4 9.3"/><path d="M5.3 7.8l1.9.5M18.7 7.8l-1.9.5"/>',
   ),
@@ -565,7 +561,7 @@ export function eventVignette(eventId: string): string | null {
 // ---------------------------------------------------------------------------
 // Achievement badges — a shared soft-hexagon frame with one motif per
 // achievement id (data/achievements.ts). Locked achievements keep the lock
-// glyph; an unknown id falls back to the generic medal.
+// glyph; an unknown id falls back to the default medal.
 // ---------------------------------------------------------------------------
 
 /** Soft-hex badge frame around a motif. */
@@ -579,7 +575,6 @@ function badge(inner: string): string {
 export const BADGE_ART: Record<string, string | null> = {
   first_crown: badge('<path d="M8.4 14.6v-4.4l2.3 1.7 1.3-2.6 1.3 2.6 2.3-1.7v4.4z" fill="currentColor" stroke="none"/>'),
   conqueror: badge('<path d="M8.6 8.6l6.8 6.8M15.4 8.6l-6.8 6.8"/><path d="M13.6 16l1.8-1.8M8.6 14.2l1.8 1.8"/>'),
-  wonder_of_the_age: badge('<path d="M11.2 13.9L12 7.9l.8 6z"/><path d="M9.8 16h4.4"/><path d="M7.6 9.2c-.3 2.4.3 4.5 1.6 6.2M16.4 9.2c.3 2.4-.3 4.5-1.6 6.2"/>'),
   enlightened: badge('<path d="M12 8.6c-1-.8-2.5-1.1-4-1v7c1.5-.1 3 .2 4 1 1-.8 2.5-1.1 4-1v-7c-1.5-.1-3 .2-4 1z"/><path d="M12 8.6v7"/>'),
   polymath: badge('<path d="M12 6.8v2.4M12 14.8v2.4M8.4 12h-2.4M18 12h-2.4M9.2 9.2L7.8 7.8M16.2 16.2l-1.4-1.4M14.8 9.2l1.4-1.4M7.8 16.2l1.4-1.4"/><circle cx="12" cy="12" r="1.9"/>'),
   veteran: badge('<path d="M9.2 17V7.2"/><path d="M9.2 7.8c2.2-1 4.4 1 6.6 0v5c-2.2 1-4.4-1-6.6 0"/>'),
@@ -589,7 +584,7 @@ export const BADGE_ART: Record<string, string | null> = {
   iron_blood: badge('<path d="M7.2 8.6h6.4c1.2 0 2.1-.4 2.9-1.1-.2 1.9-1.5 3.1-3.4 3.3v1.9c1 .2 1.7.7 2 1.6H8.9c.3-.9 1-1.4 2-1.6v-1.9c-1.7-.2-3.1-1-3.7-2.2z" fill="currentColor" stroke="none"/>'),
 };
 
-/** Badge for an achievement id — unknown ids get the generic medal. */
+/** Badge for an achievement id — unknown ids get the default medal. */
 export function badgeArt(achievementId: string): string | null {
   return BADGE_ART[achievementId] ?? MEDAL;
 }
@@ -599,11 +594,10 @@ export function badgeArt(achievementId: string): string | null {
 // ---------------------------------------------------------------------------
 
 /** Tech-branch glyphs, shown beside the branch name in research UI. */
-export const BRANCH_ART: Record<"economy" | "military" | "civics" | "wonders", string | null> = {
+export const BRANCH_ART: Record<"economy" | "military" | "civics", string | null> = {
   economy: ico('<circle cx="12" cy="12" r="6.6"/><path d="M12 8.6v6.8M10 10.4c0-.9.9-1.4 2-1.4s2 .5 2 1.3c0 2-4 1.4-4 3.4 0 .8.9 1.3 2 1.3s2-.5 2-1.4"/>', { sw: 1.6 }),
   military: ico('<path d="M6.4 6.4l11.2 11.2M17.6 6.4L6.4 17.6"/><path d="M14.9 16.9l2-2M7.1 14.9l2 2"/>', { sw: 1.6 }),
   civics: ico('<path d="M5.4 9.4L12 5.6l6.6 3.8z"/><path d="M7 9.4v6.4M12 9.4v6.4M17 9.4v6.4M5.6 15.8h12.8M4.6 18.4h14.8"/>', { sw: 1.6 }),
-  wonders: ico('<path d="M12 4.8l1.9 3.9 4.3.6-3.1 3 .7 4.3-3.8-2-3.8 2 .7-4.3-3.1-3 4.3-.6z"/>', { sw: 1.6 }),
 };
 
 /** Treaty-state glyphs for the diplomacy chips. */

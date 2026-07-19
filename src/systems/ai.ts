@@ -34,17 +34,14 @@ import {
   atWar,
   callToArms,
   declareWar,
-  establishTrade,
   getRelation,
   getTreaty,
   gift,
-  hasTrade,
   makePeace,
   nationPower,
   peaceReparations,
   setPact,
   sharedBorders,
-  wouldAccept,
   wouldBreakTreaty,
   wouldJoinWar,
 } from "@/systems/diplomacy";
@@ -63,7 +60,6 @@ import {
   FRIENDLY_THRESHOLD,
   MAX_ROUTES_PER_NATION,
   PLAYER_ID,
-  WONDER_GOAL,
   UNREST_REVOLT,
   SECESSION_REVOLT_TURNS,
   nationInstability,
@@ -202,33 +198,14 @@ function manageEconomy(state: GameState, nationId: number): GameState {
   // Tax policy: aim higher when calm and poorer; ease off when unrest bites, and
   // cut hard when any one province is tipping toward secession (a cheaper save
   // than marching an army to garrison it).
-  const p = nation.personality;
   s = setTax(s, nationId, desiredTaxRate(nation, owned));
 
-  // Buildings: fill empty slots with the best unlocked option. A Great Work is
-  // a national project — only one may be under construction at a time, so the
-  // AI can't win by spamming wonders in every region at once.
+  // Buildings: fill empty slots with the best unlocked option.
   const done = s.nations.find((n) => n.id === nationId)!.research.done;
-  // Only economy-minded nations chase a Great Works win; aggressive nations
-  // spend on military and seek domination instead. This makes the endgame
-  // follow personality rather than everyone racing the same wonder path.
-  const pursuesWonders = (p?.economy ?? 0.5) >= 0.6;
-  let wonderInProgress = s.regions.some(
-    (r) => r.ownerId === nationId && r.construction?.building === "wonder",
-  );
   for (const region of s.regions) {
     if (region.ownerId !== nationId || region.construction) continue;
-    const choice = chooseBuilding(
-      region,
-      done,
-      nation.wonders,
-      pursuesWonders && !wonderInProgress,
-      nation.trait,
-    );
-    if (choice) {
-      s = queueFor(s, region.id, choice, nationId);
-      if (choice === "wonder") wonderInProgress = true;
-    }
+    const choice = chooseBuilding(region, done, nation.trait);
+    if (choice) s = queueFor(s, region.id, choice, nationId);
   }
 
   // Specialise idle provinces so rivals play the focus system too. A region
@@ -370,8 +347,6 @@ const TRAIT_BUILD_PRIORITY: Record<TraitId, BuildingId[]> = {
 export function chooseBuilding(
   region: { unrest: number; buildings: BuildingId[]; terrain: TerrainId; focus?: FocusId; resource?: StrategicResource | null },
   done: TechId[],
-  wonders: number,
-  canStartWonder: boolean,
   trait?: TraitId,
 ): BuildingId | null {
   const has = (b: BuildingId) => region.buildings.includes(b);
@@ -383,10 +358,6 @@ export function chooseBuilding(
     return buildingFocusOk(region.focus, b);
   };
   if (region.unrest > 35 && !has("temple")) return "temple";
-  // Chase a Great Works victory — but only one wonder at a time (national project).
-  if (canStartWonder && unlocked("wonder") && !has("wonder") && wonders < WONDER_GOAL) {
-    return "wonder";
-  }
   // Build this province's focus capstone as soon as it's available — the payoff
   // for having specialised it (a martial garrison raises its Citadel, etc.).
   if (region.focus) {
@@ -559,28 +530,6 @@ function doDiplomacy(state: GameState, nationId: number, rng: Rng): GameState {
       s = offerPact(s, nationId, o, rel > 45 ? "alliance" : "nap");
       actions++;
       continue;
-    }
-
-    // Open a trade route with a peaceful, non-hostile neighbour — economic realms
-    // especially. Profitable for both, and a future war would sever it. The player
-    // gets an offer to weigh; a willing AI opens the route directly.
-    if (
-      border &&
-      rel > -10 &&
-      (p?.economy ?? 0.5) >= 0.45 &&
-      !hasTrade(s, nationId, o.id)
-    ) {
-      if (o.isPlayer) {
-        if (!s.offers.some((of) => of.from === nationId && of.to === o.id && of.type === "trade")) {
-          s = addOffer(s, nationId, o.id, "trade");
-          actions++;
-          continue;
-        }
-      } else if (wouldAccept(s, nationId, o.id, "trade")) {
-        s = establishTrade(s, nationId, o.id);
-        actions++;
-        continue;
-      }
     }
 
     // A merchant appeases a much stronger, unfriendly neighbour with a gift.

@@ -4641,7 +4641,6 @@ a:focus-visible,
 .hud-chronicle-row.kind-revolt { border-left-color: #e0a852; }
 .hud-chronicle-row.kind-betrayal { border-left-color: #b06ad0; }
 .hud-chronicle-row.kind-fall { border-left-color: #7a8496; }
-.hud-chronicle-row.kind-wonder { border-left-color: #6ab0d0; }
 .hud-chronicle-row.kind-victory { border-left-color: var(--accent); }
 
 /* --- Epoch-event notification (a dated historical beat) --------------------- */

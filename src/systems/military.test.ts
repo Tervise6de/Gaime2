@@ -70,8 +70,8 @@ function battlefield(playerUnits: Partial<Record<string, number>>, barbUnits: Pa
     rngState: 12345,
     turn: 1,
     nations: [
-      { id: PLAYER_ID, name: "Realm", color: "#000", isPlayer: true, isBarbarian: false, alive: true, stocks: { ...stocks }, taxRate: 0, research: { current: null, progress: 0, done: [] }, wonders: 0, famine: false, bankrupt: false },
-      { id: BARBARIAN_ID, name: "Barbarians", color: "#000", isPlayer: false, isBarbarian: true, alive: true, stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, taxRate: 0, research: { current: null, progress: 0, done: [] }, wonders: 0, famine: false, bankrupt: false },
+      { id: PLAYER_ID, name: "Realm", color: "#000", isPlayer: true, isBarbarian: false, alive: true, stocks: { ...stocks }, taxRate: 0, research: { current: null, progress: 0, done: [] }, famine: false, bankrupt: false },
+      { id: BARBARIAN_ID, name: "Barbarians", color: "#000", isPlayer: false, isBarbarian: true, alive: true, stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, taxRate: 0, research: { current: null, progress: 0, done: [] }, famine: false, bankrupt: false },
     ],
     regions: [r0, r1],
     armies,
@@ -99,7 +99,7 @@ function realm(r0Army: Partial<Record<string, number>>): GameState {
     rngState: 123,
     turn: 1,
     nations: [
-      { id: PLAYER_ID, name: "Realm", color: "#000", isPlayer: true, isBarbarian: false, alive: true, stocks: { gold: 200, food: 20, materials: 50, knowledge: 0 }, taxRate: 0, research: { current: null, progress: 0, done: [] }, wonders: 0, famine: false, bankrupt: false },
+      { id: PLAYER_ID, name: "Realm", color: "#000", isPlayer: true, isBarbarian: false, alive: true, stocks: { gold: 200, food: 20, materials: 50, knowledge: 0 }, taxRate: 0, research: { current: null, progress: 0, done: [] }, famine: false, bankrupt: false },
     ],
     regions: [r0, r1, r2],
     armies,
@@ -379,7 +379,7 @@ function rallyField(
   const nation = (id: number, name: string, isPlayer: boolean) => ({
     id, name, color: "#000", isPlayer, isBarbarian: false, alive: true,
     stocks: { ...stocks }, taxRate: 0, research: { current: null, progress: 0, done: [] },
-    wonders: 0, famine: false, bankrupt: false,
+    famine: false, bankrupt: false,
   });
   return {
     seed: 1, rngState: 999, turn: 1,
@@ -463,7 +463,7 @@ function allianceField(reserve: Partial<Record<string, number>>, allied: boolean
   const nation = (id: number, name: string, isPlayer: boolean) => ({
     id, name, color: "#000", isPlayer, isBarbarian: false, alive: true,
     stocks: { ...stocks }, taxRate: 0, research: { current: null, progress: 0, done: [] },
-    wonders: 0, famine: false, bankrupt: false,
+    famine: false, bankrupt: false,
   });
   return {
     seed: 1, rngState: 4242, turn: 1,
@@ -545,7 +545,7 @@ describe("zone of control (M3)", () => {
     g.regions[3] = region(3, { ownerId: RIVAL, adjacency: enemyBordersR1 ? [1] : [2] });
     g.regions[1]!.adjacency = enemyBordersR1 ? [0, 2, 3] : [0, 2];
     g.regions[2]!.adjacency = enemyBordersR1 ? [1] : [1, 3];
-    g.nations.push({ id: RIVAL, name: "Rival", color: "#000", isPlayer: false, isBarbarian: false, alive: true, stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, taxRate: 0, research: { current: null, progress: 0, done: [] }, wonders: 0, famine: false, bankrupt: false });
+    g.nations.push({ id: RIVAL, name: "Rival", color: "#000", isPlayer: false, isBarbarian: false, alive: true, stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, taxRate: 0, research: { current: null, progress: 0, done: [] }, famine: false, bankrupt: false });
     g.armies.push({ id: 9, ownerId: RIVAL, regionId: 3, units: { ...emptyUnits(), infantry: 3 }, movesLeft: 0 });
     // At war so the enemy actually exerts control.
     g.treaties = { [pairKey(PLAYER_ID, RIVAL)]: "war" };
@@ -657,10 +657,10 @@ describe("upkeep and bankruptcy", () => {
     expect(totalUpkeep(g, PLAYER_ID)).toBe(expected);
   });
 
-  it("a real game start has a positive player army and barbarian foes", () => {
+  it("a real game start has a positive player army and rival armies", () => {
     const g = createGame({ seed: 42 });
     expect(g.armies.some((a) => a.ownerId === PLAYER_ID && armySize(a.units) > 0)).toBe(true);
-    expect(g.armies.some((a) => a.ownerId === BARBARIAN_ID)).toBe(true);
+    expect(g.armies.some((a) => a.ownerId !== PLAYER_ID && a.ownerId !== BARBARIAN_ID)).toBe(true);
   });
 });
 

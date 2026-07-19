@@ -1,6 +1,5 @@
 /**
- * Scripted maps — hand-authored real-geography scenarios (the Baltic, Europe),
- * as an alternative to the procedural "random realm". A scripted map supplies
+ * Scripted map data. The Hanseatic World supplies
  * its own landmass outlines and fixed regions (real positions, names, terrain);
  * the sim derives movement adjacency from the Voronoi of those sites, and the
  * renderer clips its cells to the authored coastline instead of a generated
@@ -66,18 +65,14 @@ export interface ScriptedMap {
   };
 }
 
-import { BALTIC_MAP } from "@/data/maps/baltic";
-import { EUROPE_MAP } from "@/data/maps/europe";
 import { HANSA_MAP } from "@/data/maps/hansa";
 
 /** All scripted maps, by id. */
 export const SCRIPTED_MAPS: Record<string, ScriptedMap> = {
   [HANSA_MAP.id]: HANSA_MAP,
-  [BALTIC_MAP.id]: BALTIC_MAP,
-  [EUROPE_MAP.id]: EUROPE_MAP,
 };
 
-/** Look up a scripted map by id (undefined = procedural / random realm). */
+/** Look up an authored map by id. */
 export function scriptedMap(id: string | undefined | null): ScriptedMap | undefined {
   return id ? SCRIPTED_MAPS[id] : undefined;
 }

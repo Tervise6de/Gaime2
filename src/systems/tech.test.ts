@@ -52,8 +52,8 @@ describe("unlocks", () => {
 
   it("gates advanced buildings behind tech", () => {
     expect(isBuildingUnlockedFor([], "market")).toBe(true);
-    expect(isBuildingUnlockedFor([], "wonder")).toBe(false);
-    expect(isBuildingUnlockedFor(["architecture"], "wonder")).toBe(true);
+    expect(isBuildingUnlockedFor([], "bank")).toBe(false);
+    expect(isBuildingUnlockedFor(["banking"], "bank")).toBe(true);
   });
 
   it("gates the new resource works behind their techs (C2)", () => {

@@ -24,7 +24,7 @@ const NAMES = [
 ];
 
 // Epithets biased by archetype — a warlord earns a different reputation than a
-// merchant. Each list is the "flavour" pool; a generic pool backstops them.
+// merchant. Each list is the flavour pool; a neutral pool backstops them.
 const EPITHETS: Record<Personality["archetype"], string[]> = {
   warlord: ["the Cruel", "the Conqueror", "the Iron", "the Wrathful", "the Bloody", "the Dread"],
   merchant: ["the Rich", "the Shrewd", "the Gilded", "the Trader", "the Prosperous"],

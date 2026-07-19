@@ -1,6 +1,6 @@
 # Security model & review
 
-Petty Kingdoms is a **100% client-side, offline** browser game: no backend, no
+Hansa is a **100% client-side, offline** browser game: no backend, no
 accounts, no network calls. That shrinks the attack surface to a single class of
 untrusted input, plus the usual web hardening.
 

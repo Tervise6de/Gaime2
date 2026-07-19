@@ -2,7 +2,7 @@
  * Stress / bug-bash harness (roadmap A4).
  *
  * Plays many full games to conclusion across seeds, map sizes, rival counts,
- * difficulties, and both procedural + scripted maps — with the AI driving EVERY
+ * difficulties on the authored Hansa map — with the AI driving EVERY
  * nation (the player included), so the whole army/character stack (combined
  * battles, allied rally, zone of control, entrenchment, commanders, defection,
  * reconquest, revolts, the chronicle) gets exercised end to end. Every turn of

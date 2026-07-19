@@ -22,11 +22,6 @@ import {
   callToArms,
   warTargetsFor,
   playerDemandTribute,
-  establishTrade,
-  hasTrade,
-  severTrade,
-  tradeIncome,
-  tradePartners,
   peaceReparations,
   recordOpinion,
   decayOpinions,
@@ -47,9 +42,6 @@ import {
   RELATION_MAX,
   RELATION_MIN,
   PLAYER_ID,
-  TRADE_INCOME_BASE,
-  TRADE_INCOME_MAX,
-  TRADE_INCOME_PER_REGION,
   emptyUnits,
   pairKey,
   type GameState,
@@ -266,7 +258,11 @@ describe("kept-the-peace goodwill", () => {
   it("driftRelations warms an amicable peace toward the goodwill floor over the long run", () => {
     // Goodwill only warms an already-amicable (rel ≥ 0) peace — it never rescues a
     // souring one, so start from a mildly positive standing.
-    const warm = setRelation(game(), RIVAL_A, RIVAL_B, 4);
+    const warm0 = setRelation(game(), RIVAL_A, RIVAL_B, 4);
+    const warm = {
+      ...warm0,
+      regions: warm0.regions.map((r) => (r.ownerId === RIVAL_A || r.ownerId === RIVAL_B ? { ...r, ownerId: PLAYER_ID } : r)),
+    };
     // Early game: no goodwill accrued, so only the usual drift/border pressures act.
     const early = getRelation(driftRelations({ ...warm, turn: 3 }), RIVAL_A, RIVAL_B);
     // After a long peace the floor sits well above the start, so relations are lifted.
@@ -471,49 +467,6 @@ describe("warTargetsFor", () => {
     let s = setTreaty(game(), PLAYER, RIVAL_B, "war");
     s = { ...s, nations: s.nations.map((n) => (n.id === RIVAL_B ? { ...n, alive: false } : n)) };
     expect(warTargetsFor(s, PLAYER, RIVAL_A)).not.toContain(RIVAL_B);
-  });
-});
-
-describe("trade routes (economic diplomacy)", () => {
-  it("establishing a route sets hasTrade and warms relations; severing clears it", () => {
-    let s = game();
-    expect(hasTrade(s, RIVAL_A, RIVAL_B)).toBe(false);
-    const rel0 = getRelation(s, RIVAL_A, RIVAL_B);
-    s = establishTrade(s, RIVAL_A, RIVAL_B);
-    expect(hasTrade(s, RIVAL_A, RIVAL_B)).toBe(true);
-    expect(getRelation(s, RIVAL_A, RIVAL_B)).toBeGreaterThan(rel0);
-    s = severTrade(s, RIVAL_A, RIVAL_B);
-    expect(hasTrade(s, RIVAL_A, RIVAL_B)).toBe(false);
-  });
-
-  it("declaring war severs an active trade route", () => {
-    let s = establishTrade(game(), RIVAL_A, RIVAL_B);
-    expect(hasTrade(s, RIVAL_A, RIVAL_B)).toBe(true);
-    s = declareWar(s, RIVAL_A, RIVAL_B);
-    expect(hasTrade(s, RIVAL_A, RIVAL_B)).toBe(false);
-    expect(atWar(s, RIVAL_A, RIVAL_B)).toBe(true);
-  });
-
-  it("trade income scales with the smaller partner's region count and caps", () => {
-    const few = { regions: [{ ownerId: RIVAL_A }, { ownerId: RIVAL_A }, { ownerId: RIVAL_B }] } as unknown as GameState;
-    expect(tradeIncome(few, RIVAL_A, RIVAL_B)).toBe(TRADE_INCOME_BASE + TRADE_INCOME_PER_REGION); // min = 1
-    const many = {
-      regions: Array.from({ length: 40 }, (_, i) => ({ ownerId: i < 20 ? RIVAL_A : RIVAL_B })),
-    } as unknown as GameState;
-    expect(tradeIncome(many, RIVAL_A, RIVAL_B)).toBe(TRADE_INCOME_MAX); // 2 + 0.5·20 = 12 → capped 8
-  });
-
-  it("a rival accepts a trade at decent relations, but never while at war", () => {
-    let s = setRelation(game(), PLAYER_ID, RIVAL_A, 10);
-    expect(wouldAccept(s, PLAYER_ID, RIVAL_A, "trade")).toBe(true);
-    s = setTreaty(s, PLAYER_ID, RIVAL_A, "war");
-    expect(wouldAccept(s, PLAYER_ID, RIVAL_A, "trade")).toBe(false);
-  });
-
-  it("tradePartners lists only active trade partners", () => {
-    const s = establishTrade(game(), PLAYER_ID, RIVAL_A);
-    expect(tradePartners(s, PLAYER_ID)).toContain(RIVAL_A);
-    expect(tradePartners(s, PLAYER_ID)).not.toContain(RIVAL_B);
   });
 });
 

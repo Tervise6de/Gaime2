@@ -25,12 +25,6 @@ export const ACHIEVEMENTS: Achievement[] = [
     test: (s) => winsOf(s, "domination") + winsOf(s, "conquest") >= 1,
   },
   {
-    id: "wonder_of_the_age",
-    name: "Wonder of the Age",
-    desc: "Win by completing your Great Works.",
-    test: (s) => winsOf(s, "great works") >= 1,
-  },
-  {
     id: "enlightened",
     name: "Enlightened",
     desc: "Win on prestige at the turn limit.",
@@ -39,10 +33,9 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: "polymath",
     name: "Polymath",
-    desc: "Win by each of the three paths at least once.",
+    desc: "Win by conquest and by prestige at least once.",
     test: (s) =>
       winsOf(s, "domination") + winsOf(s, "conquest") >= 1 &&
-      winsOf(s, "great works") >= 1 &&
       winsOf(s, "prestige score") >= 1,
   },
   { id: "veteran", name: "Veteran", desc: "Play 10 games.", test: (s) => s.gamesPlayed >= 10 },

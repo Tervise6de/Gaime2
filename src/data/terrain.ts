@@ -15,7 +15,7 @@ export type TerrainId = "plains" | "forest" | "hills" | "mountains" | "coast";
  * Strategic resources (docs/game-design.md §3.2). Iron and horses gate advanced
  * units; salt and amber are the Hansa's signature *trade* strategics — salt the
  * "white gold" that preserves fish, amber the Baltic luxury — seeded on the Hansa
- * map (they never spawn procedurally, so other maps are unaffected).
+ * map.
  */
 export type StrategicResource = "iron" | "horses" | "salt" | "amber";
 
@@ -61,9 +61,9 @@ export interface TerrainDef {
   popCapacity: number;
   /** Defensive multiplier applied to a defender fighting on this terrain. */
   defense: number;
-  /** Strategic resource that may spawn on this terrain (procedural). */
+  /** Strategic resource associated with this terrain. */
   strategic: StrategicResource | null;
-  /** Relative weight for procedural placement. */
+  /** Legacy placement weight retained for data compatibility. */
   weight: number;
 }
 

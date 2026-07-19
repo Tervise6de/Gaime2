@@ -8,9 +8,8 @@
  * (economy.ts) — goods are a parallel derived quantity that only *adds* gold, so
  * the core economy and its tests are unaffected.
  *
- * The seam in the turn pipeline is `stepTrade`, inserted beside `applyTradeIncome`
- * (the older bilateral trade). Both credit gold identically and log the player's
- * total. `seedKontore` opens the four Kontore at game start.
+ * The seam in the turn pipeline is `stepTrade`, which logs the player's total.
+ * `seedKontore` opens the four Kontore at game start.
  *
  * Pure over `GameState` — no RNG (fully deterministic), no DOM. The same lane
  * BFS as turn.ts `graphDistance`, but returning the path with a lowest-id
@@ -477,7 +476,7 @@ export function routeFlows(state: GameState, route: TradeRoute): boolean {
 /**
  * Resolve every trade route one turn: recompute each route's disruption, pay its
  * owner `routeIncome` (0 if disrupted), and record `lastIncome`/`disrupted` on the
- * route. Credits gold exactly as `applyTradeIncome` does and logs the player's
+ * route. Credits route gold and logs the player's
  * total. A no-op when there are no routes. Pure — returns new state.
  *
  * A route whose owner has since lost the producing region, or been eliminated, is

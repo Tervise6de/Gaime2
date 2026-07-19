@@ -32,7 +32,6 @@ export type BuildingId =
   | "guildhall"
   | "forum"
   | "fortress"
-  | "wonder"
   | "granary"
   | "barracks"
   | "lighthouse"
@@ -87,8 +86,6 @@ export interface BuildingDef {
    * `focus` matches; changing focus doesn't remove one already built.
    */
   requiresFocus?: FocusId;
-  /** A Great Work — counts toward the economic victory. */
-  isWonder?: boolean;
   /** One-line description for the build menu. */
   blurb: string;
 }
@@ -230,17 +227,6 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     fortification: 2,
     requiresTech: "engineering",
     blurb: "+2 fortification — brick walls and a gatehouse (a Holstentor) a besieger dreads. (Engineering)",
-  },
-  wonder: {
-    id: "wonder",
-    name: "Great Work",
-    cost: 100,
-    yield: { gold: 2, knowledge: 2 },
-    popCapacity: 0,
-    unrest: 0,
-    requiresTech: "architecture",
-    isWonder: true,
-    blurb: "A prestige project — a Marienkirche to rival Lübeck's. Build enough to win an economic victory. (Architecture)",
   },
   granary: {
     id: "granary",
@@ -418,7 +404,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   // The Brick-Gothic vocabulary the era is known for (docs/hansa times.md §6):
   // a salt store, an export brewery, a canal, and the Roland freedom-monument.
   // Early, un-gated economy/order buildings (bar the ambitious Canal) — the
-  // League's own flavour, sitting beside the generic economy set.
+  // League's own flavour, sitting beside the core economy set.
   salzspeicher: {
     id: "salzspeicher",
     name: "Salzspeicher",

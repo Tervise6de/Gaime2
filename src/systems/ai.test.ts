@@ -229,77 +229,77 @@ describe("trait-aware AI openings", () => {
     ({ unrest: 0, buildings, terrain });
 
   it("opens on the trait's synergy building (unlocked from start)", () => {
-    expect(chooseBuilding(empty(), [], 0, false, "fertile")).toBe("farm");
-    expect(chooseBuilding(empty(), [], 0, false, "industrious")).toBe("workshop");
-    expect(chooseBuilding(empty(), [], 0, false, "mercantile")).toBe("market");
-    expect(chooseBuilding(empty(), [], 0, false, "scholarly")).toBe("library");
+    expect(chooseBuilding(empty(), [], "fertile")).toBe("farm");
+    expect(chooseBuilding(empty(), [], "industrious")).toBe("workshop");
+    expect(chooseBuilding(empty(), [], "mercantile")).toBe("market");
+    expect(chooseBuilding(empty(), [], "scholarly")).toBe("library");
   });
 
   it("a Martial realm rushes a fortress once it is unlocked", () => {
-    expect(chooseBuilding(empty(), ["engineering"], 0, false, "martial")).toBe("fortress");
+    expect(chooseBuilding(empty(), ["engineering"], "martial")).toBe("fortress");
     // Locked fortress → falls back to its next preference (workshop).
-    expect(chooseBuilding(empty(), [], 0, false, "martial")).toBe("workshop");
+    expect(chooseBuilding(empty(), [], "martial")).toBe("workshop");
   });
 
   it("raises a province's focus capstone as soon as its tech lands", () => {
     const farmland = { unrest: 0, buildings: [] as BuildingId[], terrain: "plains" as const, focus: "farmland" as const };
-    // With Feudalism, the specialised province builds its Manor ahead of generics.
-    expect(chooseBuilding(farmland, ["feudalism"], 0, false)).toBe("manor");
+    // With Feudalism, the specialised province builds its Manor ahead of baseline choices.
+    expect(chooseBuilding(farmland, ["feudalism"])).toBe("manor");
     // Without the tech the capstone is locked, so it falls back to the order.
-    expect(chooseBuilding(farmland, [], 0, false)).not.toBe("manor");
+    expect(chooseBuilding(farmland, [])).not.toBe("manor");
     // A garrison on rough ground raises its Citadel once Castles is in.
     const garrison = { unrest: 0, buildings: [] as BuildingId[], terrain: "hills" as const, focus: "garrison" as const };
-    expect(chooseBuilding(garrison, ["castles"], 0, false)).toBe("citadel");
+    expect(chooseBuilding(garrison, ["castles"])).toBe("citadel");
   });
 
   it("falls back to the generalist order with no trait", () => {
-    expect(chooseBuilding(empty(), [], 0, false)).toBe("market");
+    expect(chooseBuilding(empty(), [])).toBe("market");
   });
 
   it("still prioritises a temple when unrest is high, whatever the trait", () => {
-    expect(chooseBuilding({ unrest: 40, buildings: [], terrain: "plains" }, [], 0, false, "scholarly")).toBe("temple");
+    expect(chooseBuilding({ unrest: 40, buildings: [], terrain: "plains" }, [], "scholarly")).toBe("temple");
   });
 
   it("skips a building it already has and moves to the next preference", () => {
-    expect(chooseBuilding(empty(["farm"]), [], 0, false, "fertile")).not.toBe("farm");
+    expect(chooseBuilding(empty(["farm"]), [], "fertile")).not.toBe("farm");
   });
 
   it("builds the Guildhall only once Economics is researched", () => {
     // With market+bank built but no Economics, the Guildhall (next in order) is
     // still LOCKED — the AI skips it to Workshop. With the tech it's chosen.
-    expect(chooseBuilding(empty(["market", "bank"]), [], 0, false)).toBe("workshop");
-    expect(chooseBuilding(empty(["market", "bank"]), ["economics"], 0, false)).toBe("guildhall");
+    expect(chooseBuilding(empty(["market", "bank"]), [])).toBe("workshop");
+    expect(chooseBuilding(empty(["market", "bank"]), ["economics"])).toBe("guildhall");
   });
 
   it("builds the Forum only once Philosophy is researched", () => {
     // Market+workshop built; bank/guildhall/university locked. Without
     // Philosophy the Forum (next in order) is skipped to Farm; with it, chosen.
-    expect(chooseBuilding(empty(["market", "workshop"]), [], 0, false)).toBe("farm");
-    expect(chooseBuilding(empty(["market", "workshop"]), ["philosophy"], 0, false)).toBe("forum");
+    expect(chooseBuilding(empty(["market", "workshop"]), [])).toBe("farm");
+    expect(chooseBuilding(empty(["market", "workshop"]), ["philosophy"])).toBe("forum");
   });
 
   it("a Scholarly realm reaches for the Forum after its knowledge buildings", () => {
     expect(
-      chooseBuilding(empty(["library", "university"]), ["mathematics", "philosophy"], 0, false, "scholarly"),
+      chooseBuilding(empty(["library", "university"]), ["mathematics", "philosophy"], "scholarly"),
     ).toBe("forum");
   });
 
   it("builds the Mine only on mountains AND with Masonry (gates compose)", () => {
     const built: BuildingId[] = ["market", "workshop"];
     // Mountains + Masonry → Mine (next in order after workshop).
-    expect(chooseBuilding(empty(built, "mountains"), ["masonry"], 0, false)).toBe("mine");
+    expect(chooseBuilding(empty(built, "mountains"), ["masonry"])).toBe("mine");
     // Mountains without the tech → skipped (locked).
-    expect(chooseBuilding(empty(built, "mountains"), [], 0, false)).not.toBe("mine");
+    expect(chooseBuilding(empty(built, "mountains"), [])).not.toBe("mine");
     // The tech without the terrain → skipped (doesn't fit).
-    expect(chooseBuilding(empty(built, "plains"), ["masonry"], 0, false)).not.toBe("mine");
+    expect(chooseBuilding(empty(built, "plains"), ["masonry"])).not.toBe("mine");
   });
 
   it("builds the Harbor on coast regions only", () => {
     // Coast, market built → Harbor is next in the generalist order.
-    expect(chooseBuilding(empty(["market"], "coast"), [], 0, false)).toBe("harbor");
+    expect(chooseBuilding(empty(["market"], "coast"), [])).toBe("harbor");
     // Same position on plains → the Harbor never fits; skips to Workshop
     // (bank/guildhall still locked).
-    expect(chooseBuilding(empty(["market"]), [], 0, false)).toBe("workshop");
+    expect(chooseBuilding(empty(["market"]), [])).toBe("workshop");
   });
 });
 
@@ -360,7 +360,6 @@ describe("trait-aware tech selection", () => {
       stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 },
       taxRate: 0.15,
       research: emptyResearch(),
-      wonders: 0,
       famine: false,
       bankrupt: false,
       ...over,
@@ -611,8 +610,8 @@ describe("concentration of force", () => {
         relations: {},
         log: [],
         nations: [
-          { id: RIVAL, name: "R", color: "#000", isPlayer: false, isBarbarian: false, alive: true, stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, taxRate: 0.2, research: emptyResearch(), wonders: 0, famine: false, bankrupt: false, personality: { archetype: "warlord", aggression: 0.9, expansion: 0.8, economy: 0.3, trustworthiness: 0.2 } },
-          { id: ENEMY, name: "E", color: "#fff", isPlayer: false, isBarbarian: false, alive: true, stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, taxRate: 0.2, research: emptyResearch(), wonders: 0, famine: false, bankrupt: false },
+          { id: RIVAL, name: "R", color: "#000", isPlayer: false, isBarbarian: false, alive: true, stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, taxRate: 0.2, research: emptyResearch(), famine: false, bankrupt: false, personality: { archetype: "warlord", aggression: 0.9, expansion: 0.8, economy: 0.3, trustworthiness: 0.2 } },
+          { id: ENEMY, name: "E", color: "#fff", isPlayer: false, isBarbarian: false, alive: true, stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, taxRate: 0.2, research: emptyResearch(), famine: false, bankrupt: false },
         ],
         regions: [
           region({ id: 0, ownerId: RIVAL, adjacency: [1, 2] }),
@@ -769,7 +768,7 @@ describe("overstretched restraint (hold new wars while a province revolts)", () 
     ({
       id, name: `N${id}`, color: "#fff", isPlayer: false, isBarbarian: false, alive: true,
       stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, taxRate: 0.15,
-      research: emptyResearch(), wonders: 0, famine: false, bankrupt: false, ...over,
+      research: emptyResearch(), famine: false, bankrupt: false, ...over,
     }) as Nation;
 
   // AGGR (warlord) borders and is hostile to a same-strength TARGET, so it would
@@ -807,7 +806,7 @@ describe("opportunistic strike on a weak rival (target instability)", () => {
     ({
       id, name: `N${id}`, color: "#fff", isPlayer: false, isBarbarian: false, alive: true,
       stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, taxRate: 0.15,
-      research: emptyResearch(), wonders: 0, famine: false, bankrupt: false, ...over,
+      research: emptyResearch(), famine: false, bankrupt: false, ...over,
     }) as Nation;
 
   // Equal power (1 region each, no armies) → ratio ≈ 1.0, below the 1.1 base
@@ -851,7 +850,6 @@ describe("gang up on a runaway leader", () => {
       stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 },
       taxRate: 0.15,
       research: emptyResearch(),
-      wonders: 0,
       famine: false,
       bankrupt: false,
       ...over,
@@ -931,13 +929,12 @@ describe("gang up on a runaway leader", () => {
 });
 
 describe("rival behaviour over a game", () => {
-  it("rivals expand into barbarian land", () => {
+  it("rivals take turns on the authored Hansa board without losing the roster", () => {
     let s = createGame({ seed: 12345, rivals: 2 });
-    const rivalRegions = (g: typeof s) =>
-      g.regions.filter((r) => r.ownerId === RIVAL).length;
-    const start = rivalRegions(s);
+    const startAlive = s.nations.filter((n) => !n.isBarbarian && n.alive).length;
     for (let i = 0; i < 30; i++) s = resolveTurn(s);
-    expect(rivalRegions(s)).toBeGreaterThan(start);
+    expect(s.nations.filter((n) => !n.isBarbarian && n.alive).length).toBeGreaterThan(1);
+    expect(s.nations.filter((n) => !n.isBarbarian).length).toBe(startAlive);
   });
 
   it("wars break out among nations over time", () => {
@@ -995,7 +992,7 @@ describe("tribute demands", () => {
   const nat = (id: number, over: Partial<Nation> = {}): Nation => ({
     id, name: `N${id}`, color: "#fff", isPlayer: id === P, isBarbarian: id === BARBARIAN_ID, alive: true,
     stocks: { gold: id === R ? 200 : 20, food: 20, materials: 10, knowledge: 0 },
-    taxRate: 0.1, research: emptyResearch(), wonders: 0, famine: false, bankrupt: false, ...over,
+    taxRate: 0.1, research: emptyResearch(), famine: false, bankrupt: false, ...over,
   });
 
   /** A strong rival (3 regions, big army) bordering a weak player, at the given relation. */

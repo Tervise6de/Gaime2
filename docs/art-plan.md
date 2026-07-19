@@ -50,7 +50,7 @@ dependency (`dependencies: {}` stays).
 3. **Nation crests (7)** — standings, diplomacy panel, capital markers.
 4. **Terrain + background** — shaded radial fills per terrain (node view),
    tinted fills (Voronoi view), vignette world background over flat `#11151c`.
-5. **Unit (5) + building (14) icons** — recruit/build panels, Great Work gets
+5. **Unit + building icons** — recruit/build panels, civic landmarks get
    a distinct laurel treatment.
 6. **Favicon + PWA icons (192/512)** — derived from the crest/crown mark.
 7. *(stretch)* Victory/defeat end-cards, event vignettes.

@@ -72,7 +72,7 @@ pattern) shown when `state.outcome !== "playing"`:
 - A **large prestige-history line graph** over the whole game (one line per
   nation, dead nations included, player emphasised) — promote/scale up the
   existing sparkline rather than inventing a new renderer.
-- A final scoreboard: each nation's prestige, regions, wonders, techs, and
+- A final scoreboard: each nation's prestige, regions, techs, trade reach, and
   wars fought, sorted by score, player row highlighted.
 - A few "story" superlatives if cheap (peak turn, largest empire reached).
 - Clear **"New game"** and **"Keep viewing the map"** actions.

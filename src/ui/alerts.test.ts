@@ -2,10 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { deriveAlerts, type Alert } from "@/ui/alerts";
 import { createGame } from "@/systems/turn";
-import { PLAYER_ID, UNREST_REVOLT, WONDER_GOAL, type GameState } from "@/systems/state";
+import { PLAYER_ID, UNREST_REVOLT, type GameState } from "@/systems/state";
 import type { TurnSummary } from "@/systems/summary";
 
-/** A quiet (nothing-happened) summary; individual tests override fields. */
 function quietSummary(overrides: Partial<TurnSummary> = {}): TurnSummary {
   return {
     goldDelta: 0,
@@ -22,7 +21,6 @@ function quietSummary(overrides: Partial<TurnSummary> = {}): TurnSummary {
   };
 }
 
-/** A fresh game with no player region in revolt (calm baseline). */
 function calmGame(): GameState {
   const g = createGame({ seed: 4242, rivals: 2 });
   for (const r of g.regions) if (r.ownerId === PLAYER_ID) r.unrest = 0;
@@ -32,57 +30,45 @@ function calmGame(): GameState {
 const texts = (alerts: Alert[]): string[] => alerts.map((a) => a.text);
 
 describe("deriveAlerts", () => {
-  it("emits a danger alert for each region lost", () => {
-    const alerts = deriveAlerts(calmGame(), quietSummary({ regionsLost: ["Aldia", "Bryn"] }));
+  it("emits danger alerts for losses, wars, famine, and bankruptcy", () => {
+    const alerts = deriveAlerts(
+      calmGame(),
+      quietSummary({ regionsLost: ["Aldia"], warsDeclared: ["Rurik"], famine: true, bankrupt: true }),
+    );
     expect(alerts).toContainEqual({ severity: "danger", text: "Lost Aldia" });
-    expect(alerts).toContainEqual({ severity: "danger", text: "Lost Bryn" });
-  });
-
-  it("emits a danger alert for each war declared", () => {
-    const alerts = deriveAlerts(calmGame(), quietSummary({ warsDeclared: ["Rurik"] }));
     expect(alerts).toContainEqual({ severity: "danger", text: "Now at war with Rurik" });
-  });
-
-  it("emits a danger alert for famine", () => {
-    const alerts = deriveAlerts(calmGame(), quietSummary({ famine: true }));
     expect(alerts).toContainEqual({ severity: "danger", text: "Famine — population starving" });
-  });
-
-  it("emits a danger alert for bankruptcy", () => {
-    const alerts = deriveAlerts(calmGame(), quietSummary({ bankrupt: true }));
     expect(alerts).toContainEqual({ severity: "danger", text: "Bankruptcy — troops disbanded" });
   });
 
-  it("raises a danger alert when a rival nears a victory", () => {
+  it("raises a danger alert when a rival nears domination", () => {
     const g = calmGame();
     const rival = g.nations.find((n) => !n.isPlayer && !n.isBarbarian)!;
-    rival.wonders = WONDER_GOAL - 1; // one wonder short — ≥75% toward a Great Works win
+    let assigned = 0;
+    const target = Math.ceil(g.regions.filter((r) => r.ownerId !== null).length * 0.5);
+    for (const r of g.regions) {
+      if (r.ownerId !== null && assigned < target) {
+        r.ownerId = rival.id;
+        assigned++;
+      }
+    }
     const alerts = deriveAlerts(g, quietSummary());
     expect(
-      alerts.some((a) => a.severity === "danger" && a.text.startsWith(`${rival.name} nears a great works victory`)),
+      alerts.some((a) => a.severity === "danger" && a.text.startsWith(`${rival.name} nears a domination victory`)),
     ).toBe(true);
   });
 
-  it("does not alarm on a rival comfortably short of any win", () => {
-    const alerts = deriveAlerts(calmGame(), quietSummary());
-    expect(alerts.some((a) => a.text.includes("nears a"))).toBe(false);
-  });
-
-  it("does not raise the near-victory alarm for the player's own lead", () => {
+  it("does not alarm on a rival comfortably short of any win or on the player's own lead", () => {
+    expect(deriveAlerts(calmGame(), quietSummary()).some((a) => a.text.includes("nears a"))).toBe(false);
     const g = calmGame();
-    g.nations[PLAYER_ID]!.wonders = 4; // player at a win — not an alert
-    const alerts = deriveAlerts(g, quietSummary());
-    expect(alerts.some((a) => a.text.includes("nears a"))).toBe(false);
+    for (const r of g.regions) if (r.ownerId !== null) r.ownerId = PLAYER_ID;
+    expect(deriveAlerts(g, quietSummary()).some((a) => a.text.includes("nears a"))).toBe(false);
   });
 
   it("emits good alerts for gains, eliminations, and techs", () => {
     const alerts = deriveAlerts(
       calmGame(),
-      quietSummary({
-        regionsGained: ["Cove"],
-        eliminated: ["Rurik"],
-        techsCompleted: ["writing"],
-      }),
+      quietSummary({ regionsGained: ["Cove"], eliminated: ["Rurik"], techsCompleted: ["writing"] }),
     );
     expect(alerts).toContainEqual({ severity: "good", text: "Captured Cove" });
     expect(alerts).toContainEqual({ severity: "good", text: "Rurik eliminated" });
@@ -92,24 +78,18 @@ describe("deriveAlerts", () => {
   it("scans state for player revolts and warns on each", () => {
     const g = calmGame();
     const mine = g.regions.filter((r) => r.ownerId === PLAYER_ID);
-    expect(mine.length).toBeGreaterThan(0);
     mine[0]!.unrest = UNREST_REVOLT;
     mine[0]!.name = "Riotville";
-
-    const alerts = deriveAlerts(g, quietSummary());
-    expect(alerts).toContainEqual({ severity: "warn", text: "Revolt in Riotville" });
+    expect(deriveAlerts(g, quietSummary())).toContainEqual({ severity: "warn", text: "Revolt in Riotville" });
   });
 
-  it("does not warn on a region below the revolt threshold or owned by others", () => {
+  it("ignores below-threshold and non-player revolts", () => {
     const g = calmGame();
     const mine = g.regions.filter((r) => r.ownerId === PLAYER_ID);
-    mine[0]!.unrest = UNREST_REVOLT - 1; // just under
-    // Force a non-player region above the threshold — must be ignored.
+    mine[0]!.unrest = UNREST_REVOLT - 1;
     const other = g.regions.find((r) => r.ownerId !== PLAYER_ID);
     if (other) other.unrest = UNREST_REVOLT + 20;
-
-    const alerts = deriveAlerts(g, quietSummary());
-    expect(alerts).toEqual([]);
+    expect(deriveAlerts(g, quietSummary())).toEqual([]);
   });
 
   it("surfaces active revolts even when summary is null", () => {
@@ -117,16 +97,11 @@ describe("deriveAlerts", () => {
     const mine = g.regions.filter((r) => r.ownerId === PLAYER_ID);
     mine[0]!.unrest = UNREST_REVOLT + 5;
     mine[0]!.name = "Emberford";
-
-    const alerts = deriveAlerts(g, null);
-    expect(alerts).toEqual([{ severity: "warn", text: "Revolt in Emberford" }]);
+    expect(deriveAlerts(g, null)).toEqual([{ severity: "warn", text: "Revolt in Emberford" }]);
   });
 
   it("returns nothing on a quiet turn with no revolts", () => {
     expect(deriveAlerts(calmGame(), quietSummary())).toEqual([]);
-  });
-
-  it("returns nothing when summary is null and no revolts are active", () => {
     expect(deriveAlerts(calmGame(), null)).toEqual([]);
   });
 
@@ -143,24 +118,17 @@ describe("deriveAlerts", () => {
         techsCompleted: ["writing"],
       }),
     );
-
     expect(alerts).toHaveLength(6);
-    // All six survivors are danger; the good alerts were dropped by the cap.
     expect(alerts.every((a) => a.severity === "danger")).toBe(true);
     expect(texts(alerts)).not.toContain("Captured G1");
   });
 
-  it("orders danger → warn → good", () => {
+  it("orders danger, warn, then good", () => {
     const g = calmGame();
     const mine = g.regions.filter((r) => r.ownerId === PLAYER_ID);
     mine[0]!.unrest = UNREST_REVOLT;
     mine[0]!.name = "Unruly";
-
-    const alerts = deriveAlerts(
-      g,
-      quietSummary({ regionsLost: ["Fallen"], regionsGained: ["Won"] }),
-    );
-
+    const alerts = deriveAlerts(g, quietSummary({ regionsLost: ["Fallen"], regionsGained: ["Won"] }));
     expect(alerts.map((a) => a.severity)).toEqual(["danger", "warn", "good"]);
   });
 });

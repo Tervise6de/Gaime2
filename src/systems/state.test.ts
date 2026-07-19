@@ -25,7 +25,6 @@ function nation(over: Partial<Nation> = {}): Nation {
     stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 },
     taxRate: 0.15,
     research: { current: null, progress: 0, done: [] },
-    wonders: 0,
     famine: false,
     bankrupt: false,
     ...over,

@@ -12,14 +12,12 @@ import {
   clearBuildQueue,
   startQueuedBuildings,
   applySecession,
-  applyTradeIncome,
 } from "@/systems/turn";
 import { nationalProduction } from "@/systems/economy";
 import { routeIncome } from "@/systems/trade";
 import { factionByName } from "@/data/factions";
 import { totalUpkeep } from "@/systems/military";
 import { regionCapacity } from "@/systems/population";
-import { establishTrade, tradeIncome } from "@/systems/diplomacy";
 import { DEFAULT_MAP_OPTIONS } from "@/systems/mapgen";
 import { BUILDINGS } from "@/data/buildings";
 import {
@@ -72,47 +70,25 @@ describe("createGame", () => {
     expect(g.nations.some((n) => !n.isPlayer && !n.isBarbarian)).toBe(true);
   });
 
-  it("applyTradeIncome pays both partners of an active trade route", () => {
-    const RIVAL = 2;
-    const s = establishTrade(createGame({ seed: 1, rivals: 2 }), PLAYER_ID, RIVAL);
-    const inc = tradeIncome(s, PLAYER_ID, RIVAL);
-    expect(inc).toBeGreaterThan(0);
-    const p0 = s.nations[PLAYER_ID]!.stocks.gold;
-    const r0 = s.nations.find((n) => n.id === RIVAL)!.stocks.gold;
-    const next = applyTradeIncome(s);
-    expect(next.nations[PLAYER_ID]!.stocks.gold).toBeCloseTo(p0 + inc, 5);
-    expect(next.nations.find((n) => n.id === RIVAL)!.stocks.gold).toBeCloseTo(r0 + inc, 5);
-    // No trades → no-op.
-    expect(applyTradeIncome(createGame({ seed: 1, rivals: 2 }))).toEqual(createGame({ seed: 1, rivals: 2 }));
-  });
-
-  it("seats up to 5 rivals on a large map and caps rivals on a small one", () => {
-    // Medium/large maps host the full 5-rival roster.
+  it("seats the authored Hansa roster regardless of deprecated map/rival options", () => {
     const big = createGame({ seed: 4, rivals: 5, map: { ...DEFAULT_MAP_OPTIONS, regionCount: 30 } });
-    expect(big.nations.filter((n) => !n.isBarbarian && !n.isPlayer).length).toBe(5);
-    // A small map seats fewer rivals rather than cramming capitals — but always ≥1.
     const small = createGame({ seed: 4, rivals: 5, map: { ...DEFAULT_MAP_OPTIONS, regionCount: 16 } });
-    const smallRivals = small.nations.filter((n) => !n.isBarbarian && !n.isPlayer).length;
-    expect(smallRivals).toBeGreaterThanOrEqual(1);
-    expect(smallRivals).toBeLessThan(5);
-    // Whatever seats, every realm is actually placed on the map.
+    expect(big.regions.length).toBe(74);
+    expect(small.regions.length).toBe(74);
     for (const g of [big, small]) {
       const placed = new Set(g.regions.map((r) => r.ownerId).filter((o) => o !== null && o !== BARBARIAN_ID));
       expect(placed.size).toBe(g.nations.filter((n) => !n.isBarbarian).length);
     }
   });
 
-  it("respects a custom map size and still seats every nation", () => {
+  it("keeps the authored Hansa map size and seats every nation", () => {
     const small = createGame({ seed: 3, rivals: 3, map: { ...DEFAULT_MAP_OPTIONS, regionCount: 16 } });
     const large = createGame({ seed: 3, rivals: 3, map: { ...DEFAULT_MAP_OPTIONS, regionCount: 30 } });
-    expect(small.regions.length).toBe(16);
-    expect(large.regions.length).toBe(30);
-    // All four realms (player + 3 rivals) get placed on the smaller map too.
+    expect(small.regions.length).toBe(74);
+    expect(large.regions.length).toBe(74);
     for (const g of [small, large]) {
-      const owners = new Set(
-        g.regions.map((r) => r.ownerId).filter((o) => o !== null && o !== BARBARIAN_ID),
-      );
-      expect(owners.size).toBe(4);
+      const owners = new Set(g.regions.map((r) => r.ownerId).filter((o) => o !== null && o !== BARBARIAN_ID));
+      expect(owners.size).toBe(g.nations.filter((n) => !n.isBarbarian).length);
     }
   });
 
@@ -562,8 +538,8 @@ describe("war-weariness", () => {
 describe("score history", () => {
   it("seeds a one-entry series per non-barbarian nation at game start", () => {
     const g = createGame({ seed: 7, rivals: 2 });
-    // Player (0) + two rivals (2,3); barbarian (1) excluded.
-    expect(Object.keys(g.scoreHistory!).map(Number).sort()).toEqual([PLAYER_ID, 2, 3]);
+    const expected = g.nations.filter((n) => !n.isBarbarian).map((n) => n.id).sort((a, b) => a - b);
+    expect(Object.keys(g.scoreHistory!).map(Number).sort((a, b) => a - b)).toEqual(expected);
     expect(g.scoreHistory![PLAYER_ID]).toHaveLength(1);
     expect(g.scoreHistory![PLAYER_ID]![0]).toBeGreaterThan(0);
   });
@@ -613,11 +589,6 @@ describe("hansa town-size hierarchy", () => {
     const g = createGame({ seed: 42, mapId: "hansa" });
     expect(g.regions.every((r) => typeof r.baseCapacity === "number")).toBe(true);
   });
-
-  it("leaves baseCapacity unset on procedural maps (terrain cap unchanged)", () => {
-    const g = createGame({ seed: 7, rivals: 2 });
-    expect(g.regions.every((r) => r.baseCapacity === undefined)).toBe(true);
-  });
 });
 
 describe("hansa strategic resources (Plan 3B)", () => {
@@ -632,24 +603,14 @@ describe("hansa strategic resources (Plan 3B)", () => {
     expect(g.regions[68]!.resource).toBe("amber");
     expect(g.regions[34]!.resource).toBe("iron");
   });
-
-  it("leaves procedural maps to terrain-spawned resources (never salt/amber)", () => {
-    const g = createGame({ seed: 7, rivals: 2 });
-    const resources = new Set(g.regions.map((r) => r.resource).filter(Boolean));
-    expect(resources.has("salt")).toBe(false);
-    expect(resources.has("amber")).toBe(false);
-  });
 });
 
 describe("the Øresund Sound toll seeding (Plan 3B / trade-as-power)", () => {
-  it("seeds the Sound on the Hansa board (Zealand as the tollhouse), not on procedural maps", () => {
+  it("seeds the Sound on the Hansa board (Zealand as the tollhouse)", () => {
     const hansa = createGame({ seed: 5, mapId: "hansa" });
     expect(hansa.sound).toBeDefined();
-    expect(hansa.sound!.regionId).toBe(23); // Copenhagen / Zealand
+    expect(hansa.sound!.regionId).toBe(23);
     expect(hansa.sound!.embargoes).toEqual([]);
     expect(hansa.sound!.tollRate).toBeGreaterThan(0);
-
-    const procedural = createGame({ seed: 5, rivals: 3 });
-    expect(procedural.sound).toBeUndefined();
   });
 });

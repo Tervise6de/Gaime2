@@ -12,7 +12,6 @@ export type ChronicleKind =
   | "revolt"
   | "betrayal"
   | "fall"
-  | "wonder"
   | "victory";
 
 export interface ChronicleEntry {

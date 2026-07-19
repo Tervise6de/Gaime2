@@ -18,7 +18,7 @@ not admired.
 ## Grid & geometry
 
 - **viewBox is `0 0 24 24` for every icon.** Draw inside a ~1.5px safe inset
-  (nothing outside x/y 2.5–21.5 except deliberate overshoot like the wonder's
+  (nothing outside x/y 2.5-21.5 except deliberate overshoot like a landmark
   laurels).
 - **Stroke: 1.8 at 24px** (the "2px-equivalent" weight — it optically matches
   2px once the browser scales). Use `sw: 2` (the `ico()` option) only when a
@@ -50,7 +50,7 @@ the icon is the colour*:
 | `--art-ink` | `#e8e2cf` | icon ink rasterised onto the canvas map |
 | `--art-ink-bright` | `#f7f4ea` | crest sigils, filled details on colour |
 | `--art-gold` | `#d8a24a` | brand/player gold (crest, app mark) |
-| `--art-gold-hi` | `#e6c874` | gold highlight; the Great Work icon |
+| `--art-gold-hi` | `#e6c874` | gold highlight; prestige/civic accents |
 | `--art-gold-select` | `#f4d27a` | map selection / capital accent |
 | `--art-warn` | `#e0b74a` | amber state (unrest warning) |
 | `--art-danger` | `#e8776b` | red state (revolt, war front) |
@@ -92,7 +92,7 @@ take the *resolved* colour as a `__C__` substitution.
   factions under any palette.
 - **Units**: silhouette-per-role so the counter loop reads (pitchfork, sword,
   bow, horse+lance, catapult). **Buildings**: one-object-per-building; the
-  Great Work alone is fixed `--art-gold-hi`.
+  prestige civic icons may use fixed `--art-gold-hi`.
 - **Terrain**: flat base colours from `data/terrain.ts` plus hi/lo shade pairs
   in `TERRAIN_ART`; the *renderer* turns them into radial shading. Icons never
   ship their own gradients.

@@ -4,7 +4,7 @@ import { ARCHETYPES, personalityByArchetype } from "@/data/personalities";
 import { FOCUS_IDS } from "@/data/focuses";
 import { TRAIT_IDS } from "@/data/traits";
 import { createGame } from "@/systems/turn";
-import { BALTIC_MAP } from "@/data/maps/baltic";
+import { HANSA_MAP } from "@/data/maps/hansa";
 import { PLAYER_ID, playerNation } from "@/systems/state";
 
 describe("faction roster", () => {
@@ -36,7 +36,7 @@ describe("faction roster", () => {
   });
 });
 
-describe("faction selection in random games", () => {
+describe("faction selection on the Hansa board", () => {
   it("gives the player their chosen realm's name and signature trait", () => {
     const def = factionByName("Novgorod")!;
     const g = createGame({ seed: 3, rivals: 3, playerFaction: "Novgorod" });
@@ -63,14 +63,14 @@ describe("faction selection in random games", () => {
   });
 });
 
-describe("faction identity on the scripted Baltic map", () => {
-  it("seats eleven roster realms, each carrying its faction trait", () => {
-    expect(BALTIC_MAP.factions.length).toBe(11);
-    for (const f of BALTIC_MAP.factions) {
+describe("faction identity on the authored Hansa map", () => {
+  it("seats the authored roster, each carrying its faction trait", () => {
+    expect(HANSA_MAP.factions.length).toBe(16);
+    for (const f of HANSA_MAP.factions) {
       const def = factionByName(f.name);
       expect(def, `${f.name} is in the roster`).toBeDefined();
     }
-    const g = createGame({ seed: 5, mapId: "baltic", playerFaction: "Lithuania" });
+    const g = createGame({ seed: 5, mapId: "hansa", playerFaction: "Lithuania" });
     const p = playerNation(g);
     expect(p.name).toBe("Lithuania");
     expect(p.trait).toBe(factionByName("Lithuania")!.trait);
@@ -92,7 +92,7 @@ describe("faction AI disposition (per-faction temperament)", () => {
     expect(personalityByArchetype("builder").aggression).toBe(0.2);
   });
 
-  it("seats each AI realm with its faction's signature disposition (random game)", () => {
+  it("seats each AI realm with its faction's signature disposition", () => {
     const g = createGame({ seed: 7, rivals: 5 });
     for (const n of g.nations) {
       if (n.isPlayer || n.isBarbarian) continue;
@@ -101,8 +101,8 @@ describe("faction AI disposition (per-faction temperament)", () => {
     }
   });
 
-  it("seats dispositions on the scripted Baltic map too", () => {
-    const g = createGame({ seed: 5, mapId: "baltic", playerFaction: "Lithuania" });
+  it("seats dispositions on the authored Hansa map too", () => {
+    const g = createGame({ seed: 5, mapId: "hansa", playerFaction: "Lithuania" });
     const sweden = g.nations.find((n) => n.name === "Sweden");
     if (sweden) expect(sweden.personality?.archetype).toBe("warlord");
   });
@@ -124,7 +124,7 @@ describe("faction home focus (capital opens specialised)", () => {
     }
   });
 
-  it("the player's capital opens with its faction's home focus (random game)", () => {
+  it("the player's capital opens with its faction's home focus", () => {
     const g = createGame({ seed: 3, rivals: 3, playerFaction: "Gotland" });
     const cap = g.regions[playerNation(g).capitalRegionId!]!;
     expect(cap.focus).toBe(factionByName("Gotland")!.homeFocus); // market
@@ -139,8 +139,8 @@ describe("faction home focus (capital opens specialised)", () => {
     }
   });
 
-  it("seats home focuses on the scripted Baltic map", () => {
-    const g = createGame({ seed: 5, mapId: "baltic", playerFaction: "Lithuania" });
+  it("seats home focuses on the authored Hansa map", () => {
+    const g = createGame({ seed: 5, mapId: "hansa", playerFaction: "Lithuania" });
     const p = playerNation(g);
     expect(g.regions[p.capitalRegionId!]!.focus).toBe(factionByName(p.name)!.homeFocus);
   });

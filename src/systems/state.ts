@@ -134,17 +134,6 @@ export const HOSTILE_THRESHOLD = -30;
 export const FRIENDLY_THRESHOLD = 40;
 
 /**
- * Trade tuning (economic diplomacy). An active trade route pays both partners
- * `TRADE_INCOME_BASE + TRADE_INCOME_PER_REGION × (smaller partner's region count)`
- * gold each turn, capped at `TRADE_INCOME_MAX`. Trading with a big neighbour is
- * lucrative, but bounded by your own size — and war severs the route, so peace is
- * profitable and aggression carries an opportunity cost.
- */
-export const TRADE_INCOME_BASE = 1;
-export const TRADE_INCOME_PER_REGION = 0.3;
-export const TRADE_INCOME_MAX = 5;
-
-/**
  * Goods-trade tuning (the merchant layer, hansa-plan.md §6). A trade route carries
  * one good from a region that sources it, along a lane of regions, to a Kontor that
  * demands it — turning the good into gold each turn (systems/trade.ts `stepTrade`).
@@ -168,8 +157,6 @@ export const MAX_ROUTES_PER_NATION = 6;
  */
 /** Fraction of all regions a nation must hold for a domination victory. */
 export const DOMINATION_FRACTION = 0.6;
-/** Great Works needed for an economic victory. */
-export const WONDER_GOAL = 5;
 /** The game ends at this turn on a prestige-score tiebreak. A full campaign is
     a long arc through all five ages (research is era-gated, data/eras.ts). The
     standard-length default; per-game the effective limit lives on
@@ -240,7 +227,7 @@ export interface Region {
    * Per-region town-size floor for the population cap (in pop units), so historic
    * hubs out-scale hinterland provinces (a Kontor city vs. a backwater). Set from
    * a scripted map's town sizing; when absent the cap falls back to terrain alone
-   * (regionCapacity), so procedural/older maps and legacy saves are unaffected.
+   * (regionCapacity), so legacy saves are unaffected.
    */
   baseCapacity?: number;
   /** 0..100. Tax and famine raise it; temples and low tax lower it (M2). */
@@ -351,7 +338,7 @@ export interface TradeRoute {
  * The Øresund Sound toll's live state (data/sound.ts) — present only on the Hansa
  * board. The holder of `regionId` skims `tollRate` of every Baltic→western route
  * and may `embargoes`-close the strait to named rivals. Optional (absent on
- * procedural maps and legacy saves).
+ * legacy saves).
  */
 export interface SoundState {
   /** Host region (Zealand) whose holder levies the toll. */
@@ -477,8 +464,6 @@ export interface Nation {
   capitalRegionId?: number;
   /** Research state (techs done, current, progress). */
   research: Research;
-  /** Great Works completed (economic victory progress). */
-  wonders: number;
   /** Last turn's flags, for the HUD. */
   famine: boolean;
   bankrupt: boolean;
@@ -543,7 +528,7 @@ export interface DiplomaticOffer {
   id: number;
   from: number;
   to: number;
-  type: "peace" | "nap" | "alliance" | "tribute" | "trade";
+  type: "peace" | "nap" | "alliance" | "tribute";
   /** Gold the sender offers (tribute/gift sweetener), if any. */
   gold?: number;
 }
@@ -551,7 +536,7 @@ export interface DiplomaticOffer {
 export interface GameState {
   /** The seed the whole game derives from (map generation). */
   seed: number;
-  /** Scripted-map id (e.g. "baltic", "europe"); absent = procedural realm. */
+  /** Authored map id; the live game uses "hansa". */
   mapId?: string;
   /** Advancing RNG state for combat/AI/events — keeps resolution deterministic. */
   rngState: number;
@@ -616,12 +601,6 @@ export interface GameState {
    * read as peace-since-founding, which is the correct default.
    */
   peaceSince?: Record<string, number>;
-  /**
-   * Active trade routes, keyed by pairKey(a,b) → true. A route pays both partners
-   * gold each turn (economic diplomacy) and is severed the moment they go to war.
-   * Optional so legacy saves load as "no trades".
-   */
-  trades?: Record<string, boolean>;
   /** Offers from AI nations awaiting the player's response. */
   offers: DiplomaticOffer[];
   nextOfferId: number;

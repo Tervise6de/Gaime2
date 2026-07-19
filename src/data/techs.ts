@@ -1,10 +1,7 @@
 /**
- * Technology tree (docs/game-design.md §3.6, §9.5) — a branching tree of ~30
- * nodes across four branches and the five world ages. Techs grant economic
- * multipliers, unlock advanced units and buildings, provide unrest tools, and —
- * at the capstones — enable the Great Works victory. Branches force build
- * diversity; you cannot research everything in one game, so tech order is a
- * strategy identity.
+ * Technology tree (docs/game-design.md §3.6, §9.5) — a branching tree across
+ * the five world ages. Techs grant economic multipliers, unlock advanced units
+ * and buildings, provide unrest tools, and shape a realm's strategic identity.
  *
  * **Era-gated:** every tech belongs to an `era` (0-based age index, data/eras.ts).
  * A tech cannot be researched before its age has dawned, so progress is
@@ -47,18 +44,16 @@ export type TechId =
   | "guilds"
   | "lubeck_law"
   // Age of Conquest (era 3)
-  | "architecture"
   | "nationalism"
   | "printing"
   | "mercantilism"
   | "standing_army"
   // Age of Legacy (era 4)
   | "theology"
-  | "grand_architecture"
   | "absolutism"
   | "gunpowder";
 
-export type TechBranch = "economy" | "military" | "civics" | "wonders";
+export type TechBranch = "economy" | "military" | "civics";
 
 export interface TechDef {
   id: TechId;
@@ -196,11 +191,6 @@ export const TECHS: Record<TechId, TechDef> = {
   },
 
   // --- Age of Conquest (era 3) ---------------------------------------------
-  architecture: {
-    id: "architecture", name: "Architecture", branch: "wonders", tier: 3, era: 3, cost: 78,
-    requires: ["engineering", "economics"], unlockBuilding: "wonder",
-    blurb: "Unlock Great Works (Wonders) — an economic victory path.",
-  },
   nationalism: {
     id: "nationalism", name: "Nationalism", branch: "civics", tier: 3, era: 3, cost: 72,
     requires: ["philosophy", "feudalism"], unrestReduction: 8, yieldMult: { gold: 0.1 },
@@ -227,11 +217,6 @@ export const TECHS: Record<TechId, TechDef> = {
     id: "theology", name: "Theology", branch: "civics", tier: 4, era: 4, cost: 90,
     requires: ["printing"], unrestReduction: 8, yieldMult: { knowledge: 0.15 },
     unlockBuilding: "cathedral", blurb: "-8 unrest, +15% knowledge; unlocks the Cathedral.",
-  },
-  grand_architecture: {
-    id: "grand_architecture", name: "Grand Architecture", branch: "wonders", tier: 4, era: 4, cost: 96,
-    requires: ["architecture"], yieldMult: { gold: 0.1, knowledge: 0.1 },
-    blurb: "+10% gold & knowledge — the masters' age of great building.",
   },
   absolutism: {
     id: "absolutism", name: "Absolutism", branch: "civics", tier: 4, era: 4, cost: 92,

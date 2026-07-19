@@ -1,11 +1,10 @@
 /**
  * Victory conditions and prestige score (docs/game-design.md §6).
  *
- * Three paths, so different strategies win from the same systems:
+ * Two live paths:
  *   1. Domination — hold ≥ DOMINATION_FRACTION of all regions (or, via
  *      elimination in turn.ts, be the last realm standing).
- *   2. Great Works — complete WONDER_GOAL wonders (a builder/turtle path).
- *   3. Prestige — at TURN_LIMIT, the highest score wins (a decisive fallback).
+ *   2. Prestige — at TURN_LIMIT, the highest score wins (a decisive fallback).
  *
  * Pure over `GameState`.
  */
@@ -14,11 +13,10 @@ import {
   DOMINATION_FRACTION,
   PLAYER_ID,
   TURN_LIMIT,
-  WONDER_GOAL,
   type GameState,
 } from "@/systems/state";
 
-/** Prestige score — territory, tech, wonders, treasury and population. */
+/** Prestige score — territory, tech, treasury and population. */
 export function nationScore(state: GameState, id: number): number {
   const regions = state.regions.filter((r) => r.ownerId === id);
   const nation = state.nations.find((n) => n.id === id);
@@ -27,7 +25,6 @@ export function nationScore(state: GameState, id: number): number {
   return Math.round(
     regions.length * 10 +
       nation.research.done.length * 15 +
-      nation.wonders * 40 +
       Math.max(0, nation.stocks.gold) / 10 +
       population,
   );
@@ -35,36 +32,27 @@ export function nationScore(state: GameState, id: number): number {
 
 export interface VictoryProgress {
   /** The path this nation is closest to completing. */
-  kind: "domination" | "great works";
-  /** A compact label, e.g. "42%⬢" (territory) or "2/4★" (wonders). */
+  kind: "domination";
+  /** A compact territory label, e.g. "42%⬢". */
   label: string;
   /** How far toward that win, 0..1 (1 = would trigger it). */
   fraction: number;
 }
 
 /**
- * The victory path a nation is nearest to winning, as a 0..1 threat gauge for
- * the standings. Compares its territory share (domination) and wonders (Great
- * Works) and reports whichever is closest. Pure.
+ * The domination threat gauge for the standings. Pure.
  */
 export function victoryProgress(state: GameState, id: number): VictoryProgress {
-  const nation = state.nations.find((n) => n.id === id);
   const total = state.regions.filter((r) => r.ownerId !== null).length || 1;
   const held = state.regions.filter((r) => r.ownerId === id).length;
   const domShare = held / total;
   const domFraction = Math.min(1, domShare / DOMINATION_FRACTION);
-  const wonders = nation?.wonders ?? 0;
-  const wonderFraction = Math.min(1, wonders / WONDER_GOAL);
-
-  if (wonderFraction >= domFraction && wonders > 0) {
-    return { kind: "great works", label: `${wonders}/${WONDER_GOAL}★`, fraction: wonderFraction };
-  }
   return { kind: "domination", label: `${Math.round(domShare * 100)}%⬢`, fraction: domFraction };
 }
 
 /** One victory path as a legible race: your standing vs the leading rival's. */
 export interface VictoryRace {
-  kind: "domination" | "great works" | "prestige";
+  kind: "domination" | "prestige";
   title: string;
   /** What winning this path takes. */
   goal: string;
@@ -76,14 +64,13 @@ export interface VictoryRace {
 }
 
 /**
- * The three victory paths as side-by-side races (you vs the leading rival on
+ * The live victory paths as side-by-side races (you vs the leading rival on
  * each), for the Politics readout. Pure; fractions are 0..1 toward the win.
  */
 export function victoryRaces(state: GameState): VictoryRace[] {
   const living = state.nations.filter((n) => !n.isBarbarian && n.alive);
   const rivals = living.filter((n) => !n.isPlayer);
   const total = state.regions.filter((r) => r.ownerId !== null).length || 1;
-  const player = state.nations[PLAYER_ID];
   const held = (id: number): number => state.regions.filter((r) => r.ownerId === id).length;
   const topRival = (val: (n: (typeof rivals)[number]) => number): { n: (typeof rivals)[number]; v: number } | null => {
     let best: { n: (typeof rivals)[number]; v: number } | null = null;
@@ -97,9 +84,6 @@ export function victoryRaces(state: GameState): VictoryRace[] {
   const domShare = (id: number): number => held(id) / total;
   const pDom = domShare(PLAYER_ID);
   const rDom = topRival((n) => domShare(n.id));
-
-  const pW = player?.wonders ?? 0;
-  const rW = topRival((n) => n.wonders);
 
   const pScore = nationScore(state, PLAYER_ID);
   const rScore = topRival((n) => nationScore(state, n.id));
@@ -122,14 +106,6 @@ export function victoryRaces(state: GameState): VictoryRace[] {
       alarm: !!rDom && rDom.v >= DOMINATION_FRACTION - 0.12,
     },
     {
-      kind: "great works",
-      title: "Great Works",
-      goal: `Complete ${WONDER_GOAL} wonders`,
-      you: { value: `${pW}/${WONDER_GOAL}`, fraction: Math.min(1, pW / WONDER_GOAL) },
-      rival: rW ? { name: rW.n.name, value: `${rW.v}/${WONDER_GOAL}`, fraction: Math.min(1, rW.v / WONDER_GOAL) } : null,
-      alarm: !!rW && rW.v > 0 && rW.v >= WONDER_GOAL - 1,
-    },
-    {
       kind: "prestige",
       title: endless ? `Prestige · turn ${state.turn}/∞` : `Prestige · turn ${state.turn}/${limit}`,
       goal: endless ? "Lead in score — no turn limit" : `Lead in score when turn ${limit} ends`,
@@ -147,8 +123,8 @@ export interface VictoryCheck {
 }
 
 /**
- * Decide the game if a condition is met, else return null. Domination and Great
- * Works can trigger any turn; the score tiebreak triggers at the turn limit.
+ * Decide the game if a condition is met, else return null. Domination can
+ * trigger any turn; the score tiebreak triggers at the turn limit.
  */
 export function checkVictory(state: GameState): VictoryCheck | null {
   const total = state.regions.filter((r) => r.ownerId !== null).length || 1;
@@ -158,9 +134,6 @@ export function checkVictory(state: GameState): VictoryCheck | null {
     const held = state.regions.filter((r) => r.ownerId === n.id).length;
     if (held / total >= DOMINATION_FRACTION) {
       return decide(n.id, "domination");
-    }
-    if (n.wonders >= WONDER_GOAL) {
-      return decide(n.id, "great works");
     }
   }
 
@@ -187,7 +160,6 @@ export interface EndSummaryRow {
   id: number;
   score: number;
   regions: number;
-  wonders: number;
   techs: number;
   /** Highest prestige this nation ever reached, and the turn it peaked. */
   peakScore: number;
@@ -236,7 +208,6 @@ export function endGameSummary(state: GameState): EndSummary {
         id: n.id,
         score,
         regions: state.regions.filter((r) => r.ownerId === n.id).length,
-        wonders: n.wonders,
         techs: n.research.done.length,
         peakScore,
         peakTurn,

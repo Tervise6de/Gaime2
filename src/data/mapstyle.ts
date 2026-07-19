@@ -1,50 +1,11 @@
 /**
- * Map-presentation style — the centralised knobs for the island-world look.
+ * Map-presentation style — the centralised knobs for the Hansa map look.
  *
  * Everything the territory view's framing, coastline, ocean and political ink
  * can be tuned with lives in this table, mirroring the data-driven content
  * philosophy: re-balancing the map's *look* is editing numbers here, not
  * renderer code. Serialisable constants only — no DOM, no logic.
  */
-
-/** How the landmass is presented; chosen from map size + seed (island.ts). */
-export type IslandArchetype = "small" | "medium" | "large" | "archipelago";
-
-export interface IslandFrame {
-  /** Fraction of the canvas width/height kept as ocean margin around the land. */
-  marginX: number;
-  marginY: number;
-  /** Outward padding (normalised units) from the outer sites to the coastline. */
-  coastPad: number;
-  /** Decorative offshore islets to scatter around the landmass. */
-  isletCount: number;
-}
-
-/**
- * Per-archetype framing: a small island floats in generous ocean; a large one
- * fills most of the view; the archipelago sits in between with many islets.
- */
-export const ISLAND_FRAME: Record<IslandArchetype, IslandFrame> = {
-  small: { marginX: 0.19, marginY: 0.2, coastPad: 0.085, isletCount: 6 },
-  medium: { marginX: 0.14, marginY: 0.15, coastPad: 0.075, isletCount: 4 },
-  large: { marginX: 0.105, marginY: 0.115, coastPad: 0.055, isletCount: 3 },
-  archipelago: { marginX: 0.12, marginY: 0.14, coastPad: 0.045, isletCount: 7 },
-};
-
-/** Region-count ceilings: ≤ small → "small", ≤ medium → "medium", else "large". */
-export const ARCHETYPE_REGION_LIMITS = { small: 18, medium: 26 } as const;
-
-/** 1-in-N qualifying seeds present as an archipelago instead of one island. */
-export const ARCHIPELAGO_ROLL = 4;
-/** Minimum region count before an archipelago presentation is considered. */
-export const ARCHIPELAGO_MIN_REGIONS = 20;
-
-/** Coastline fractal: midpoint displacement relative to segment length. */
-export const COAST_ROUGHNESS = 0.24;
-/** Subdivision rounds applied to the coast outline. */
-export const COAST_DETAIL = 3;
-/** Longest outline segment (normalised) before resampling splits it. */
-export const COAST_MAX_SEGMENT = 0.055;
 
 /**
  * Interior region borders: subtle shared-edge distortion so province lines
@@ -57,7 +18,7 @@ export const EDGE_DETAIL = 2;
 export const EDGE_MAX_DISP = 0.012;
 
 /**
- * Procedural terrain texture: how many stamps (trees, ridges, bumps, grass,
+ * Deterministic terrain texture: how many stamps (trees, ridges, bumps, grass,
  * wave ticks) to scatter per unit of normalised map area. Baked into the
  * cached terrain layer, so density costs nothing per frame. 0 disables.
  */

@@ -1,7 +1,7 @@
 /**
  * Playable factions — the realms of the medieval Baltic rim you can rule
  * (docs/game-design.md §3.1). A CK3/Civ-style roster: pick your people at the
- * start, in a random world or on the scripted Baltic map.
+ * start, on the authored Hanseatic World map.
  *
  * Each faction carries an identity (name, map colour, flavour) and a **signature
  * national trait** — its current gameplay difference, drawn from the existing

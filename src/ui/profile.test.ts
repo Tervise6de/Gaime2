@@ -27,11 +27,11 @@ describe("deriveAchievements", () => {
     expect(got).toContain("veteran"); // existing unlocks are preserved
   });
 
-  it("requires all three paths for polymath", () => {
+  it("requires conquest and prestige paths for polymath", () => {
     const base = { ...emptyStats(), gamesWon: 3 } as ProfileStats;
-    expect(deriveAchievements({ ...base, winsByKind: { domination: 1, "great works": 1 } })).not.toContain("polymath");
+    expect(deriveAchievements({ ...base, winsByKind: { domination: 1 } })).not.toContain("polymath");
     expect(
-      deriveAchievements({ ...base, winsByKind: { domination: 1, "great works": 1, "prestige score": 1 } }),
+      deriveAchievements({ ...base, winsByKind: { domination: 1, "prestige score": 1 } }),
     ).toContain("polymath");
   });
 });

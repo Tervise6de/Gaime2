@@ -21,7 +21,7 @@ function nation(over: Partial<Nation> = {}): Nation {
   return {
     id: 0, name: "N", color: "#fff", isPlayer: true, isBarbarian: false, alive: true,
     stocks: { gold: 100, food: 0, materials: 100, knowledge: 0 }, taxRate: 0,
-    research: emptyResearch(), wonders: 0, famine: false, bankrupt: false, ...over,
+    research: emptyResearch(), famine: false, bankrupt: false, ...over,
   };
 }
 
@@ -87,8 +87,9 @@ describe("setRegionFocus", () => {
     const g = createGame({ seed: 4 });
     const enemy = g.regions.find((r) => r.ownerId !== PLAYER_ID && r.ownerId !== null);
     if (enemy) {
+      const before = enemy.focus;
       const g2 = setRegionFocus(g, enemy.id, "market");
-      expect(g2.regions[enemy.id]!.focus).toBeUndefined();
+      expect(g2.regions[enemy.id]!.focus).toBe(before);
     }
   });
 

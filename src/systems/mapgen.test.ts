@@ -16,16 +16,19 @@ function isConnected(regions: { id: number; adjacency: number[] }[]): boolean {
 }
 
 describe("map generation", () => {
-  it("is deterministic: same seed → identical map", () => {
+  it("is deterministic: same seed yields identical Hansa starts", () => {
     const a = generateMap(12345);
     const b = generateMap(12345);
     expect(a).toEqual(b);
   });
 
-  it("differs across seeds", () => {
+  it("keeps the authored Hansa board while varying seeded population", () => {
     const a = generateMap(1);
     const b = generateMap(2);
-    expect(a).not.toEqual(b);
+    expect(a.regions.map((r) => r.name)).toEqual(b.regions.map((r) => r.name));
+    expect(a.regions.map((r) => r.x)).toEqual(b.regions.map((r) => r.x));
+    expect(a.regions.map((r) => r.y)).toEqual(b.regions.map((r) => r.y));
+    expect(a.regions.map((r) => r.population)).not.toEqual(b.regions.map((r) => r.population));
   });
 
   it("produces the requested number of regions", () => {

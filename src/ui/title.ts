@@ -5,7 +5,7 @@
  * entries: Continue (or Begin), New game (expands the shared setup form from
  * ui/newgame.ts — identical to the HUD's), Options and Records (the HUD's own
  * overlays, raised above the menu while it is open). The wordmark
- * ("Petty Kingdoms") renders as DOM text, so a rename stays a copy edit rather
+ * ("Hansa") renders as DOM text, so a rename stays a copy edit rather
  * than an art change.
  *
  * Pure presentation: no sim access. The end-turn hotkey is blocked by main.ts's
