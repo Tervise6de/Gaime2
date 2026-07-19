@@ -11,8 +11,37 @@
 
 export type TerrainId = "plains" | "forest" | "hills" | "mountains" | "coast";
 
-/** Strategic resources gate advanced units (docs/game-design.md §3.2). */
-export type StrategicResource = "iron" | "horses";
+/**
+ * Strategic resources (docs/game-design.md §3.2). Iron and horses gate advanced
+ * units; salt and amber are the Hansa's signature *trade* strategics — salt the
+ * "white gold" that preserves fish, amber the Baltic luxury — seeded on the Hansa
+ * map (they never spawn procedurally, so other maps are unaffected).
+ */
+export type StrategicResource = "iron" | "horses" | "salt" | "amber";
+
+/** Display metadata for each strategic resource (map marker, region panel, legend). */
+export const STRATEGIC_RESOURCES: Record<StrategicResource, { label: string; glyph: string; tip: string }> = {
+  iron: {
+    label: "Iron",
+    glyph: "⚒",
+    tip: "Iron deposit — a strategic resource: advanced units (Ranged, Siege) need iron, and it trades as a good.",
+  },
+  horses: {
+    label: "Horses",
+    glyph: "🐎",
+    tip: "Horses — a strategic resource: Cavalry and Knights need horses.",
+  },
+  salt: {
+    label: "Salt",
+    glyph: "🧂",
+    tip: "Salt — the 'white gold' that preserves fish; a high-value Hansa trade good (Lüneburg, Wieliczka).",
+  },
+  amber: {
+    label: "Amber",
+    glyph: "🟠",
+    tip: "Amber — the Baltic's signature luxury, gathered on the Samland and Curonian shores; a rich trade good.",
+  },
+};
 
 export interface ResourceYield {
   food: number;

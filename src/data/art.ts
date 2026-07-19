@@ -21,7 +21,7 @@ import type { UnitType } from "@/data/units";
 import type { BuildingId } from "@/data/buildings";
 
 /** Resource ids carrying art: the four stockpiles + the two strategic resources. */
-export type ResourceArtId = "gold" | "food" | "materials" | "knowledge" | "iron" | "horses";
+export type ResourceArtId = "gold" | "food" | "materials" | "knowledge" | "iron" | "horses" | "salt" | "amber";
 
 /** UI glyph vocabulary — one designed set replacing the emoji grab-bag. */
 export type GlyphId =
@@ -96,6 +96,16 @@ export const RESOURCE_ART: Record<ResourceArtId, string | null> = {
   // Horse head — filled silhouette with ear + muzzle.
   horses: ico(
     '<path d="M6.4 20.5c0-4.9 1.6-8.3 4.4-10.2l-1.5-5 2.1 1.4.7-2.2 1.9 3.3c3.5 1.6 5.8 4.9 5.8 8.6v4.1h-3.9c0-2.3-1.1-3.7-3.3-4.2-1.5 1-2.3 2.4-2.3 4.2z"/>',
+    { fill: true },
+  ),
+  // Salt — a heaped mound of the "white gold".
+  salt: ico(
+    '<path d="M3.4 19.6c1.4-6.4 4.6-10 8.6-10s7.2 3.6 8.6 10z"/>',
+    { fill: true },
+  ),
+  // Amber — a faceted teardrop gem.
+  amber: ico(
+    '<path d="M12 3.6l5 5.1-5 11.7-5-11.7z"/>',
     { fill: true },
   ),
 };

@@ -3,8 +3,8 @@ import { GOODS, GOOD_IDS, type GoodId } from "@/data/goods";
 import { KONTORE, KONTOR_IDS } from "@/data/kontore";
 
 describe("goods table", () => {
-  it("has the four staple goods with positive value and base output", () => {
-    expect(GOOD_IDS).toEqual(["grain", "timber", "furs", "iron"]);
+  it("has the eight Hansa goods with positive value and base output", () => {
+    expect(GOOD_IDS).toEqual(["grain", "timber", "furs", "iron", "salt", "herring", "amber", "beer"]);
     for (const id of GOOD_IDS) {
       const g = GOODS[id];
       expect(g.id).toBe(id);
@@ -15,11 +15,15 @@ describe("goods table", () => {
     }
   });
 
-  it("sources match the design (grain=plains, timber/furs=forest, iron=iron resource)", () => {
+  it("sources match the design (terrain staples, resource strategics)", () => {
     expect(GOODS.grain.source.terrain).toContain("plains");
     expect(GOODS.timber.source.terrain).toContain("forest");
     expect(GOODS.furs.source.terrain).toContain("forest");
     expect(GOODS.iron.source.resource).toBe("iron");
+    expect(GOODS.salt.source.resource).toBe("salt");
+    expect(GOODS.amber.source.resource).toBe("amber");
+    expect(GOODS.herring.source.terrain).toContain("coast");
+    expect(GOODS.beer.source.terrain).toContain("plains");
   });
 });
 

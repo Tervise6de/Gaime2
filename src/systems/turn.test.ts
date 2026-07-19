@@ -619,3 +619,24 @@ describe("hansa town-size hierarchy", () => {
     expect(g.regions.every((r) => r.baseCapacity === undefined)).toBe(true);
   });
 });
+
+describe("hansa strategic resources (Plan 3B)", () => {
+  it("seeds iron, horses, salt and amber on the Hansa board", () => {
+    const g = createGame({ seed: 5, mapId: "hansa" });
+    const resources = new Set(g.regions.map((r) => r.resource).filter(Boolean));
+    expect(resources.has("iron")).toBe(true);
+    expect(resources.has("horses")).toBe(true);
+    expect(resources.has("salt")).toBe(true);
+    expect(resources.has("amber")).toBe(true);
+    // Königsberg (region 68) is the Samland amber coast; Bergslagen (34) the ore.
+    expect(g.regions[68]!.resource).toBe("amber");
+    expect(g.regions[34]!.resource).toBe("iron");
+  });
+
+  it("leaves procedural maps to terrain-spawned resources (never salt/amber)", () => {
+    const g = createGame({ seed: 7, rivals: 2 });
+    const resources = new Set(g.regions.map((r) => r.resource).filter(Boolean));
+    expect(resources.has("salt")).toBe(false);
+    expect(resources.has("amber")).toBe(false);
+  });
+});

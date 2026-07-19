@@ -59,9 +59,18 @@ function state(regions: Region[], over: Partial<GameState> = {}): GameState {
 }
 
 describe("regionGoodOutput", () => {
-  it("plains source grain", () => {
+  it("plains source grain and beer (in GOOD_IDS order)", () => {
     expect(regionGoodOutput(reg({ terrain: "plains" }))).toEqual([
       { good: "grain", amount: GOODS.grain.source.baseOutput },
+      { good: "beer", amount: GOODS.beer.source.baseOutput },
+    ]);
+  });
+
+  it("coast sources herring; salt/amber come from their strategic resource", () => {
+    expect(regionGoodOutput(reg({ terrain: "coast" })).map((g) => g.good)).toEqual(["herring"]);
+    expect(regionGoodOutput(reg({ terrain: "hills", resource: "salt" })).map((g) => g.good)).toEqual(["salt"]);
+    expect(regionGoodOutput(reg({ terrain: "coast", resource: "amber" })).map((g) => g.good)).toEqual([
+      "herring", "amber",
     ]);
   });
 

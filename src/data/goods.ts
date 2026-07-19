@@ -8,9 +8,12 @@
  * (economy.ts) untouched — goods are a parallel derived quantity, so the core
  * economy and its tests are unaffected.
  *
- * This slice ships the four terrain/resource-derived staples. Amber, salt,
- * herring and cloth are deferred: they need map-level seeding (special nodes and
- * the Bruges cloth import), which lands with the Hansa map wiring.
+ * Eight goods: the four terrain/resource staples (grain, timber, furs, iron) plus
+ * the Hansa's signature wares — salt (the "white gold"), herring (the staple
+ * fishery), amber (the Baltic luxury) and hopped beer (the Wendish export). Salt
+ * and amber are seeded as strategic resources on the Hansa map (systems/turn.ts);
+ * herring and beer come from coast and plains. Cloth (the Bruges import) is still
+ * deferred.
  *
  * Serialisable content only — no logic, no DOM. Balancing is editing this table.
  */
@@ -18,7 +21,7 @@
 import type { StrategicResource, TerrainId } from "@/data/terrain";
 import type { KontorId } from "@/data/kontore";
 
-export type GoodId = "grain" | "timber" | "furs" | "iron";
+export type GoodId = "grain" | "timber" | "furs" | "iron" | "salt" | "herring" | "amber" | "beer";
 
 /**
  * What lets a region source a good: a matching terrain (any of `terrain`) and/or
@@ -88,6 +91,43 @@ export const GOODS: Record<GoodId, GoodDef> = {
     source: { resource: "iron", baseOutput: 2 },
     // Worked in the western markets — Flanders (Bruges) and England (London).
     demandedAt: ["bruges", "london"],
+  },
+  salt: {
+    id: "salt",
+    name: "Salt",
+    glyph: "🧂",
+    value: 4,
+    source: { resource: "salt", baseOutput: 3 },
+    // The "white gold" preserves fish — bought where the fisheries land (Bergen)
+    // and the great western market (Bruges).
+    demandedAt: ["bergen", "bruges"],
+  },
+  herring: {
+    id: "herring",
+    name: "Herring",
+    glyph: "🐟",
+    value: 3,
+    source: { terrain: ["coast"], baseOutput: 3 },
+    // Salted herring, distributed west through Bruges and London.
+    demandedAt: ["bruges", "london"],
+  },
+  amber: {
+    id: "amber",
+    name: "Amber",
+    glyph: "🟠",
+    value: 6,
+    source: { resource: "amber", baseOutput: 1 },
+    // The Baltic luxury — sold into the western markets at London and Bruges.
+    demandedAt: ["london", "bruges"],
+  },
+  beer: {
+    id: "beer",
+    name: "Beer",
+    glyph: "🍺",
+    value: 3,
+    source: { terrain: ["plains"], baseOutput: 2 },
+    // Wendish hopped beer, shipped to the grain-poor north and east (Bergen, Novgorod).
+    demandedAt: ["bergen", "novgorod"],
   },
 };
 

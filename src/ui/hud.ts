@@ -14,7 +14,7 @@
 
 import { BUILDINGS, BUILDING_IDS, BUILD_RATE, buildingFocusOk, buildingResourceOk, type BuildingId } from "@/data/buildings";
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
-import { TERRAIN, TERRAIN_IDS } from "@/data/terrain";
+import { TERRAIN, TERRAIN_IDS, STRATEGIC_RESOURCES } from "@/data/terrain";
 import { regionProduction, nationalProduction, nationYieldMult, yieldFactors, singleModifierMult, unrestPenalty } from "@/systems/economy";
 import { garrisonCalm, overexpansionUnrest } from "@/systems/stability";
 import { techUnrestReduction } from "@/systems/tech";
@@ -2517,11 +2517,8 @@ function renderRegion(
   }
   if (region.fortification > 0) bits.push(`fort ${region.fortification}`);
   if (region.resource) {
-    bits.push(
-      region.resource === "iron"
-        ? `${resourceIconHtml("iron", "⚒")} iron`
-        : `${resourceIconHtml("horses", "🐎")} horses`,
-    );
+    const rm = STRATEGIC_RESOURCES[region.resource];
+    bits.push(`${resourceIconHtml(region.resource, rm.glyph)} ${rm.label.toLowerCase()}`);
   }
   if (region.focus) bits.push(`${FOCUSES[region.focus].icon} ${escapeHtml(FOCUSES[region.focus].label)}`);
   // Faith — shown when it differs from the ruler (the telling cases: a province
@@ -3172,6 +3169,8 @@ function buildLegend(): HTMLElement {
   row(dot("#e8776b"), "Unrest — revolt risk (red dot)");
   row(resourceIconHtml("iron", "⚒", "hud-legend-ico"), "Iron deposit");
   row(resourceIconHtml("horses", "🐎", "hud-legend-ico"), "Horses");
+  row(resourceIconHtml("salt", "🧂", "hud-legend-ico"), "Salt — the white gold (preserves fish)");
+  row(resourceIconHtml("amber", "🟠", "hud-legend-ico"), "Amber — the Baltic luxury");
   row(glyphHtml("hammer", "🔨", "hud-legend-ico"), "Building under construction (status row under the name)");
   row(glyphHtml("shield", "🛡", "hud-legend-ico"), "Fortification level (harder to capture; siege strips it)");
   row(glyphHtml("crown", "👑", "hud-legend-ico"), "Capital — the crest beside the population chip");

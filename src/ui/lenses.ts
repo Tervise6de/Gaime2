@@ -40,7 +40,7 @@ export const LENSES: LensDef[] = [
   { id: "faith", label: "Faith", glyph: "faith", fallback: "🛐", hint: "Whose faith each province holds — win by converting the world." },
   { id: "relations", label: "Relations", glyph: "diplomacy", fallback: "🤝", hint: "How each realm stands with you — allies green, enemies red." },
   { id: "military", label: "Military", glyph: "attack", fallback: "⚔", hint: "Where the armies are — your forces green, hostiles red, exposed land amber." },
-  { id: "trade", label: "Trade", glyph: "gold", fallback: "⚓", hint: "The merchant world — what each land exports (grain, timber, iron) and the Kontore that buy it (amber)." },
+  { id: "trade", label: "Trade", glyph: "gold", fallback: "⚓", hint: "The merchant world — what each land exports (grain, timber, furs, iron, salt, herring, amber, beer) and the Kontore that buy it." },
 ];
 
 /** Trade lens: the good each land exports, and the Kontor markets (amber). */
@@ -49,8 +49,12 @@ const TRADE_MUTED = "#3d434b"; // land with nothing to export (ports, transit, t
 /** Colour a region takes from the good it exports; first match wins (a forest
     sources timber and furs — it reads as timber, the bulk export). */
 const TRADE_GOODS: { good: GoodId; color: string }[] = [
-  { good: "iron", color: "#8b97a6" }, // mining country — steel grey
-  { good: "grain", color: "#d9b23f" }, // the grain plains — wheat gold
+  { good: "amber", color: "#e0a021" }, // the amber shore — warm amber
+  { good: "salt", color: "#e6ddc4" }, // salt — pale white-gold
+  { good: "iron", color: "#8b97a6" }, // ore country — steel grey
+  { good: "herring", color: "#5a8fb0" }, // the fisheries — sea blue
+  { good: "grain", color: "#d9b23f" }, // the grain plains — wheat gold (beat by beer below only if no grain)
+  { good: "beer", color: "#c8862f" }, // plains also brew — amber ale
   { good: "timber", color: "#6f8a4c" }, // the forests — timber/furs green
 ];
 

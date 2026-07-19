@@ -21,7 +21,7 @@
  * transform until input settles.
  */
 
-import { TERRAIN, type TerrainId } from "@/data/terrain";
+import { TERRAIN, STRATEGIC_RESOURCES, type TerrainId } from "@/data/terrain";
 import { BUILDINGS, BUILD_RATE } from "@/data/buildings";
 import { GLYPH_ART, RESOURCE_ART, TERRAIN_ART, TERRAIN_MOTIF, crestSvg } from "@/data/art";
 import { cbSafe } from "@/data/palette";
@@ -1746,10 +1746,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     // reveal so they do not clutter the fit-zoom province map.
     const slots: { tip: string; draw(x: number, y: number): void; always?: boolean }[] = [];
     if (region.resource) {
-      const tip =
-        region.resource === "iron"
-          ? "Iron deposit — a strategic resource; advanced units (Ranged, Siege) need iron."
-          : "Horses — a strategic resource; Cavalry needs horses.";
+      const tip = STRATEGIC_RESOURCES[region.resource].tip;
       slots.push({
         tip,
         draw: (x, y) => {
