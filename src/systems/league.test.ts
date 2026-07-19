@@ -11,6 +11,7 @@ import {
   isBoycotted,
   kontorBlockedFor,
   leagueSeversRoute,
+  isLeagueMonopoly,
   stepLeague,
   leagueDividendPool,
 } from "@/systems/league";
@@ -51,16 +52,34 @@ const route = (id: number, owner: number, kontor: "london" | "bruges" | "bergen"
 });
 
 describe("founding & joining the League", () => {
+  // Founding is era-gated to "The League Rises" (era 2, turn 90). Route/eligibility
+  // fixtures therefore set a turn in that era; the gate itself is exercised below.
+  const LEAGUE_ERA = 100;
+
   it("only a trading power (enough routes) may found it, once, on the Hansa map", () => {
-    const twoRoutes = state(regionsOf(63), { routes: [route(0, A, "london"), route(1, A, "bruges")] });
+    const twoRoutes = state(regionsOf(63), { turn: LEAGUE_ERA, routes: [route(0, A, "london"), route(1, A, "bruges")] });
     expect(canFoundLeague(twoRoutes, A)).toBe(false); // under the route threshold
-    const threeRoutes = state(regionsOf(63), { routes: [route(0, A, "london"), route(1, A, "bruges"), route(2, A, "bergen")] });
+    const threeRoutes = state(regionsOf(63), { turn: LEAGUE_ERA, routes: [route(0, A, "london"), route(1, A, "bruges"), route(2, A, "bergen")] });
     expect(canFoundLeague(threeRoutes, A)).toBe(true);
     const founded = foundLeague(threeRoutes, A);
     expect(founded.league!.members).toEqual([A]);
     expect(canFoundLeague(founded, B)).toBe(false); // only one League
     // Not on a procedural map.
     expect(canFoundLeague({ ...threeRoutes, mapId: undefined }, A)).toBe(false);
+  });
+
+  it("cannot be founded before 'The League Rises' era, however many routes (design gate #2)", () => {
+    const routes = [route(0, A, "london"), route(1, A, "bruges"), route(2, A, "bergen")];
+    // Era 0 (Trade Dawn, turn 1) and era 1 (Gotland Age, turns 45–89) are too early…
+    expect(canFoundLeague(state(regionsOf(63), { turn: 1, routes }), A)).toBe(false);
+    expect(canFoundLeague(state(regionsOf(63), { turn: 45, routes }), A)).toBe(false);
+    expect(canFoundLeague(state(regionsOf(63), { turn: 89, routes }), A)).toBe(false);
+    // …era 2 (turn 90) opens founding, and it stays open thereafter.
+    expect(canFoundLeague(state(regionsOf(63), { turn: 90, routes }), A)).toBe(true);
+    expect(canFoundLeague(state(regionsOf(63), { turn: 200, routes }), A)).toBe(true);
+    // foundLeague itself honours the gate: a no-op before the era, a real founding after.
+    expect(foundLeague(state(regionsOf(63), { turn: 1, routes }), A).league).toBeUndefined();
+    expect(foundLeague(state(regionsOf(63), { turn: 90, routes }), A).league!.members).toEqual([A]);
   });
 
   it("a realm joins only at peace with every member", () => {
@@ -118,6 +137,39 @@ describe("Kontor access & the trade dividend", () => {
     expect(after.nations.find((n) => n.id === A)!.stocks.gold).toBeCloseTo(100 + share, 5);
     expect(after.nations.find((n) => n.id === B)!.stocks.gold).toBeCloseTo(100 + share, 5);
     expect(after.nations.find((n) => n.id === C)!.stocks.gold).toBe(100); // non-member: nothing
+  });
+
+  it("a League corner counts only routes that actually flow (A2)", () => {
+    const regions = regionsOf(63, { [LONDON]: { ownerId: A } });
+    const s = state(regions, {
+      league: { members: [A], foundedTurn: 1, boycotts: [] },
+      routes: [route(0, A, "london"), route(1, C, "london")], // member A + non-member C, both iron → London
+    });
+    // Counting every route, non-member C breaks the League's corner…
+    expect(isLeagueMonopoly(s, "iron", "london")).toBe(false);
+    // …but once C's route is severed (does not flow), the League alone supplies it.
+    const flows = (r: TradeRoute) => r.ownerId !== C;
+    expect(isLeagueMonopoly(s, "iron", "london", flows)).toBe(true);
+  });
+});
+
+describe("stepLeague prunes eliminated members (A4)", () => {
+  it("drops a dead member and pays the living the undiluted dividend — no leak to the dead", () => {
+    const regions = regionsOf(63, { [LONDON]: { ownerId: A }, [BRUGES]: { ownerId: A } });
+    const base = state(regions, { league: { members: [A, B], foundedTurn: 1, boycotts: [] } });
+    const s = { ...base, nations: base.nations.map((n) => (n.id === B ? { ...n, alive: false } : n)) };
+    const pool = leagueDividendPool(s); // London + Bruges, both A's
+    const after = stepLeague(s);
+    expect(after.league!.members).toEqual([A]); // the dead member is struck from the roll…
+    expect(after.nations.find((n) => n.id === A)!.stocks.gold).toBeCloseTo(100 + pool, 5); // …A draws the whole, undiluted pool…
+    expect(after.nations.find((n) => n.id === B)!.stocks.gold).toBe(100); // …and nothing leaks to the dead
+  });
+
+  it("dissolves the League when its last living member is gone", () => {
+    const regions = regionsOf(63, { [LONDON]: { ownerId: A } });
+    const base = state(regions, { league: { members: [A], foundedTurn: 1, boycotts: [] } });
+    const s = { ...base, nations: base.nations.map((n) => (n.id === A ? { ...n, alive: false } : n)) };
+    expect(stepLeague(s).league).toBeUndefined();
   });
 });
 

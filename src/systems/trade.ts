@@ -30,6 +30,7 @@ import {
   TRADE_DIST_CAP,
   TRADE_DIST_COEF,
   inLeague,
+  nationById,
   type GameState,
   type KontorState,
   type Region,
@@ -110,6 +111,19 @@ export function laneFor(state: GameState, fromRegionId: number, kontor: KontorId
   return path.reverse();
 }
 
+// --- Kontor state -----------------------------------------------------------
+
+/**
+ * Whether a Kontor is open for trade. Reads the live merchant network
+ * (`state.kontore`, seeded by `seedKontore`); an epoch such as the fall of the
+ * Novgorod Peterhof shuts one by flipping `open` (systems/epochs.ts). Defaults to
+ * open when the Kontor has no entry — legacy saves and non-Hansa maps carry no
+ * `kontore` table. Pure.
+ */
+export function kontorOpen(state: GameState, kontor: KontorId): boolean {
+  return state.kontore?.find((k) => k.id === kontor)?.open ?? true;
+}
+
 // --- route creation ---------------------------------------------------------
 
 /**
@@ -118,7 +132,7 @@ export function laneFor(state: GameState, fromRegionId: number, kontor: KontorId
  *  - the region exists and `ownerId` holds it (you trade from your own land);
  *  - `ownerId` is a real realm (not the barbarians);
  *  - the region structurally sources the good;
- *  - the Kontor demands the good;
+ *  - the Kontor demands the good, and is open (not shuttered by an epoch);
  *  - a lane exists to the Kontor host;
  *  - `ownerId` is not at war with the Kontor's host owner (no trading into a foe);
  *  - the nation is under its MAX_ROUTES_PER_NATION cap.
@@ -139,6 +153,7 @@ export function createRoute(
   if (!region || region.ownerId !== ownerId) return state;
   if (!regionSources(region, good)) return state;
   if (!kontor.demands.includes(good)) return state;
+  if (!kontorOpen(state, toKontorId)) return state; // a shuttered Kontor (e.g. the Peterhof fell) takes no trade
 
   const lane = laneFor(state, fromRegionId, toKontorId);
   if (lane.length === 0) return state;
@@ -193,6 +208,7 @@ export function routeOptions(state: GameState, fromRegionId: number, ownerId: nu
   for (const good of GOOD_IDS) {
     if (!regionSources(region, good)) continue;
     for (const toKontorId of GOODS[good].demandedAt) {
+      if (!kontorOpen(state, toKontorId)) continue; // a shuttered Kontor offers no routes
       if (open.some((r) => r.good === good && r.toKontorId === toKontorId)) continue;
       const lane = laneFor(state, fromRegionId, toKontorId);
       if (lane.length === 0) continue;
@@ -224,12 +240,17 @@ const SCARCITY_FLOOR = 0.75; // a glutted market still pays three-quarters
 const MONOPOLY_PREMIUM = 1.25; // sole supplier cornering a good's trade into a Kontor pays a quarter more
 const LEAGUE_MONOPOLY_PREMIUM = 1.1; // the League collectively cornering a good pays its members a lighter premium
 
-/** The market for a good into a Kontor: how many routes feed it, and the distinct realms supplying it. */
+/**
+ * The market for a good into a Kontor: how many routes actually *flow* into it this
+ * turn, and the distinct realms so supplying it. Only flowing routes are counted
+ * (`routeFlows`) — a severed rival delivers nothing, so it must not glut the price
+ * nor deny a de-facto sole supplier its monopoly premium (A2). Pure.
+ */
 function marketAt(state: GameState, good: GoodId, kontor: KontorId): { routes: number; owners: Set<number> } {
   const owners = new Set<number>();
   let routes = 0;
   for (const r of state.routes ?? []) {
-    if (r.good === good && r.toKontorId === kontor) {
+    if (r.good === good && r.toKontorId === kontor && routeFlows(state, r)) {
       routes += 1;
       owners.add(r.ownerId);
     }
@@ -258,8 +279,11 @@ function scarcityFactor(state: GameState, route: TradeRoute): number {
 function monopolyFactor(state: GameState, route: TradeRoute): number {
   const { owners } = marketAt(state, route.good, route.toKontorId);
   if (owners.size === 1 && owners.has(route.ownerId)) return MONOPOLY_PREMIUM; // you alone corner it
-  // The League collectively cornering a good into a Kontor pays its members a lighter premium.
-  if (inLeague(state, route.ownerId) && isLeagueMonopoly(state, route.good, route.toKontorId)) return LEAGUE_MONOPOLY_PREMIUM;
+  // The League collectively cornering a good into a Kontor pays its members a lighter
+  // premium — counting only routes that actually flow, so a severed rival never breaks it.
+  if (inLeague(state, route.ownerId) && isLeagueMonopoly(state, route.good, route.toKontorId, (r) => routeFlows(state, r))) {
+    return LEAGUE_MONOPOLY_PREMIUM;
+  }
   return 1;
 }
 
@@ -429,6 +453,25 @@ export function setSoundEmbargo(state: GameState, ownerId: number, targetId: num
   return { ...state, sound: { ...state.sound, embargoes, embargoBy: ownerId } };
 }
 
+// --- what actually flows ----------------------------------------------------
+
+/**
+ * Whether a route actually *carries goods* into its Kontor this turn — the delivery
+ * the market is priced on. A route flows unless it is war-disrupted, shut out by the
+ * League (a non-member barred from a League Kontor, or a boycott), bound for a
+ * shuttered Kontor, or stopped at a closed Øresund. `marketAt` counts only flowing
+ * routes, so a severed rival never gluts the price nor denies a de-facto sole supplier
+ * its premium (A2). The Sound *toll* (a mere skim) does not stop a route; only a
+ * *blocked* strait does. Pure.
+ */
+export function routeFlows(state: GameState, route: TradeRoute): boolean {
+  if (routeDisrupted(state, route)) return false;
+  if (leagueSeversRoute(state, route)) return false;
+  if (!kontorOpen(state, route.toKontorId)) return false;
+  if (soundEffect(state, route, 0).blocked) return false;
+  return true;
+}
+
 // --- the turn seam ----------------------------------------------------------
 
 /**
@@ -436,6 +479,12 @@ export function setSoundEmbargo(state: GameState, ownerId: number, targetId: num
  * owner `routeIncome` (0 if disrupted), and record `lastIncome`/`disrupted` on the
  * route. Credits gold exactly as `applyTradeIncome` does and logs the player's
  * total. A no-op when there are no routes. Pure — returns new state.
+ *
+ * A route whose owner has since lost the producing region, or been eliminated, is
+ * *void*: `createRoute` checks source ownership once, so a later conquest would leave
+ * it paying phantom gold from land it no longer holds. Such a route pays nothing AND
+ * is struck from the returned book, so it never lingers against the per-nation route
+ * cap (A1). A route bound for a Kontor shuttered after it was founded pays 0 (A3).
  */
 export function stepTrade(state: GameState): GameState {
   const routes = state.routes;
@@ -443,11 +492,19 @@ export function stepTrade(state: GameState): GameState {
 
   const gain = new Map<number, number>();
   const tollGain = new Map<number, number>(); // Sound-toll income, tracked apart for the log
-  const nextRoutes = routes.map((route) => {
+  const nextRoutes: TradeRoute[] = [];
+  for (const route of routes) {
+    // A1 — a route is only as good as the land under it: drop it (paying nothing) if
+    // its owner no longer holds `fromRegionId` or is no longer a living realm.
+    const owner = nationById(state, route.ownerId);
+    const holdsSource = state.regions[route.fromRegionId]?.ownerId === route.ownerId;
+    if (!owner || !owner.alive || !holdsSource) continue;
+
     // The League shuts a non-member (or a boycotted realm) out of its Kontore entirely.
     const leagueBlocked = leagueSeversRoute(state, route);
     const disrupted = routeDisrupted(state, route);
-    let income = disrupted || leagueBlocked ? 0 : routeIncome(state, route);
+    const kontorClosed = !kontorOpen(state, route.toKontorId); // a shuttered Kontor takes no trade (A3)
+    let income = disrupted || leagueBlocked || kontorClosed ? 0 : routeIncome(state, route);
 
     // The Øresund toll: the strait-holder skims a crossing route, or closes it.
     const eff = income > 0 ? soundEffect(state, route, income) : { toll: 0, blocked: false, holderId: null };
@@ -464,8 +521,8 @@ export function stepTrade(state: GameState): GameState {
     }
 
     if (income > 0) gain.set(route.ownerId, round1((gain.get(route.ownerId) ?? 0) + income));
-    return { ...route, lastIncome: income, disrupted: disrupted || soundBlocked || leagueBlocked, tollPaid, soundBlocked, leagueBlocked };
-  });
+    nextRoutes.push({ ...route, lastIncome: income, disrupted: disrupted || soundBlocked || leagueBlocked || kontorClosed, tollPaid, soundBlocked, leagueBlocked });
+  }
 
   const nations =
     gain.size === 0

@@ -22,12 +22,14 @@
  */
 
 import { KONTORE, KONTOR_IDS, type KontorId } from "@/data/kontore";
+import { eraIndexForTurn } from "@/data/eras";
 import { atWar, adjustRelation } from "@/systems/diplomacy";
 import { round1 } from "@/systems/economy";
 import {
   BARBARIAN_ID,
   PLAYER_ID,
   inLeague,
+  nationById,
   type GameState,
   type Nation,
   type TradeRoute,
@@ -36,6 +38,10 @@ import {
 // Tuning (docs/hansa-alignment-plan.md). Founding wants a real trading power, so the
 // League is a mid-game institution rather than a turn-1 lock-in.
 export const FOUND_MIN_ROUTES = 3; // routes that mark a realm as a trading power fit to found
+// The League cannot form before its historical era. The game opens ~900 AD, but the
+// Hansa proper coheres only once "The League Rises" (data/eras.ts era 2, turn 90 —
+// "Lübeck is founded and the towns swear common cause") dawns.
+export const FOUND_MIN_ERA = 2;
 const BOYCOTT_LEVY = 8; // Pfundzoll — each member's ad-hoc contribution when a boycott is called
 const BOYCOTT_RELATION_HIT = -12; // the cut-off realm's resentment of each member
 const LEAVE_PENALTY = -14; // relations hit with each member on leaving
@@ -79,10 +85,12 @@ function routeCount(state: GameState, nationId: number): number {
 }
 
 /** A realm is a real trading power — fit to found the League — once it runs enough
-    routes. Trade-gated (not mere Kontor ownership) so the League is a mid-game
-    institution, not a turn-1 lock-in. Pure. */
+    routes AND its own age has come. Trade-gated (not mere Kontor ownership) and
+    era-gated (not before "The League Rises"), so the League is a mid-game institution,
+    not a turn-1 lock-in. Joining an already-formed League is *not* era-gated. Pure. */
 export function canFoundLeague(state: GameState, nationId: number): boolean {
   if (state.league || nationId === BARBARIAN_ID || state.mapId !== "hansa") return false;
+  if (eraIndexForTurn(state.turn) < FOUND_MIN_ERA) return false; // too early — the Hansa has not yet risen
   return routeCount(state, nationId) >= FOUND_MIN_ROUTES;
 }
 
@@ -195,13 +203,20 @@ export function leagueSeversRoute(state: GameState, route: TradeRoute): boolean 
 /**
  * Whether every realm shipping `good` into `kontor` is a League member (the League
  * has cornered that good's market there) — the hook for the League-monopoly premium.
- * False if there is no supply or the League is absent. Pure.
+ * False if there is no supply or the League is absent. `flows` (optional) restricts
+ * the count to routes that actually deliver this turn, so a severed non-member does
+ * not break the corner (A2); it defaults to counting every route. Pure.
  */
-export function isLeagueMonopoly(state: GameState, good: string, kontor: KontorId): boolean {
+export function isLeagueMonopoly(
+  state: GameState,
+  good: string,
+  kontor: KontorId,
+  flows: (route: TradeRoute) => boolean = () => true,
+): boolean {
   if (!state.league) return false;
   const suppliers = new Set<number>();
   for (const r of state.routes ?? []) {
-    if (r.good === good && r.toKontorId === kontor) suppliers.add(r.ownerId);
+    if (r.good === good && r.toKontorId === kontor && flows(r)) suppliers.add(r.ownerId);
   }
   if (suppliers.size === 0) return false;
   for (const s of suppliers) if (!inLeague(state, s)) return false;
@@ -226,33 +241,45 @@ export function leagueDividendPool(state: GameState): number {
  * (the League's Kontor wealth), and let the League's enmity slide relations with any
  * realm at war with a member (mutual defence, short of a formal call-to-arms). Also
  * lifts boycotts of realms that have since joined. Pure — returns new state.
+ *
+ * Eliminated realms are pruned from the roll *before* anything is paid: a dead member
+ * must neither draw the dividend (leaked gold) nor dilute the living members' share,
+ * nor freeze the Aldermanship as a ghost holder (A4). The pruned membership is written
+ * back to `state.league`; if it empties, the League dissolves.
  */
 export function stepLeague(state: GameState): GameState {
   const league = state.league;
   if (!league || league.members.length === 0) return state;
 
-  // 1) Dividend — split the pool equally among members.
-  const pool = leagueDividendPool(state);
-  const share = round1(pool / league.members.length);
+  // 0) Prune the dead from the roll. If no living member remains, the League is gone.
+  const members = league.members.filter((m) => nationById(state, m)?.alive ?? false);
+  if (members.length === 0) {
+    return { ...state, league: undefined, log: [...state.log, "The Hanseatic League dissolves — no realms remain to uphold it."].slice(-50) };
+  }
+  const workingLeague = { ...league, members };
+
+  // 1) Dividend — split the pool equally among the LIVING members.
+  const pool = leagueDividendPool({ ...state, league: workingLeague });
+  const share = round1(pool / members.length);
   let nations = state.nations;
   if (share > 0) {
-    nations = nations.map((n) => (league.members.includes(n.id) ? { ...n, stocks: { ...n.stocks, gold: round1(n.stocks.gold + share) } } : n));
+    nations = nations.map((n) => (members.includes(n.id) ? { ...n, stocks: { ...n.stocks, gold: round1(n.stocks.gold + share) } } : n));
   }
 
-  // Housekeeping — a boycott of a realm that has since joined lapses.
-  const boycotts = league.boycotts.filter((id) => !inLeague(state, id));
-  const nextLeague = boycotts.length === league.boycotts.length ? league : { ...league, boycotts };
+  // Housekeeping — a boycott of a realm that has since joined (or died out) lapses.
+  const boycotts = workingLeague.boycotts.filter((id) => !members.includes(id));
+  const nextLeague = { ...workingLeague, boycotts };
 
   let next: GameState = { ...state, nations, league: nextLeague };
 
   // 2) Mutual defence — anyone warring a member cools with every member (short of a
   // formal call-to-arms; the enmity feeds the existing coalition/relations systems).
   for (const aggressor of state.nations) {
-    if (aggressor.isBarbarian || inLeague(state, aggressor.id)) continue;
-    if (!league.members.some((m) => atWar(state, aggressor.id, m))) continue;
-    for (const m of league.members) next = adjustRelation(next, aggressor.id, m, DEFENCE_ENMITY);
+    if (aggressor.isBarbarian || members.includes(aggressor.id)) continue;
+    if (!members.some((m) => atWar(state, aggressor.id, m))) continue;
+    for (const m of members) next = adjustRelation(next, aggressor.id, m, DEFENCE_ENMITY);
   }
-  const playerShare = league.members.includes(PLAYER_ID) ? share : 0;
+  const playerShare = members.includes(PLAYER_ID) ? share : 0;
   if (playerShare > 0) {
     next = { ...next, log: [...next.log, `The Hanseatic League's Kontore paid you a +${playerShare}g dividend.`].slice(-50) };
   }

@@ -30,6 +30,7 @@ import {
   MAX_ROUTES_PER_NATION,
   TRADE_DIST_CAP,
   type GameState,
+  type KontorState,
   type Region,
   type TradeRoute,
 } from "@/systems/state";
@@ -413,11 +414,14 @@ describe("the Øresund Sound toll (trade as power)", () => {
   const BRUGES_ID = KONTORE.bruges.regionId; // western Kontor host
 
   // A 70-region world: the Sound held by `holder`, the Bruges host left neutral so
-  // only the Sound (never the host) can sever a crossing route in these tests.
+  // only the Sound (never the host) can sever a crossing route in these tests. The
+  // Baltic source is held by the route's own shipper (default RIVAL) so a route is
+  // never voided for trading from land its owner does not hold (A1).
   function soundState(holder: number, routes: TradeRoute[]): GameState {
+    const srcOwner = routes[0]?.ownerId ?? RIVAL;
     const regions = regionsOf(70, {
       [SOUND_REGION]: { ownerId: holder },
-      [BALTIC_SRC]: { ownerId: RIVAL },
+      [BALTIC_SRC]: { ownerId: srcOwner },
       [BRUGES_ID]: { ownerId: BARBARIAN_ID },
     });
     return state(regions, {
@@ -524,6 +528,89 @@ describe("market pricing — scarcity & monopoly (Plan 3B)", () => {
     const solo = projectedRouteIncome(withRoutes([]), PLAYER_ID, "grain", "bruges", 2); // sole supplier
     const shared = projectedRouteIncome(withRoutes([grainRoute(0, RIVAL)]), PLAYER_ID, "grain", "bruges", 2); // a rival already supplies
     expect(solo).toBeGreaterThan(shared);
+  });
+
+  it("a severed rival is no competitor — a de-facto sole supplier keeps the premium (A2)", () => {
+    // PLAYER and RIVAL both ship grain → Bruges, but they are at war and the lane runs
+    // PLAYER's own land, so only PLAYER's route actually flows. The severed rival must
+    // not glut the market away from PLAYER.
+    const regions = regionsOf(BRUGES + 1, { 4: { ownerId: PLAYER_ID }, [BRUGES]: { ownerId: PLAYER_ID } });
+    const severed = state(regions, { routes: [grainRoute(0, PLAYER_ID), grainRoute(1, RIVAL)], treaties: { "0-2": "war" } });
+    const soleOnly = state(regions, { routes: [grainRoute(0, PLAYER_ID)] });
+    const bothFlow = state(regions, { routes: [grainRoute(0, PLAYER_ID), grainRoute(1, RIVAL)] }); // at peace — both deliver
+    const playerRoute = severed.routes![0]!;
+    // Same income as if PLAYER were truly alone (the severed rival is invisible)…
+    expect(routeIncome(severed, playerRoute)).toBeCloseTo(routeIncome(soleOnly, soleOnly.routes![0]!), 5);
+    // …and strictly more than when the rival's route really flows (a genuine glut).
+    expect(routeIncome(severed, playerRoute)).toBeGreaterThan(routeIncome(bothFlow, bothFlow.routes![0]!));
+  });
+});
+
+describe("a route is void when its owner loses the source or is eliminated (A1)", () => {
+  const routeState = (srcOwner: number, over: Partial<GameState> = {}): GameState =>
+    state(
+      regionsOf(BRUGES + 1, {
+        4: { terrain: "plains", ownerId: srcOwner, adjacency: [BRUGES] },
+        [BRUGES]: { terrain: "coast", ownerId: PLAYER_ID, adjacency: [4] },
+      }),
+      {
+        routes: [{ id: 0, ownerId: PLAYER_ID, good: "grain", fromRegionId: 4, toKontorId: "bruges", lane: [4, BRUGES] }],
+        nextRouteId: 1,
+        ...over,
+      },
+    );
+
+  it("drops (and pays 0 for) a route whose owner no longer holds the source region", () => {
+    const s = routeState(BARBARIAN_ID); // region 4 has fallen to the barbarians
+    const before = s.nations[PLAYER_ID]!.stocks.gold;
+    const next = stepTrade(s);
+    expect(next.routes).toEqual([]); // struck from the book — never lingers against the per-nation cap
+    expect(next.nations[PLAYER_ID]!.stocks.gold).toBe(before); // no phantom income from lost land
+  });
+
+  it("drops a route whose owner has been eliminated", () => {
+    const base = routeState(PLAYER_ID);
+    const s = { ...base, nations: base.nations.map((n) => (n.id === PLAYER_ID ? { ...n, alive: false } : n)) };
+    const next = stepTrade(s);
+    expect(next.routes).toEqual([]);
+    expect(next.nations[PLAYER_ID]!.stocks.gold).toBe(s.nations[PLAYER_ID]!.stocks.gold);
+  });
+
+  it("keeps and pays a route whose owner still holds the source (control)", () => {
+    const next = stepTrade(routeState(PLAYER_ID));
+    expect(next.routes).toHaveLength(1);
+    expect(next.routes![0]!.lastIncome!).toBeGreaterThan(0);
+  });
+});
+
+describe("a closed Kontor takes no trade (A3)", () => {
+  const shut = (id: KontorState["id"]): KontorState[] => [{ id, holderId: PLAYER_ID, open: false, sinceTurn: 1 }];
+  const laneRegions = () =>
+    regionsOf(BRUGES + 1, {
+      4: { terrain: "plains", ownerId: PLAYER_ID, adjacency: [BRUGES] },
+      [BRUGES]: { terrain: "coast", ownerId: PLAYER_ID, adjacency: [4] },
+    });
+
+  it("createRoute rejects a route into a shuttered Kontor (but founds into an open one)", () => {
+    expect(createRoute(state(laneRegions(), { kontore: shut("bruges") }), PLAYER_ID, 4, "grain", "bruges").routes).toEqual([]);
+    expect(createRoute(state(laneRegions()), PLAYER_ID, 4, "grain", "bruges").routes).toHaveLength(1); // open by default
+  });
+
+  it("routeOptions omits a shuttered Kontor", () => {
+    const s = state(laneRegions(), { kontore: shut("bruges") });
+    expect(routeOptions(s, 4, PLAYER_ID).some((o) => o.toKontorId === "bruges")).toBe(false);
+  });
+
+  it("stepTrade pays 0 into a Kontor shuttered after the route was founded", () => {
+    const s = state(laneRegions(), {
+      routes: [{ id: 0, ownerId: PLAYER_ID, good: "grain", fromRegionId: 4, toKontorId: "bruges", lane: [4, BRUGES] }],
+      kontore: shut("bruges"),
+    });
+    const before = s.nations[PLAYER_ID]!.stocks.gold;
+    const next = stepTrade(s);
+    expect(next.routes![0]!.lastIncome).toBe(0);
+    expect(next.routes![0]!.disrupted).toBe(true);
+    expect(next.nations[PLAYER_ID]!.stocks.gold).toBe(before);
   });
 });
 
