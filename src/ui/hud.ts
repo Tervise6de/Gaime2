@@ -1781,6 +1781,12 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       });
       chipWrap.append(chip, go);
       row.append(chipWrap);
+      // Long odds get a plain-language reason so a doomed assault isn't a mystery.
+      if (!preview.undefended && preview.winChance < 0.4) {
+        const warn = el("div", "hud-attack-warn");
+        warn.innerHTML = `${glyphHtml("warning", "⚠")} ${escapeHtml(attackWarning(army, target))}`;
+        row.append(warn);
+      }
       list.append(row);
     });
     panel.append(list);
@@ -3134,6 +3140,24 @@ function oddsClass(chance: number): string {
   if (chance >= 0.65) return "win";
   if (chance >= 0.4) return "even";
   return "lose";
+}
+
+/**
+ * The most actionable reason an assault faces long odds — so a doomed attack
+ * reads as a choice, not a mystery. Militia-as-a-defensive-levy first (the classic
+ * trap), then soft-hitting armies, then walls and ground.
+ */
+function attackWarning(army: Army, target: Region): string {
+  const total = armySize(army.units) || 1;
+  if (army.units.militia / total >= 0.5) {
+    return "Militia are a defensive levy — weak on the attack. Lead with Infantry or Ranged.";
+  }
+  let atk = 0;
+  for (const t of UNIT_TYPES) atk += army.units[t] * UNITS[t].attack;
+  if (atk / total < 4) return "Your troops hit softly attacking — bring Infantry, Ranged or Cavalry.";
+  if (target.fortification >= 2) return "The walls favour the defender — bring Siege to batter them down.";
+  if (TERRAIN[target.terrain].defense >= 1.2) return "The defender holds strong, high ground here.";
+  return "The defender is simply the stronger force — mass more troops before you strike.";
 }
 
 /** Compact per-unit casualty list for a forecast tooltip, e.g. "2 Infantry, 1 Ranged". */

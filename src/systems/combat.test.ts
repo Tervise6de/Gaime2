@@ -97,6 +97,20 @@ describe("resolveCombat", () => {
     expect(armySize(res.attackerLosses)).toBe(0);
   });
 
+  it("a defended assault always bloodies the defender (no zero-loss win)", () => {
+    // Equal militia attacking uphill into a fort: the defender wins decisively,
+    // but a real clash never leaves it untouched.
+    const res = resolveCombat(
+      units({ militia: 6 }),
+      units({ militia: 6 }),
+      { terrainDefense: 1.25, fortification: 2 },
+      createRng(3),
+    );
+    expect(res.attackerWins).toBe(false);
+    expect(armySize(res.defenderLosses)).toBeGreaterThan(0);
+    expect(armySize(res.attackerLosses)).toBeGreaterThan(armySize(res.defenderLosses)); // still a clear win
+  });
+
   it("an overwhelming attacker wins and captures", () => {
     const res = resolveCombat(
       units({ infantry: 10, ranged: 6 }),

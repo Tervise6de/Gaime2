@@ -1997,6 +1997,20 @@ body {
   background: #e8776b;
 }
 
+/* Plain-language reason under a long-odds assault. */
+.hud-attack-warn {
+  flex-basis: 100%;
+  margin-top: 5px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #e6bd57;
+}
+.hud-attack-warn .ico-svg svg,
+.hud-attack-warn .ico {
+  vertical-align: -1px;
+  margin-right: 3px;
+}
+
 .hud-unit-menu {
   display: grid;
   grid-template-columns: repeat(5, 1fr);

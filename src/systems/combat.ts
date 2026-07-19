@@ -341,8 +341,16 @@ export function resolveCombat(
     // converges even between tiny, evenly-matched stacks. The defender "holds"
     // the round when at least as strong, and it's the attacker who's thrown back.
     const defenderHeldRound = defPow >= atkPow;
-    const defHit = scaleLosses(def, defFrac, !defenderHeldRound);
-    const atkHit = scaleLosses(atk, atkFrac, defenderHeldRound);
+    // A real clash bloodies BOTH sides: in the OPENING melee the round's winner
+    // also sheds a regiment when the loser fought with meaningful force — so a
+    // defended assault never costs the defender *nothing*. Only the first round
+    // (not every round) so a small garrison isn't ground away and the outcome
+    // never flips; a lopsided walkover still spares the winner entirely.
+    const bloody = round === 1;
+    const atkMeaningful = bloody && atkPow >= defPow * 0.2;
+    const defMeaningful = bloody && defPow >= atkPow * 0.2;
+    const defHit = scaleLosses(def, defFrac, !defenderHeldRound || atkMeaningful);
+    const atkHit = scaleLosses(atk, atkFrac, defenderHeldRound || defMeaningful);
     atk = subtract(atk, atkHit);
     def = subtract(def, defHit);
     phases.push({
