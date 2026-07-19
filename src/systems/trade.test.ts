@@ -4,6 +4,8 @@ import {
   regionGoodOutput,
   laneFor,
   createRoute,
+  closeRoute,
+  routeOptions,
   distanceFactor,
   routeIncome,
   routeDisrupted,
@@ -325,6 +327,56 @@ describe("seedKontore", () => {
     const regions = regionsOf(1, { 0: { ownerId: BARBARIAN_ID } });
     const london = seedKontore(state(regions)).find((k) => k.id === "london")!;
     expect(london.holderId).toBeNull();
+  });
+});
+
+describe("closeRoute", () => {
+  const withRoute = (): GameState =>
+    state(
+      regionsOf(BRUGES + 1, {
+        4: { terrain: "plains", ownerId: PLAYER_ID, adjacency: [BRUGES] },
+        [BRUGES]: { terrain: "coast", ownerId: PLAYER_ID, adjacency: [4] },
+      }),
+      { routes: [{ id: 7, ownerId: PLAYER_ID, good: "grain", fromRegionId: 4, toKontorId: "bruges", lane: [4, BRUGES] }], nextRouteId: 8 },
+    );
+
+  it("drops the owner's route by id", () => {
+    expect(closeRoute(withRoute(), 7, PLAYER_ID).routes).toEqual([]);
+  });
+
+  it("is a no-op for a route the caller does not own, or a missing id", () => {
+    expect(closeRoute(withRoute(), 7, RIVAL).routes).toHaveLength(1); // not yours
+    expect(closeRoute(withRoute(), 99, PLAYER_ID).routes).toHaveLength(1); // no such route
+  });
+});
+
+describe("routeOptions", () => {
+  const base = (): GameState =>
+    state(
+      regionsOf(BRUGES + 1, {
+        4: { terrain: "plains", ownerId: PLAYER_ID, adjacency: [BRUGES] }, // grain source
+        [BRUGES]: { terrain: "coast", ownerId: PLAYER_ID, adjacency: [4] }, // Bruges host
+      }),
+    );
+
+  it("offers a sourced good to a demanding, reachable Kontor", () => {
+    const opts = routeOptions(base(), 4, PLAYER_ID);
+    expect(opts.some((o) => o.good === "grain" && o.toKontorId === "bruges")).toBe(true);
+    const bruges = opts.find((o) => o.toKontorId === "bruges")!;
+    expect(bruges.income).toBeGreaterThan(0);
+    expect(bruges.hops).toBe(2); // 4 → Bruges host
+  });
+
+  it("excludes a route already open from this region", () => {
+    let s = base();
+    s = createRoute(s, PLAYER_ID, 4, "grain", "bruges");
+    expect(routeOptions(s, 4, PLAYER_ID).some((o) => o.good === "grain" && o.toKontorId === "bruges")).toBe(false);
+  });
+
+  it("offers nothing from a region that sources nothing, or one you don't hold", () => {
+    const barren = state(regionsOf(BRUGES + 1, { 4: { terrain: "mountains", ownerId: PLAYER_ID, adjacency: [BRUGES] } }));
+    expect(routeOptions(barren, 4, PLAYER_ID)).toEqual([]);
+    expect(routeOptions(base(), 4, RIVAL)).toEqual([]); // not your region
   });
 });
 

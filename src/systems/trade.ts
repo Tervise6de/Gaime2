@@ -152,6 +152,54 @@ export function createRoute(
   return { ...state, routes: [...existing, route], nextRouteId: id + 1 };
 }
 
+/**
+ * Close a route: drop it from `ownerId`'s book. A no-op unless the route exists
+ * and belongs to `ownerId` (you can only pull your own routes). Pure.
+ */
+export function closeRoute(state: GameState, routeId: number, ownerId: number): GameState {
+  const routes = state.routes ?? [];
+  const keep = routes.filter((r) => !(r.id === routeId && r.ownerId === ownerId));
+  if (keep.length === routes.length) return state;
+  return { ...state, routes: keep };
+}
+
+/** A route `ownerId` could open from a region: a sourced good to a demanding,
+    reachable Kontor it doesn't already run, with the gold it would pay per turn. */
+export interface RouteOption {
+  good: GoodId;
+  toKontorId: KontorId;
+  income: number;
+  /** Lane length (nodes) — 1 is the Kontor's own host region. */
+  hops: number;
+}
+
+/**
+ * Every trade route `ownerId` could open from `fromRegionId` right now: for each
+ * good the region sources, each Kontor that demands it and is reachable (and whose
+ * host it isn't at war with), excluding routes already running from this region.
+ * The same validity as `createRoute`, surfaced for the UI/AI to choose from.
+ * Sorted richest first (deterministic tie-break). Pure.
+ */
+export function routeOptions(state: GameState, fromRegionId: number, ownerId: number): RouteOption[] {
+  const region = state.regions[fromRegionId];
+  if (!region || region.ownerId !== ownerId || ownerId === BARBARIAN_ID) return [];
+  const open = (state.routes ?? []).filter((r) => r.ownerId === ownerId && r.fromRegionId === fromRegionId);
+  const out: RouteOption[] = [];
+  for (const good of GOOD_IDS) {
+    if (!regionSources(region, good)) continue;
+    for (const toKontorId of GOODS[good].demandedAt) {
+      if (open.some((r) => r.good === good && r.toKontorId === toKontorId)) continue;
+      const lane = laneFor(state, fromRegionId, toKontorId);
+      if (lane.length === 0) continue;
+      const hostOwner = state.regions[KONTORE[toKontorId].regionId]?.ownerId ?? null;
+      if (hostOwner !== null && hostOwner !== ownerId && atWar(state, ownerId, hostOwner)) continue;
+      out.push({ good, toKontorId, income: round1(GOODS[good].value * distanceFactor(lane.length)), hops: lane.length });
+    }
+  }
+  out.sort((a, b) => b.income - a.income || a.good.localeCompare(b.good) || a.toKontorId.localeCompare(b.toKontorId));
+  return out;
+}
+
 // --- route income -----------------------------------------------------------
 
 /**

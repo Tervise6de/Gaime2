@@ -1453,6 +1453,83 @@ body {
   color: var(--muted);
 }
 
+/* Trade section — the merchant layer in the region panel. */
+.hud-trade-exports {
+  margin: 2px 0 6px;
+}
+.hud-trade-route {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 4px 7px;
+  margin: 3px 0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+}
+.hud-trade-route-label {
+  font-size: 12px;
+}
+.hud-trade-income {
+  color: #6fae7f;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.hud-trade-severed {
+  color: #d6786c;
+  font-weight: 700;
+}
+.hud-trade-close {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+.hud-trade-close:hover {
+  color: #d6786c;
+  background: rgba(214, 120, 108, 0.12);
+}
+.hud-trade-open {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+.hud-trade-open-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 9px;
+  text-align: left;
+  color: var(--fg);
+  background: rgba(232, 145, 58, 0.1);
+  border: 1px solid rgba(232, 145, 58, 0.45);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.hud-trade-open-btn:hover {
+  background: rgba(232, 145, 58, 0.22);
+}
+.hud-trade-open-name {
+  font-size: 12px;
+  font-weight: 600;
+}
+.hud-trade-open-inc {
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
+  color: #e8a24a;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Population vs. cap, as a labelled bar. */
 .hud-popblock {
   margin: 2px 0 10px;

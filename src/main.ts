@@ -22,6 +22,7 @@ import {
   rejectOffer,
 } from "@/systems/diplomacy";
 import { resolveChoice } from "@/systems/events";
+import { createRoute, closeRoute } from "@/systems/trade";
 import { saveToLocal, loadFromLocal, hasLocalSave, clearLocalSave, serializeGame, deserializeGame } from "@/systems/save";
 import { summarizeTurn, type TurnSummary } from "@/systems/summary";
 import { PLAYER_ID, BARBARIAN_ID, type GameState } from "@/systems/state";
@@ -146,6 +147,15 @@ function main(): void {
     },
     onSetFocus(regionId, focus) {
       state = setRegionFocus(state, regionId, focus);
+      commit();
+    },
+    onOpenRoute(regionId, good, kontorId) {
+      state = createRoute(state, PLAYER_ID, regionId, good, kontorId);
+      play("build");
+      commit();
+    },
+    onCloseRoute(routeId) {
+      state = closeRoute(state, routeId, PLAYER_ID);
       commit();
     },
     onRaiseUnit(regionId, unit) {

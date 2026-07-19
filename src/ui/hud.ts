@@ -69,6 +69,9 @@ import {
 } from "@/systems/military";
 import { getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, nationPower, hasTrade, tradeIncome, opinionReasons, foreignRelations, casusBelli, CASUS_BELLI, TRIBUTE_DEMAND } from "@/systems/diplomacy";
 import { nationScore, victoryProgress, victoryRaces, endGameSummary } from "@/systems/victory";
+import { GOODS, type GoodId } from "@/data/goods";
+import { KONTORE, type KontorId } from "@/data/kontore";
+import { routeOptions, regionGoodOutput } from "@/systems/trade";
 import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
 import type { TurnSummary } from "@/systems/summary";
 import { deriveAlerts, type Alert } from "@/ui/alerts";
@@ -89,6 +92,7 @@ import {
 import { rulerTitle } from "@/data/rulers";
 import {
   BARBARIAN_ID,
+  MAX_ROUTES_PER_NATION,
   PLAYER_ID,
   RESOURCE_KEYS,
   TAX_MAX,
@@ -132,6 +136,10 @@ export interface HudCallbacks {
   onCancelConstruction(regionId: number): void;
   /** Assign a region's specialisation focus (or "balanced" to clear it). */
   onSetFocus(regionId: number, focus: FocusId): void;
+  /** Open a trade route: ship `good` from a region to a Kontor that demands it. */
+  onOpenRoute(regionId: number, good: GoodId, kontorId: KontorId): void;
+  /** Close one of your trade routes by id. */
+  onCloseRoute(routeId: number): void;
   onRaiseUnit(regionId: number, unit: UnitType): void;
   onBeginMove(armyId: number): void;
   onCancelMove(): void;
@@ -2410,6 +2418,78 @@ function populationBlock(region: Region): HTMLElement {
   return wrap;
 }
 
+/**
+ * The Trade section of a region panel: what the province exports, the routes it
+ * already runs (income or a "severed" flag, each with a close button), and the
+ * routes you could open to a demanding Kontor — one click each, richest first,
+ * gated by your route-book cap. Reads/writes only through callbacks; the sim
+ * (`routeOptions`, `createRoute`, `closeRoute`) is the source of truth.
+ */
+function tradeSection(state: GameState, region: Region, callbacks: HudCallbacks): HTMLElement {
+  const wrap = el("div", "hud-region-trade");
+  wrap.append(regionSubhead("Trade"));
+
+  const sourced = regionGoodOutput(region);
+  const exports = el("p", "hud-hint hud-trade-exports");
+  exports.innerHTML = sourced.length
+    ? "Exports " + sourced.map((s) => `${GOODS[s.good].glyph} ${escapeHtml(GOODS[s.good].name)}`).join(" · ")
+    : "No goods to export — but its ports can still carry others’ trade.";
+  wrap.append(exports);
+
+  // Standing routes from this province.
+  const routes = (state.routes ?? []).filter((r) => r.ownerId === region.ownerId && r.fromRegionId === region.id);
+  for (const rt of routes) {
+    const g = GOODS[rt.good];
+    const k = KONTORE[rt.toKontorId];
+    const row = el("div", "hud-trade-route");
+    const label = el("span", "hud-trade-route-label");
+    const worth = rt.disrupted
+      ? `<span class="hud-trade-severed">severed</span>`
+      : `<span class="hud-trade-income">+${fmt(rt.lastIncome ?? 0)}g</span>`;
+    label.innerHTML = `${g.glyph} ${escapeHtml(g.name)} → ${escapeHtml(k.name)} ${worth}`;
+    const close = btn("✕", "hud-trade-close", () => callbacks.onCloseRoute(rt.id));
+    close.title = `Close this ${g.name} route to ${k.name}.`;
+    close.setAttribute("aria-label", `Close ${g.name} route to ${k.name}`);
+    row.append(label, close);
+    wrap.append(row);
+  }
+
+  // Routes you could open (your land only).
+  if (region.ownerId === PLAYER_ID) {
+    const total = (state.routes ?? []).filter((r) => r.ownerId === PLAYER_ID).length;
+    if (total >= MAX_ROUTES_PER_NATION) {
+      const full = el("p", "hud-hint muted");
+      full.textContent = `Your trade book is full (${total}/${MAX_ROUTES_PER_NATION}) — close a route to open another.`;
+      wrap.append(full);
+    } else {
+      const opts = routeOptions(state, region.id, PLAYER_ID);
+      if (opts.length) {
+        const menu = el("div", "hud-trade-open");
+        for (const o of opts) {
+          const g = GOODS[o.good];
+          const k = KONTORE[o.toKontorId];
+          const b = btn("", "hud-trade-open-btn", () => callbacks.onOpenRoute(region.id, o.good, o.toKontorId));
+          b.innerHTML =
+            `<span class="hud-trade-open-name">${g.glyph} ${escapeHtml(g.name)} → ${escapeHtml(k.name)}</span>` +
+            `<span class="hud-trade-open-inc">+${fmt(o.income)}g</span>`;
+          b.title =
+            `Ship ${g.name} to ${k.name} — about ${o.hops} stop${o.hops === 1 ? "" : "s"} away, ` +
+            `paying ~${fmt(o.income)} gold a turn while the road stays open (a war astride the lane severs it).`;
+          menu.append(b);
+        }
+        wrap.append(menu);
+      } else if (sourced.length) {
+        const none = el("p", "hud-hint muted");
+        none.textContent = routes.length
+          ? "Every Kontor that wants these goods is already served from here."
+          : "No Kontor in reach demands these goods yet.";
+        wrap.append(none);
+      }
+    }
+  }
+  return wrap;
+}
+
 /** A small uppercase divider inside the region panel ("Income / turn"). */
 function regionSubhead(text: string): HTMLElement {
   const h = el("div", "hud-region-subhead");
@@ -2675,6 +2755,10 @@ function renderOwnedRegion(
     table.append(row);
   }
   container.append(table);
+
+  // Trade: what this province exports, its standing routes, and the routes you
+  // could open to the Kontore (the merchant layer). Owned-region panel only.
+  container.append(tradeSection(state, region, callbacks));
 
   // Buildings: a collapsed-by-default tab listing what's built and each one's
   // effect (its "level" of benefit), plus the region's fortification level.
