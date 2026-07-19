@@ -1419,6 +1419,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       const proj = ensureProjection(state);
       paintVoronoi(state, proj, busy);
       drawTradeLanes(proj);
+      drawMarchOrders(state, proj);
       drawArmies(state);
       drawRipples(state);
       if (minimap) drawMinimap(state);
@@ -1871,6 +1872,42 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       context.arc(end.x, end.y, mine ? 4.5 : 3.5, 0, Math.PI * 2);
       context.fillStyle = disrupted ? "#c8463c" : "#f0b35a";
       context.fill();
+    }
+    context.restore();
+  }
+
+  /**
+   * March orders: a dashed heading line from each marching army to its
+   * destination, with an arrowhead — so an in-transit force reads at a glance.
+   * The player's are gold; rivals' (if any march) a muted red. Cheap; drawn live.
+   */
+  function drawMarchOrders(s: GameState, proj: Projection): void {
+    const marching = s.armies.filter((a) => a.dest != null);
+    if (!marching.length) return;
+    context.save();
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    for (const a of marching) {
+      const from = proj.sites[a.regionId];
+      const to = proj.sites[a.dest!];
+      if (!from || !to) continue;
+      const mine = a.ownerId === PLAYER_ID;
+      context.strokeStyle = mine ? "rgba(244, 210, 122, 0.9)" : "rgba(216, 120, 110, 0.75)";
+      context.lineWidth = mine ? 2.4 : 1.8;
+      context.setLineDash([6, 5]);
+      context.beginPath();
+      context.moveTo(from.x, from.y);
+      context.lineTo(to.x, to.y);
+      context.stroke();
+      // Arrowhead at the destination.
+      const ang = Math.atan2(to.y - from.y, to.x - from.x);
+      context.setLineDash([]);
+      context.beginPath();
+      context.moveTo(to.x, to.y);
+      context.lineTo(to.x - 10 * Math.cos(ang - 0.42), to.y - 10 * Math.sin(ang - 0.42));
+      context.moveTo(to.x, to.y);
+      context.lineTo(to.x - 10 * Math.cos(ang + 0.42), to.y - 10 * Math.sin(ang + 0.42));
+      context.stroke();
     }
     context.restore();
   }

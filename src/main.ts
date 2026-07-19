@@ -10,7 +10,7 @@ import {
   setRegionFocus,
   chooseResearch,
 } from "@/systems/turn";
-import { raiseUnit, moveArmy, moveDetachment, disbandUnits, fortifyArmy, appointCommander, reachableRegions } from "@/systems/military";
+import { raiseUnit, orderMarch, cancelMarch, moveDetachment, disbandUnits, fortifyArmy, appointCommander, reachableRegions } from "@/systems/military";
 import {
   declareWar,
   atWar,
@@ -31,7 +31,7 @@ import { createHud } from "@/ui/hud";
 import { showMainMenu } from "@/ui/title";
 import { runTutorial, hasSeenTutorial } from "@/ui/tutorial";
 import { play, outcomeCue, armAmbientOnGesture } from "@/ui/audio";
-import { applyDisplaySettings, isColourblind, isReduceMotion, isCombatReport } from "@/ui/settings";
+import { applyDisplaySettings, isColourblind, isReduceMotion } from "@/ui/settings";
 import { applyLocale } from "@/ui/i18n";
 import { lensColorsFor, type LensId } from "@/ui/lenses";
 import { recordGameEnd } from "@/ui/profile";
@@ -172,31 +172,21 @@ function main(): void {
       sync();
     },
     onAttackWith(armyId, regionId) {
-      // Attack a region with the army the player chose (same sim path as the
-      // map move/attack flow). Guarded to a real, adjacent, ready army.
-      const army = state.armies.find(
-        (a) =>
-          a.id === armyId &&
-          a.ownerId === PLAYER_ID &&
-          a.movesLeft > 0 &&
-          state.regions[a.regionId]?.adjacency.includes(regionId),
-      );
+      // Order the chosen army to march on the target: it advances there over
+      // turns and fights on arrival (resolved at End turn), rather than striking
+      // instantly. Guarded to a real, owned army; attacking is an act of war.
+      const army = state.armies.find((a) => a.id === armyId && a.ownerId === PLAYER_ID);
       if (!army) return;
       withWarConfirm(regionId, () => {
-        const before = state;
-        const battlesBefore = before.battles?.length ?? 0;
-        state = moveArmy(state, army.id, regionId);
-        const moved = state.armies.find((a) => a.id === army.id);
-        // Stay on the fight's outcome region: the captured target, or the army's
-        // spot if it was repelled.
-        selectedRegion = state.regions[regionId]?.ownerId === PLAYER_ID ? regionId : (moved?.regionId ?? regionId);
+        state = orderMarch(state, armyId, regionId);
+        selectedRegion = army.regionId;
         moveArmyId = null;
         commit();
-        for (const after of state.regions) {
-          if (before.regions[after.id]?.ownerId !== after.ownerId) renderer.pulseCapture(after.id);
-        }
-        maybeShowBattle(battlesBefore);
       });
+    },
+    onCancelMarch(armyId) {
+      state = cancelMarch(state, armyId);
+      commit();
     },
     onMoveDetachment(armyId, targetRegionId, subset) {
       state = moveDetachment(state, armyId, targetRegionId, subset);
@@ -295,17 +285,28 @@ function main(): void {
   renderer.onRegionClick((regionId) => {
     if (moveArmyId !== null && regionId !== null) {
       const army = state.armies.find((a) => a.id === moveArmyId);
-      if (army && reachableRegions(state, army).includes(regionId)) {
-        const attackerId = moveArmyId;
-        withWarConfirm(regionId, () => {
-          const battlesBefore = state.battles?.length ?? 0;
-          state = moveArmy(state, attackerId, regionId);
-          const moved = state.armies.find((a) => a.id === attackerId);
-          selectedRegion = moved ? moved.regionId : regionId;
-          moveArmyId = moved && moved.movesLeft > 0 ? moved.id : null;
-          commit();
-          maybeShowBattle(battlesBefore);
-        });
+      // Give the army a march order to the clicked region: it travels there over
+      // turns (fighting whatever it meets on arrival), rather than teleporting.
+      // Attacking an enemy destination is still an act of war — confirmed here.
+      if (army && army.regionId !== regionId) {
+        const armyId = moveArmyId;
+        const order = (): void => {
+          const before = state;
+          state = orderMarch(state, armyId, regionId);
+          selectedRegion = regionId;
+          moveArmyId = null;
+          if (state === before) hud.toast("No route there — the army can't reach that region.");
+          else commit();
+        };
+        const target = state.regions[regionId];
+        const enemyDest =
+          !!target &&
+          target.ownerId !== null &&
+          target.ownerId !== PLAYER_ID &&
+          target.ownerId !== BARBARIAN_ID &&
+          !atWar(state, PLAYER_ID, target.ownerId);
+        if (enemyDest) withWarConfirm(regionId, order);
+        else order();
         return;
       }
     }
@@ -402,20 +403,6 @@ function main(): void {
   function commit(): void {
     sync();
     saveToLocal(state, nowStamp(), "auto");
-  }
-
-  /**
-   * Replay the fight the player just fought, if a new battle was recorded and
-   * the combat-report option is on. `battlesBefore` is the battle count before
-   * the move, so relocations and undefended captures (which record nothing) are
-   * skipped, as are purely-AI fights (never player-involved).
-   */
-  function maybeShowBattle(battlesBefore: number): void {
-    if (!isCombatReport()) return;
-    const battles = state.battles ?? [];
-    if (battles.length <= battlesBefore) return;
-    const b = battles[battles.length - 1];
-    if (b && (b.attackerIsPlayer || b.defenderIsPlayer)) hud.showBattleReport(b);
   }
 
   /** The rival an attack on `regionId` would newly declare war on, or null. */

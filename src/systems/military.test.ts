@@ -6,6 +6,10 @@ import {
   canRaiseUnit,
   raiseUnit,
   moveArmy,
+  orderMarch,
+  cancelMarch,
+  advanceMarches,
+  marchEta,
   moveDetachment,
   disbandUnits,
   fortifyArmy,
@@ -657,5 +661,56 @@ describe("upkeep and bankruptcy", () => {
     const g = createGame({ seed: 42 });
     expect(g.armies.some((a) => a.ownerId === PLAYER_ID && armySize(a.units) > 0)).toBe(true);
     expect(g.armies.some((a) => a.ownerId === BARBARIAN_ID)).toBe(true);
+  });
+});
+
+describe("marching (travel over turns)", () => {
+  // Simulate the turn pipeline's move-point refresh (resolveTurn step 5).
+  const refresh = (g: GameState): GameState => ({
+    ...g,
+    armies: g.armies.map((a) => ({ ...a, movesLeft: armyMoves(a.units) })),
+  });
+
+  it("orders a march when a path exists; ordering to the current region cancels it", () => {
+    const g = realm({ militia: 2 }); // army 0 at r0; chain r0–r1–r2, all owned
+    const ordered = orderMarch(g, 0, 2);
+    expect(ordered.armies[0]!.dest).toBe(2);
+    expect(orderMarch(ordered, 0, 0).armies[0]!.dest).toBeNull();
+  });
+
+  it("no-ops on an unreachable destination", () => {
+    const g = realm({ militia: 2 });
+    g.regions.push(region(9, { ownerId: PLAYER_ID, adjacency: [] })); // island, no path
+    expect(orderMarch(g, 0, 9).armies[0]!.dest ?? null).toBeNull();
+  });
+
+  it("advances a militia march one region per turn, arriving and clearing the order", () => {
+    let g = orderMarch(realm({ militia: 2 }), 0, 2); // 2 hops at moves 1
+    g = advanceMarches(refresh(g));
+    expect(g.armies[0]!.regionId).toBe(1); // stepped one region
+    expect(g.armies[0]!.dest).toBe(2); // still marching
+    g = advanceMarches(refresh(g));
+    expect(g.armies[0]!.regionId).toBe(2); // arrived
+    expect(g.armies[0]!.dest ?? null).toBeNull(); // order cleared
+  });
+
+  it("a faster stack covers more ground per turn", () => {
+    // Cavalry moves 2: r0 → r2 in a single turn.
+    let g = orderMarch(realm({ cavalry: 2 }), 0, 2);
+    g = advanceMarches(refresh(g));
+    expect(g.armies[0]!.regionId).toBe(2);
+    expect(g.armies[0]!.dest ?? null).toBeNull();
+  });
+
+  it("cancelMarch clears a standing order", () => {
+    const g = orderMarch(realm({ militia: 2 }), 0, 2);
+    expect(cancelMarch(g, 0).armies[0]!.dest).toBeNull();
+  });
+
+  it("marchEta reports the turns to arrive at the army's move rate", () => {
+    const slow = orderMarch(realm({ militia: 2 }), 0, 2); // moves 1 → 2 turns
+    expect(marchEta(slow, slow.armies[0]!)).toBe(2);
+    const fast = orderMarch(realm({ cavalry: 2 }), 0, 2); // moves 2 → 1 turn
+    expect(marchEta(fast, fast.armies[0]!)).toBe(1);
   });
 });

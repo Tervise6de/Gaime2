@@ -313,6 +313,13 @@ export interface Army {
    * maths; low loyalty foments unrest where they stand. Undefined = unled.
    */
   commander?: Commander;
+  /**
+   * March order (travel over turns): the region this army is marching toward.
+   * The turn pipeline advances it a step (its move rate) toward `dest` each turn,
+   * fighting whatever it steps into, until it arrives or is stopped — then `dest`
+   * clears. Undefined/null = idle (no standing order). Set by orderMarch.
+   */
+  dest?: number | null;
 }
 
 /**

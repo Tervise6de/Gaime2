@@ -31,7 +31,7 @@ import { stepFaith, seedFaith } from "@/systems/faith";
 import { stepTrade, seedKontore } from "@/systems/trade";
 import { nextPopulation } from "@/systems/population";
 import { nextUnrest } from "@/systems/stability";
-import { applyCommanderEffects, applyDefection, armyMoves, tickEntrenchment, totalUpkeep } from "@/systems/military";
+import { advanceMarches, applyCommanderEffects, applyDefection, armyMoves, tickEntrenchment, totalUpkeep } from "@/systems/military";
 import { commanderTitle, generateCommander } from "@/data/commanders";
 import { generateRuler } from "@/data/rulers";
 import { recordChronicle, chronicleName } from "@/systems/chronicle";
@@ -872,6 +872,11 @@ export function resolveTurn(state: GameState): GameState {
   // Kontore, turning goods into gold. Sits beside applyTradeIncome — a parallel
   // stream that never touches the four-resource economy.
   s = stepTrade(s);
+
+  // 1.7. March orders: armies travelling under a standing order advance a step
+  // toward their destination (fighting whatever they meet), BEFORE the rivals
+  // move, so the AI reacts to where your forces actually end up this turn.
+  s = advanceMarches(s);
 
   // 2. Rival AI turns (deterministic RNG stream).
   const rng: Rng = createRng(s.rngState);

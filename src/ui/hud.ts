@@ -60,7 +60,9 @@ import { previewCombat, forecastCombat } from "@/systems/combat";
 import {
   armyAt,
   anyArmyAt,
+  armyMoves,
   canRaiseUnit,
+  marchEta,
   reachableRegions,
   inEnemyZoc,
   strategicAccess,
@@ -143,8 +145,10 @@ export interface HudCallbacks {
   onRaiseUnit(regionId: number, unit: UnitType): void;
   onBeginMove(armyId: number): void;
   onCancelMove(): void;
-  /** Attack a region with a specific one of your adjacent armies. */
+  /** Order an army to march on a region (travels over turns, fights on arrival). */
   onAttackWith(armyId: number, regionId: number): void;
+  /** Cancel an army's standing march order. */
+  onCancelMarch(armyId: number): void;
   /** Split a chosen subset of an army off into an adjacent region you own. */
   onMoveDetachment(armyId: number, targetRegionId: number, subset: Partial<Record<UnitType, number>>): void;
   /** Disband a chosen subset of an army's units to cut upkeep. */
@@ -1770,14 +1774,9 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       const chipWrap = el("div", "hud-prod-status");
       const chip = el("span", "hud-odds-chip " + (preview.undefended ? "win" : oddsClass(preview.winChance)));
       chip.textContent = preview.undefended ? "capture" : `${Math.round(preview.winChance * 100)}%`;
-      const go = btn(i === 0 ? "Attack ▸ (strongest)" : "Attack ▸", "hud-army-move", () => {
+      const go = btn(i === 0 ? "March ▸ (strongest)" : "March ▸", "hud-army-move", () => {
         callbacks.onAttackWith(army.id, regionId);
-        // Re-render for a follow-up strike, or close once one army remains.
-        if (eligibleAttackers(lastState!, regionId).length > 1 && lastState!.regions[regionId]?.ownerId !== PLAYER_ID) {
-          renderAttack(regionId);
-        } else {
-          closeAttack();
-        }
+        closeAttack(); // the assault is ordered — it resolves when the army arrives
       });
       chipWrap.append(chip, go);
       row.append(chipWrap);
@@ -2873,7 +2872,8 @@ function renderArmySection(
 
   if (army && armySize(army.units) > 0) {
     section.append(compositionLine(army));
-    section.append(line(`Moves left: ${army.movesLeft}`, "hud-hint"));
+    const rate = armyMoves(army.units);
+    section.append(line(`Marches ${rate} region${rate === 1 ? "" : "s"} per turn.`, "hud-hint"));
     // Commander (M4): who leads, their martial and trait, and a loyalty warning.
     if (army.commander) {
       const c = army.commander;
@@ -2901,15 +2901,38 @@ function renderArmySection(
     if (inEnemyZoc(state, region.id, PLAYER_ID)) {
       section.append(line("In an enemy zone of control — moving here ends the march.", "hud-hint"));
     }
+    // Standing march order: where it's headed and when it arrives.
+    if (army.dest != null) {
+      const destName = state.regions[army.dest]?.name ?? "its destination";
+      const eta = marchEta(state, army);
+      section.append(
+        htmlLine(
+          `${glyphHtml("flag", "⚑")} Marching to <b>${escapeHtml(destName)}</b>` +
+            (eta ? ` — about ${eta} turn${eta === 1 ? "" : "s"} away` : "") +
+            "; it advances each End turn.",
+          "hud-hint",
+        ),
+      );
+    }
     const moving = moveArmyId === army.id;
     const moveBtn = document.createElement("button");
     moveBtn.className = "hud-move-btn" + (moving ? " active" : "");
-    moveBtn.textContent = moving ? "Cancel move" : "Move / Attack ▸";
-    moveBtn.disabled = !moving && army.movesLeft <= 0;
+    moveBtn.textContent = moving
+      ? "Pick a destination…"
+      : army.dest != null
+        ? "Re-route march ▸"
+        : "March ▸";
     moveBtn.addEventListener("click", () =>
       moving ? callbacks.onCancelMove() : callbacks.onBeginMove(army.id),
     );
     section.append(moveBtn);
+    if (army.dest != null && !moving) {
+      const cancelBtn = document.createElement("button");
+      cancelBtn.className = "hud-move-btn";
+      cancelBtn.textContent = "Cancel march";
+      cancelBtn.addEventListener("click", () => callbacks.onCancelMarch(army.id));
+      section.append(cancelBtn);
+    }
     // Dig in: hold this region to entrench (forgoes the rest of the turn's moves).
     if (!army.fortifying) {
       const fortBtn = document.createElement("button");

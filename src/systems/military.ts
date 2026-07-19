@@ -505,6 +505,120 @@ export function moveArmy(
   return next;
 }
 
+// --- Marching: movement that takes time (in-transit orders) -----------------
+
+/**
+ * The first region on the shortest path from `fromId` to `destId` over region
+ * adjacency (breadth-first, lowest-id tie-break for a reproducible route), or
+ * null if the destination is unreachable / already reached. Pure.
+ */
+export function nextHopToward(state: GameState, fromId: number, destId: number): number | null {
+  if (fromId === destId) return null;
+  const regions = state.regions;
+  const prev = new Map<number, number>();
+  const seen = new Set<number>([fromId]);
+  const queue: number[] = [fromId];
+  while (queue.length) {
+    const n = queue.shift()!;
+    if (n === destId) break;
+    for (const m of [...(regions[n]?.adjacency ?? [])].sort((a, b) => a - b)) {
+      if (!seen.has(m)) {
+        seen.add(m);
+        prev.set(m, n);
+        queue.push(m);
+      }
+    }
+  }
+  if (!seen.has(destId)) return null;
+  let cur = destId;
+  while (prev.get(cur) !== undefined && prev.get(cur) !== fromId) cur = prev.get(cur)!;
+  return prev.get(cur) === fromId ? cur : null;
+}
+
+/**
+ * Give an army a standing march order toward `destId`: it will travel there over
+ * turns (a step of its move rate each turn, fighting whatever it meets), until it
+ * arrives or is stopped. A no-op unless a path exists; ordering a march to where
+ * the army already stands cancels any order. Clears entrenchment intent (it's
+ * moving now). Pure.
+ */
+export function orderMarch(state: GameState, armyId: number, destId: number): GameState {
+  const army = state.armies.find((a) => a.id === armyId);
+  if (!army) return state;
+  if (destId === army.regionId) return cancelMarch(state, armyId);
+  if (!state.regions[destId]) return state;
+  if (nextHopToward(state, army.regionId, destId) === null) return state;
+  return {
+    ...state,
+    armies: state.armies.map((a) => (a.id === armyId ? { ...a, dest: destId, fortifying: false } : a)),
+  };
+}
+
+/** Cancel an army's standing march order (it holds where it stands). Pure. */
+export function cancelMarch(state: GameState, armyId: number): GameState {
+  const army = state.armies.find((a) => a.id === armyId);
+  if (!army || army.dest == null) return state;
+  return { ...state, armies: state.armies.map((a) => (a.id === armyId ? { ...a, dest: null } : a)) };
+}
+
+/** Turns an army with orders needs to reach its destination at its move rate. */
+export function marchEta(state: GameState, army: Army): number | null {
+  if (army.dest == null) return null;
+  let hops = 0;
+  let at = army.regionId;
+  const guard = new Set<number>();
+  while (at !== army.dest && !guard.has(at)) {
+    guard.add(at);
+    const next = nextHopToward(state, at, army.dest);
+    if (next === null) return null;
+    hops += 1;
+    at = next;
+  }
+  return Math.max(1, Math.ceil(hops / Math.max(1, armyMoves(army.units))));
+}
+
+/**
+ * Advance every army that carries a march order one turn's travel toward its
+ * destination: it steps `armyMoves` regions along the shortest path, using
+ * `moveArmy` for each hop so it fights whatever it steps into. The order clears
+ * when it arrives, is repelled/blocked, is destroyed, or the path is cut; it is
+ * kept (to resume next turn) when the army simply runs out of moves en route.
+ * Deterministic (ascending army id). Pure — advances the shared RNG via moveArmy.
+ */
+export function advanceMarches(state: GameState): GameState {
+  let s = state;
+  const ids = s.armies
+    .filter((a) => a.dest != null)
+    .map((a) => a.id)
+    .sort((a, b) => a - b);
+  for (const id of ids) {
+    const start = s.armies.find((a) => a.id === id);
+    if (!start || start.dest == null) continue;
+    const dest = start.dest;
+    let clear = false;
+    let died = false;
+    let guard = 0;
+    while (guard++ < 80) {
+      const army = s.armies.find((a) => a.id === id);
+      if (!army) { died = true; break; }
+      if (army.regionId === dest) { clear = true; break; } // arrived
+      if (army.movesLeft <= 0) break; // out of moves — resume next turn (keep the order)
+      const next = nextHopToward(s, army.regionId, dest);
+      if (next === null) { clear = true; break; } // path cut
+      const before = army.regionId;
+      s = moveArmy(s, id, next);
+      const after = s.armies.find((a) => a.id === id);
+      if (!after) { died = true; break; } // destroyed in the fight
+      if (after.regionId === before) { clear = true; break; } // repelled/blocked — the march ends here
+      // else advanced (or captured and advanced); loop for the next hop
+    }
+    if (died) continue; // the stack is gone — nothing to update
+    // moveArmy builds fresh army objects that drop `dest`; re-apply (or clear it).
+    s = { ...s, armies: s.armies.map((a) => (a.id === id ? { ...a, dest: clear ? null : dest } : a)) };
+  }
+  return s;
+}
+
 /**
  * Move a chosen SUBSET of an army's units to an adjacent region you own — the
  * split / detach / reinforce primitive (M1). The remainder holds in place; the
