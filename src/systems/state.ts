@@ -239,6 +239,13 @@ export interface Region {
   /** Owning nation id, or null for unowned/neutral terrain (used from M3). */
   ownerId: number | null;
   population: number;
+  /**
+   * Per-region town-size floor for the population cap (in pop units), so historic
+   * hubs out-scale hinterland provinces (a Kontor city vs. a backwater). Set from
+   * a scripted map's town sizing; when absent the cap falls back to terrain alone
+   * (regionCapacity), so procedural/older maps and legacy saves are unaffected.
+   */
+  baseCapacity?: number;
   /** 0..100. Tax and famine raise it; temples and low tax lower it (M2). */
   unrest: number;
   /** Defensive works (levels). Multiplies defender strength in combat (M3). */

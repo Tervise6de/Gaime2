@@ -49,7 +49,12 @@ export type BuildingId =
   | "charter_fair"
   | "foundry"
   | "athenaeum"
-  | "citadel";
+  | "citadel"
+  // Signature Hansa buildings (Brick-Gothic vocabulary; see docs/hansa times.md §6).
+  | "salzspeicher"
+  | "brewery"
+  | "canal"
+  | "roland";
 
 export interface BuildingDef {
   id: BuildingId;
@@ -144,32 +149,32 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   },
   library: {
     id: "library",
-    name: "Library",
+    name: "Scriptorium",
     cost: 20,
     yield: { knowledge: 2 },
     popCapacity: 0,
     unrest: 0,
-    blurb: "+2 knowledge per turn.",
+    blurb: "+2 knowledge per turn — a scriptorium of charters and portolans.",
   },
   temple: {
     id: "temple",
-    name: "Temple",
+    name: "Church",
     cost: 14,
     yield: {},
     popCapacity: 0,
     unrest: 12,
     faith: 2,
-    blurb: "-12 unrest, and preaches your faith locally — keeps a taxed region in order.",
+    blurb: "-12 unrest, and preaches your faith locally — a Brick-Gothic church keeps a taxed town in order.",
   },
   aqueduct: {
     id: "aqueduct",
-    name: "Aqueduct",
+    name: "Wells & Cistern",
     cost: 22,
     yield: { food: 3 },
     popCapacity: 6,
     unrest: 0,
     requiresTech: "irrigation",
-    blurb: "+3 food, +6 population capacity. (Irrigation)",
+    blurb: "+3 food, +6 population capacity — wells and a cistern water a growing town. (Irrigation)",
   },
   university: {
     id: "university",
@@ -183,13 +188,13 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   },
   bank: {
     id: "bank",
-    name: "Bank",
+    name: "Counting House",
     cost: 24,
     yield: { gold: 5 },
     popCapacity: 0,
     unrest: 0,
     requiresTech: "banking",
-    blurb: "+5 gold per turn. (Banking)",
+    blurb: "+5 gold per turn — merchant banking and the bill of exchange. (Banking)",
   },
   guildhall: {
     id: "guildhall",
@@ -203,24 +208,24 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   },
   forum: {
     id: "forum",
-    name: "Forum",
+    name: "Council Chamber",
     cost: 26,
     yield: { knowledge: 2 },
     popCapacity: 0,
     unrest: 6,
     requiresTech: "philosophy",
-    blurb: "+2 knowledge, -6 unrest — the civics branch's library-and-temple in one. (Philosophy)",
+    blurb: "+2 knowledge, -6 unrest — burghers govern themselves under Lübeck Law. (Philosophy)",
   },
   fortress: {
     id: "fortress",
-    name: "Fortress",
+    name: "City Walls",
     cost: 28,
     yield: {},
     popCapacity: 0,
     unrest: 0,
     fortification: 2,
     requiresTech: "engineering",
-    blurb: "+2 fortification — a hard region to crack. (Engineering)",
+    blurb: "+2 fortification — brick walls and a gatehouse (a Holstentor) a besieger dreads. (Engineering)",
   },
   wonder: {
     id: "wonder",
@@ -231,27 +236,27 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     unrest: 0,
     requiresTech: "architecture",
     isWonder: true,
-    blurb: "A prestige project. Build enough to win an economic victory. (Architecture)",
+    blurb: "A prestige project — a Marienkirche to rival Lübeck's. Build enough to win an economic victory. (Architecture)",
   },
   granary: {
     id: "granary",
-    name: "Granary",
+    name: "Speicher",
     cost: 14,
     yield: { food: 2 },
     popCapacity: 4,
     unrest: 0,
     requiresTech: "pottery",
-    blurb: "+2 food, +4 population capacity. (Pottery)",
+    blurb: "+2 food, +4 population capacity — a gabled Speicher against lean years. (Pottery)",
   },
   barracks: {
     id: "barracks",
-    name: "Barracks",
+    name: "Muster Hall",
     cost: 16,
     yield: {},
     popCapacity: 0,
     unrest: 8,
     requiresTech: "warcraft",
-    blurb: "-8 unrest — a drilled garrison keeps a martial town in order. (Warcraft)",
+    blurb: "-8 unrest — a drilled town watch keeps a martial town in order. (Warcraft)",
   },
   lighthouse: {
     id: "lighthouse",
@@ -277,24 +282,24 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   },
   watchtower: {
     id: "watchtower",
-    name: "Watchtower",
+    name: "Coastal Beacon",
     cost: 18,
     yield: {},
     popCapacity: 0,
     unrest: 3,
     fortification: 1,
     requiresTech: "castles",
-    blurb: "+1 fortification, -3 unrest — a watched, defended march. (Castles)",
+    blurb: "+1 fortification, -3 unrest — a warded, watched shore. (Castles)",
   },
   courthouse: {
     id: "courthouse",
-    name: "Courthouse",
+    name: "Rathaus",
     cost: 24,
     yield: {},
     popCapacity: 0,
     unrest: 14,
     requiresTech: "common_law",
-    blurb: "-14 unrest — the king's law tames a restless province. (Common Law)",
+    blurb: "-14 unrest — the Rathaus and Lübeck Law tame a restless province. (Common Law)",
   },
   printing_house: {
     id: "printing_house",
@@ -308,14 +313,14 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   },
   cathedral: {
     id: "cathedral",
-    name: "Cathedral",
+    name: "Dom",
     cost: 34,
     yield: { knowledge: 2, gold: 1 },
     popCapacity: 0,
     unrest: 10,
     requiresTech: "theology",
     faith: 5,
-    blurb: "+2 knowledge, +1 gold, -10 unrest, and projects your faith far — a seat of faith. (Theology)",
+    blurb: "+2 knowledge, +1 gold, -10 unrest, and projects your faith far — a great brick Dom. (Theology)",
   },
 
   // --- Strategic-resource works ----------------------------------------------
@@ -385,7 +390,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   },
   athenaeum: {
     id: "athenaeum",
-    name: "Athenaeum",
+    name: "Great School",
     cost: 30,
     yield: { knowledge: 6 },
     popCapacity: 0,
@@ -405,6 +410,49 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     requiresTech: "castles",
     requiresFocus: "garrison",
     blurb: "+3 fortification, -8 unrest — an impregnable stronghold. Garrison focus. (Castles)",
+  },
+
+  // --- Signature Hansa buildings ---------------------------------------------
+  // The Brick-Gothic vocabulary the era is known for (docs/hansa times.md §6):
+  // a salt store, an export brewery, a canal, and the Roland freedom-monument.
+  // Early, un-gated economy/order buildings (bar the ambitious Canal) — the
+  // League's own flavour, sitting beside the generic economy set.
+  salzspeicher: {
+    id: "salzspeicher",
+    name: "Salzspeicher",
+    cost: 20,
+    yield: { gold: 3 },
+    popCapacity: 2,
+    unrest: 0,
+    blurb: "+3 gold, +2 population — a salt warehouse; the ‘white gold’ underwrites the town's trade.",
+  },
+  brewery: {
+    id: "brewery",
+    name: "Export Brewery",
+    cost: 22,
+    yield: { gold: 4 },
+    popCapacity: 1,
+    unrest: 0,
+    blurb: "+4 gold — Wendish hopped beer, prized across the north, brewed for export.",
+  },
+  canal: {
+    id: "canal",
+    name: "Canal",
+    cost: 30,
+    yield: { gold: 3, food: 1 },
+    popCapacity: 2,
+    unrest: 0,
+    requiresTech: "engineering",
+    blurb: "+3 gold, +1 food, +2 population — a Stecknitz-style canal carries salt and goods inland. (Engineering)",
+  },
+  roland: {
+    id: "roland",
+    name: "Roland Statue",
+    cost: 18,
+    yield: { gold: 1 },
+    popCapacity: 0,
+    unrest: 10,
+    blurb: "+1 gold, -10 unrest — a Roland proclaims the town's freedom and market rights.",
   },
 };
 

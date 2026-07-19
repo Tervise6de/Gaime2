@@ -22,9 +22,11 @@ import {
 } from "@/systems/state";
 import { round1 } from "@/systems/economy";
 
-/** Sustainable population cap = terrain capacity + building bonuses. */
+/** Sustainable population cap = town-size (or terrain) base + building bonuses.
+ *  A scripted map that sizes its towns sets `baseCapacity` per region so hubs
+ *  out-scale hinterland; absent it, the terrain capacity is the base as before. */
 export function regionCapacity(region: Region): number {
-  let cap = TERRAIN[region.terrain].popCapacity;
+  let cap = region.baseCapacity ?? TERRAIN[region.terrain].popCapacity;
   for (const id of region.buildings) cap += BUILDINGS[id].popCapacity;
   cap += focusPopCapacity(region.focus); // Farmland focus raises the ceiling
   return cap;

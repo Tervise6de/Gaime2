@@ -2877,8 +2877,8 @@ body {
   align-content: start;
   /* Denser auto-fill grid so a building-rich province still fits without the
      column scrolling — buildings are the focus, so show as many as possible. */
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 5px;
 }
 
 .hud-capital-right .hud-build-btn {

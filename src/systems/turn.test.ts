@@ -18,6 +18,7 @@ import { nationalProduction } from "@/systems/economy";
 import { routeIncome } from "@/systems/trade";
 import { factionByName } from "@/data/factions";
 import { totalUpkeep } from "@/systems/military";
+import { regionCapacity } from "@/systems/population";
 import { establishTrade, tradeIncome } from "@/systems/diplomacy";
 import { DEFAULT_MAP_OPTIONS } from "@/systems/mapgen";
 import { BUILDINGS } from "@/data/buildings";
@@ -594,5 +595,27 @@ describe("score history", () => {
     const len = s.scoreHistory![PLAYER_ID]!.length;
     s = resolveTurn(s);
     expect(s.scoreHistory![PLAYER_ID]!.length).toBe(len);
+  });
+});
+
+describe("hansa town-size hierarchy", () => {
+  it("gives historic hubs a bigger population cap than hinterland", () => {
+    const g = createGame({ seed: 135625, mapId: "hansa" });
+    const caps = g.regions.map((r) => regionCapacity(r));
+    const max = Math.max(...caps);
+    const min = Math.min(...caps);
+    // A Kontor city / capital should out-scale a backwater by a clear margin.
+    expect(max).toBeGreaterThanOrEqual(18);
+    expect(max).toBeGreaterThan(min * 2);
+  });
+
+  it("sets a per-region baseCapacity on the hansa map", () => {
+    const g = createGame({ seed: 42, mapId: "hansa" });
+    expect(g.regions.every((r) => typeof r.baseCapacity === "number")).toBe(true);
+  });
+
+  it("leaves baseCapacity unset on procedural maps (terrain cap unchanged)", () => {
+    const g = createGame({ seed: 7, rivals: 2 });
+    expect(g.regions.every((r) => r.baseCapacity === undefined)).toBe(true);
   });
 });

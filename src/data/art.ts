@@ -319,6 +319,22 @@ export const BUILDING_ART: Record<BuildingId, string | null> = {
   citadel: ico(
     '<path d="M6.4 19.5V8h2.1V6.1h2.2V8h2.6V6.1h2.2V8h2.1v11.5z"/><path d="M10.4 19.5v-3.7h3.2v3.7"/><path d="M4.6 19.5h14.8"/>',
   ),
+  // Salt warehouse — a gabled Speicher store (reuses the granary barn read).
+  salzspeicher: ico(
+    '<path d="M4.5 19.5v-8.5L12 5.3l7.5 5.7v8.5z"/><path d="M9.8 19.5v-5.3h4.4v5.3"/><path d="M3.4 19.5h17.2"/>',
+  ),
+  // Export brewery — a roofed manufacturing shed (reuses the workshop read).
+  brewery: ico(
+    '<path d="M4 10.6L12 4.6l8 6"/><path d="M5.6 10.6v8.9M18.4 10.6v8.9M3.4 19.5h17.2"/><path d="M9.4 16.8l3.2-3.2M12 12l2.3 2.3 1.5-1.5L13.5 10.5z"/>',
+  ),
+  // Stecknitz canal — an arched waterway (reuses the aqueduct read).
+  canal: ico(
+    '<path d="M3.4 5.4h17.2M4.6 5.4v2.4M19.4 5.4v2.4M3.4 7.8h17.2"/><path d="M5.2 19.5v-8.1a3.2 3.2 0 016.4 0v8.1M12.4 19.5v-8.1a3.2 3.2 0 016.4 0v8.1"/><path d="M3 19.5h18"/>',
+  ),
+  // Roland statue — a civic-freedom monument (reuses the Great Work monument read).
+  roland: ico(
+    '<path d="M10.8 14.3L12 4.6l1.2 9.7z"/><path d="M9.2 16.9h5.6M8 19.5h8"/><path d="M5.3 7.8c-.6 3.6.3 6.7 2.4 9.3M18.7 7.8c.6 3.6-.3 6.7-2.4 9.3"/><path d="M5.3 7.8l1.9.5M18.7 7.8l-1.9.5"/>',
+  ),
 };
 
 // ---------------------------------------------------------------------------

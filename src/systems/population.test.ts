@@ -32,6 +32,20 @@ describe("regionCapacity", () => {
     const withFarm = regionCapacity(region({ buildings: ["farm"] }));
     expect(withFarm).toBeGreaterThan(base);
   });
+
+  it("uses the per-region town-size floor when set, over the terrain cap", () => {
+    // A great hub on modest terrain still out-caps a plain by its baseCapacity.
+    const hub = regionCapacity(region({ terrain: "forest", baseCapacity: 18 }));
+    expect(hub).toBe(18);
+    expect(hub).toBeGreaterThan(regionCapacity(region({ terrain: "plains" })));
+  });
+
+  it("adds building bonuses on top of the town-size floor", () => {
+    const bare = regionCapacity(region({ baseCapacity: 12, buildings: [] }));
+    const withFarm = regionCapacity(region({ baseCapacity: 12, buildings: ["farm"] }));
+    expect(bare).toBe(12);
+    expect(withFarm).toBeGreaterThan(bare);
+  });
 });
 
 describe("nextPopulation", () => {

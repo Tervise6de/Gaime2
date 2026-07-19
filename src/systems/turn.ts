@@ -25,6 +25,7 @@ import { TECHS, type TechId } from "@/data/techs";
 import { generateMap, type MapGenOptions } from "@/systems/mapgen";
 import { scriptedMap } from "@/data/maps/types";
 import type { ScriptedMap } from "@/data/maps/types";
+import { KONTORE } from "@/data/kontore";
 import { nationalProduction, round1 } from "@/systems/economy";
 import { advanceConstruction } from "@/systems/construction";
 import { stepFaith, seedFaith } from "@/systems/faith";
@@ -366,18 +367,43 @@ function createScriptedGame(map: ScriptedMap, regions: Region[], options: NewGam
     armies.push({ id: nextArmyId++, ownerId: nationId, regionId: f.capital, units: startUnits, movesLeft: armyMoves(startUnits) });
   });
 
+  // Town-size hierarchy (docs/hansa-alignment-plan.md, Plan 2): historic hubs
+  // out-scale hinterland so a Kontor city dwarfs a backwater — a Kontor host is a
+  // great emporium, a realm's capital a leading town, then coast > plains > forest
+  // > mountains. Sets a per-region `baseCapacity` and a proportional starting
+  // population (hubs start populous, backwaters sparse). Only for maps that opt in
+  // (the Hansa board); other maps keep the flat terrain cap + mapgen population.
+  const kontorHosts = new Set(Object.values(KONTORE).map((k) => k.regionId));
+  const sizedTowns = map.id === "hansa";
+  const townSizing = (r: Region, isCapital: boolean): Partial<Region> => {
+    if (!sizedTowns) return {};
+    const size = kontorHosts.has(r.id)
+      ? 18
+      : isCapital
+        ? 13
+        : r.terrain === "coast"
+          ? 8
+          : r.terrain === "plains"
+            ? 6
+            : r.terrain === "mountains"
+              ? 3
+              : 5; // forest / hills
+    const population = Math.max(2, Math.round(size * 0.45) + rng.int(-1, 1));
+    return { baseCapacity: size, population };
+  };
+
   // Lay out regions: owned (fort + home focus on capitals) or Free-Tribe held.
   const laidOut: Region[] = regions.map((r) => {
     const owner = ownerOf.get(r.id);
     if (owner !== undefined) {
       const isCapital = capitalSet.has(r.id);
-      return { ...r, ownerId: owner, fortification: isCapital ? 1 : 0, focus: isCapital ? capitalFocus.get(r.id) : undefined };
+      return { ...r, ownerId: owner, fortification: isCapital ? 1 : 0, focus: isCapital ? capitalFocus.get(r.id) : undefined, ...townSizing(r, isCapital) };
     }
     const fort = rng.int(0, 2);
     const garrison = { ...emptyUnits(), militia: rng.int(1, 2) };
     if (rng.next() < 0.35) garrison.infantry = 1;
     armies.push({ id: nextArmyId++, ownerId: BARBARIAN_ID, regionId: r.id, units: garrison, movesLeft: 0 });
-    return { ...r, ownerId: BARBARIAN_ID, fortification: fort };
+    return { ...r, ownerId: BARBARIAN_ID, fortification: fort, ...townSizing(r, false) };
   });
 
   // National traits come from each realm's faction (a scenario may pin the
