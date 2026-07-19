@@ -374,6 +374,9 @@ function main(): void {
     // Pause with a readable digest before play moves on (optional via Options;
     // quiet turns, pending decisions and decided games skip it).
     hud.showTurnReport(before.turn, lastSummary, state);
+    // A dated historical event (plague, monopoly, a lost Kontor…) fired this turn:
+    // surface it as a notification card above the digest (mutable for good).
+    hud.showEpochEvents(state);
     // Cosmetic: ripple every region that changed hands this turn (gated inside the
     // renderer by reduce-motion). Uses ids, not the summary's names.
     for (const after of state.regions) {

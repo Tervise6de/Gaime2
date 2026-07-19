@@ -89,6 +89,30 @@ export function setCombatReport(v: boolean): boolean {
   return v;
 }
 
+const EVENT_NOTICES_KEY = "gaime2:eventNotices";
+
+/**
+ * Epoch-event notifications: a card when a dated historical event (plague, the
+ * herring monopoly, a lost Kontor…) fires. On by default; the card's own "mute"
+ * toggle turns them off for the rest of the game (the events still fire and log).
+ */
+export function isEventNotices(): boolean {
+  try {
+    return localStorage.getItem(EVENT_NOTICES_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+export function setEventNotices(v: boolean): boolean {
+  try {
+    localStorage.setItem(EVENT_NOTICES_KEY, v ? "1" : "0");
+  } catch {
+    /* storage unavailable — preference just won't persist */
+  }
+  return v;
+}
+
 /**
  * Reflect the current display preferences onto the document root so CSS can key
  * off them (`:root[data-colourblind="1"]`, `:root[data-reduce-motion="1"]`).

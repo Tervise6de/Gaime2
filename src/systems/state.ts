@@ -378,6 +378,20 @@ export interface ScheduledEpoch {
   fireTurn: number;
 }
 
+/**
+ * An epoch event that fired this turn, for the UI to surface as a notification
+ * (systems/epochs.ts fills it; the HUD reads it after End turn and clears with the
+ * next turn, like `battles`). Carries only the dynamic bits — the year and the
+ * filled headline (what happened, where); static content (name, description,
+ * artwork) is looked up by `id` from data/epochEvents.ts.
+ */
+export interface FiredEpochNote {
+  id: string;
+  year: number;
+  /** The event's headline with its place filled in ("… Åbo lose near half …"). */
+  headline: string;
+}
+
 export interface ResourceStocks {
   gold: number;
   food: number;
@@ -530,6 +544,11 @@ export interface GameState {
    * saves load (undefined = no scheduled history, the events simply never fire).
    */
   epochs?: ScheduledEpoch[];
+  /**
+   * Epoch events that fired *this* turn, for the HUD to show as notifications.
+   * Set during resolveTurn, cleared at the start of the next (like `battles`).
+   */
+  firedEpochs?: FiredEpochNote[];
   /** Pairwise relations, keyed by pairKey(a,b): −100..+100. */
   relations: Record<string, number>;
   /**

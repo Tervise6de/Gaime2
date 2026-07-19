@@ -877,8 +877,8 @@ export function applyTradeIncome(state: GameState): GameState {
 export function resolveTurn(state: GameState): GameState {
   if (state.outcome !== "playing") return state;
 
-  // Fresh turn: clear last turn's battle reports (the UI has shown them).
-  let s: GameState = { ...state, turn: state.turn + 1, battles: [] };
+  // Fresh turn: clear last turn's battle reports and epoch notices (shown already).
+  let s: GameState = { ...state, turn: state.turn + 1, battles: [], firedEpochs: [] };
 
   // 1. Economy for each living non-barbarian nation.
   for (const nation of s.nations) {

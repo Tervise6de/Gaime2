@@ -45,6 +45,18 @@ describe("scheduleEpochs", () => {
   });
 });
 
+describe("epoch event data", () => {
+  it("every event carries an icon, a description and a headline for the notification", () => {
+    for (const e of EPOCH_EVENTS) {
+      expect(e.icon.length).toBeGreaterThan(0);
+      expect(e.description.length).toBeGreaterThan(20);
+      expect(e.headline.length).toBeGreaterThan(0);
+      expect(e.chance).toBeGreaterThan(0);
+      expect(e.chance).toBeLessThanOrEqual(1);
+    }
+  });
+});
+
 describe("stepEpochs", () => {
   it("does not fire events whose turn has not yet come", () => {
     const g = createGame({ seed: 5, mapId: "hansa" });
@@ -83,6 +95,17 @@ describe("stepEpochs", () => {
     const g = createGame({ seed: 5, mapId: "hansa" });
     const s: GameState = { ...g, epochs: undefined };
     expect(stepEpochs(s, rng(1))).toEqual(s);
+  });
+
+  it("records a firedEpochs note (id, year, filled headline) for the HUD", () => {
+    const g = createGame({ seed: 5, mapId: "hansa" });
+    const s: GameState = { ...g, epochs: [{ id: "black_death", fireTurn: 1 }], firedEpochs: [] };
+    const next = stepEpochs(s, rng(1));
+    expect(next.firedEpochs).toHaveLength(1);
+    const note = next.firedEpochs![0]!;
+    expect(note.id).toBe("black_death");
+    expect(note.headline).toContain("Black Death");
+    expect(typeof note.year).toBe("number");
   });
 
   it("resolveTurn fires an epoch due on the coming turn (pipeline wiring)", () => {

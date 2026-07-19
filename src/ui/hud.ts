@@ -31,6 +31,8 @@ import {
   setTurnReport,
   isCombatReport,
   setCombatReport,
+  isEventNotices,
+  setEventNotices,
 } from "@/ui/settings";
 import type { BattleReport } from "@/systems/combat";
 import { LENSES, lensGradient, type LensId } from "@/ui/lenses";
@@ -68,6 +70,7 @@ import {
 import { getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, nationPower, hasTrade, tradeIncome, opinionReasons, foreignRelations, casusBelli, CASUS_BELLI, TRIBUTE_DEMAND } from "@/systems/diplomacy";
 import { nationScore, victoryProgress, victoryRaces, endGameSummary } from "@/systems/victory";
 import { GOODS, type GoodId } from "@/data/goods";
+import { EPOCH_EVENTS } from "@/data/epochEvents";
 import { KONTORE, type KontorId } from "@/data/kontore";
 import { routeOptions, regionGoodOutput } from "@/systems/trade";
 import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
@@ -214,6 +217,8 @@ export interface Hud {
   showTurnReport(turn: number, summary: TurnSummary | null, state: GameState): void;
   /** Replay a battle blow-by-blow (a player-involved fight). */
   showBattleReport(report: BattleReport): void;
+  /** Show a notification card for each historical epoch event that fired this turn. */
+  showEpochEvents(state: GameState): void;
   /** The HUD-owned minimap canvas (in the Map panel), handed to renderer.setMinimap. */
   minimapCanvas: HTMLCanvasElement;
 }
@@ -1275,6 +1280,14 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
         "Replay each of your battles blow-by-blow — volley, melee rounds, and the outcome.",
       ),
     );
+    panel.append(
+      checkboxRow(
+        "Show historical event notices",
+        isEventNotices,
+        (v) => setEventNotices(v),
+        "A card when a dated event fires — the Black Death, the herring monopoly, a lost Kontor. The events still happen when off.",
+      ),
+    );
 
     // Accessibility ----------------------------------------------------------
     panel.append(sectionHeading("Accessibility"));
@@ -1919,6 +1932,108 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     cont.focus(); // Enter/Space continue immediately
   }
 
+  // --- Epoch events: a notification card when a dated historical beat fires ---
+  // Sits above the turn report (see .hud-epoch-overlay z-index). Queues multiple
+  // if more than one fires in a turn; a "mute" toggle silences them for good.
+  const epochOverlay = el("div", "hud-techtree-overlay hud-epoch-overlay");
+  epochOverlay.style.display = "none";
+  epochOverlay.addEventListener("click", (ev) => {
+    if (ev.target === epochOverlay) closeEpoch();
+  });
+  root.append(epochOverlay);
+  let epochQueue: NonNullable<GameState["firedEpochs"]> = [];
+  let epochIdx = 0;
+
+  function closeEpoch(): void {
+    epochOverlay.style.display = "none";
+    epochOverlay.innerHTML = "";
+    epochQueue = [];
+    epochIdx = 0;
+  }
+
+  function showEpochEvents(state: GameState): void {
+    if (!isEventNotices()) return; // muted — the events still fired and logged
+    const fired = state.firedEpochs ?? [];
+    if (fired.length === 0 || state.outcome !== "playing") return;
+    epochQueue = fired;
+    epochIdx = 0;
+    renderEpochCard();
+    epochOverlay.style.display = "flex";
+  }
+
+  function renderEpochCard(): void {
+    const note = epochQueue[epochIdx];
+    if (!note) return closeEpoch();
+    const def = EPOCH_EVENTS.find((e) => e.id === note.id);
+    epochOverlay.innerHTML = "";
+    const panel = el("div", "hud-techtree-panel hud-epoch-panel");
+
+    // Header: motif glyph, name, and a year badge.
+    const head = el("div", "hud-epoch-head");
+    const glyph = el("span", "hud-epoch-glyph");
+    glyph.textContent = def?.icon ?? "⚑";
+    const titleWrap = el("div", "hud-epoch-titlewrap");
+    const title = el("h2", "hud-epoch-title");
+    title.textContent = def?.name ?? "A turn of history";
+    const yearBadge = el("span", "hud-epoch-year");
+    yearBadge.textContent = `${note.year} AD`;
+    titleWrap.append(title, yearBadge);
+    head.append(glyph, titleWrap, closeButton(closeEpoch));
+    panel.append(head);
+
+    // Illustration — the artwork, or an open placeholder until art exists.
+    const figure = el("div", "hud-epoch-figure");
+    if (def?.image) {
+      const img = document.createElement("img");
+      img.src = def.image;
+      img.alt = def.name;
+      img.className = "hud-epoch-img";
+      figure.append(img);
+    } else {
+      figure.classList.add("placeholder");
+      const ph = el("div", "hud-epoch-ph");
+      const phGlyph = el("span", "hud-epoch-ph-glyph");
+      phGlyph.textContent = def?.icon ?? "🖼";
+      const phText = el("span", "hud-epoch-ph-text");
+      phText.textContent = "Illustration coming";
+      ph.append(phGlyph, phText);
+      figure.append(ph);
+    }
+    panel.append(figure);
+
+    // What happened this game, then the historical context.
+    const happened = el("p", "hud-epoch-headline");
+    happened.textContent = note.headline;
+    panel.append(happened);
+    if (def?.description) {
+      const desc = el("p", "hud-epoch-desc");
+      desc.textContent = def.description;
+      panel.append(desc);
+    }
+
+    // Footer: mute toggle (persists) + continue / next.
+    const foot = el("div", "hud-epoch-foot");
+    const mute = document.createElement("label");
+    mute.className = "hud-epoch-mute";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = !isEventNotices();
+    cb.addEventListener("change", () => setEventNotices(!cb.checked));
+    mute.append(cb, document.createTextNode(" Don't show event notices again"));
+    const more = epochIdx < epochQueue.length - 1;
+    const cont = btn(more ? `Next (${epochIdx + 1}/${epochQueue.length}) ▶` : "Continue ▶", "hud-end-btn primary", () => {
+      // Muting mid-queue closes the rest immediately.
+      if (!isEventNotices() || epochIdx >= epochQueue.length - 1) return closeEpoch();
+      epochIdx++;
+      renderEpochCard();
+    });
+    foot.append(mute, cont);
+    panel.append(foot);
+
+    epochOverlay.append(panel);
+    cont.focus();
+  }
+
   // --- Combat report: a battle replayed blow-by-blow -------------------------
   const battleOverlay = el("div", "hud-techtree-overlay");
   battleOverlay.style.display = "none";
@@ -2359,7 +2474,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     }
   }
 
-  return { update, toast: flashToast, openOptions, openRecords, mapTip, openRegionScreen, showTurnReport, showBattleReport, minimapCanvas };
+  return { update, toast: flashToast, openOptions, openRecords, mapTip, openRegionScreen, showTurnReport, showBattleReport, showEpochEvents, minimapCanvas };
 }
 
 function renderRegion(

@@ -34,6 +34,16 @@ export interface EpochEventDef {
   effect: EpochEffect;
   /** Flavour logged when it fires; "{place}" is filled with the affected region. */
   headline: string;
+  /** Emoji motif used as the notification's glyph and image-placeholder icon. */
+  icon: string;
+  /** A short paragraph of real historical context, shown in the notification. */
+  description: string;
+  /**
+   * Illustration for the notification (a path under /public or a data URI).
+   * Undefined until art exists — the notification then shows an open placeholder.
+   * The events still needing art are tracked in docs/event-art-brief.md.
+   */
+  image?: string;
 }
 
 /**
@@ -50,6 +60,9 @@ export const EPOCH_EVENTS: readonly EpochEventDef[] = [
     chance: 0.85,
     effect: { kind: "plague", regions: 3, popLoss: 0.5, unrest: 12 },
     headline: "The Black Death arrives by ship — {place} and the great towns lose near half their people.",
+    icon: "☠️",
+    description:
+      "The Black Death reaches the Hanseatic ports — carried, like everything else, up the very trade lanes that made the towns rich. Hamburg and Bremen lost more than half their people; councils, guilds and whole trades were gutted in a single summer.",
   },
   {
     id: "herring_monopoly",
@@ -59,6 +72,9 @@ export const EPOCH_EVENTS: readonly EpochEventDef[] = [
     chance: 0.6,
     effect: { kind: "trade_boom", goldPerRegion: 3 },
     headline: "A monopoly on the Baltic fish trade is won — salted herring pours gold into every port.",
+    icon: "🐟",
+    description:
+      "By the Peace of Stralsund the League wins a monopoly on the Baltic fish trade. Salted herring — preserved with Lüneburg's 'white gold' — is distributed across a Europe with no refrigeration, and the gold flows back to every port that handles it.",
   },
   {
     id: "victual_brothers",
@@ -68,6 +84,9 @@ export const EPOCH_EVENTS: readonly EpochEventDef[] = [
     chance: 0.6,
     effect: { kind: "pirates", goldLoss: 30, unrest: 4 },
     headline: "The Victual Brothers prey on the sea-lanes — a convoy off {place} is taken by pirates.",
+    icon: "🏴‍☠️",
+    description:
+      "Privateers first hired in the Sweden–Denmark war, the Victual Brothers — the 'Likedeelers', or equal-sharers — turn to open piracy across the Baltic and North Sea, preying on merchant shipping until their bloody suppression at Hamburg around 1400.",
   },
   {
     id: "great_fire",
@@ -77,6 +96,9 @@ export const EPOCH_EVENTS: readonly EpochEventDef[] = [
     chance: 0.55,
     effect: { kind: "great_fire", popLoss: 0.2, materialsLoss: 20, unrest: 6 },
     headline: "Fire tears through the crowded wharves of {place} — warehouses and homes are lost.",
+    icon: "🔥",
+    description:
+      "The crowded, timber-built wharves of the Hansa — above all Bergen's Bryggen — burned again and again. A great fire could gut a town's warehouses and homes in a single night: the price of packing a port tight with wooden gable-houses.",
   },
   {
     id: "novgorod_closed",
@@ -86,5 +108,8 @@ export const EPOCH_EVENTS: readonly EpochEventDef[] = [
     chance: 0.7,
     effect: { kind: "kontor_closed", kontor: "novgorod" },
     headline: "Moscow shuts the Novgorod Peterhof and deports its merchants — the eastern trade collapses.",
+    icon: "🚫",
+    description:
+      "Ivan III of Moscow shuts the Novgorod Peterhof and deports its German merchants to Moscow, to break the League's grip on Russian trade. The gateway to Russian furs and wax is gone — a structural blow to the whole eastern network.",
   },
 ];

@@ -18,6 +18,7 @@ import {
   PLAYER_ID,
   type GameState,
   type ScheduledEpoch,
+  type FiredEpochNote,
 } from "@/systems/state";
 import { EPOCH_EVENTS, type EpochEventDef } from "@/data/epochEvents";
 import { BASE_YEAR, YEARS_PER_TURN, yearForTurn } from "@/data/eras";
@@ -62,9 +63,19 @@ export function stepEpochs(state: GameState, rng: Rng): GameState {
   return s;
 }
 
-/** Announce a fired event in the turn log, stamped with the in-game year. */
-function announce(state: GameState, msg: string): GameState {
-  return { ...state, log: [...state.log, `⚑ ${yearForTurn(state.turn)} — ${msg}`].slice(-50) };
+/**
+ * Announce a fired event: append to the turn log (stamped with the in-game year)
+ * AND record a structured note the HUD surfaces as a notification. `filled` is the
+ * event's headline with its {place} resolved.
+ */
+function announce(state: GameState, def: EpochEventDef, filled: string): GameState {
+  const year = yearForTurn(state.turn);
+  const note: FiredEpochNote = { id: def.id, year, headline: filled };
+  return {
+    ...state,
+    log: [...state.log, `⚑ ${year} — ${filled}`].slice(-50),
+    firedEpochs: [...(state.firedEpochs ?? []), note],
+  };
 }
 
 const bumpUnrest = (u: number, by: number): number => Math.min(UNREST_MAX, u + by);
@@ -88,7 +99,7 @@ function applyEpoch(state: GameState, def: EpochEventDef, rng: Rng): GameState {
       const regions = state.regions.map((r) =>
         hit.has(r.id) ? { ...r, population: cull(r.population, eff.popLoss), unrest: bumpUnrest(r.unrest, eff.unrest) } : r,
       );
-      return announce({ ...state, regions }, def.headline.replace("{place}", place));
+      return announce({ ...state, regions }, def, def.headline.replace("{place}", place));
     }
     case "trade_boom": {
       // A windfall to every realm, scaled by how much land (and thus trade) it holds.
@@ -97,7 +108,7 @@ function applyEpoch(state: GameState, def: EpochEventDef, rng: Rng): GameState {
         const owned = state.regions.filter((r) => r.ownerId === n.id).length;
         return owned > 0 ? { ...n, stocks: { ...n.stocks, gold: round1(n.stocks.gold + owned * eff.goldPerRegion) } } : n;
       });
-      return announce({ ...state, nations }, def.headline);
+      return announce({ ...state, nations }, def, def.headline);
     }
     case "pirates": {
       // A raid on one of the player's shores: gold lost, that province unsettled.
@@ -111,7 +122,7 @@ function applyEpoch(state: GameState, def: EpochEventDef, rng: Rng): GameState {
       const regions = coast
         ? state.regions.map((r) => (r.id === coast.id ? { ...r, unrest: bumpUnrest(r.unrest, eff.unrest) } : r))
         : state.regions;
-      return announce({ ...state, nations, regions }, def.headline.replace("{place}", place));
+      return announce({ ...state, nations, regions }, def, def.headline.replace("{place}", place));
     }
     case "great_fire": {
       // Fire guts the busiest wharf-town: people lost, its owner's stockpiled
@@ -120,7 +131,7 @@ function applyEpoch(state: GameState, def: EpochEventDef, rng: Rng): GameState {
         .filter((r) => r.terrain === "coast")
         .sort((a, b) => b.population - a.population);
       const pool = (ports.length ? ports : [...state.regions].sort((a, b) => b.population - a.population)).slice(0, 3);
-      if (pool.length === 0) return announce(state, def.headline.replace("{place}", "a great port"));
+      if (pool.length === 0) return announce(state, def, def.headline.replace("{place}", "a great port"));
       const town = pool[rng.int(0, pool.length - 1)]!;
       const regions = state.regions.map((r) =>
         r.id === town.id ? { ...r, population: cull(r.population, eff.popLoss), unrest: bumpUnrest(r.unrest, eff.unrest) } : r,
@@ -130,13 +141,13 @@ function applyEpoch(state: GameState, def: EpochEventDef, rng: Rng): GameState {
           ? { ...n, stocks: { ...n.stocks, materials: round1(Math.max(0, n.stocks.materials - eff.materialsLoss)) } }
           : n,
       );
-      return announce({ ...state, regions, nations }, def.headline.replace("{place}", town.name));
+      return announce({ ...state, regions, nations }, def, def.headline.replace("{place}", town.name));
     }
     case "kontor_closed": {
       // Only bites where the Kontor exists and is open (else the history is moot).
       if (!state.kontore || !state.kontore.some((k) => k.id === eff.kontor && k.open)) return state;
       const kontore = state.kontore.map((k) => (k.id === eff.kontor ? { ...k, open: false, holderId: null } : k));
-      return announce({ ...state, kontore }, def.headline);
+      return announce({ ...state, kontore }, def, def.headline);
     }
     default:
       return state;
