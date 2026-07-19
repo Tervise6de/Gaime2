@@ -208,6 +208,16 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     return Math.max(0, Math.min(1, (cam.s - LABEL_FADE_LO) / (LABEL_FADE_HI - LABEL_FADE_LO)));
   }
 
+  // Animated sea: gentle drifting wave crests over open water, but ONLY once
+  // zoomed into the sea-trade heart — the fit view stays idle-skipped (zero draw
+  // cost) and reduce-motion silences it. Alpha ramps in across this zoom window so
+  // the effect arrives softly rather than snapping on.
+  const SEA_ANIM_LO = 1.7, SEA_ANIM_HI = 2.5;
+  function seaShimmerAlpha(): number {
+    if (reduceMotion) return 0;
+    return Math.max(0, Math.min(1, (cam.s - SEA_ANIM_LO) / (SEA_ANIM_HI - SEA_ANIM_LO)));
+  }
+
   function clampCam(): void {
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
@@ -1404,9 +1414,13 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     // the label pass is dropped for a smooth camera; we keep repainting until it
     // settles, so the final frame lands with the labels back.
     const busy = pointers.size > 0 || interactFrames > 0;
+    // The animated sea (zoomed in only) keeps the loop painting, but at ~30fps
+    // (even ticks) so the ambient motion costs half the frames — the fit view is
+    // untouched and still idle-skips to zero work.
+    const wantShimmer = seaShimmerAlpha() > 0 && tick % 2 === 0;
     // Idle skip: nothing animating and no repaint requested — keep the last
     // frame on screen and do no work at all.
-    if (!needsPaint && ripples.length === 0 && !busy) {
+    if (!needsPaint && ripples.length === 0 && !busy && !wantShimmer) {
       tick += 1;
       frame = window.requestAnimationFrame(render);
       return;
@@ -1419,6 +1433,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     if (state) {
       const proj = ensureProjection(state);
       paintVoronoi(state, proj, busy);
+      drawSeaShimmer(proj);
       drawTradeLanes(proj);
       drawMarchOrders(state, proj);
       drawArmies(state);
@@ -1762,6 +1777,25 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         },
       });
     }
+    if (state?.sound && region.id === state.sound.regionId) {
+      slots.push({
+        always: true, // the strait is a key strategic site — visible at any zoom
+        tip: "The Øresund Sound — whoever holds Zealand tolls every Baltic cargo bound west (London, Bruges), and can shut the strait to a rival.",
+        draw: (x, y) => {
+          iconChip(x, y, 8.5);
+          context.strokeStyle = MAP_ICON_COLOR;
+          context.lineWidth = 1.4;
+          context.lineCap = "round";
+          context.beginPath();
+          context.arc(x, y, 4.1, 0, Math.PI * 2); // a toll seal…
+          context.stroke();
+          context.beginPath();
+          context.moveTo(x - 4.1, y); // …barred across the strait
+          context.lineTo(x + 4.1, y);
+          context.stroke();
+        },
+      });
+    }
     if (region.fortification > 0) {
       slots.push({
         tip: `Fortification level ${region.fortification} — defenders here are much harder to dislodge; siege units strip it.`,
@@ -1828,6 +1862,69 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         markerHits.push({ x, y: rowY, r: 9.5, text: slot.tip });
       });
     }
+  }
+
+  /**
+   * The animated sea — gentle drifting wave crests over open water, drawn only
+   * when zoomed in (`seaShimmerAlpha`) and motion is allowed. A screen grid of
+   * small ˘ crests, clipped to the water (the landmass punched out even-odd),
+   * anchored to the camera so crests ride the map as you pan, with a slow
+   * rightward swell and a per-crest bob + twinkle. Cost is bounded by the viewport
+   * (a couple of tiny strokes per grid cell) and it never runs at fit zoom, so the
+   * calm default view stays free. Purely cosmetic; phase comes from the frame tick.
+   */
+  function drawSeaShimmer(proj: Projection): void {
+    const alpha = seaShimmerAlpha();
+    if (alpha <= 0) return;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    context.save();
+    // Clip to open water: the whole viewport minus the landmass (even-odd fill).
+    const water = new Path2D();
+    water.rect(0, 0, w, h);
+    water.addPath(proj.land);
+    context.clip(water, "evenodd");
+    context.lineCap = "round";
+    const G = 52; // grid spacing (screen px) — sparse so the sea reads calm, not busy
+    const mod = (n: number, m: number) => ((n % m) + m) % m;
+    // Anchor the field to the map (cam translation) so crests ride the terrain as
+    // you pan, plus a slow rightward swell that drifts over time.
+    const swell = tick * 0.22;
+    const ox = mod(cam.tx + swell, G);
+    const oy = mod(cam.ty, G);
+    const baseCol = Math.floor((cam.tx + swell) / G);
+    const baseRow = Math.floor(cam.ty / G);
+    const cols = Math.ceil(w / G) + 1;
+    const rows = Math.ceil(h / G) + 1;
+    for (let j = 0; j < rows; j++) {
+      for (let i = 0; i < cols; i++) {
+        // Stable jitter per *map* cell so a patch of sea keeps its character as it
+        // drifts/pans (the origin's floor cancels the wrap).
+        const ci = i - baseCol;
+        const cj = j - baseRow;
+        const jx = hashFloat(0, 811, ci, cj);
+        const jy = hashFloat(0, 812, ci, cj);
+        const jp = hashFloat(0, 813, ci, cj) * 6.2832;
+        const x = ox + i * G + (jx - 0.5) * G * 0.7;
+        const y = oy + j * G + (jy - 0.5) * G * 0.7 + Math.sin(tick * 0.045 + jp) * 2.2;
+        // Twinkle: each crest swells and fades on its own phase.
+        const a = alpha * (0.34 + 0.66 * (0.5 + 0.5 * Math.sin(tick * 0.05 + jp)));
+        const r = 4.6 + jx * 2.6;
+        // A muted ripple with a paler foam glint just above it (depth cue).
+        context.lineWidth = 1.3;
+        context.strokeStyle = `rgba(116, 150, 182, ${(0.42 * a).toFixed(3)})`;
+        context.beginPath();
+        context.moveTo(x - r, y);
+        context.quadraticCurveTo(x, y - r * 0.6, x + r, y);
+        context.stroke();
+        context.strokeStyle = `rgba(230, 242, 249, ${(0.32 * a).toFixed(3)})`;
+        context.beginPath();
+        context.moveTo(x - r * 0.66, y - 1.5);
+        context.quadraticCurveTo(x, y - r * 0.6 - 1.5, x + r * 0.66, y - 1.5);
+        context.stroke();
+      }
+    }
+    context.restore();
   }
 
   /**
