@@ -43,6 +43,7 @@ import {
   type Region,
 } from "@/systems/state";
 import { atWar } from "@/systems/diplomacy";
+import { nextHopToward } from "@/systems/military";
 import { regionCapacity } from "@/systems/population";
 import { popCompact, popDisplay, soldiersCompact, soldiersDisplay } from "@/systems/format";
 import { computeVoronoiCells, pointInPolygon, type Point, type VoronoiCell } from "@/systems/voronoi";
@@ -1912,6 +1913,231 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     context.restore();
   }
 
+  /** A stack's broad tactical role, by its most numerous unit — drives the flag glyph. */
+  function armyRole(units: Record<string, number>): "melee" | "ranged" | "mounted" | "siege" {
+    const roleOf: Record<string, "melee" | "ranged" | "mounted" | "siege"> = {
+      militia: "melee", infantry: "melee", pikeman: "melee", swordsman: "melee",
+      ranged: "ranged", handgunner: "ranged",
+      cavalry: "mounted", knight: "mounted",
+      siege: "siege",
+    };
+    let best: "melee" | "ranged" | "mounted" | "siege" = "melee";
+    let bestN = -1;
+    for (const k in units) {
+      const n = units[k] ?? 0;
+      if (n > bestN) { bestN = n; best = roleOf[k] ?? "melee"; }
+    }
+    return best;
+  }
+
+  /** Do two regions share a land border (a polygon edge)? A march hop between
+   *  sim-adjacent regions that do NOT share an edge is a crossing over open water. */
+  function landBordered(a: number, b: number): boolean {
+    const na = organic[a]?.neighbor;
+    if (na && na.indexOf(b) !== -1) return true;
+    const nb = organic[b]?.neighbor;
+    return !!(nb && nb.indexOf(a) !== -1);
+  }
+
+  /** An army is "at sea" this turn if it is marching and its next step crosses water —
+   *  when it's drawn as a ship (a Hansa cog) rather than a planted banner. */
+  function armyAtSea(s: GameState, army: Army): boolean {
+    const dest = army.dest;
+    if (dest == null) return false;
+    const next = nextHopToward(s, army.regionId, dest);
+    if (next == null || next === army.regionId) return false;
+    return !landBordered(army.regionId, next);
+  }
+
+  /** A small tactical-role glyph in a ~2*rad box centred at (cx, cy), stroked in `ink`. */
+  function drawUnitGlyph(cx: number, cy: number, rad: number, role: string, ink: string): void {
+    context.save();
+    context.strokeStyle = ink;
+    context.fillStyle = ink;
+    context.lineWidth = 1.5;
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    context.beginPath();
+    if (role === "melee") {
+      // Crossed swords: an X.
+      context.moveTo(cx - rad, cy + rad); context.lineTo(cx + rad, cy - rad);
+      context.moveTo(cx - rad, cy - rad); context.lineTo(cx + rad, cy + rad);
+      context.stroke();
+    } else if (role === "ranged") {
+      // An arrow, bottom-left to top-right, with a two-line head.
+      context.moveTo(cx - rad, cy + rad); context.lineTo(cx + rad, cy - rad);
+      context.moveTo(cx + rad, cy - rad); context.lineTo(cx + rad * 0.1, cy - rad);
+      context.moveTo(cx + rad, cy - rad); context.lineTo(cx + rad, cy - rad * 0.1);
+      context.stroke();
+    } else if (role === "mounted") {
+      // A horseshoe: an arc open at the bottom, with two stud ends.
+      context.arc(cx, cy, rad, Math.PI * 0.85, Math.PI * 0.15, false);
+      context.stroke();
+    } else {
+      // Siege: a catapult-frame triangle.
+      context.moveTo(cx, cy - rad);
+      context.lineTo(cx + rad, cy + rad);
+      context.lineTo(cx - rad, cy + rad);
+      context.closePath();
+      context.stroke();
+    }
+    context.restore();
+  }
+
+  /** A small owner-coloured count chip (troop strength) centred at (cx, cy). */
+  function drawStrengthChip(cx: number, cy: number, label: string, color: string): number {
+    context.font = "700 10px system-ui, sans-serif";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    const halfW = Math.max(8, context.measureText(label).width / 2 + 5);
+    const h = 8;
+    context.beginPath();
+    if (typeof context.roundRect === "function") {
+      context.roundRect(cx - halfW, cy - h, halfW * 2, h * 2, h);
+    } else {
+      context.arc(cx, cy, h, 0, Math.PI * 2);
+    }
+    context.fillStyle = color;
+    context.fill();
+    context.lineWidth = 1.2;
+    context.strokeStyle = "rgba(238, 242, 248, 0.9)";
+    context.stroke();
+    context.fillStyle = "#0d0f14";
+    context.fillText(label, cx, cy + 0.5);
+    return halfW;
+  }
+
+  /** CK3-style planted banner: a swallowtail flag on a staff bearing the role glyph,
+   *  with a strength chip at the foot. The player's is gold-trimmed and softly lit. */
+  function drawArmyBanner(cx: number, cy: number, color: string, mine: boolean, label: string, role: string): void {
+    const fw = 20;
+    const fh = 14;
+    const lx = cx - fw / 2;         // hoist (staff) edge
+    const rx = cx + fw / 2;         // fly edge
+    const ty = cy - fh / 2;
+    const by = cy + fh / 2;
+    const staffTop = ty - 5;
+    const staffBase = by + 9;
+    const staffColor = mine ? "#f4d27a" : "#2c313b";
+
+    // Staff.
+    context.lineCap = "round";
+    context.lineWidth = 2;
+    context.strokeStyle = staffColor;
+    context.beginPath();
+    context.moveTo(lx, staffTop);
+    context.lineTo(lx, staffBase);
+    context.stroke();
+    // Finial.
+    context.beginPath();
+    context.arc(lx, staffTop, 2.2, 0, Math.PI * 2);
+    context.fillStyle = staffColor;
+    context.fill();
+
+    // Flag (swallowtail): fly edge notched inward. Player flags get a soft glow.
+    if (mine) { context.save(); context.shadowColor = "rgba(244, 210, 122, 0.85)"; context.shadowBlur = 7; }
+    context.beginPath();
+    context.moveTo(lx, ty);
+    context.lineTo(rx, ty);
+    context.lineTo(rx - 5, cy);
+    context.lineTo(rx, by);
+    context.lineTo(lx, by);
+    context.closePath();
+    context.fillStyle = color;
+    context.fill();
+    if (mine) context.restore();
+    context.lineWidth = 1.2;
+    context.strokeStyle = "rgba(13, 15, 20, 0.5)";
+    context.stroke();
+    if (mine) {
+      context.lineWidth = 1;
+      context.strokeStyle = "rgba(244, 210, 122, 0.95)";
+      context.stroke();
+    }
+
+    // Role emblem, centred on the flag toward the hoist.
+    drawUnitGlyph(cx - 1, cy, 4, role, "rgba(248, 250, 252, 0.94)");
+
+    // Strength chip at the foot of the staff.
+    drawStrengthChip(lx, staffBase + 6, label, color);
+  }
+
+  /** A Hansa cog for a force crossing open water: a wooden hull with an owner-coloured
+   *  sail and a strength chip. The player's is gold-trimmed and softly lit. */
+  function drawCog(cx: number, cy: number, color: string, mine: boolean, label: string): void {
+    const hw = 14;
+    const hull = "#6b533a";
+    const hullDark = "#3a2c1c";
+    const trim = mine ? "#f4d27a" : hullDark;
+
+    // Hull (rounded cog belly).
+    if (mine) { context.save(); context.shadowColor = "rgba(244, 210, 122, 0.75)"; context.shadowBlur = 7; }
+    context.beginPath();
+    context.moveTo(cx - hw, cy - 2);
+    context.quadraticCurveTo(cx, cy + 12, cx + hw, cy - 2);
+    context.closePath();
+    context.fillStyle = hull;
+    context.fill();
+    if (mine) context.restore();
+    context.lineWidth = 1.4;
+    context.strokeStyle = trim;
+    context.stroke();
+    // A lighter plank line along the sheer.
+    context.beginPath();
+    context.moveTo(cx - hw + 2, cy + 1.5);
+    context.quadraticCurveTo(cx, cy + 7.5, cx + hw - 2, cy + 1.5);
+    context.lineWidth = 1;
+    context.strokeStyle = "rgba(232, 226, 207, 0.5)";
+    context.stroke();
+    // Raised stem & stern posts.
+    context.lineWidth = 1.6;
+    context.strokeStyle = hullDark;
+    context.beginPath();
+    context.moveTo(cx - hw + 1, cy - 2); context.lineTo(cx - hw + 1, cy - 6);
+    context.moveTo(cx + hw - 1, cy - 2); context.lineTo(cx + hw - 1, cy - 6);
+    context.stroke();
+
+    // Mast + yard.
+    context.lineWidth = 1.6;
+    context.strokeStyle = hullDark;
+    context.beginPath();
+    context.moveTo(cx, cy - 2); context.lineTo(cx, cy - 18);
+    context.moveTo(cx - 8, cy - 14); context.lineTo(cx + 8, cy - 14);
+    context.stroke();
+
+    // Sail (owner colours), gently billowed.
+    context.beginPath();
+    context.moveTo(cx - 8, cy - 14);
+    context.lineTo(cx + 8, cy - 14);
+    context.quadraticCurveTo(cx + 10, cy - 8, cx + 8, cy - 3);
+    context.lineTo(cx - 8, cy - 3);
+    context.quadraticCurveTo(cx - 6, cy - 8, cx - 8, cy - 14);
+    context.closePath();
+    context.fillStyle = color;
+    context.fill();
+    context.lineWidth = 1;
+    context.strokeStyle = mine ? "#f4d27a" : "rgba(13, 15, 20, 0.5)";
+    context.stroke();
+    // Sail seam.
+    context.beginPath();
+    context.moveTo(cx, cy - 13.5); context.lineTo(cx, cy - 3.5);
+    context.lineWidth = 0.8;
+    context.strokeStyle = "rgba(13, 15, 20, 0.35)";
+    context.stroke();
+
+    // Masthead pennant.
+    context.beginPath();
+    context.moveTo(cx, cy - 18);
+    context.lineTo(cx + 7, cy - 16.5);
+    context.lineTo(cx, cy - 15);
+    context.closePath();
+    context.fillStyle = mine ? "#f4d27a" : "#c8463c";
+    context.fill();
+
+    // Strength chip at the waterline.
+    drawStrengthChip(cx, cy + 13, label, color);
+  }
+
   function drawArmies(s: GameState): void {
     for (const army of s.armies) {
       const size = armySize(army.units);
@@ -1921,67 +2147,28 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       const ownerNation = s.nations.find((n) => n.id === army.ownerId);
       const mine = !!ownerNation?.isPlayer;
       const p = project(region);
-      const bx = p.x + NODE_RADIUS - 4;
-      const by = p.y + NODE_RADIUS - 4;
-      // YOUR armies must be findable at a glance: bigger badge, gold outer
-      // ring, a tiny banner pennant on top. Rivals keep the plain badge.
-      // Sized as a pill so soldier counts ("3k", "12k") always fit.
-      const r = mine ? 12 : 10;
+      // Token centre, lower-right of the region node so it clears the capital
+      // star and the centred region name.
+      const cx = p.x + NODE_RADIUS - 5;
+      const cy = p.y + NODE_RADIUS - 3;
+      const color = ownerColor(army.ownerId);
       const label = soldiersCompact(size);
-      context.font = `700 ${mine ? 12 : 11}px system-ui, sans-serif`;
-      context.textAlign = "center";
-      context.textBaseline = "middle";
-      const halfW = Math.max(r, context.measureText(label).width / 2 + 6);
+      const atSea = armyAtSea(s, army);
 
-      const pill = (grow: number): void => {
-        context.beginPath();
-        if (typeof context.roundRect === "function") {
-          context.roundRect(bx - halfW - grow, by - r - grow, (halfW + grow) * 2, (r + grow) * 2, r + grow);
-        } else {
-          context.arc(bx, by, r + grow, 0, Math.PI * 2);
-        }
-      };
-      pill(0);
-      context.fillStyle = ownerColor(army.ownerId);
-      context.fill();
-      // Light ring lifts the badge off the map (a dark ring sank into tints).
-      context.lineWidth = 1.5;
-      context.strokeStyle = "rgba(238, 242, 248, 0.85)";
-      pill(0);
-      context.stroke();
-      if (mine) {
-        context.lineWidth = 2.5;
-        context.strokeStyle = "#f4d27a";
-        pill(2.5);
-        context.stroke();
-        // Banner pennant: a small gold flag poking above the badge.
-        context.beginPath();
-        context.moveTo(bx - 1, by - r - 12);
-        context.lineTo(bx - 1, by - r - 2);
-        context.lineWidth = 1.6;
-        context.strokeStyle = "#f4d27a";
-        context.stroke();
-        context.beginPath();
-        context.moveTo(bx - 1, by - r - 12);
-        context.lineTo(bx + 8, by - r - 9.5);
-        context.lineTo(bx - 1, by - r - 7);
-        context.closePath();
-        context.fillStyle = "#f4d27a";
-        context.fill();
-      }
-
-      context.fillStyle = "#0d0f14";
-      context.fillText(label, bx, by);
+      if (atSea) drawCog(cx, cy, color, mine, label);
+      else drawArmyBanner(cx, cy, color, mine, label, armyRole(army.units));
 
       const who = ownerNation?.isPlayer ? "Your" : ownerNation?.isBarbarian ? "Tribal" : `${ownerNation?.name ?? "Rival"}'s`;
-      const hint = mine
-        ? " Click the region, then Move / Attack to send it somewhere."
-        : "";
+      const where = atSea
+        ? `at sea off ${region.name}, under sail`
+        : `stationed in ${region.name}`;
+      const kind = atSea ? "fleet" : "army";
+      const hint = mine && !atSea ? " Click the region, then Move / Attack to send it somewhere." : "";
       markerHits.push({
-        x: bx,
-        y: by,
-        r: halfW + 3,
-        text: `${who} army — ${soldiersDisplay(size)} soldiers stationed in ${region.name}.${hint}`,
+        x: cx,
+        y: cy,
+        r: 16,
+        text: `${who} ${kind} — ${soldiersDisplay(size)} soldiers ${where}.${hint}`,
       });
     }
   }
