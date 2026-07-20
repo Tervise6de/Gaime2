@@ -6,6 +6,8 @@
 import { isReduceMotion } from "@/ui/settings";
 import { t } from "@/ui/i18n";
 import { buildNewGameForm, type NewGameConfig } from "@/ui/newgame";
+import { factionByName } from "@/data/factions";
+import { TRAITS, type TraitId } from "@/data/traits";
 
 const LOADING_ART = [
   "/key-art/loading-map-table.jpg",
@@ -96,7 +98,7 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
     menu.append(primary, newGameBtn, optionsBtn, recordsBtn);
 
     const setup = document.createElement("div");
-    setup.className = "title-setup";
+    setup.className = "title-setup title-newgame-panel";
     setup.style.display = "none";
     const setupHead = document.createElement("div");
     setupHead.className = "title-setup-head";
@@ -127,6 +129,33 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
     setup.append(setupHead, ...form.rows, startBtn, backBtn);
     newGameBtn.addEventListener("click", () => showSetup(true));
 
+    const setupScreen = document.createElement("div");
+    setupScreen.className = "title-newgame-screen";
+    setupScreen.style.display = "none";
+
+    const setupLeft = document.createElement("div");
+    setupLeft.className = "title-newgame-left";
+    const setupBrand = document.createElement("div");
+    setupBrand.className = "title-newgame-brand";
+    const setupEmblem = document.createElement("img");
+    setupEmblem.className = "title-newgame-emblem";
+    setupEmblem.src = "/key-art/sea-of-coin-emblem.png";
+    setupEmblem.alt = "";
+    setupEmblem.decoding = "async";
+    setupEmblem.setAttribute("aria-hidden", "true");
+    const setupMark = document.createElement("div");
+    setupMark.className = "title-newgame-mark";
+    setupMark.textContent = t("menu.wordmark");
+    const setupSub = document.createElement("div");
+    setupSub.className = "title-newgame-sub";
+    setupSub.textContent = "A Hanseatic trade strategy game";
+    setupBrand.append(setupEmblem, setupMark, setupSub);
+
+    const realmCard = document.createElement("section");
+    realmCard.className = "title-realm-card";
+    setupLeft.append(setupBrand, realmCard);
+    setupScreen.append(setupLeft, setup);
+
     const hint = document.createElement("p");
     hint.className = "title-hint";
     hint.textContent = t("menu.escContinue");
@@ -135,6 +164,9 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
     function showSetup(open: boolean): void {
       menu.style.display = open ? "none" : "flex";
       setup.style.display = open ? "flex" : "none";
+      shell.style.display = open ? "none" : "grid";
+      setupScreen.style.display = open ? "grid" : "none";
+      overlay.classList.toggle("title-creating", open);
       hint.textContent = open ? t("menu.escBack") : t("menu.escContinue");
       overlay.scrollTop = 0;
       if (open) {
@@ -145,6 +177,13 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
         newGameBtn.focus();
       }
     }
+
+    const playAsSelect = setup.querySelector<HTMLSelectElement>(".hud-playas");
+    const renderRealmCard = (): void => {
+      renderSelectedRealm(realmCard, playAsSelect?.value || "Lübeck");
+    };
+    playAsSelect?.addEventListener("change", renderRealmCard);
+    renderRealmCard();
 
     const summary = titlePanel("Campaign Summary", [
       ["House", "Lübeck"],
@@ -162,9 +201,9 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
     ]);
     news.classList.add("title-news");
 
-    center.append(emblem, wordmark, subtitle, divider, menu, setup, hint);
+    center.append(emblem, wordmark, subtitle, divider, menu, hint);
     shell.append(summary, center, news);
-    overlay.append(shell, version, loading);
+    overlay.append(shell, setupScreen, version, loading);
 
     const hudRoot = document.querySelector("#hud") ?? document.body;
     hudRoot.classList.add("title-open");
@@ -299,6 +338,63 @@ function titlePanel(title: string, rows: readonly (readonly [string, string])[])
   }
   panel.append(head, list);
   return panel;
+}
+
+function renderSelectedRealm(card: HTMLElement, factionName: string): void {
+  const def = factionByName(factionName);
+  card.innerHTML = "";
+  const eyebrow = document.createElement("div");
+  eyebrow.className = "title-realm-eyebrow";
+  eyebrow.textContent = "Selected realm";
+  const body = document.createElement("div");
+  body.className = "title-realm-body";
+  const crest = document.createElement("div");
+  crest.className = "title-realm-crest";
+  crest.style.setProperty("--realm-color", def?.color ?? "#b0273b");
+  const names = document.createElement("div");
+  names.className = "title-realm-nameblock";
+  const name = document.createElement("h2");
+  name.textContent = def?.name ?? "Random realm";
+  const trait = document.createElement("p");
+  trait.textContent = def ? TRAITS[def.trait].label : "Random";
+  names.append(name, trait);
+  body.append(crest, names);
+
+  const stats = document.createElement("div");
+  stats.className = "title-realm-stats";
+  const rows = def ? realmStats(def.trait) : [["Realm", "Random"], ["Opening", "Chosen at start"], ["Pressure", "Adaptive"]];
+  for (const [label, value] of rows) {
+    const row = document.createElement("div");
+    row.className = "title-realm-stat";
+    const l = document.createElement("span");
+    l.textContent = label;
+    const v = document.createElement("strong");
+    v.textContent = value;
+    row.append(l, v);
+    stats.append(row);
+  }
+
+  const blurb = document.createElement("p");
+  blurb.className = "title-realm-blurb";
+  blurb.textContent = def
+    ? `${def.blurb} ${def.bonus.label}: ${def.bonus.detail}`
+    : "A realm is picked for you.";
+  card.append(eyebrow, body, stats, blurb);
+}
+
+function realmStats(trait: TraitId): readonly (readonly [string, string])[] {
+  switch (trait) {
+    case "mercantile":
+      return [["Trade influence", "+15%"], ["Wealth generation", "+10%"], ["Market access", "+1"]];
+    case "industrious":
+      return [["Work output", "+25%"], ["Build tempo", "+10%"], ["Guild access", "+1"]];
+    case "fertile":
+      return [["Food surplus", "+25%"], ["Growth pressure", "+10%"], ["Settlers", "+1"]];
+    case "martial":
+      return [["Unit cost", "-20%"], ["Border pressure", "+10%"], ["Muster", "+1"]];
+    case "scholarly":
+      return [["Knowledge", "+30%"], ["Research pace", "+10%"], ["Civic access", "+1"]];
+  }
 }
 
 type TitleMenuIcon = "anchor" | "ship" | "gear" | "medal" | "back";

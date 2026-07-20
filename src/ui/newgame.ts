@@ -48,42 +48,13 @@ export function saveNewGamePrefs(prefs: NewGamePrefs): void {
   }
 }
 
-export function parseSeed(raw: string): number {
-  const n = Number(raw);
-  if (Number.isFinite(n)) return Math.abs(Math.trunc(n)) >>> 0;
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < raw.length; i++) {
-    h ^= raw.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
 function freshSeed(): number {
   return 100000 + Math.floor(Math.random() * 900000);
 }
 
 export function buildNewGameForm(): NewGameForm {
   const prefs = loadNewGamePrefs();
-
-  const seedInput = document.createElement("input");
-  seedInput.type = "text";
-  seedInput.className = "hud-seed";
-  seedInput.value = String(freshSeed());
-  seedInput.title = "Same seed and choices rebuild the same Hansa campaign.";
-  seedInput.setAttribute("aria-label", "Game seed");
-
-  const seedNew = document.createElement("button");
-  seedNew.type = "button";
-  seedNew.className = "hud-seed-new";
-  seedNew.textContent = "Roll";
-  seedNew.title = "Roll a new seed";
-  seedNew.addEventListener("click", () => {
-    seedInput.value = String(freshSeed());
-  });
-
-  const seedRow = div("hud-seed-row");
-  seedRow.append(seedInput, seedNew);
+  let seed = freshSeed();
 
   const difficultySeg = segmented(
     [
@@ -110,13 +81,18 @@ export function buildNewGameForm(): NewGameForm {
 
   const world = div("hud-static-choice");
   world.textContent = "Hanseatic World";
-  world.title = "The North Sea and Baltic trading world, c. 1250-1550.";
+  world.title = "The North Sea and Baltic trading world, c. 1228-1550.";
+
+  const startYear = div("hud-static-choice hud-start-year");
+  startYear.textContent = "1228";
+  startYear.title = "The campaign begins just after Bornhöved, before the League has fully formed.";
 
   const hansa = scriptedMap("hansa");
   const names = hansa?.factions.map((f) => f.name) ?? [];
+  const defaultFaction = names.includes("Lübeck") ? "Lübeck" : "";
   const playAsSel = select(
     [["", "Random realm"], ...names.map((n) => [n, optionLabel(n)] as [string, string])],
-    prefs.playerFaction && names.includes(prefs.playerFaction) ? prefs.playerFaction : "",
+    prefs.playerFaction && names.includes(prefs.playerFaction) ? prefs.playerFaction : defaultFaction,
     "hud-select hud-playas",
   );
   playAsSel.title = "Which realm you rule.";
@@ -124,7 +100,7 @@ export function buildNewGameForm(): NewGameForm {
   const updatePlayAsBlurb = (): void => {
     const def = factionByName(playAsSel.value);
     if (!def) {
-      playAsBlurb.textContent = "A realm is picked for you from the seed.";
+      playAsBlurb.textContent = "A realm is picked for you.";
       return;
     }
     const disp = def.disposition
@@ -139,22 +115,21 @@ export function buildNewGameForm(): NewGameForm {
 
   return {
     rows: [
-      field("Game seed", seedRow),
       field("World", world),
+      field("Start year", startYear),
       field("Play as", playAsSel),
       playAsBlurb,
       field("Difficulty", difficultySeg.root),
       field("Game length", gameLengthSeg.root),
     ],
     readConfig(): NewGameConfig {
-      const raw = seedInput.value.trim();
       saveNewGamePrefs({
         difficulty: difficultySeg.get(),
         gameLength: gameLengthSeg.get(),
         playerFaction: playAsSel.value || undefined,
       });
       return {
-        seed: raw === "" ? freshSeed() : parseSeed(raw),
+        seed,
         difficulty: (difficultySeg.get() || "normal") as Difficulty,
         gameLength: (gameLengthSeg.get() || "standard") as GameLength,
         mapId: "hansa",
@@ -162,7 +137,7 @@ export function buildNewGameForm(): NewGameForm {
       };
     },
     refreshSeed(): void {
-      seedInput.value = String(freshSeed());
+      seed = freshSeed();
     },
   };
 }

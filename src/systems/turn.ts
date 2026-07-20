@@ -305,7 +305,7 @@ function createScriptedGame(map: ScriptedMap, regions: Region[], options: NewGam
     outcome: "playing",
     log: [
       `Turn 1 — you rule ${playerName} on the ${map.name} map; ` +
-        `${rivalCount} rival power${rivalCount === 1 ? "" : "s"} share the land (seed ${options.seed}).`,
+        `${rivalCount} rival power${rivalCount === 1 ? "" : "s"} share the land.`,
     ],
     scoreHistory: {},
   };

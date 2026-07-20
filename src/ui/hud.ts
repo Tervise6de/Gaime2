@@ -459,7 +459,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   root.append(moveBanner);
 
   // Map legend (hidden until toggled) — explains the marker vocabulary and
-  // carries the World card (seed, difficulty, age…) filled live in update().
+  // carries the World card (difficulty, age, trait...) filled live in update().
   const legendPanel = buildLegend();
   legendPanel.style.display = "none";
   const legendWorld = el("div", "hud-legend-world");
@@ -728,7 +728,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
   function openGameMenu(): void {
     refreshSlotLabels(); // slot turn markers reflect the latest saves on open
-    newGameForm.refreshSeed(); // every visit shows a fresh, real seed
+    newGameForm.refreshSeed(); // every visit starts a fresh campaign variant
     gameMenuOverlay.style.display = "flex";
     gameMenuPanel.scrollTop = 0; // the panel persists — reset to its top on open
   }
@@ -2158,11 +2158,11 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
   // --- Keyboard shortcuts for the overlays ----------------------------------
   // L toggles the map legend, H toggles the getting-started tips, Esc closes
-  // whatever's open. Ignore while typing in a form control so the tax/seed
-  // inputs keep their own keys. (Enter/Space to end turn live in main.ts.)
+  // whatever's open. Ignore while typing in a form control so inputs keep their
+  // own keys. (Enter/Space to end turn live in main.ts.)
   window.addEventListener("keydown", (ev) => {
     const target = ev.target as HTMLElement | null;
-    // Form controls own their keys (the seed input must keep "l", "s", …) —
+    // Form controls own their keys —
     // except Escape, which must always close whatever is open, even when a
     // checkbox or slider inside a modal still holds focus.
     if (target && (target.tagName === "INPUT" || target.tagName === "SELECT") && ev.key !== "Escape") return;
@@ -2360,8 +2360,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       "Bankruptcy: the treasury ran dry and troops disband.";
 
     // The turn block: turn·year, then age · difficulty · trait, then any
-    // active timed modifiers ("War-weariness ×2 (3)"). Seed stays in the
-    // legend's World card.
+    // active timed modifiers ("War-weariness ×2 (3)").
     const era = eraForTurn(state.turn);
     turnMain.textContent = `Turn ${state.turn} · ${yearForTurn(state.turn)} AD`;
     turnSub.textContent =
@@ -2375,7 +2374,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       .join(" · ");
     turnMods.style.display = mods.length ? "block" : "none";
     turnBlock.title =
-      `${era.blurb}\n\nDifficulty: ${state.difficulty} · seed ${state.seed}` +
+      `${era.blurb}\n\nDifficulty: ${state.difficulty}` +
       (player.trait ? `\n${TRAITS[player.trait].label} — ${TRAITS[player.trait].blurb}` : "") +
       (mods.length ? `\nActive effects: ${turnMods.textContent} — number in brackets = turns remaining.` : "");
 
@@ -2394,7 +2393,6 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       r.append(l, v);
       legendWorld.append(r);
     };
-    worldRow("Seed", String(state.seed), "The world seed — the same seed and settings rebuild this exact world.");
     worldRow("Difficulty", String(state.difficulty));
     worldRow("Regions", String(state.regions.length));
     worldRow("Age", `${era.name} · ${yearForTurn(state.turn)} AD`, era.blurb);

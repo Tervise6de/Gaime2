@@ -2,19 +2,19 @@ import { describe, expect, it } from "vitest";
 import { BASE_YEAR, ERAS, YEARS_PER_TURN, eraForTurn, yearForTurn } from "@/data/eras";
 
 describe("world ages", () => {
-  it("maps turn 1 to the base year (900 AD)", () => {
-    expect(BASE_YEAR).toBe(900);
-    expect(yearForTurn(1)).toBe(900);
+  it("maps turn 1 to the base year (1228 AD)", () => {
+    expect(BASE_YEAR).toBe(1228);
+    expect(yearForTurn(1)).toBe(1228);
   });
 
-  it("stretches ~2.8 years per turn so a standard game spans ~900→~1500 AD", () => {
-    expect(YEARS_PER_TURN).toBe(2.8);
-    // Each turn advances ~2.8 years (rounded), decoupling the span from the turn count.
-    expect(yearForTurn(2)).toBe(BASE_YEAR + Math.round(1 * YEARS_PER_TURN)); // 903
-    expect(yearForTurn(90)).toBe(1149);
-    expect(yearForTurn(185)).toBe(1415);
+  it("stretches ~1.47 years per turn so a standard game spans ~1228-1550 AD", () => {
+    expect(YEARS_PER_TURN).toBe(1.47);
+    // Each turn advances ~1.47 years (rounded), decoupling the span from the turn count.
+    expect(yearForTurn(2)).toBe(BASE_YEAR + Math.round(1 * YEARS_PER_TURN)); // 1229
+    expect(yearForTurn(90)).toBe(1359);
+    expect(yearForTurn(185)).toBe(1498);
     // A full standard campaign (220 turns) reaches the Hansa twilight.
-    expect(yearForTurn(220)).toBe(1513); // 900 + Math.round(219 * 2.8)
+    expect(yearForTurn(220)).toBe(1550); // 1228 + Math.round(219 * 1.47)
   });
 
   it("clamps nonsense turns to the base year", () => {
@@ -36,12 +36,12 @@ describe("world ages", () => {
   });
 
   it("resolves the correct era at boundaries, renamed to the Hansa arc", () => {
-    expect(eraForTurn(1).name).toBe("Trade Dawn");
-    expect(eraForTurn(44).name).toBe("Trade Dawn");
-    expect(eraForTurn(45).name).toBe("The Gotland Age");
-    expect(eraForTurn(89).name).toBe("The Gotland Age");
-    expect(eraForTurn(90).name).toBe("The League Rises");
-    expect(eraForTurn(139).name).toBe("The League Rises");
+    expect(eraForTurn(1).name).toBe("Gotland Network");
+    expect(eraForTurn(44).name).toBe("Gotland Network");
+    expect(eraForTurn(45).name).toBe("Lübeck Ascendant");
+    expect(eraForTurn(89).name).toBe("Lübeck Ascendant");
+    expect(eraForTurn(90).name).toBe("League Takes Shape");
+    expect(eraForTurn(139).name).toBe("League Takes Shape");
     expect(eraForTurn(140).name).toBe("Peak of the Hansa");
     expect(eraForTurn(184).name).toBe("Peak of the Hansa");
     expect(eraForTurn(185).name).toBe("The Turning");
@@ -49,14 +49,14 @@ describe("world ages", () => {
   });
 
   it("dates each era's dawn across the Hansa lifecycle", () => {
-    expect(yearForTurn(ERAS[0]!.fromTurn)).toBe(900); // Trade Dawn
-    expect(yearForTurn(ERAS[1]!.fromTurn)).toBe(1023); // The Gotland Age
-    expect(yearForTurn(ERAS[2]!.fromTurn)).toBe(1149); // The League Rises (Lübeck's rise)
-    expect(yearForTurn(ERAS[3]!.fromTurn)).toBe(1289); // Peak of the Hansa
-    expect(yearForTurn(ERAS[4]!.fromTurn)).toBe(1415); // The Turning
+    expect(yearForTurn(ERAS[0]!.fromTurn)).toBe(1228);
+    expect(yearForTurn(ERAS[1]!.fromTurn)).toBe(1293);
+    expect(yearForTurn(ERAS[2]!.fromTurn)).toBe(1359);
+    expect(yearForTurn(ERAS[3]!.fromTurn)).toBe(1432);
+    expect(yearForTurn(ERAS[4]!.fromTurn)).toBe(1498);
   });
 
   it("clamps turns below the first era", () => {
-    expect(eraForTurn(0).name).toBe("Trade Dawn");
+    expect(eraForTurn(0).name).toBe("Gotland Network");
   });
 });

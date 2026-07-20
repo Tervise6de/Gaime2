@@ -1236,41 +1236,6 @@ body {
   padding: 8px 9px;
 }
 
-.hud-seed {
-  flex: 1;
-  min-width: 0;
-  padding: 9px 10px;
-  font-size: 13px;
-  color: var(--fg);
-  background: #141a24;
-  border: 1px solid var(--panel-border);
-  border-radius: 7px;
-  font-variant-numeric: tabular-nums;
-}
-
-/* Seed field + the dice that rolls a fresh one. */
-.hud-seed-row {
-  display: flex;
-  gap: 6px;
-}
-
-.hud-seed-new {
-  flex: 0 0 auto;
-  padding: 0 12px;
-  font-size: 15px;
-  color: var(--fg);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--panel-border);
-  border-radius: 7px;
-  cursor: pointer;
-  transition: border-color 0.12s ease;
-}
-
-.hud-seed-new:hover,
-.hud-seed-new:focus-visible {
-  border-color: rgba(230, 200, 116, 0.55);
-}
-
 /* A labelled setup field: small-caps label over its control. */
 .hud-field {
   display: flex;
@@ -5450,5 +5415,360 @@ a:focus-visible,
 
   .title-menu {
     gap: 7px;
+  }
+}
+
+/* --- New game creation screen --------------------------------------------- */
+.title-creating::after {
+  background:
+    linear-gradient(90deg, rgba(3, 5, 8, 0.34), rgba(3, 5, 8, 0.12) 34%, rgba(3, 5, 8, 0.52)),
+    linear-gradient(180deg, rgba(3, 5, 8, 0.18), rgba(3, 5, 8, 0.62) 72%, rgba(3, 5, 8, 0.88));
+}
+
+.title-newgame-screen {
+  width: min(1160px, 96vw);
+  min-height: calc(100vh - 48px);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(300px, 390px) minmax(480px, 560px);
+  gap: clamp(42px, 8vw, 140px);
+  align-items: center;
+}
+
+.title-newgame-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.title-newgame-brand {
+  width: 100%;
+  text-align: center;
+}
+
+.title-newgame-emblem {
+  width: 122px;
+  height: 122px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto 6px;
+  filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.72));
+}
+
+.title-newgame-mark {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  background: linear-gradient(180deg, #fff0bd, #d8a24a 62%, #a87424);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.title-newgame-sub {
+  margin-top: 6px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: rgba(244, 213, 138, 0.84);
+}
+
+.title-realm-card,
+.title-newgame-panel {
+  position: relative;
+  border: 1px solid rgba(216, 162, 74, 0.64);
+  border-radius: 4px;
+  background:
+    linear-gradient(180deg, rgba(10, 18, 26, 0.9), rgba(4, 8, 13, 0.94)),
+    rgba(4, 8, 13, 0.9);
+  box-shadow:
+    inset 0 0 0 1px rgba(244, 213, 138, 0.1),
+    0 24px 50px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(8px);
+}
+
+.title-realm-card::before,
+.title-newgame-panel::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  pointer-events: none;
+  border: 1px solid rgba(216, 162, 74, 0.26);
+  border-radius: 2px;
+}
+
+.title-realm-card {
+  width: 100%;
+  padding: 26px 30px 28px;
+  color: rgba(247, 244, 234, 0.82);
+}
+
+.title-realm-eyebrow,
+.title-setup-head {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--title-gold);
+}
+
+.title-realm-body {
+  display: grid;
+  grid-template-columns: 74px 1fr;
+  gap: 18px;
+  align-items: center;
+  margin: 18px 0;
+  padding: 14px 0 16px;
+  border-top: 1px solid rgba(244, 213, 138, 0.14);
+  border-bottom: 1px solid rgba(244, 213, 138, 0.14);
+}
+
+.title-realm-crest {
+  width: 64px;
+  height: 74px;
+  justify-self: center;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), transparent 22%),
+    linear-gradient(180deg, var(--realm-color), #0f141c);
+  clip-path: polygon(50% 0, 90% 12%, 86% 70%, 50% 100%, 14% 70%, 10% 12%);
+  border: 2px solid rgba(244, 213, 138, 0.75);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.45);
+}
+
+.title-realm-nameblock h2 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 31px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--title-gold-hi);
+}
+
+.title-realm-nameblock p {
+  margin: 7px 0 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--title-gold);
+}
+
+.title-realm-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  margin: 4px 0 20px;
+}
+
+.title-realm-stat {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: baseline;
+  font-size: 16px;
+}
+
+.title-realm-stat span {
+  color: rgba(244, 213, 138, 0.82);
+}
+
+.title-realm-stat strong {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--title-gold-hi);
+}
+
+.title-realm-blurb {
+  margin: 0;
+  padding-top: 17px;
+  border-top: 1px solid rgba(244, 213, 138, 0.14);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  line-height: 1.55;
+  color: rgba(247, 244, 234, 0.75);
+}
+
+.title-newgame-panel {
+  width: 100%;
+  margin: 0;
+  padding: 28px 32px 30px;
+  gap: 13px;
+  align-self: center;
+}
+
+.title-newgame-panel .title-setup-head {
+  margin-bottom: 8px;
+  font-size: 26px;
+  letter-spacing: 0.18em;
+  color: var(--title-gold-hi);
+}
+
+.title-newgame-panel .title-setup-head::after {
+  content: "";
+  display: block;
+  width: 240px;
+  height: 1px;
+  margin: 10px auto 2px;
+  background: linear-gradient(90deg, transparent, rgba(216, 162, 74, 0.72), transparent);
+}
+
+.title-newgame-panel .hud-field {
+  gap: 6px;
+}
+
+.title-newgame-panel .hud-field-label {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--title-gold);
+}
+
+.title-newgame-panel .hud-static-choice,
+.title-newgame-panel .hud-select {
+  height: 34px;
+  padding: 6px 12px;
+  color: rgba(247, 244, 234, 0.92);
+  background:
+    linear-gradient(180deg, rgba(17, 26, 35, 0.92), rgba(7, 12, 18, 0.96));
+  border: 1px solid rgba(216, 162, 74, 0.38);
+  border-radius: 4px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 16px;
+}
+
+.title-newgame-panel .hud-select {
+  padding-right: 34px;
+}
+
+.title-newgame-panel .hud-playas-blurb {
+  display: none;
+}
+
+.title-newgame-panel .hud-segmented {
+  display: flex;
+  gap: 0;
+}
+
+.title-newgame-panel .hud-segmented button {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  color: rgba(247, 244, 234, 0.82);
+  background: rgba(7, 12, 18, 0.86);
+  border: 1px solid rgba(216, 162, 74, 0.34);
+  border-left-width: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.title-newgame-panel .hud-segmented button:first-child {
+  border-left-width: 1px;
+  border-radius: 4px 0 0 4px;
+}
+
+.title-newgame-panel .hud-segmented button:last-child {
+  border-radius: 0 4px 4px 0;
+}
+
+.title-newgame-panel .hud-segmented button.active {
+  color: #1a0f04;
+  background: linear-gradient(180deg, #f6d980, #c99432);
+  border-color: rgba(255, 227, 161, 0.8);
+}
+
+.title-newgame-panel .title-menu-btn {
+  min-height: 44px;
+  margin-top: 3px;
+}
+
+.title-newgame-panel .title-menu-btn.primary {
+  margin-top: 8px;
+  min-height: 52px;
+  grid-template-columns: 1fr;
+  font-size: 21px;
+  letter-spacing: 0.12em;
+}
+
+.title-newgame-panel .title-menu-btn.primary .title-menu-icon,
+.title-newgame-panel .title-menu-btn.primary .title-menu-detail {
+  display: none;
+}
+
+.title-newgame-panel .title-menu-btn:not(.primary) {
+  grid-template-columns: 1fr;
+  min-height: 42px;
+  font-size: 18px;
+  letter-spacing: 0.12em;
+}
+
+.title-newgame-panel .title-menu-btn:not(.primary) .title-menu-icon {
+  display: none;
+}
+
+@media (max-width: 960px) {
+  .title-newgame-screen {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+    padding: 16px 0 26px;
+  }
+
+  .title-newgame-left {
+    gap: 12px;
+  }
+
+  .title-newgame-brand {
+    display: none;
+  }
+
+  .title-realm-card,
+  .title-newgame-panel {
+    width: min(560px, calc(100vw - 36px));
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 620px) {
+  .title-newgame-screen {
+    width: 100%;
+    min-height: auto;
+  }
+
+  .title-realm-card,
+  .title-newgame-panel {
+    width: 100%;
+    padding: 20px 18px;
+  }
+
+  .title-realm-body {
+    grid-template-columns: 56px 1fr;
+    gap: 12px;
+  }
+
+  .title-realm-crest {
+    width: 48px;
+    height: 58px;
+  }
+
+  .title-realm-nameblock h2 {
+    font-size: 24px;
+  }
+
+  .title-realm-nameblock p,
+  .title-realm-blurb {
+    font-size: 14px;
+  }
+
+  .title-newgame-panel .title-setup-head {
+    font-size: 22px;
   }
 }
