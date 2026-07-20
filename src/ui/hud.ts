@@ -83,11 +83,11 @@ import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
 import type { TurnSummary } from "@/systems/summary";
 import { deriveAlerts, type Alert } from "@/ui/alerts";
 import { researchFrontier, recommendedTech, isBuildingUnlockedFor } from "@/systems/tech";
-import { eraIndexForTurn, eraByIndex } from "@/data/eras";
+import { eraIndexForTurn, eraByIndex, ERAS } from "@/data/eras";
 import { ARCHETYPE_LABEL } from "@/data/personalities";
 import { eraForTurn, yearForTurn } from "@/data/eras";
 import { TRAITS } from "@/data/traits";
-import { TECHS, TECH_IDS, type TechId, type TechBranch } from "@/data/techs";
+import { TECHS, TECH_IDS, type TechId, type TechBranch, type TechDef } from "@/data/techs";
 import { DOMINATION_FRACTION, TURN_LIMIT, MODIFIER_LABEL, MAX_ENTRENCH } from "@/systems/state";
 import {
   commanderAttack,
@@ -4042,10 +4042,10 @@ function renderTechTree(
   const etaTurns = (cost: number, progress = 0): number | null =>
     knowledgeFlow > 0 ? Math.max(1, Math.ceil((cost - progress) / knowledgeFlow)) : null;
 
-  const panel = el("div", "hud-techtree-panel");
+  const panel = el("div", "hud-techtree-panel hud-tt2-panel");
   const head = el("div", "hud-techtree-head");
   const ttTitle = el("h2", "hud-techtree-title");
-  ttTitle.textContent = "Research — Technology tree";
+  ttTitle.textContent = "Research — the Ages of the Hansa";
   head.append(ttTitle, closeButton(onClose));
   panel.append(head);
 
@@ -4093,59 +4093,174 @@ function renderTechTree(
     player.trait === "martial" ? "military" : player.trait === "scholarly" ? "civics" : "economy";
   const rec = recommendedTech(research.done, era, recBranch);
 
-  const grid = el("div", "hud-techtree-grid");
-  for (const branch of TECH_BRANCHES) {
-    const row = el("div", "hud-techtree-row");
-    const label = el("div", "hud-techtree-branch");
-    label.textContent = branch;
-    label.style.color = BRANCH_COLOR[branch];
-    row.append(label);
+  // --- The tree: age columns × branch lanes, with dependency connectors -------
+  // Layout is computed to absolute pixels so the prerequisite lines can be drawn
+  // precisely (an SVG cable from each prereq's right edge to its child's left).
+  const COL_W = 226, PAD_X = 8, NODE_W = 200, NODE_H = 100, V_GAP = 14, SLOT = NODE_H + V_GAP;
+  const HEADER_H = 46, LANE_GAP = 14, LANE_PAD_TOP = 28, LANE_PAD_BOT = 10;
+  const eraCount = ERAS.length;
 
-    const track = el("div", "hud-techtree-track");
-    const ids = TECH_IDS.filter((id) => TECHS[id].branch === branch).sort(
-      (a, b) => TECHS[a].tier - TECHS[b].tier || TECHS[a].cost - TECHS[b].cost,
-    );
-    for (const id of ids) {
-      const def = TECHS[id];
-      const isDone = done.has(id);
-      const isCurrent = current === id;
-      const unlocked = def.requires.every((r) => done.has(r));
-      const ageReached = def.era <= era;
-      const available = !isDone && !isCurrent && unlocked && ageReached;
-      // A tech of a future age reads as age-locked (whether or not its prereqs
-      // are met), so the whole tree is legible by age at a glance.
-      const ageLocked = !isDone && !isCurrent && !ageReached;
-      const isRec = available && id === rec;
-      const state = isDone ? "done" : isCurrent ? "current" : available ? "available" : ageLocked ? "agelocked" : "locked";
+  /** Techs of one branch in one age, cheapest first (a stable vertical order). */
+  const cellOf = (b: TechBranch, e: number): TechId[] =>
+    TECH_IDS.filter((id) => TECHS[id].branch === b && TECHS[id].era === e).sort((a, z) => TECHS[a].cost - TECHS[z].cost);
 
-      const node = el("div", "hud-tt-node " + state + (isRec ? " recommended" : ""));
-      node.style.borderColor = BRANCH_COLOR[branch];
-      const missing = def.requires.filter((r) => !done.has(r)).map((r) => TECHS[r].name);
-      // Turns-to-complete shown for the current study (remaining) and anything
-      // you could pick right now, so cost reads as time, not just a raw number.
-      const eta = isCurrent ? etaTurns(def.cost, research.progress) : available ? etaTurns(def.cost) : null;
-      node.title =
-        def.blurb +
-        (eta !== null ? ` — ~${eta} turn${eta === 1 ? "" : "s"} at your current knowledge income` : "") +
-        (missing.length ? ` (needs ${missing.join(", ")})` : "") +
-        (ageLocked ? ` — awaits the ${eraByIndex(def.era).name}` : "") +
-        (isRec ? " — recommended for your realm." : "");
-      node.innerHTML =
-        `<span class="hud-tt-name">${isDone ? "✓ " : ""}${ageLocked ? "🔒 " : ""}${escapeHtml(def.name)}${isRec ? ' <span class="hud-tt-rec">★</span>' : ""}</span>` +
-        `<span class="hud-tt-meta">${eraByIndex(def.era).name.replace("Age of ", "")} · ${def.cost}${resourceIconHtml("knowledge", "📖")}${eta !== null ? ` · ~${eta}t` : ""} · ${iconHtml(BRANCH_ART[def.branch], "")}</span>`;
-      if (available) {
-        // Selecting keeps the page open so its progress bar starts filling in.
-        node.addEventListener("click", () => callbacks.onChooseResearch(id));
-      }
-      track.append(node);
+  // Size each branch lane to its busiest age, and stack the lanes down the canvas.
+  const laneTop: number[] = [];
+  const laneH: number[] = [];
+  let cursor = HEADER_H;
+  TECH_BRANCHES.forEach((b, bi) => {
+    let rows = 0;
+    for (let e = 0; e < eraCount; e++) rows = Math.max(rows, cellOf(b, e).length);
+    laneTop[bi] = cursor;
+    laneH[bi] = LANE_PAD_TOP + Math.max(1, rows) * SLOT - V_GAP + LANE_PAD_BOT;
+    cursor += laneH[bi] + LANE_GAP;
+  });
+  const canvasW = eraCount * COL_W;
+  const canvasH = cursor;
+
+  // Every tech's node-box top-left, keyed by id (drives both nodes and links).
+  const pos = new Map<TechId, { x: number; y: number }>();
+  TECH_BRANCHES.forEach((b, bi) => {
+    for (let e = 0; e < eraCount; e++) {
+      cellOf(b, e).forEach((id, k) => {
+        pos.set(id, { x: e * COL_W + PAD_X, y: laneTop[bi]! + LANE_PAD_TOP + k * SLOT });
+      });
     }
-    row.append(track);
-    grid.append(row);
+  });
+
+  const wrap = el("div", "hud-tt2-wrap");
+  const canvas = el("div", "hud-tt2-canvas");
+  canvas.style.width = `${canvasW}px`;
+  canvas.style.height = `${canvasH}px`;
+
+  // Branch lanes — faint tinted bands with a colour-keyed label at the left.
+  TECH_BRANCHES.forEach((b, bi) => {
+    const band = el("div", "hud-tt2-lane lane-" + b);
+    band.style.top = `${laneTop[bi]}px`;
+    band.style.height = `${laneH[bi]}px`;
+    band.style.width = `${canvasW}px`;
+    band.style.setProperty("--branch", BRANCH_COLOR[b]);
+    const label = el("div", "hud-tt2-lanelabel");
+    label.style.color = BRANCH_COLOR[b];
+    label.innerHTML = `${iconHtml(BRANCH_ART[b], "")}<span>${escapeHtml(b)}</span>`;
+    band.append(label);
+    canvas.append(band);
+  });
+
+  // The current age gets a soft highlight column behind everything.
+  if (era >= 0 && era < eraCount) {
+    const now = el("div", "hud-tt2-nowcol");
+    now.style.left = `${era * COL_W}px`;
+    now.style.width = `${COL_W}px`;
+    now.style.height = `${canvasH}px`;
+    canvas.append(now);
   }
-  panel.append(grid);
+
+  // Age headers — name, opening year and how many of the age's techs are known.
+  for (let e = 0; e < eraCount; e++) {
+    const eh = el("div", "hud-tt2-erahead" + (e === era ? " current" : e > era ? " future" : " past"));
+    eh.style.left = `${e * COL_W}px`;
+    eh.style.width = `${COL_W}px`;
+    const inEra = TECH_IDS.filter((id) => TECHS[id].era === e);
+    const doneN = inEra.filter((id) => done.has(id)).length;
+    eh.innerHTML =
+      `<span class="hud-tt2-eraname">${escapeHtml(ERAS[e]!.name)}</span>` +
+      `<span class="hud-tt2-erayear">${yearForTurn(ERAS[e]!.fromTurn)} AD · ${doneN}/${inEra.length} known${e === era ? " · now" : ""}</span>`;
+    eh.title = ERAS[e]!.blurb;
+    canvas.append(eh);
+  }
+
+  // Dependency cables — a smooth curve from each prereq's right edge to the child.
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("class", "hud-tt2-links");
+  svg.setAttribute("width", String(canvasW));
+  svg.setAttribute("height", String(canvasH));
+  svg.setAttribute("viewBox", `0 0 ${canvasW} ${canvasH}`);
+  for (const id of TECH_IDS) {
+    const def = TECHS[id];
+    const to = pos.get(id);
+    if (!to) continue;
+    for (const pr of def.requires) {
+      const from = pos.get(pr);
+      if (!from) continue;
+      const x1 = from.x + NODE_W, y1 = from.y + NODE_H / 2;
+      const x2 = to.x, y2 = to.y + NODE_H / 2;
+      const bend = Math.max(26, (x2 - x1) * 0.45);
+      const path = document.createElementNS(NS, "path");
+      path.setAttribute("d", `M${x1},${y1} C${x1 + bend},${y1} ${x2 - bend},${y2} ${x2},${y2}`);
+      const linkState = done.has(id) ? "done" : done.has(pr) && def.era <= era ? "open" : "dim";
+      path.setAttribute("class", "hud-tt2-link " + linkState);
+      path.setAttribute("stroke", BRANCH_COLOR[def.branch]);
+      svg.append(path);
+    }
+  }
+  canvas.append(svg);
+
+  // Rich node bodies: name + cost/ETA, effect chips, and what it unlocks.
+  const RES: readonly ["gold" | "materials" | "food" | "knowledge", string][] = [
+    ["gold", "💰"], ["materials", "🪵"], ["food", "🌾"], ["knowledge", "📖"],
+  ];
+  const chipHtml = (def: TechDef): string => {
+    const chips: string[] = [];
+    for (const [k, fb] of RES) {
+      const v = def.yieldMult?.[k];
+      if (v) chips.push(`<span class="hud-tt2-chip">+${Math.round(v * 100)}% ${resourceIconHtml(k, fb)}</span>`);
+    }
+    if (def.unrestReduction) chips.push(`<span class="hud-tt2-chip calm">−${def.unrestReduction} unrest</span>`);
+    return chips.join("");
+  };
+  const unlockHtml = (def: TechDef): string => {
+    if (def.unlockBuilding)
+      return `<span class="hud-tt2-unlock build">${buildingIconHtml(def.unlockBuilding, "🏛")}<span>${escapeHtml(BUILDINGS[def.unlockBuilding].name)}</span></span>`;
+    if (def.unlockUnit)
+      return `<span class="hud-tt2-unlock unit">${unitIconHtml(def.unlockUnit, "⚔")}<span>${escapeHtml(UNITS[def.unlockUnit].name)}</span></span>`;
+    return "";
+  };
+
+  for (const id of TECH_IDS) {
+    const def = TECHS[id];
+    const p = pos.get(id);
+    if (!p) continue;
+    const isDone = done.has(id);
+    const isCurrent = current === id;
+    const unlocked = def.requires.every((r) => done.has(r));
+    const ageReached = def.era <= era;
+    const available = !isDone && !isCurrent && unlocked && ageReached;
+    const ageLocked = !isDone && !isCurrent && !ageReached;
+    const isRec = available && id === rec;
+    const stateCls = isDone ? "done" : isCurrent ? "current" : available ? "available" : ageLocked ? "agelocked" : "locked";
+    const node = el("div", "hud-tt2-node " + stateCls + (isRec ? " recommended" : ""));
+    node.style.left = `${p.x}px`;
+    node.style.top = `${p.y}px`;
+    node.style.width = `${NODE_W}px`;
+    node.style.height = `${NODE_H}px`;
+    node.style.setProperty("--branch", BRANCH_COLOR[def.branch]);
+    const missing = def.requires.filter((r) => !done.has(r)).map((r) => TECHS[r].name);
+    const eta = isCurrent ? etaTurns(def.cost, research.progress) : available ? etaTurns(def.cost) : null;
+    node.title =
+      def.blurb +
+      (eta !== null ? ` — ~${eta} turn${eta === 1 ? "" : "s"} at your current knowledge income` : "") +
+      (missing.length ? ` (needs ${missing.join(", ")})` : "") +
+      (ageLocked ? ` — awaits the ${eraByIndex(def.era).name}` : "") +
+      (isRec ? " — recommended for your realm." : "");
+    const unlock = unlockHtml(def);
+    node.innerHTML =
+      `<div class="hud-tt2-top">` +
+      `<span class="hud-tt2-name">${isDone ? "✓ " : ""}${ageLocked ? "🔒 " : ""}${escapeHtml(def.name)}${isRec ? ' <span class="hud-tt2-rec">★</span>' : ""}</span>` +
+      `<span class="hud-tt2-cost">${def.cost}${resourceIconHtml("knowledge", "📖")}${eta !== null ? ` · ~${eta}t` : ""}</span>` +
+      `</div>` +
+      `<div class="hud-tt2-chips">${chipHtml(def)}</div>` +
+      (unlock ? `<div class="hud-tt2-unlockrow">${unlock}</div>` : "");
+    if (available) node.addEventListener("click", () => callbacks.onChooseResearch(id));
+    canvas.append(node);
+  }
+
+  wrap.append(canvas);
+  panel.append(wrap);
   panel.append(
     line(
-      "✓ researched · glowing = in progress · ★ recommended · bright = available (~Nt = turns to complete) · 🔒 = awaits its age · dim = locked",
+      "✓ researched · glowing = studying now · ★ recommended · bright = available (~Nt = turns to complete) · 🔒 = awaits its age · dim = locked",
       "hud-techtree-legend",
     ),
   );

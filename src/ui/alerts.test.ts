@@ -72,7 +72,7 @@ describe("deriveAlerts", () => {
     );
     expect(alerts).toContainEqual({ severity: "good", text: "Captured Cove" });
     expect(alerts).toContainEqual({ severity: "good", text: "Rurik eliminated" });
-    expect(alerts).toContainEqual({ severity: "good", text: "Researched Writing" });
+    expect(alerts).toContainEqual({ severity: "good", text: "Researched Town Charters" });
   });
 
   it("scans state for player revolts and warns on each", () => {

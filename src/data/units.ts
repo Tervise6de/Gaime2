@@ -93,8 +93,8 @@ export const UNITS: Record<UnitType, UnitDef> = {
   },
   ranged: {
     id: "ranged",
-    name: "Ranged",
-    short: "Rng",
+    name: "Crossbowmen",
+    short: "Xbow",
     cost: { gold: 20, materials: 8 },
     upkeep: 2,
     attack: 6,

@@ -3516,6 +3516,308 @@ body {
   color: var(--muted);
 }
 
+/* === Tech tree v2 — age columns × branch lanes, with dependency cables ===== */
+.hud-tt2-panel {
+  width: min(1200px, 97vw);
+  max-height: 93vh;
+}
+
+.hud-tt2-wrap {
+  margin-top: 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  padding-bottom: 6px;
+  border-radius: 10px;
+  /* A faint parchment-ledger warmth behind the whole tree. */
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(224, 183, 74, 0.06), transparent 60%),
+    rgba(0, 0, 0, 0.16);
+}
+
+.hud-tt2-canvas {
+  position: relative;
+  margin: 0 auto;
+}
+
+/* Branch lanes — a tinted band running the width of the ages. */
+.hud-tt2-lane {
+  position: absolute;
+  left: 0;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--branch) 7%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--branch) 16%, transparent);
+}
+
+.hud-tt2-lanelabel {
+  position: absolute;
+  top: 6px;
+  left: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+
+.hud-tt2-lanelabel .ico svg,
+.hud-tt2-lanelabel .ico-svg svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Soft highlight over the current age's whole column. */
+.hud-tt2-nowcol {
+  position: absolute;
+  top: 0;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(244, 210, 122, 0.1), rgba(244, 210, 122, 0.03));
+  box-shadow: inset 0 0 0 1px rgba(244, 210, 122, 0.22);
+  pointer-events: none;
+}
+
+/* Age headers across the top. */
+.hud-tt2-erahead {
+  position: absolute;
+  top: 0;
+  height: 42px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  text-align: center;
+  padding: 0 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.hud-tt2-eraname {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.hud-tt2-erayear {
+  font-size: 9.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-tt2-erahead.current .hud-tt2-eraname {
+  color: var(--accent);
+}
+
+.hud-tt2-erahead.current {
+  border-bottom-color: rgba(244, 210, 122, 0.5);
+}
+
+.hud-tt2-erahead.future {
+  opacity: 0.5;
+}
+
+/* The dependency cables. */
+.hud-tt2-links {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  fill: none;
+}
+
+.hud-tt2-link {
+  fill: none;
+  stroke-width: 1.6px;
+  stroke-linecap: round;
+  opacity: 0.18;
+}
+
+.hud-tt2-link.open {
+  stroke-width: 2px;
+  opacity: 0.5;
+}
+
+.hud-tt2-link.done {
+  stroke-width: 2.4px;
+  opacity: 0.8;
+}
+
+/* Tech nodes — absolutely placed cards. */
+.hud-tt2-node {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--panel-border, #2a323d);
+  border-left: 3px solid var(--branch);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.08s ease;
+}
+
+.hud-tt2-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.hud-tt2-name {
+  font-size: 12.5px;
+  font-weight: 650;
+  line-height: 1.15;
+  color: var(--fg);
+}
+
+.hud-tt2-cost {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hud-tt2-cost .ico svg,
+.hud-tt2-cost .ico-svg svg {
+  width: 11px;
+  height: 11px;
+  vertical-align: -1px;
+}
+
+.hud-tt2-rec {
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.hud-tt2-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.hud-tt2-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-tt2-chip .ico svg,
+.hud-tt2-chip .ico-svg svg {
+  width: 11px;
+  height: 11px;
+}
+
+.hud-tt2-chip.calm {
+  background: rgba(99, 199, 214, 0.14);
+  color: #9fdce8;
+}
+
+.hud-tt2-unlockrow {
+  margin-top: auto;
+}
+
+.hud-tt2-unlock {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 2px 7px 2px 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.hud-tt2-unlock span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hud-tt2-unlock .ico svg,
+.hud-tt2-unlock .ico-svg svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.hud-tt2-unlock.build {
+  color: #ecc766;
+}
+
+.hud-tt2-unlock.unit {
+  color: #eaa39d;
+}
+
+/* --- node states ---------------------------------------------------------- */
+.hud-tt2-node.done {
+  background: linear-gradient(180deg, rgba(108, 174, 122, 0.2), rgba(108, 174, 122, 0.08));
+}
+
+.hud-tt2-node.done .hud-tt2-name {
+  color: #8fd0a0;
+}
+
+.hud-tt2-node.current {
+  box-shadow: 0 0 0 1px var(--accent), 0 0 16px rgba(244, 210, 122, 0.45);
+  background: linear-gradient(180deg, rgba(244, 210, 122, 0.22), rgba(244, 210, 122, 0.07));
+  animation: tt2-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes tt2-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px var(--accent), 0 0 12px rgba(244, 210, 122, 0.35); }
+  50% { box-shadow: 0 0 0 1px var(--accent), 0 0 22px rgba(244, 210, 122, 0.6); }
+}
+
+.hud-tt2-node.available {
+  cursor: pointer;
+  border-color: color-mix(in srgb, var(--branch) 55%, var(--panel-border));
+}
+
+.hud-tt2-node.available:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--branch);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03));
+}
+
+.hud-tt2-node.recommended {
+  box-shadow: inset 0 0 0 1px rgba(244, 210, 122, 0.6), 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.hud-tt2-node.agelocked {
+  opacity: 0.66;
+  border-style: dashed;
+  background:
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.03) 5px, transparent 5px, transparent 11px);
+}
+
+.hud-tt2-node.locked {
+  opacity: 0.4;
+}
+
+@media (max-width: 900px) {
+  .hud-tt2-panel {
+    width: 97vw;
+  }
+}
+
 /* --- Outcome banner ------------------------------------------------------- */
 .hud-banner {
   position: absolute;
