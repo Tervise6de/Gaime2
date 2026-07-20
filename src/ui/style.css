@@ -60,8 +60,7 @@ body {
 }
 
 #hud .hud-panel,
-#hud .hud-topbar,
-#hud .hud-rail {
+#hud .hud-topbar {
   pointer-events: auto;
 }
 
@@ -88,13 +87,16 @@ body {
   left: 0;
   right: 0;
   display: flex;
-  gap: 14px;
-  align-items: flex-end;
+  gap: 10px;
+  align-items: stretch;
   justify-content: space-between;
-  padding: 5px 14px;
-  background: linear-gradient(180deg, rgba(17, 22, 31, 0.97), rgba(12, 16, 23, 0.92));
-  border-bottom: 1px solid rgba(230, 233, 239, 0.14);
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35);
+  min-height: 76px;
+  padding: 7px 10px;
+  background:
+    linear-gradient(180deg, rgba(6, 15, 24, 0.98), rgba(7, 13, 19, 0.94)),
+    radial-gradient(circle at 50% 0, rgba(230, 177, 78, 0.12), transparent 50%);
+  border-bottom: 1px solid rgba(214, 158, 62, 0.58);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.48), inset 0 -1px 0 rgba(255, 225, 150, 0.16);
   /* The z-index keeps the bar's ☰ dropdown above later-added panels (the
      region inspector) — and its stacking context makes that reliable.
      Deliberately no backdrop-filter anywhere in the HUD: at these near-opaque
@@ -106,7 +108,67 @@ body {
 .hud-topbar-left {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 0;
+  min-width: 0;
+}
+
+.hud-realm-block {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 214px;
+  max-width: 286px;
+  height: 100%;
+  padding: 4px 18px 4px 4px;
+  border-right: 1px solid rgba(214, 158, 62, 0.42);
+}
+
+.hud-realm-crest {
+  flex: 0 0 46px;
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+}
+
+.hud-realm-crest svg {
+  width: 46px;
+  height: 46px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.55));
+}
+
+.hud-realm-crest.fallback {
+  border: 1px solid rgba(214, 158, 62, 0.52);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.hud-realm-text {
+  min-width: 0;
+  line-height: 1.12;
+}
+
+.hud-realm-name {
+  overflow: hidden;
+  color: var(--accent);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hud-realm-sub {
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .hud-topbar-center {
@@ -119,7 +181,8 @@ body {
 .hud-topbar-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0;
 }
 
 /* Labelled resource segment: icon beside a small column of name / value /
@@ -128,8 +191,9 @@ body {
   display: flex;
   gap: 8px;
   align-items: center;
-  padding: 3px 14px 3px 10px;
-  border-right: 1px solid rgba(230, 233, 239, 0.1);
+  min-width: 82px;
+  padding: 4px 12px 4px 10px;
+  border-right: 1px solid rgba(214, 158, 62, 0.24);
 }
 
 .hud-resource-icon {
@@ -168,10 +232,16 @@ body {
 
 /* The turn block: turn·year / age·difficulty·trait / active modifiers. */
 .hud-turnblock {
-  padding: 2px 14px;
-  border-right: 1px solid rgba(230, 233, 239, 0.1);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 180px;
+  padding: 4px 18px;
+  border-left: 1px solid rgba(214, 158, 62, 0.28);
+  border-right: 1px solid rgba(214, 158, 62, 0.28);
   line-height: 1.25;
   white-space: nowrap;
+  text-align: center;
 }
 
 .hud-turn-mods {
@@ -180,43 +250,13 @@ body {
   color: #e8a68a;
 }
 
-/* Labelled quick buttons (Legend / Help / Standing / Game). */
-.hud-topbtn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  min-width: 56px;
-  padding: 4px 8px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  color: var(--fg);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--panel-border);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: border-color 0.12s ease, background 0.12s ease;
-}
-
-.hud-topbtn:hover {
-  border-color: rgba(230, 200, 116, 0.55);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.hud-topbtn .ico,
-.hud-topbtn .ico-svg svg {
-  width: 16px;
-  height: 16px;
-}
-
 /* --- Top-bar nav buttons: Diplomacy / Research / Production / Army / Politics
    (the old left rail, promoted into the bar). Icon over a small caption, with a
    corner badge for pending business. */
 .hud-navwrap {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .hud-navbtn {
@@ -224,23 +264,24 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  min-width: 54px;
-  padding: 4px 8px;
-  font-size: 10px;
+  gap: 3px;
+  min-width: 50px;
+  height: 58px;
+  padding: 5px 6px;
+  font-size: 9.5px;
   font-weight: 600;
   letter-spacing: 0.03em;
   color: var(--fg);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--panel-border);
-  border-radius: 8px;
+  background: rgba(5, 13, 22, 0.72);
+  border: 1px solid rgba(214, 158, 62, 0.38);
+  border-radius: 5px;
   cursor: pointer;
   transition: border-color 0.12s ease, background 0.12s ease;
 }
 
 .hud-navbtn:hover {
   border-color: rgba(230, 200, 116, 0.55);
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(244, 210, 122, 0.11);
 }
 
 .hud-navbtn.active {
@@ -541,7 +582,7 @@ body {
 /* Move-mode banner: shown while an army is picking its destination. */
 .hud-move-banner {
   position: absolute;
-  top: 64px;
+  top: 88px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 38;
@@ -614,8 +655,7 @@ body {
   box-shadow: var(--panel-shadow);
 }
 
-/* Bottom-left action cluster: the per-turn levers (tax, End turn) plus the
-   Game menu entry — everything else on the left opens on demand. */
+/* Top-bar action cluster: quick Politics access plus End turn. */
 .hud-actions {
   left: 12px;
   bottom: 12px;
@@ -623,6 +663,27 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.hud-topbar .hud-actions {
+  position: static;
+  width: auto;
+  min-width: 220px;
+  max-width: 270px;
+  height: 58px;
+  display: grid;
+  grid-template-columns: minmax(88px, 1fr) 112px;
+  align-items: stretch;
+  gap: 6px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.hud-topbar .hud-advisor {
+  display: none !important;
 }
 
 .hud-actions .hud-hint {
@@ -644,6 +705,18 @@ body {
   border-radius: 8px;
   cursor: pointer;
   transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.hud-topbar .hud-taxjump {
+  width: auto;
+  height: 100%;
+  justify-content: center;
+  padding: 5px 8px;
+  border-color: rgba(214, 158, 62, 0.38);
+  border-radius: 5px;
+  font-size: 11px;
+  line-height: 1.2;
+  text-align: center;
 }
 
 .hud-taxjump:hover {
@@ -778,7 +851,7 @@ body {
   vertical-align: -2px;
 }
 
-/* --- Bottom-left stack: Map panel over the actions cluster (End turn) ------- */
+/* --- Bottom-left stack: map overview --------------------------------------- */
 .hud-bottomleft {
   position: absolute;
   left: 12px;
@@ -797,7 +870,7 @@ body {
   pointer-events: auto;
 }
 
-/* --- Map panel: a CK3-style minimap + map-mode dropdown (bottom-right) ------- */
+/* --- Map panel: a CK3-style minimap + map-mode dropdown (bottom-left) -------- */
 .hud-mappanel {
   position: absolute;
   right: 12px;
@@ -876,6 +949,104 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
+/* --- Goods ledger: right drawer opened from the top command bar ------------ */
+.hud-ledger-drawer {
+  position: absolute;
+  top: 88px;
+  right: 12px;
+  z-index: 32;
+  width: 288px;
+  max-height: calc(100vh - 112px);
+  overflow-y: auto;
+  padding: 12px;
+  border-color: rgba(214, 158, 62, 0.55);
+  border-radius: 6px;
+}
+
+.hud-ledger-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid rgba(214, 158, 62, 0.28);
+}
+
+.hud-ledger-title {
+  color: var(--accent);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hud-ledger-meta {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.hud-ledger-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.hud-good-card {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(214, 158, 62, 0.24);
+  border-radius: 5px;
+}
+
+.hud-good-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  font-size: 20px;
+}
+
+.hud-good-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hud-good-name {
+  overflow: hidden;
+  color: var(--fg);
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hud-good-sub {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hud-good-value {
+  color: #82c99a;
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 @media (max-width: 820px) {
   .hud-minimap {
     height: 104px;
@@ -909,64 +1080,6 @@ body {
   margin: 0 0 10px;
 }
 
-/* A small uppercase heading inside the actions cluster (fiscal policy). */
-.hud-actions-head {
-  margin: 0 0 -3px;
-}
-
-/* Left stack: the compact rail plus whichever drawer is open beneath it. */
-.hud-leftstack {
-  position: absolute;
-  left: 12px;
-  top: 66px;
-  bottom: 200px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  pointer-events: none;
-  /* Open drawers must paint over the bottom-left actions cluster (which has
-     grown taller with the advisor) — never slide behind it. */
-  z-index: 34;
-}
-
-.hud-rail {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-}
-
-.hud-railbtn {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--fg);
-  background: var(--panel-grad);
-  border: 1px solid var(--panel-border);
-  border-radius: 10px;
-  cursor: pointer;
-  box-shadow: var(--panel-shadow);
-}
-
-.hud-railbtn:hover {
-  border-color: rgba(244, 210, 122, 0.5);
-}
-
-.hud-railbtn.active {
-  border-color: var(--accent);
-  background: rgba(244, 210, 122, 0.12);
-}
-
-.hud-railbtn .ico-label {
-  flex: 1;
-  text-align: left;
-}
-
 .hud-railbadge {
   display: inline-flex;
   align-items: center;
@@ -980,15 +1093,6 @@ body {
   font-size: 10.5px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-}
-
-/* Drawers flow under the rail inside the stack; one open at a time. */
-.hud-drawer {
-  position: static;
-  width: 268px;
-  max-height: 100%;
-  overflow-y: auto;
-  pointer-events: auto;
 }
 
 .hud-drawer-head {
@@ -1100,7 +1204,7 @@ body {
   margin-top: 8px;
 }
 
-/* Research choice waiting: a gentle gold pulse on the rail entry. */
+/* Research choice waiting: a gentle gold pulse on the top-bar entry. */
 @keyframes hud-attn {
   0%,
   100% {
@@ -1109,11 +1213,6 @@ body {
   50% {
     box-shadow: var(--panel-shadow), 0 0 0 5px rgba(244, 210, 122, 0.22);
   }
-}
-
-.hud-railbtn.attention {
-  border-color: var(--accent);
-  animation: hud-attn 2.2s ease-in-out infinite;
 }
 
 /* Map camera controls: a small vertical cluster above the turn log. */
@@ -1227,6 +1326,17 @@ body {
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(214, 168, 74, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.4);
   transition: filter 0.12s ease, transform 0.06s ease;
+}
+
+.hud-topbar .hud-endturn {
+  width: auto;
+  min-width: 112px;
+  height: 100%;
+  padding: 7px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .hud-endturn:hover {
@@ -2826,7 +2936,7 @@ body {
 /* --- Critical-events alert strip ------------------------------------------ */
 .hud-alerts {
   position: fixed;
-  top: 66px;
+  top: 88px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 20;
@@ -2898,6 +3008,11 @@ body {
 /* Choice-event decision modal. */
 .hud-choice-panel {
   width: min(420px, 96vw);
+}
+
+.hud-bottomleft .hud-mappanel {
+  position: static;
+  width: 100%;
 }
 
 .hud-choice-image {
@@ -3928,7 +4043,6 @@ body {
 
 /* Gentle hover feel on the common controls (reduce-motion squashes these). */
 .hud-legend-toggle,
-.hud-railbtn,
 .hud-diplo-btn,
 .hud-newgame-btn,
 .hud-build-btn,
@@ -4167,7 +4281,6 @@ a:focus-visible,
   .hud-hints-btn,
   .hud-techtree-close,
   .confirm-btn,
-  .hud-railbtn,
   .hud-gamemenu-btn,
   .hud-navbtn,
   .hud-lens-select {
@@ -4187,8 +4300,24 @@ a:focus-visible,
   .hud-topbar {
     gap: 8px;
   }
+  .hud-realm-block {
+    min-width: 178px;
+    max-width: 214px;
+  }
+  .hud-realm-name {
+    font-size: 15px;
+  }
   .hud-resource {
-    padding: 2px 4px;
+    min-width: 68px;
+    padding: 2px 5px;
+  }
+  .hud-topbar .hud-actions {
+    min-width: 190px;
+    grid-template-columns: minmax(76px, 1fr) 102px;
+  }
+  .hud-navbtn {
+    min-width: 44px;
+    padding-inline: 4px;
   }
 }
 
@@ -4196,9 +4325,6 @@ a:focus-visible,
 @media (max-width: 1024px) {
   .hud-right {
     width: 216px;
-  }
-  .hud-drawer {
-    width: 240px;
   }
   .hud-bottomleft {
     width: 200px;
@@ -4219,6 +4345,7 @@ a:focus-visible,
      cover the corner panels below it. */
   .hud-topbar {
     gap: 6px;
+    min-height: 58px;
     padding: 4px 8px;
     font-size: 12px;
     flex-wrap: nowrap;
@@ -4235,6 +4362,44 @@ a:focus-visible,
   .hud-topbar-center {
     flex: 0 0 auto;
   }
+  .hud-realm-block {
+    min-width: 148px;
+    max-width: 148px;
+    padding-right: 10px;
+  }
+  .hud-realm-crest {
+    flex-basis: 34px;
+    width: 34px;
+    height: 34px;
+  }
+  .hud-realm-crest svg {
+    width: 34px;
+    height: 34px;
+  }
+  .hud-realm-name {
+    font-size: 13px;
+  }
+  .hud-realm-sub {
+    display: none;
+  }
+  .hud-turnblock {
+    min-width: 132px;
+    padding-inline: 10px;
+  }
+  .hud-navbtn {
+    min-width: 44px;
+    height: 50px;
+    font-size: 9px;
+  }
+  .hud-topbar .hud-actions {
+    min-width: 174px;
+    height: 50px;
+    grid-template-columns: 74px 94px;
+  }
+  .hud-topbar .hud-taxjump,
+  .hud-topbar .hud-endturn {
+    font-size: 10px;
+  }
   .hud-resource {
     padding: 2px 5px;
     gap: 5px;
@@ -4246,25 +4411,16 @@ a:focus-visible,
     font-size: 14px;
   }
 
-  .hud-leftstack {
-    left: 6px;
-    top: 58px;
-    bottom: 40vh;
-  }
-  .hud-drawer {
-    width: min(74vw, 300px);
-    max-height: 42vh;
-  }
   .hud-right {
     right: 6px;
-    top: 58px;
+    top: 68px;
     width: 46vw;
     max-height: 32vh;
   }
   .hud-bottomleft {
     left: 6px;
     bottom: 6px;
-    width: 46vw;
+    width: min(44vw, 180px);
     gap: 6px;
   }
   /* The minimap would crowd the phone corner — the dropdown filter is enough. */
@@ -4273,9 +4429,17 @@ a:focus-visible,
     display: none;
   }
   .hud-log {
+    left: auto;
     right: 6px;
+    transform: none;
     bottom: 6px;
     width: 46vw;
+  }
+  .hud-ledger-drawer {
+    top: 64px;
+    right: 6px;
+    width: min(72vw, 300px);
+    max-height: calc(100vh - 76px);
   }
   .hud-log.open {
     width: 46vw;

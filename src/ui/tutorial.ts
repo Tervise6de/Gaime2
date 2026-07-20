@@ -37,14 +37,14 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     body: "Your realm carries the widest, brightest border — that's always you. Click any region to inspect and develop it; zoom with the wheel or pinch, drag to pan. Armies (coloured badges) move between adjacent regions to expand or attack.",
   },
   {
-    target: ".hud-railbtn-research",
+    target: ".hud-navbtn-research",
     title: "Research",
     body: "Knowledge funds one technology at a time. This drawer holds your current progress, the frontier of available techs and the full tree — a gold badge means a choice is waiting.",
   },
   {
-    target: ".hud-rail",
+    target: ".hud-navwrap",
     title: "Diplomacy & your capital",
-    body: "Diplomacy opens war, peace, pacts, gifts, tribute and trade (badge = offers awaiting your answer). The crown jumps to your capital. Alerts and last turn's events live bottom-right in Events & log.",
+    body: "The top command bar opens diplomacy, ledger, research, production, armies and politics. Badges show waiting work; last turn's events live in Events & log.",
   },
   {
     target: ".hud-endturn",

@@ -71,12 +71,12 @@ import {
 } from "@/systems/military";
 import { getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, nationPower, opinionReasons, foreignRelations, casusBelli, CASUS_BELLI, TRIBUTE_DEMAND, atWar } from "@/systems/diplomacy";
 import { nationScore, victoryProgress, victoryRaces, endGameSummary } from "@/systems/victory";
-import { GOODS, type GoodId } from "@/data/goods";
+import { GOODS, GOOD_IDS, type GoodId } from "@/data/goods";
 import { EPOCH_EVENTS } from "@/data/epochEvents";
 import { choiceEventImage } from "@/data/eventArt";
 import { KONTORE, type KontorId } from "@/data/kontore";
 import { SOUND } from "@/data/sound";
-import { routeOptions, regionGoodOutput, soundHolderId, activeEmbargoes, soundPreview, marketOutlook } from "@/systems/trade";
+import { routeOptions, regionGoodOutput, routeIncome, soundHolderId, activeEmbargoes, soundPreview, marketOutlook } from "@/systems/trade";
 import { canFoundLeague, canJoinLeague, leagueLeader, leagueDividendPool, isBoycotted } from "@/systems/league";
 import { inLeague } from "@/systems/state";
 import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
@@ -273,6 +273,14 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   // Standing / Game) and the ☰ menu close the right end.
   const topBar = el("div", "hud-topbar");
   const barLeft = el("div", "hud-topbar-left");
+  const realmBlock = el("div", "hud-realm-block");
+  const realmCrest = el("div", "hud-realm-crest");
+  const realmText = el("div", "hud-realm-text");
+  const realmName = el("div", "hud-realm-name");
+  const realmSub = el("div", "hud-realm-sub");
+  realmText.append(realmName, realmSub);
+  realmBlock.append(realmCrest, realmText);
+  barLeft.append(realmBlock);
   const resourceEls: Record<ResourceKey, { stock: HTMLElement; flow: HTMLElement }> =
     {} as never;
   for (const key of RESOURCE_KEYS) {
@@ -508,12 +516,15 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const diploRail = railBtn("flag", "⚑", t("nav.diplomacy"), t("nav.diplomacy.tip"), () =>
     toggleScreen("diplo"),
   );
+  const ledgerRail = railBtn("book", "▤", "Ledger", "Goods ledger: local output, routes and trade income.", () =>
+    toggleLedger(),
+  );
   // D5 keeps the label/​tip localised; the fixes make the button open the tree
   // directly (it is the sole research page now) instead of the old list screen.
   const researchRail = railBtn("book", "📖", t("nav.research"), t("nav.research.tip"), () =>
     toggleTechTree(),
   );
-  researchRail.btn.classList.add("hud-railbtn-research");
+  researchRail.btn.classList.add("hud-navbtn-research");
   const productionRail = railBtn(
     "hammer",
     "🔨",
@@ -538,7 +549,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     () => openPolitics(),
   );
   const navWrap = el("div", "hud-navwrap");
-  navWrap.append(diploRail.btn, researchRail.btn, productionRail.btn, armiesRail.btn, politicsRail.btn);
+  navWrap.append(ledgerRail.btn, diploRail.btn, researchRail.btn, productionRail.btn, armiesRail.btn, politicsRail.btn);
   barRight.insertBefore(navWrap, menuWrap);
 
   // --- Diplomacy & Research: big centred screens ------------------------------
@@ -629,8 +640,9 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   advisorBox.style.display = "none";
 
   actions.append(taxJump, advisorBox, endTurnBtn);
-  // `actions` is parented into the bottom-left stack below (beneath the Map
-  // panel), so End turn keeps the corner while the minimap sits just above it.
+  // Turn actions live in the top command bar. Pending-business details surface as
+  // badges on the nav buttons; the old permanent lower-corner action box is gone.
+  barRight.insertBefore(actions, menuWrap);
 
   // --- Politics page: taxes, fiscal policy and the victory race --------------
   // Governance in one place: the tax lever (moved off the End-turn cluster) and
@@ -697,17 +709,11 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   lensScale.innerHTML = `<span>low</span><i class="hud-lens-ramp"></i><span>high</span>`;
   mapPanel.append(mapPanelHead, minimapCanvas, lensRow, lensScale);
 
-  // Bottom-left column: the Map panel (minimap + filter) sits above the actions
-  // cluster, so End turn stays in the corner and the two never overlap however
-  // many advisor chips the actions cluster grows.
-  // Actions cluster stays bottom-left; the Map panel (minimap + lens) moves to
-  // its own bottom-right corner, and the events log centres along the bottom
-  // (see the CSS) — so the middle of the board is clear and the minimap sits
-  // where the eye expects it (CK3/Civ-style).
+  // Bottom-left column: map overview only. The turn/action commands are top-right,
+  // which leaves the lower map area cleaner and closer to grand-strategy HUDs.
   const bottomLeft = el("div", "hud-bottomleft");
-  bottomLeft.append(actions);
+  bottomLeft.append(mapPanel);
   root.append(bottomLeft);
-  root.append(mapPanel);
 
   function setLens(id: LensId): void {
     activeLens = id;
@@ -893,6 +899,87 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const regionBody = el("div", "hud-region-body");
   rightPanel.append(regionBody);
   root.append(rightPanel);
+
+  // --- Goods Ledger: right-side trade drawer ---------------------------------
+  // Opened from the top bar. Goods are a merchant-layer output, not stored
+  // resources, so the ledger labels them as output/routes/income instead of
+  // pretending they are a fifth stockpile.
+  const ledgerPanel = el("div", "hud-panel hud-ledger-drawer");
+  ledgerPanel.style.display = "none";
+  root.append(ledgerPanel);
+  let ledgerOpen = false;
+
+  function toggleLedger(): void {
+    if (ledgerOpen) closeLedger();
+    else openLedger();
+  }
+  function openLedger(): void {
+    ledgerOpen = true;
+    ledgerPanel.style.display = "block";
+    ledgerRail.btn.classList.add("active");
+    if (lastState) renderGoodsLedger(lastState);
+  }
+  function closeLedger(): void {
+    ledgerOpen = false;
+    ledgerPanel.style.display = "none";
+    ledgerRail.btn.classList.remove("active");
+  }
+  function renderGoodsLedger(state: GameState): void {
+    const rows = new Map<GoodId, { output: number; routes: number; income: number }>();
+    for (const id of GOOD_IDS) rows.set(id, { output: 0, routes: 0, income: 0 });
+    for (const region of state.regions) {
+      if (region.ownerId !== PLAYER_ID) continue;
+      for (const out of regionGoodOutput(region)) {
+        const row = rows.get(out.good)!;
+        row.output += out.amount;
+      }
+    }
+    for (const route of state.routes ?? []) {
+      if (route.ownerId !== PLAYER_ID) continue;
+      const row = rows.get(route.good);
+      if (!row) continue;
+      row.routes += 1;
+      row.income += route.lastIncome ?? (route.disrupted || route.soundBlocked || route.leagueBlocked ? 0 : routeIncome(state, route));
+    }
+
+    const activeRoutes = (state.routes ?? []).filter((r) => r.ownerId === PLAYER_ID);
+    const totalOutput = [...rows.values()].reduce((sum, row) => sum + row.output, 0);
+    const totalIncome = [...rows.values()].reduce((sum, row) => sum + row.income, 0);
+    ledgerPanel.innerHTML = "";
+    const head = el("div", "hud-ledger-head");
+    const title = el("div", "hud-ledger-title");
+    title.textContent = "Goods Ledger";
+    const meta = el("div", "hud-ledger-meta");
+    meta.textContent = `${fmt(totalOutput)} output · ${activeRoutes.length}/${MAX_ROUTES_PER_NATION} routes · +${fmt(totalIncome)}g`;
+    const titleWrap = el("div", "hud-ledger-titlewrap");
+    titleWrap.append(title, meta);
+    head.append(titleWrap, closeButton(closeLedger));
+    ledgerPanel.append(head);
+
+    const grid = el("div", "hud-ledger-grid");
+    const ordered = GOOD_IDS
+      .map((id) => ({ id, ...rows.get(id)! }))
+      .sort((a, b) => b.income - a.income || b.output - a.output || GOODS[a.id].name.localeCompare(GOODS[b.id].name));
+    for (const row of ordered) {
+      const good = GOODS[row.id];
+      const card = el("div", "hud-good-card");
+      const icon = el("span", "hud-good-icon");
+      icon.textContent = good.glyph;
+      const body = el("div", "hud-good-body");
+      const name = el("span", "hud-good-name");
+      name.textContent = good.name;
+      const sub = el("span", "hud-good-sub");
+      sub.textContent = `${fmt(row.output)} local output · ${row.routes} route${row.routes === 1 ? "" : "s"}`;
+      body.append(name, sub);
+      const value = el("div", "hud-good-value");
+      value.textContent = `${row.income >= 0 ? "+" : ""}${fmt(row.income)}g`;
+      card.append(icon, body, value);
+      const destinations = good.demandedAt.map((id) => KONTORE[id].name).join(", ");
+      card.title = `${good.name}: value ${good.value}g/unit. Demanded at ${destinations}.`;
+      grid.append(card);
+    }
+    ledgerPanel.append(grid);
+  }
 
   // --- End-game screen (a full modal recap, hidden until the game is decided) --
   const endOverlay = el("div", "hud-techtree-overlay hud-end-overlay");
@@ -2236,6 +2323,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       cycleLens();
     } else if (ev.key === "Escape") {
       if (lastMoveArmy !== null) callbacks.onCancelMove(); // abort picking a destination
+      closeLedger();
       closeTechTree();
       closeStandings();
       closeOptions();
@@ -2269,6 +2357,16 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     const player = playerNation(state);
     lastPlayer = player;
     lastState = state;
+    const crest = crestSvg(player.id, cbSafe(player.color, isColourblind()));
+    realmCrest.innerHTML = crest ? crest : "";
+    realmCrest.classList.toggle("fallback", !crest);
+    if (!crest) realmCrest.textContent = player.name.slice(0, 1).toUpperCase();
+    realmName.textContent = inLeague(state, PLAYER_ID) ? "Hanseatic League" : player.name;
+    realmSub.textContent = inLeague(state, PLAYER_ID)
+      ? "Maritime Confederation"
+      : player.trait
+        ? `${TRAITS[player.trait].label} realm`
+        : "Independent realm";
     // Inspecting a different region starts its panel at the top (the panel
     // element persists, so a previous region's scroll would otherwise linger).
     if (selectedRegionId !== lastSelected) rightPanel.scrollTop = 0;
@@ -2342,6 +2440,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     }
     // Keep an open standings overlay live as turns resolve.
     if (standingsOverlay.style.display !== "none") renderStandingsOverlay();
+    if (ledgerOpen) renderGoodsLedger(state);
     // Keep the big region screen in sync (queueing a building re-renders it).
     if (regionOverlay.style.display !== "none") renderRegionScreen();
     // A pending decision blocks play until resolved — show its modal.
