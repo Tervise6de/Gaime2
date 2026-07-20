@@ -1,17 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <defs>
-    <radialGradient id="bg" cx="50%" cy="42%" r="75%">
-      <stop offset="0%" stop-color="#1b2230"/>
-      <stop offset="100%" stop-color="#0b0e14"/>
-    </radialGradient>
-    <linearGradient id="shield" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#e2b45e"/>
-      <stop offset="100%" stop-color="#c0893a"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" fill="url(#bg)"/>
-  <path d="M256 58l166 57v128c0 102-67 179-166 206-99-27-166-104-166-206V115z"
-        fill="url(#shield)" stroke="#efd694" stroke-width="14" stroke-linejoin="round"/>
-  <path d="M165 306v-94l51 38 40-71 40 71 51-38v94z" fill="#f7f4ea"/>
-  <rect x="165" y="330" width="182" height="26" rx="13" fill="#f7f4ea"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#070b10"/>
+  <circle cx="256" cy="256" r="202" fill="#d6a23e"/>
+  <circle cx="256" cy="256" r="178" fill="#8b5b19" opacity=".55"/>
+  <circle cx="256" cy="256" r="194" fill="none" stroke="#ffe39a" stroke-width="16"/>
+  <path d="M145 310h248l-40 64H193z" fill="#2b1a08" stroke="#ffe39a" stroke-width="16" stroke-linejoin="round"/>
+  <path d="M193 310V128l152 64v118" fill="none" stroke="#2b1a08" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M193 136h136v136H193z" fill="#f3d276" stroke="#2b1a08" stroke-width="16" stroke-linejoin="round"/>
+  <path d="M257 144v160" stroke="#2b1a08" stroke-width="16" stroke-linecap="round"/>
+  <path d="M145 408c32-24 64-24 96 0s64 24 96 0 64-24 96 0" fill="none" stroke="#ffe39a" stroke-width="20" stroke-linecap="round"/>
 </svg>

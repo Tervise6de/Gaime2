@@ -5085,6 +5085,12 @@ a:focus-visible,
     0 10px 24px rgba(0, 0, 0, 0.36);
 }
 
+.title-menu-ornament {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
 .title-menu-btn::before,
 .title-menu-btn::after,
 .title-menu-ornament::before,
@@ -5788,5 +5794,143 @@ a:focus-visible,
 
   .title-newgame-panel .title-setup-head {
     font-size: 22px;
+  }
+}
+
+@media (max-width: 760px) {
+  .title-overlay {
+    padding: max(12px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+  }
+
+  .title-shell {
+    min-height: calc(100svh - 24px);
+  }
+
+  .title-center {
+    min-height: calc(100svh - 24px);
+    align-items: flex-start;
+    justify-content: center;
+    overflow: visible;
+    padding-top: 0;
+  }
+
+  .title-emblem,
+  .title-wordmark,
+  .title-subtitle,
+  .title-divider,
+  .title-menu,
+  .title-hint {
+    align-self: flex-start;
+  }
+
+  .title-emblem {
+    width: 96px;
+    height: 96px;
+    margin: 0 0 4px calc((min(360px, calc(100dvw - 28px)) - 96px) / 2);
+  }
+
+  .title-wordmark {
+    width: min(360px, calc(100dvw - 28px));
+    font-size: clamp(28px, 9vw, 34px);
+  }
+
+  .title-subtitle {
+    width: min(360px, calc(100dvw - 28px));
+    margin-top: 6px;
+    font-size: 11px;
+    line-height: 1.15;
+  }
+
+  .title-divider {
+    width: min(180px, calc(100vw - 96px));
+    margin: 9px 0 12px calc((min(360px, calc(100dvw - 28px)) - min(180px, calc(100dvw - 96px))) / 2);
+  }
+
+  .title-menu,
+  .title-hint {
+    width: min(360px, calc(100dvw - 28px));
+    max-width: 360px;
+  }
+
+  .title-menu {
+    gap: 6px;
+  }
+
+  .title-menu-btn {
+    min-height: 42px;
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 8px;
+    padding: 6px 11px;
+    font-size: 14px;
+  }
+
+  .title-menu-btn.primary {
+    min-height: 52px;
+  }
+
+  .title-menu-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .title-menu-icon svg {
+    width: 21px;
+    height: 21px;
+  }
+
+  .title-menu-copy,
+  .title-menu-label,
+  .title-menu-detail {
+    text-align: left;
+  }
+
+  .title-menu-copy {
+    align-items: flex-start;
+  }
+
+  .title-menu-detail {
+    font-size: 10.5px;
+    white-space: normal;
+  }
+
+  .title-hint {
+    margin-top: 8px;
+  }
+}
+
+@media (max-width: 760px) and (max-height: 700px) {
+  .title-emblem {
+    width: 76px;
+    height: 76px;
+    margin-left: calc((min(332px, calc(100dvw - 28px)) - 76px) / 2);
+  }
+
+  .title-wordmark {
+    width: min(332px, calc(100dvw - 28px));
+    font-size: clamp(25px, 8vw, 30px);
+  }
+
+  .title-subtitle {
+    width: min(332px, calc(100dvw - 28px));
+    font-size: 10px;
+  }
+
+  .title-divider {
+    margin: 7px 0 9px calc((min(332px, calc(100dvw - 28px)) - min(180px, calc(100dvw - 96px))) / 2);
+  }
+
+  .title-menu,
+  .title-hint {
+    width: min(332px, calc(100dvw - 28px));
+    max-width: 332px;
+  }
+
+  .title-menu-btn {
+    min-height: 38px;
+    font-size: 13px;
+  }
+
+  .title-menu-btn.primary {
+    min-height: 46px;
   }
 }
