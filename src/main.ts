@@ -112,7 +112,7 @@ function main(): void {
       hud.toast(cleared ? `Cleared ${slotLabel(slot)}.` : `${slotLabel(slot)} is already empty.`);
     },
     onExport() {
-      downloadText(`gaime2-turn${state.turn}-seed${state.seed}.json`, serializeGame(state, nowStamp()));
+      downloadText(`sea-of-coin-turn${state.turn}.json`, serializeGame(state, nowStamp()));
       hud.toast("Save exported to file.");
     },
     onImport(json) {

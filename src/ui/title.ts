@@ -8,6 +8,7 @@ import { t } from "@/ui/i18n";
 import { buildNewGameForm, type NewGameConfig } from "@/ui/newgame";
 import { factionByName } from "@/data/factions";
 import { TRAITS, type TraitId } from "@/data/traits";
+import { fullscreenAvailable, isFullscreen, toggleFullscreen } from "@/ui/fullscreen";
 
 const LOADING_ART = [
   "/key-art/loading-map-table.jpg",
@@ -91,11 +92,26 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
     primary.addEventListener("click", () => dismiss());
 
     const newGameBtn = menuBtn(t("menu.newGame"), "", "ship");
+    const fullscreenBtn = menuBtn(t("menu.fullscreen"), "", "fullscreen");
     const optionsBtn = menuBtn(t("menu.options"), "", "gear");
     optionsBtn.addEventListener("click", () => hooks.onOpenOptions());
     const recordsBtn = menuBtn(t("menu.records"), "", "medal");
     recordsBtn.addEventListener("click", () => hooks.onOpenRecords());
-    menu.append(primary, newGameBtn, optionsBtn, recordsBtn);
+    menu.append(primary, newGameBtn, fullscreenBtn, optionsBtn, recordsBtn);
+
+    function syncFullscreenBtn(): void {
+      const available = fullscreenAvailable();
+      fullscreenBtn.disabled = !available;
+      setMenuBtnLabel(fullscreenBtn, t(isFullscreen() ? "menu.exitFullscreen" : "menu.fullscreen"));
+      fullscreenBtn.title = available
+        ? "Toggle browser fullscreen."
+        : "Fullscreen is not available in this browser.";
+    }
+    fullscreenBtn.addEventListener("click", () => {
+      void toggleFullscreen().then(syncFullscreenBtn, syncFullscreenBtn);
+    });
+    document.addEventListener("fullscreenchange", syncFullscreenBtn);
+    syncFullscreenBtn();
 
     const setup = document.createElement("div");
     setup.className = "title-setup title-newgame-panel";
@@ -214,6 +230,7 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
       if (closing) return;
       closing = true;
       window.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("fullscreenchange", syncFullscreenBtn);
       hudRoot.classList.remove("title-open");
       overlay.classList.add("loading");
       window.setTimeout(finishDismiss, isReduceMotion() ? 90 : 620);
@@ -237,7 +254,7 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
       if (ev.key === "Escape" && !typing) {
         ev.preventDefault();
         if (setup.style.display !== "none") showSetup(false);
-        else dismiss();
+        else primary.focus();
       } else if (ev.key === "Tab") {
         trapFocus(overlay, ev);
       }
@@ -397,12 +414,13 @@ function realmStats(trait: TraitId): readonly (readonly [string, string])[] {
   }
 }
 
-type TitleMenuIcon = "anchor" | "ship" | "gear" | "medal" | "back";
+type TitleMenuIcon = "anchor" | "ship" | "gear" | "medal" | "fullscreen" | "back";
 
 const TITLE_MENU_ICONS: Record<TitleMenuIcon, string> = {
   anchor: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v13"/><path d="M8.5 7h7"/><path d="M12 3.5a2 2 0 110 4 2 2 0 010-4z"/><path d="M5 13c0 4 3 7 7 7s7-3 7-7"/><path d="M5 13l-2 2M19 13l2 2"/></svg>',
   ship: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15.5h16l-2.3 4.2H7z"/><path d="M8 15.5V6l8 3.2v6.3"/><path d="M8 6h8"/><path d="M6 21c1.2-.8 2.4-.8 3.6 0 1.2.8 2.4.8 3.6 0 1.2-.8 2.4-.8 3.6 0"/></svg>',
   gear: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.7 5.7l2.1 2.1M16.2 16.2l2.1 2.1M18.3 5.7l-2.1 2.1M7.8 16.2l-2.1 2.1"/></svg>',
   medal: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4.5"/><path d="M9.4 12.1L7.8 20l4.2-2 4.2 2-1.6-7.9"/></svg>',
+  fullscreen: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H4v4"/><path d="M4 4l6 6"/><path d="M16 4h4v4"/><path d="M20 4l-6 6"/><path d="M8 20H4v-4"/><path d="M4 20l6-6"/><path d="M16 20h4v-4"/><path d="M20 20l-6-6"/></svg>',
   back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/><path d="M9 12h11"/></svg>',
 };

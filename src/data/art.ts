@@ -31,6 +31,7 @@ export type GlyphId =
   | "standings" // 📊
   | "map" // 🗺
   | "records" // 🏅 toolbar
+  | "fullscreen" // browser fullscreen
   | "options" // ⚙
   | "victory" // 🏆
   | "star"
@@ -125,6 +126,9 @@ export const GLYPH_ART: Record<GlyphId, string | null> = {
     '<path d="M3.5 6.2l5.5-2 6 2 5.5-2v13.6l-5.5 2-6-2-5.5 2z"/><path d="M9 4.2v13.6M15 6.2v13.6"/>',
   ),
   records: MEDAL,
+  fullscreen: ico(
+    '<path d="M8 4H4v4"/><path d="M4 4l5.5 5.5"/><path d="M16 4h4v4"/><path d="M20 4l-5.5 5.5"/><path d="M8 20H4v-4"/><path d="M4 20l5.5-5.5"/><path d="M16 20h4v-4"/><path d="M20 20l-5.5-5.5"/>',
+  ),
   options: ico(
     '<circle cx="12" cy="12" r="6.4"/><circle cx="12" cy="12" r="2.5"/><path d="M12 5.6V3.2M12 20.8v-2.4M18.4 12h2.4M3.2 12h2.4M16.5 7.5l1.7-1.7M5.8 18.2l1.7-1.7M16.5 16.5l1.7 1.7M5.8 5.8l1.7 1.7"/>',
     { sw: 2 },

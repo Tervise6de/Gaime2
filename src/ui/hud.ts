@@ -47,11 +47,13 @@ import {
   iconBtn,
   iconEl,
   iconHtml,
+  setIconBtnLabel,
   resourceIconEl,
   resourceIconHtml,
   unitIconHtml,
   buildingIconHtml,
 } from "@/ui/icons";
+import { fullscreenAvailable, isFullscreen, toggleFullscreen } from "@/ui/fullscreen";
 import { loadProfile, type ProfileStats } from "@/ui/profile";
 import { ACHIEVEMENTS } from "@/data/achievements";
 import { WAR_EDGE_COLOR } from "@/systems/renderer";
@@ -420,6 +422,19 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       closeTopMenu();
       run();
     });
+  const fullscreenItem = menuItem("fullscreen", "⛶", "Fullscreen", () => {
+    void toggleFullscreen().then(syncFullscreenItem, syncFullscreenItem);
+  });
+  function syncFullscreenItem(): void {
+    const available = fullscreenAvailable();
+    fullscreenItem.disabled = !available;
+    setIconBtnLabel(fullscreenItem, isFullscreen() ? "Exit fullscreen" : "Fullscreen");
+    fullscreenItem.title = available
+      ? "Toggle browser fullscreen."
+      : "Fullscreen is not available in this browser.";
+  }
+  document.addEventListener("fullscreenchange", syncFullscreenItem);
+  syncFullscreenItem();
   // The nav buttons now hold Diplomacy/Research/Production/Army/Politics; the ☰
   // gathers the reference & system panels so the bar stays uncluttered.
   topMenu.append(
@@ -430,6 +445,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     menuItem("standings", "📊", "Standing", () => toggleStandings()),
     menuItem("tutorial", "🎓", "Tutorial", () => runTutorial()),
     menuItem("records", "🏅", "Records", () => openRecords()),
+    fullscreenItem,
     menuItem("options", "⚙", "Options", () => openOptions()),
     menuItem("crown", "🎲", "Game — new / save", () => openGameMenu()),
   );
