@@ -98,8 +98,11 @@ body {
   min-height: 88px;
   padding: 9px 12px;
   background:
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='180'%20height='180'%3E%3Cfilter%20id='g'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.75'%20numOctaves='2'%20seed='7'%20stitchTiles='stitch'/%3E%3CfeColorMatrix%20values='0%200%200%200%200.93%200%200%200%200%200.85%200%200%200%200%200.66%200%200%200%200.055%200'/%3E%3C/filter%3E%3Crect%20width='180'%20height='180'%20filter='url(%23g)'/%3E%3C/svg%3E") repeat,
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='260'%20height='260'%3E%3Cfilter%20id='m'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.045'%20numOctaves='3'%20seed='11'%20stitchTiles='stitch'/%3E%3CfeColorMatrix%20values='0%200%200%200%200.9%200%200%200%200%200.8%200%200%200%200%200.58%200%200%200%200.05%200'/%3E%3C/filter%3E%3Crect%20width='260'%20height='260'%20filter='url(%23m)'/%3E%3C/svg%3E") repeat,
     radial-gradient(130% 210% at 50% -70%, rgba(232, 190, 108, 0.14), transparent 52%),
     linear-gradient(180deg, #13273f 0%, #0f2036 52%, #0b1626 100%);
+  background-size: 180px 180px, 260px 260px, auto, auto;
   /* Gold gradient frame: a hairline along the top edge, a thicker rail along
      the bottom — the "gilded banner" the title screen already uses. */
   border-width: 1px 0 3px 0;
@@ -125,15 +128,19 @@ body {
   flex: 0 1 auto;
 }
 
-/* Gilt-framed panel — the mockup's ornamental gold frame (double line, corner
-   ticks and diamond finials), drawn by an SVG border-image so every panel gets
-   identical corners at any size. Edges between the corner zones are straight
-   lines, so the stretch slicing stays crisp. */
+/* Gilt-framed panel — an ornamental gold frame drawn by an SVG border-image.
+   Deliberately hand-inked: the main strokes bow slightly and overshoot at the
+   corners like crossed nib strokes, and each corner's tick, weight and diamond
+   differs a touch — the panels read as drawn, not generated. */
 .hud-frame {
   position: relative;
   border: 9px solid transparent;
-  border-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='48'%20height='48'%3E%3Crect%20x='3.5'%20y='3.5'%20width='41'%20height='41'%20fill='none'%20stroke='%23c9a558'%20stroke-width='1.4'/%3E%3Crect%20x='6.5'%20y='6.5'%20width='35'%20height='35'%20fill='none'%20stroke='%23c9a558'%20stroke-opacity='.32'%20stroke-width='.8'/%3E%3Cg%20fill='none'%20stroke='%23ecd292'%20stroke-width='2'%20stroke-linecap='square'%3E%3Cpath%20d='M3.5%2011V3.5H11'/%3E%3Cpath%20d='M37%203.5H44.5V11'/%3E%3Cpath%20d='M44.5%2037V44.5H37'/%3E%3Cpath%20d='M11%2044.5H3.5V37'/%3E%3C/g%3E%3Cg%20fill='%23ecd292'%3E%3Crect%20x='1.6'%20y='1.6'%20width='3.8'%20height='3.8'%20transform='rotate(45%203.5%203.5)'/%3E%3Crect%20x='42.6'%20y='1.6'%20width='3.8'%20height='3.8'%20transform='rotate(45%2044.5%203.5)'/%3E%3Crect%20x='42.6'%20y='42.6'%20width='3.8'%20height='3.8'%20transform='rotate(45%2044.5%2044.5)'/%3E%3Crect%20x='1.6'%20y='42.6'%20width='3.8'%20height='3.8'%20transform='rotate(45%203.5%2044.5)'/%3E%3C/g%3E%3C/svg%3E") 14 / 9px stretch;
-  background: linear-gradient(180deg, rgba(16, 30, 50, 0.72), rgba(8, 16, 29, 0.78));
+  border-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='48'%20height='48'%3E%3Cg%20fill='none'%20stroke='%23c9a558'%20stroke-linecap='round'%3E%3Cpath%20d='M2.7%203.6Q24%203.2%2045.4%203.7'%20stroke-width='1.35'%20opacity='.92'/%3E%3Cpath%20d='M44.4%202.7Q44.85%2024%2044.5%2045.3'%20stroke-width='1.3'%20opacity='.85'/%3E%3Cpath%20d='M45.3%2044.4Q24%2044.85%202.6%2044.5'%20stroke-width='1.4'%20opacity='.9'/%3E%3Cpath%20d='M3.6%2045.3Q3.2%2024%203.5%202.8'%20stroke-width='1.3'%20opacity='.88'/%3E%3C/g%3E%3Cpath%20d='M6.6%206.4Q24%206.1%2041.5%206.5Q41.9%2024%2041.4%2041.6Q24%2041.9%206.5%2041.5Q6.2%2024%206.6%206.4'%20fill='none'%20stroke='%23c9a558'%20stroke-opacity='.3'%20stroke-width='.8'/%3E%3Cg%20fill='none'%20stroke='%23ecd292'%20stroke-linecap='square'%3E%3Cpath%20d='M3.4%2011.2V3.7H10.8'%20stroke-width='2.1'/%3E%3Cpath%20d='M36.9%203.5H44.6V10.6'%20stroke-width='1.85'/%3E%3Cpath%20d='M44.6%2037.2V44.7H37.3'%20stroke-width='2.2'/%3E%3Cpath%20d='M10.9%2044.5H3.5V36.8'%20stroke-width='2'/%3E%3C/g%3E%3Cg%20fill='%23ecd292'%3E%3Crect%20x='1.7'%20y='1.5'%20width='3.9'%20height='3.9'%20transform='rotate(43%203.6%203.4)'/%3E%3Crect%20x='42.7'%20y='1.8'%20width='3.6'%20height='3.6'%20transform='rotate(49%2044.5%203.6)'/%3E%3Crect%20x='42.5'%20y='42.6'%20width='4.1'%20height='4.1'%20transform='rotate(41%2044.6%2044.7)'/%3E%3Crect%20x='1.6'%20y='42.8'%20width='3.7'%20height='3.7'%20transform='rotate(52%203.4%2044.6)'/%3E%3C/g%3E%3C/svg%3E") 14 / 9px stretch;
+  background:
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='180'%20height='180'%3E%3Cfilter%20id='g'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.75'%20numOctaves='2'%20seed='7'%20stitchTiles='stitch'/%3E%3CfeColorMatrix%20values='0%200%200%200%200.93%200%200%200%200%200.85%200%200%200%200%200.66%200%200%200%200.055%200'/%3E%3C/filter%3E%3Crect%20width='180'%20height='180'%20filter='url(%23g)'/%3E%3C/svg%3E") repeat,
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='260'%20height='260'%3E%3Cfilter%20id='m'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.045'%20numOctaves='3'%20seed='11'%20stitchTiles='stitch'/%3E%3CfeColorMatrix%20values='0%200%200%200%200.9%200%200%200%200%200.8%200%200%200%200%200.58%200%200%200%200.05%200'/%3E%3C/filter%3E%3Crect%20width='260'%20height='260'%20filter='url(%23m)'/%3E%3C/svg%3E") repeat,
+    linear-gradient(180deg, rgba(16, 30, 50, 0.72), rgba(8, 16, 29, 0.78));
+  background-size: 180px 180px, 260px 260px, auto;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.32);
 }
 

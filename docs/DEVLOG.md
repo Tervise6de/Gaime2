@@ -6,6 +6,27 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-20 — Parchment grain + hand-inked frames (v0.95.0)
+
+Two hand-craft passes against the "too clean, too generated" feel of the top
+bar (`ui/style.css` only):
+
+**Parchment texture.** The bar and the gilt panels now carry two tiled
+`feTurbulence` SVG layers over the navy: a fine warm speckle (180px tile,
+baseFrequency .75, alpha .07) for tooth, and a broad low-frequency mottle
+(260px tile, baseFrequency .045) for the cloudy tone shifts that make paper
+read as paper. Static background rasters — zero runtime cost, no
+backdrop-filter.
+
+**Hand-inked frames.** The shared `.hud-frame` border-image SVG is redrawn so
+nothing is mathematically identical: the four main strokes bow slightly and
+overshoot at the corners like crossed nib strokes, each corner's tick differs
+in length and weight, the four diamond finials sit at different rotations and
+sizes, and the inner hairline wobbles. The slicing contract is unchanged
+(slice 14, same widths), so every framed panel picks the look up as-is.
+
+691 tests green, typecheck + production build clean (CSS +0.4 kB gzipped).
+
 ## 2026-07-20 — Centred turn panel; army numbers become privileged intel (v0.94.0)
 
 **Turn panel at true centre.** The gilt turn panel is now absolutely centred in
