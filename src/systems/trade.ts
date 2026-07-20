@@ -22,6 +22,7 @@ import { KONTORE, KONTOR_IDS, type KontorId } from "@/data/kontore";
 import { SOUND } from "@/data/sound";
 import { round1, unrestPenalty, regionWareMult } from "@/systems/economy";
 import { atWar } from "@/systems/diplomacy";
+import { techTradeMult } from "@/systems/tech";
 import { kontorBlockedFor, leagueSeversRoute, isLeagueMonopoly } from "@/systems/league";
 import {
   BARBARIAN_ID,
@@ -388,6 +389,16 @@ function saltFishFactor(state: GameState, good: GoodId, ownerId: number): number
 }
 
 /**
+ * The route owner's research trade multiplier — the Commerce/Maritime/League
+ * doctrines that raise (or, for Absolute Rule, lower) trade-route income. 1 when
+ * the owner has no trade doctrines. Pure.
+ */
+function doctrineTradeFactor(state: GameState, ownerId: number): number {
+  const done = state.nations.find((n) => n.id === ownerId)?.research?.done;
+  return done ? techTradeMult(done) : 1;
+}
+
+/**
  * The gold a route `ownerId` would earn if founded now: base income times the
  * market it would *join* (this route added to supply, and its owner counted as a
  * supplier). Lets the open-route UI show the gold you'd actually keep, not a
@@ -404,7 +415,7 @@ export function projectedRouteIncome(
   const scar = scarcityFrom(routes + 1); // this route joins the market
   const sole = owners.size === 0 || (owners.size === 1 && owners.has(ownerId));
   const mono = sole ? MONOPOLY_PREMIUM : 1;
-  return round1(GOODS[good].value * distanceFactor(laneLength) * scar * mono * saltFishFactor(state, good, ownerId));
+  return round1(GOODS[good].value * distanceFactor(laneLength) * scar * mono * saltFishFactor(state, good, ownerId) * doctrineTradeFactor(state, ownerId));
 }
 
 /**
@@ -413,7 +424,7 @@ export function projectedRouteIncome(
  */
 export function routeIncome(state: GameState, route: TradeRoute): number {
   const base = GOODS[route.good].value * distanceFactor(route.lane.length);
-  return round1(base * scarcityFactor(state, route) * monopolyFactor(state, route) * saltFishFactor(state, route.good, route.ownerId));
+  return round1(base * scarcityFactor(state, route) * monopolyFactor(state, route) * saltFishFactor(state, route.good, route.ownerId) * doctrineTradeFactor(state, route.ownerId));
 }
 
 /**

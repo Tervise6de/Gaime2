@@ -145,6 +145,45 @@ grain, a salted coast is a breadbasket, and forest/hill/mountain realms must tra
 for grain or build farms. (Making famine bite harder is a future balance lever; the
 model currently runs with ample headroom.)
 
+## Research — the Doctrines system (v0.97 overhaul)
+
+The old linear "collect every tech across five ages" tree is retired. Research is
+now a run of **permanent identity choices**, grounded in the Hanseatic setting.
+
+**Model.** Six **categories** — Commerce, Maritime, Production, Governance,
+Military, Scholarship — each offer two or three **doctrine paths** that are
+*mutually exclusive*. Committing to one path (completing any node in it) rejects
+the siblings in that category for the rest of the game. Each path is a short
+ladder of tier nodes unlocked in order (tier 0 from turn 1; tier 1 in the Age of
+Crowns; tier 2 later), bought with knowledge. So a realm makes ~6 grand
+decisions — "Open Markets *or* Balanced Control *or* Strong Monopoly", "Knightly
+Orders *or* Town Levies" — each buying a distinct bundle and denying the rest.
+That opportunity cost *is* the game; you cannot have everything.
+
+**Effects** are declarative data (`data/techs.ts`), aggregated over a nation's
+completed-node list so every consumer (economy, unrest, unlocks) is unchanged:
+gold/food/knowledge yield %, ware-output %, a flat unrest change (negative on the
+monopoly/absolutist paths — wealth breeds resentment), building/unit unlocks, and
+a **trade-route income %** (`tradeMult`, wired into `systems/trade.ts`) — the one
+new lever, central to a trade game. Prestige already rides on gold + trade + node
+count, so the wealth doctrines feed the score without a bespoke hook.
+
+**What doctrines gate.** Only the ~dozen *advanced* buildings (Counting House,
+Guildhall, Hanse Hall, University, Printing House, Dom, City Walls, …) and the
+five *premium* units (Knights, Siege, Pikemen, Swordsmen, Handgunners). The core
+a realm always needs — the militia/infantry/ranged/cavalry loop, the everyday
+buildings, the resource works and focus capstones — is **ungated** (buildable
+from the start where terrain/resource/focus allow). This fixes the old
+"can't raise an army until I research it" trap and keeps early play open.
+
+**Commitment is on completion, not selection:** you may re-pick which opener you
+study until one actually finishes, then that category locks. Factions that begin
+with a free doctrine (e.g. Novgorod's Monastic Orders) are pre-committed to it.
+
+**UI** (`ui/hud.ts renderTechTree`): a category sidebar, the chosen category's
+paths as commitment columns, and a detail panel with the path's KEY EFFECTS and a
+Start/Continue button — matching the mockup in `docs/`.
+
 ## Build plan — resource overhaul (R-series)
 
 Each R-milestone leaves the game runnable, tested and playable end-to-end.

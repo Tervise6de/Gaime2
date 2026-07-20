@@ -12,7 +12,7 @@ describe("nationScore", () => {
   it("rewards techs", () => {
     const g = createGame({ seed: 1, rivals: 2 });
     const base = nationScore(g, PLAYER_ID);
-    g.nations[PLAYER_ID]!.research.done = ["agriculture", "currency"];
+    g.nations[PLAYER_ID]!.research.done = ["free_trade", "council_oversight"];
     expect(nationScore(g, PLAYER_ID)).toBeGreaterThan(base);
   });
 

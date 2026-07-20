@@ -205,54 +205,50 @@ describe("recruitment", () => {
     expect(strategicAccess(g, PLAYER_ID).has("iron")).toBe(false);
   });
 
-  it("canRaiseUnit gates cavalry on horse access and tech", () => {
+  it("canRaiseUnit gates cavalry on horse access (ungated by research)", () => {
     const g = battlefield({ militia: 1 }, {});
-    // Needs the Horseback tech and horse access.
-    g.nations[PLAYER_ID]!.research.done = ["horseback"];
+    // Cavalry is part of the ungated core — it needs only horse access.
     expect(canRaiseUnit(g, 0, "cavalry", PLAYER_ID).ok).toBe(false); // no horses yet
     g.regions[0]!.resource = "horses";
     expect(canRaiseUnit(g, 0, "cavalry", PLAYER_ID).ok).toBe(true);
-    // Without the tech it's blocked even with horses.
-    g.nations[PLAYER_ID]!.research.done = [];
-    expect(canRaiseUnit(g, 0, "cavalry", PLAYER_ID).ok).toBe(false);
   });
 
-  it("canRaiseUnit gates pikemen on Feudalism, but needs no strategic resource", () => {
+  it("canRaiseUnit gates pikemen on the Town Watch doctrine, but needs no resource", () => {
     const g = battlefield({ militia: 1 }, {});
-    expect(canRaiseUnit(g, 0, "pikeman", PLAYER_ID).ok).toBe(false); // no tech yet
-    g.nations[PLAYER_ID]!.research.done = ["feudalism"];
-    // Unlike cavalry/siege, pikemen draw on no resource — the tech alone unlocks them.
+    expect(canRaiseUnit(g, 0, "pikeman", PLAYER_ID).ok).toBe(false); // no doctrine yet
+    g.nations[PLAYER_ID]!.research.done = ["town_watch"];
+    // Unlike cavalry/siege, pikemen draw on no resource — the doctrine alone unlocks them.
     expect(canRaiseUnit(g, 0, "pikeman", PLAYER_ID).ok).toBe(true);
   });
 
-  it("canRaiseUnit gates handgunners on Gunpowder and iron access", () => {
+  it("canRaiseUnit gates handgunners on the Gunpowder Shot doctrine and iron access", () => {
     const g = battlefield({ militia: 1 }, {});
-    g.nations[PLAYER_ID]!.research.done = ["gunpowder"];
+    g.nations[PLAYER_ID]!.research.done = ["gunpowder_shot"];
     expect(canRaiseUnit(g, 0, "handgunner", PLAYER_ID).ok).toBe(false); // no iron yet
     g.regions[0]!.resource = "iron";
     expect(canRaiseUnit(g, 0, "handgunner", PLAYER_ID).ok).toBe(true);
-    // Without the tech it's blocked even with iron.
+    // Without the doctrine it's blocked even with iron.
     g.nations[PLAYER_ID]!.research.done = [];
     expect(canRaiseUnit(g, 0, "handgunner", PLAYER_ID).ok).toBe(false);
   });
 
-  it("canRaiseUnit gates swordsmen on Standing Army and iron access", () => {
+  it("canRaiseUnit gates swordsmen on the Drilled Infantry doctrine and iron access", () => {
     const g = battlefield({ militia: 1 }, {});
-    g.nations[PLAYER_ID]!.research.done = ["standing_army"];
+    g.nations[PLAYER_ID]!.research.done = ["drilled_infantry"];
     expect(canRaiseUnit(g, 0, "swordsman", PLAYER_ID).ok).toBe(false); // no iron yet
     g.regions[0]!.resource = "iron";
     expect(canRaiseUnit(g, 0, "swordsman", PLAYER_ID).ok).toBe(true);
-    g.nations[PLAYER_ID]!.research.done = []; // tech removed → blocked even with iron
+    g.nations[PLAYER_ID]!.research.done = []; // doctrine removed → blocked even with iron
     expect(canRaiseUnit(g, 0, "swordsman", PLAYER_ID).ok).toBe(false);
   });
 
-  it("canRaiseUnit gates knights on Feudalism and horse access", () => {
+  it("canRaiseUnit gates knights on the Knightly Orders doctrine and horse access", () => {
     const g = battlefield({ militia: 1 }, {});
-    g.nations[PLAYER_ID]!.research.done = ["feudalism"];
+    g.nations[PLAYER_ID]!.research.done = ["knightly_orders"];
     expect(canRaiseUnit(g, 0, "knight", PLAYER_ID).ok).toBe(false); // no horses yet
     g.regions[0]!.resource = "horses";
     expect(canRaiseUnit(g, 0, "knight", PLAYER_ID).ok).toBe(true);
-    g.nations[PLAYER_ID]!.research.done = []; // tech removed → blocked even with horses
+    g.nations[PLAYER_ID]!.research.done = []; // doctrine removed → blocked even with horses
     expect(canRaiseUnit(g, 0, "knight", PLAYER_ID).ok).toBe(false);
   });
 
@@ -273,12 +269,12 @@ describe("recruitment", () => {
     expect(g.nations[PLAYER_ID]!.stocks.gold).toBe(200);
   });
 
-  it("raises a tech-unlocked pikeman into the field", () => {
+  it("raises a doctrine-unlocked pikeman into the field", () => {
     const g = battlefield({ militia: 1 }, {});
-    g.nations[PLAYER_ID]!.research.done = ["feudalism"];
+    g.nations[PLAYER_ID]!.research.done = ["town_watch"];
     const next = raiseUnit(g, 0, "pikeman", PLAYER_ID);
     expect(armyAt(next, 0, PLAYER_ID)!.units.pikeman).toBe(1);
-    // A gate miss is a no-op: without the tech the state is returned untouched.
+    // A gate miss is a no-op: without the doctrine the state is returned untouched.
     expect(raiseUnit(battlefield({ militia: 1 }, {}), 0, "pikeman", PLAYER_ID).armies[0]!.units.pikeman).toBe(0);
   });
 });

@@ -143,7 +143,7 @@ describe("fireEvent", () => {
     const g = {
       ...base,
       nations: base.nations.map((n) =>
-        n.id === PLAYER_ID ? { ...n, research: { current: "writing" as const, progress: 0, done: [] } } : n,
+        n.id === PLAYER_ID ? { ...n, research: { current: "free_trade" as const, progress: 0, done: [] } } : n,
       ),
     };
     for (let i = 1; i <= 200; i++) {
@@ -295,7 +295,7 @@ describe("choice events", () => {
     const s = {
       ...base,
       nations: base.nations.map((n) =>
-        n.id === PLAYER_ID ? { ...n, research: { current: "writing" as const, progress: 0, done: [] } } : n,
+        n.id === PLAYER_ID ? { ...n, research: { current: "free_trade" as const, progress: 0, done: [] } } : n,
       ),
       regions: base.regions.map((r) => (r.ownerId === PLAYER_ID ? { ...r, unrest: 10 } : r)),
     };

@@ -68,11 +68,11 @@ describe("deriveAlerts", () => {
   it("emits good alerts for gains, eliminations, and techs", () => {
     const alerts = deriveAlerts(
       calmGame(),
-      quietSummary({ regionsGained: ["Cove"], eliminated: ["Rurik"], techsCompleted: ["writing"] }),
+      quietSummary({ regionsGained: ["Cove"], eliminated: ["Rurik"], techsCompleted: ["free_trade"] }),
     );
     expect(alerts).toContainEqual({ severity: "good", text: "Captured Cove" });
     expect(alerts).toContainEqual({ severity: "good", text: "Rurik eliminated" });
-    expect(alerts).toContainEqual({ severity: "good", text: "Researched Writing" });
+    expect(alerts).toContainEqual({ severity: "good", text: "Researched Free Trade Principles" });
   });
 
   it("scans state for player revolts and warns on each", () => {
@@ -115,7 +115,7 @@ describe("deriveAlerts", () => {
         bankrupt: true,
         regionsGained: ["G1"],
         eliminated: ["E1"],
-        techsCompleted: ["writing"],
+        techsCompleted: ["free_trade"],
       }),
     );
     expect(alerts).toHaveLength(6);

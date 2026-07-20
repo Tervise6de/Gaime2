@@ -154,7 +154,10 @@ describe("faction opening bonuses", () => {
     for (const f of FACTIONS) {
       expect(f.bonus.label.length).toBeGreaterThan(0);
       expect(f.bonus.detail.length).toBeGreaterThan(0);
-      if (f.bonus.startTech) expect(TECHS[f.bonus.startTech].era).toBe(0); // researchable at turn 1
+      if (f.bonus.startTech) {
+        expect(TECHS[f.bonus.startTech].era).toBe(0); // researchable at turn 1
+        expect(TECHS[f.bonus.startTech].tier).toBe(0); // a path opener — commits, not mid-path
+      }
     }
   });
 
@@ -164,9 +167,9 @@ describe("faction opening bonuses", () => {
     expect(playerNation(g).stocks.gold).toBe(60 + 55);
   });
 
-  it("applies a free opening tech", () => {
-    const g = createGame({ seed: 4, playerFaction: "Novgorod" }); // Writing
-    expect(playerNation(g).research.done).toContain("writing");
+  it("applies a free opening doctrine", () => {
+    const g = createGame({ seed: 4, playerFaction: "Novgorod" }); // Monastic Orders
+    expect(playerNation(g).research.done).toContain("monastic_orders");
   });
 
   it("applies extra starting regiments to the capital army", () => {

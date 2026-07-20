@@ -94,14 +94,19 @@ suggested fix / question to resolve. Fold the tractable ones into
   happens if I pay vs. refuse? → Surface the reason, the stakes, and the consequence
   of each choice in the demand UI.
 
-### Research — full overhaul
+### Research — full overhaul — **✓ Done v0.97.0** (the Doctrines system)
 - **[4a] Tech content is anachronistic for the start date.** In 1227 the tree still
   offers Pottery, Writing, etc. — things that would already be done. → Rebuild the
   tree around the Hansa era (see `hansa times.md` military-tech ladder & economy),
-  drop pre-medieval basics.
+  drop pre-medieval basics. **✓ Done** — the linear age-tech tree is retired for
+  6 categories of era-appropriate **doctrine paths** (Open Markets, Knightly
+  Orders, League Federation, …); no more Pottery/Writing.
 - **[4b] Can't build an army / core things due to missing research.** Being gated
   out of basic actions at the start feels wrong. → Re-gate so the player can do the
   fundamentals immediately; research should *improve*, not *unlock the obvious*.
+  **✓ Done** — the militia/infantry/ranged/cavalry core, everyday buildings,
+  resource works and focus capstones are all **ungated** now; doctrines gate only
+  the ~dozen advanced buildings and 5 premium units. See `game-design.md` §Research.
 
 ### Buildings — redo
 - **[5] Buildings (e.g. "houses") are opaque and feel out of era.** Hard to tell what

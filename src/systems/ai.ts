@@ -45,13 +45,13 @@ import {
   wouldBreakTreaty,
   wouldJoinWar,
 } from "@/systems/diplomacy";
-import { researchFrontier, selectTech, isBuildingUnlockedFor } from "@/systems/tech";
+import { researchFrontier, selectTech, isBuildingUnlockedFor, nextNodeInPath, isPathRejected } from "@/systems/tech";
 import { createRoute, laneFor, regionSources, distanceFactor } from "@/systems/trade";
 import { foundLeague, joinLeague, canFoundLeague, canJoinLeague, kontoreHeldBy, hasHanseHall } from "@/systems/league";
 import { GOODS, GOOD_IDS } from "@/data/goods";
 import { KONTORE } from "@/data/kontore";
 import { eraIndexForTurn } from "@/data/eras";
-import { TECHS, type TechId, type TechBranch } from "@/data/techs";
+import { TECHS, type TechId, type ResearchCategory } from "@/data/techs";
 import type { Rng } from "@/systems/rng";
 import {
   BARBARIAN_ID,
@@ -282,57 +282,56 @@ export function desiredTaxRate(nation: Nation, owned: Region[]): number {
   return clampTax(target);
 }
 
-/** The research branch a nation should favour, given the personality thresholds. */
-function personalityBranch(nation: Nation): TechBranch {
+/** The research category a nation should favour, given the personality thresholds. */
+function personalityCategory(nation: Nation): ResearchCategory {
   const p = nation.personality;
-  return (p?.aggression ?? 0) > 0.6 ? "military" : (p?.economy ?? 0) > 0.6 ? "economy" : "civics";
+  return (p?.aggression ?? 0) > 0.6 ? "military" : (p?.economy ?? 0) > 0.6 ? "commerce" : "governance";
 }
 
 /**
- * The research branch a nation prefers, biased first by its national TRAIT so a
- * realm rushes the tech path that plays to its strength — a Scholarly nation up
- * the knowledge/civics line, a Martial one the military line, economic traits
- * the economy line. With no trait it falls back to the personality branch.
+ * The research category a nation prefers, biased first by its national TRAIT so a
+ * realm rushes the doctrines that play to its strength — a Scholarly nation up the
+ * knowledge line, a Martial one the military line, mercantile ones commerce,
+ * builders production. With no trait it falls back to the personality category.
  */
-export function preferredTechBranch(nation: Nation): TechBranch {
+export function preferredCategory(nation: Nation): ResearchCategory {
   switch (nation.trait) {
     case "scholarly":
-      return "civics";
+      return "scholarship";
     case "martial":
       return "military";
     case "mercantile":
+      return "commerce";
     case "industrious":
     case "fertile":
-      return "economy";
+      return "production";
     default:
-      return personalityBranch(nation);
+      return personalityCategory(nation);
   }
 }
 
 /**
- * The next researchable step toward `target`: the target itself once its prereqs are
- * done and its era has come, else the first missing prerequisite that is researchable
- * now (walking the requires chain). null if nothing on the path can be taken yet.
+ * The next researchable node on the way to `target`: the first unfinished rung of
+ * target's path (up to target's own tier), once its age has come and the path is
+ * not already committed away from. null if the path is blocked or the rung's age
+ * has not yet dawned.
  */
 function nextTechToward(target: TechId, done: TechId[], era: number): TechId | null {
   if (done.includes(target)) return null;
-  const missing = TECHS[target].requires.filter((r) => !done.includes(r));
-  for (const r of missing) {
-    const step = nextTechToward(r, done, era); // research prereqs first (their own eras permitting)
-    if (step) return step;
-  }
-  if (missing.length > 0) return null; // a prerequisite isn't researchable yet
-  return era >= TECHS[target].era ? target : null;
+  if (isPathRejected(done, TECHS[target].path)) return null;
+  const next = nextNodeInPath(done, TECHS[target].path);
+  if (!next || TECHS[next].tier > TECHS[target].tier) return null;
+  return era >= TECHS[next].era ? next : null;
 }
 
 function pickTech(done: TechId[], nation: Nation, era: number): TechId | null {
   const frontier = researchFrontier(done, era);
   if (!frontier.length) return null;
-  // Prefer the trait-driven branch, then the personality branch, then anything.
-  const traitBranch = preferredTechBranch(nation);
-  const persBranch = personalityBranch(nation);
-  const inTrait = frontier.filter((t) => TECHS[t].branch === traitBranch);
-  const inPers = frontier.filter((t) => TECHS[t].branch === persBranch);
+  // Prefer the trait-driven category, then the personality category, then anything.
+  const traitCat = preferredCategory(nation);
+  const persCat = personalityCategory(nation);
+  const inTrait = frontier.filter((t) => TECHS[t].category === traitCat);
+  const inPers = frontier.filter((t) => TECHS[t].category === persCat);
   const pool = inTrait.length ? inTrait : inPers.length ? inPers : frontier;
   // Cheapest of the chosen candidate set (deterministic, never null here).
   return pool.reduce((best, t) => (TECHS[t].cost < TECHS[best].cost ? t : best), pool[0]!);

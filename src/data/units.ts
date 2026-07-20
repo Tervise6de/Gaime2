@@ -7,10 +7,10 @@
  * Each of the four roles has a cheap, early **basic** and a tech-gated **premium**
  * that counters the same type, so the loop stays a clean 4-cycle while the roster
  * deepens over the ages:
- *   counters Cavalry :  Militia   → Pikemen     (Feudalism)
- *   counters Militia :  Infantry  → Swordsmen   (Standing Army + iron)
- *   counters Infantry:  Ranged    → Handgunners (Gunpowder + iron)
- *   counters Ranged  :  Cavalry   → Knights     (Feudalism + horses)
+ *   counters Cavalry :  Militia   → Pikemen     (Town Watch doctrine)
+ *   counters Militia :  Infantry  → Swordsmen   (Drilled Infantry + iron)
+ *   counters Infantry:  Ranged    → Handgunners (Gunpowder Shot + iron)
+ *   counters Ranged  :  Cavalry   → Knights     (Knightly Orders + horses)
  * Premiums cost more and gate behind tech (and often a strategic resource), so the
  * early game is the tidy four-unit loop and the late game adds heavy specialists.
  *
@@ -107,7 +107,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     volley: true,
     siegePower: 0,
     requires: null,
-    requiresTech: "bronze_working",
+    requiresTech: null,
   },
   cavalry: {
     id: "cavalry",
@@ -122,7 +122,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     volley: false,
     siegePower: 0,
     requires: "horses",
-    requiresTech: "horseback",
+    requiresTech: null,
   },
   siege: {
     id: "siege",
@@ -137,10 +137,10 @@ export const UNITS: Record<UnitType, UnitDef> = {
     volley: true,
     siegePower: 2,
     requires: "iron",
-    requiresTech: "engineering",
+    requiresTech: "heavy_horse",
   },
   // Mid-game anti-cavalry wall: a drilled pike block. Cheap, tanky, low bite —
-  // a dedicated answer to horse beyond the humble Militia (Feudalism, no resource).
+  // a dedicated answer to horse beyond the humble Militia (Town Watch, no resource).
   pikeman: {
     id: "pikeman",
     name: "Pikemen",
@@ -154,10 +154,10 @@ export const UNITS: Record<UnitType, UnitDef> = {
     volley: false,
     siegePower: 0,
     requires: null,
-    requiresTech: "feudalism",
+    requiresTech: "town_watch",
   },
   // Late-game firepower: early handguns. A hard-hitting volley unit that punches
-  // through foot, but fragile in the melee (Gunpowder + iron) — the endgame Ranged.
+  // through foot, but fragile in the melee (Gunpowder Shot + iron) — the endgame Ranged.
   handgunner: {
     id: "handgunner",
     name: "Handgunners",
@@ -171,10 +171,10 @@ export const UNITS: Record<UnitType, UnitDef> = {
     volley: true,
     siegePower: 0,
     requires: "iron",
-    requiresTech: "gunpowder",
+    requiresTech: "gunpowder_shot",
   },
   // Elite men-at-arms: a hard, well-armoured melee line that outclasses the levy
-  // it hunts (Standing Army + iron) — the premium Infantry: more bite, more armour.
+  // it hunts (Drilled Infantry + iron) — the premium Infantry: more bite, more armour.
   swordsman: {
     id: "swordsman",
     name: "Swordsmen",
@@ -188,10 +188,10 @@ export const UNITS: Record<UnitType, UnitDef> = {
     volley: false,
     siegePower: 0,
     requires: "iron",
-    requiresTech: "standing_army",
+    requiresTech: "drilled_infantry",
   },
   // Heavy shock cavalry — the crusading orders' mailed fist. Fast, hard-hitting and
-  // dear to field (Feudalism + horses) — the premium Cavalry, death to loose shot.
+  // dear to field (Knightly Orders + horses) — the premium Cavalry, death to loose shot.
   knight: {
     id: "knight",
     name: "Knights",
@@ -205,7 +205,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     volley: false,
     siegePower: 0,
     requires: "horses",
-    requiresTech: "feudalism",
+    requiresTech: "knightly_orders",
   },
 };
 

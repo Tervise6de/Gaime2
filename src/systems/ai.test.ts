@@ -11,7 +11,7 @@ import {
   chooseBuilding,
   runawayLeader,
   coalitionPowerAgainst,
-  preferredTechBranch,
+  preferredCategory,
   bestTarget,
   secessionRiskRegion,
   desiredTaxRate,
@@ -235,21 +235,20 @@ describe("trait-aware AI openings", () => {
     expect(chooseBuilding(empty(), [], "scholarly")).toBe("library");
   });
 
-  it("a Martial realm rushes a fortress once it is unlocked", () => {
-    expect(chooseBuilding(empty(), ["engineering"], "martial")).toBe("fortress");
-    // Locked fortress → falls back to its next preference (workshop).
+  it("a Martial realm rushes City Walls once the Forge Works doctrine is in", () => {
+    expect(chooseBuilding(empty(), ["forge_works"], "martial")).toBe("fortress");
+    // Locked City Walls → falls back to its next preference (workshop).
     expect(chooseBuilding(empty(), [], "martial")).toBe("workshop");
   });
 
-  it("raises a province's focus capstone as soon as its tech lands", () => {
+  it("raises a province's focus capstone immediately (capstones are ungated)", () => {
     const farmland = { unrest: 0, buildings: [] as BuildingId[], terrain: "plains" as const, focus: "farmland" as const };
-    // With Feudalism, the specialised province builds its Manor ahead of baseline choices.
-    expect(chooseBuilding(farmland, ["feudalism"])).toBe("manor");
-    // Without the tech the capstone is locked, so it falls back to the order.
-    expect(chooseBuilding(farmland, [])).not.toBe("manor");
-    // A garrison on rough ground raises its Citadel once Castles is in.
+    // Focus capstones no longer gate on research — the specialised province
+    // raises its Manor at once, ahead of the baseline order.
+    expect(chooseBuilding(farmland, [])).toBe("manor");
+    // A garrison on rough ground likewise raises its Citadel on the focus alone.
     const garrison = { unrest: 0, buildings: [] as BuildingId[], terrain: "hills" as const, focus: "garrison" as const };
-    expect(chooseBuilding(garrison, ["castles"])).toBe("citadel");
+    expect(chooseBuilding(garrison, [])).toBe("citadel");
   });
 
   it("falls back to the generalist order with no trait", () => {
@@ -280,34 +279,32 @@ describe("trait-aware AI openings", () => {
     expect(chooseBuilding(empty(["farm"]), [], "fertile")).not.toBe("farm");
   });
 
-  it("builds the Guildhall only once Economics is researched", () => {
-    // With market+bank built but no Economics, the Guildhall (next in order) is
-    // still LOCKED — the AI skips it to Workshop. With the tech it's chosen.
+  it("builds the Guildhall only once the Regulated Guilds doctrine is in", () => {
+    // With market+bank built but no doctrine, the Guildhall (next in order) is
+    // still LOCKED — the AI skips it to Workshop. With the doctrine it's chosen.
     expect(chooseBuilding(empty(["market", "bank"]), [])).toBe("workshop");
-    expect(chooseBuilding(empty(["market", "bank"]), ["economics"])).toBe("guildhall");
+    expect(chooseBuilding(empty(["market", "bank"]), ["regulated_guilds_charter"])).toBe("guildhall");
   });
 
-  it("builds the Forum only once Philosophy is researched", () => {
-    // Market+workshop built; bank/guildhall/university locked. Without
-    // Philosophy the Forum (next in order) is skipped to Farm; with it, chosen.
+  it("builds the Council Chamber only once the Town Charters doctrine is in", () => {
+    // Market+workshop built; bank/guildhall/university locked. Without the
+    // doctrine the Council Chamber (next in order) is skipped to Farm; with it, chosen.
     expect(chooseBuilding(empty(["market", "workshop"]), [])).toBe("farm");
-    expect(chooseBuilding(empty(["market", "workshop"]), ["philosophy"])).toBe("forum");
+    expect(chooseBuilding(empty(["market", "workshop"]), ["town_charters"])).toBe("forum");
   });
 
-  it("a Scholarly realm reaches for the Forum after its knowledge buildings", () => {
+  it("a Scholarly realm reaches for the Council Chamber after its knowledge buildings", () => {
     expect(
-      chooseBuilding(empty(["library", "university"]), ["mathematics", "philosophy"], "scholarly"),
+      chooseBuilding(empty(["library", "university"]), ["town_charters"], "scholarly"),
     ).toBe("forum");
   });
 
-  it("builds the Mine only on mountains AND with Masonry (gates compose)", () => {
+  it("builds the Mine on mountains only (ungated — the terrain is the gate)", () => {
     const built: BuildingId[] = ["market", "workshop"];
-    // Mountains + Masonry → Mine (next in order after workshop).
-    expect(chooseBuilding(empty(built, "mountains"), ["masonry"])).toBe("mine");
-    // Mountains without the tech → skipped (locked).
-    expect(chooseBuilding(empty(built, "mountains"), [])).not.toBe("mine");
-    // The tech without the terrain → skipped (doesn't fit).
-    expect(chooseBuilding(empty(built, "plains"), ["masonry"])).not.toBe("mine");
+    // Mountains → Mine (next in order after workshop); no research needed.
+    expect(chooseBuilding(empty(built, "mountains"), [])).toBe("mine");
+    // Without the terrain → skipped (doesn't fit).
+    expect(chooseBuilding(empty(built, "plains"), [])).not.toBe("mine");
   });
 
   it("builds the Harbor on coast regions only", () => {
@@ -404,19 +401,19 @@ describe("trait-aware tech selection", () => {
   it("a Scholarly nation rushes a civics tech over an economy one (trait beats personality)", () => {
     // Merchant personality alone would take an economy tech; the trait flips it.
     const tech = chosenTech(techNation({ trait: "scholarly", personality: MERCHANT }));
-    expect(tech).toBe("writing"); // cheapest civics frontier tech
+    expect(tech).toBe("monastic_orders"); // cheapest scholarship opener
   });
 
-  it("a Martial nation rushes a military tech even with an economic personality", () => {
+  it("a Martial nation rushes a military doctrine even with an economic personality", () => {
     const tech = chosenTech(techNation({ trait: "martial", personality: MERCHANT }));
-    expect(tech).toBe("bronze_working"); // cheapest military frontier tech
+    expect(tech).toBe("town_watch"); // cheapest military opener
   });
 
-  it("falls back to the personality branch when the nation has no trait", () => {
+  it("falls back to the personality category when the nation has no trait", () => {
     const warlordTech = chosenTech(techNation({ personality: WARLORD }));
-    expect(warlordTech).toBe("bronze_working"); // aggression>0.6 → military
+    expect(warlordTech).toBe("town_watch"); // aggression>0.6 → military
     const merchantTech = chosenTech(techNation({ personality: MERCHANT }));
-    expect(merchantTech).toBe("agriculture"); // economy>0.6 → cheapest economy tech
+    expect(merchantTech).toBe("free_trade"); // economy>0.6 → cheapest commerce opener
   });
 
   it("is deterministic — same nation yields the same pick", () => {
@@ -424,24 +421,24 @@ describe("trait-aware tech selection", () => {
     expect(chosenTech(nation)).toBe(chosenTech(nation));
   });
 
-  describe("preferredTechBranch", () => {
+  describe("preferredCategory", () => {
     const withTrait = (trait: TraitId) =>
-      preferredTechBranch(techNation({ trait, personality: MERCHANT }));
+      preferredCategory(techNation({ trait, personality: MERCHANT }));
 
-    it("maps each trait to its branch", () => {
-      expect(withTrait("scholarly")).toBe("civics");
+    it("maps each trait to its research category", () => {
+      expect(withTrait("scholarly")).toBe("scholarship");
       expect(withTrait("martial")).toBe("military");
-      expect(withTrait("mercantile")).toBe("economy");
-      expect(withTrait("industrious")).toBe("economy");
-      expect(withTrait("fertile")).toBe("economy");
+      expect(withTrait("mercantile")).toBe("commerce");
+      expect(withTrait("industrious")).toBe("production");
+      expect(withTrait("fertile")).toBe("production");
     });
 
-    it("falls back to the personality branch when trait is undefined", () => {
-      expect(preferredTechBranch(techNation({ personality: WARLORD }))).toBe("military");
-      expect(preferredTechBranch(techNation({ personality: MERCHANT }))).toBe("economy");
-      // No aggression/economy edge → civics.
+    it("falls back to the personality category when trait is undefined", () => {
+      expect(preferredCategory(techNation({ personality: WARLORD }))).toBe("military");
+      expect(preferredCategory(techNation({ personality: MERCHANT }))).toBe("commerce");
+      // No aggression/economy edge → governance.
       expect(
-        preferredTechBranch(
+        preferredCategory(
           techNation({
             personality: {
               archetype: "builder",
@@ -452,11 +449,11 @@ describe("trait-aware tech selection", () => {
             },
           }),
         ),
-      ).toBe("civics");
+      ).toBe("governance");
     });
 
-    it("falls back to civics when there is no trait and no personality", () => {
-      expect(preferredTechBranch(techNation())).toBe("civics");
+    it("falls back to governance when there is no trait and no personality", () => {
+      expect(preferredCategory(techNation())).toBe("governance");
     });
   });
 });

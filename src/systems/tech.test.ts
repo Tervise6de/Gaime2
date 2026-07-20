@@ -1,79 +1,164 @@
 import { describe, it, expect } from "vitest";
 import {
   techMultipliers,
+  techWareMult,
+  techTradeMult,
   techUnrestReduction,
   isBuildingUnlockedFor,
   isUnitUnlockedFor,
   researchFrontier,
+  eraLockedTechs,
   canResearch,
   advanceResearch,
   selectTech,
+  queueResearch,
+  dequeueResearch,
+  clearQueue,
+  recommendedTech,
+  committedPath,
+  isPathRejected,
+  nextNodeInPath,
+  pathDoneCount,
 } from "@/systems/tech";
-import { TECHS } from "@/data/techs";
+import { TECHS, TECH_IDS, PATHS, PATH_IDS, CATEGORIES, CATEGORY_IDS, type TechId } from "@/data/techs";
+import { BUILDINGS, BUILDING_IDS } from "@/data/buildings";
+import { UNITS, UNIT_TYPES } from "@/data/units";
 
-describe("techMultipliers", () => {
-  it("is 1.0 with no techs", () => {
+// A few concrete nodes used across the suite.
+//  commerce/open_markets:      free_trade(0) → low_tariffs(1) → open_prosperity(2)
+//  commerce/regulated_guilds:  council_oversight(0) → …
+//  commerce/staple_monopoly:   exclusive_charters(0) → …
+
+describe("effect aggregation", () => {
+  it("yield multipliers stack (1.0 baseline)", () => {
     expect(techMultipliers([])).toEqual({ food: 1, gold: 1, knowledge: 1 });
+    expect(techMultipliers(["free_trade"]).knowledge).toBeCloseTo(1.05, 5);
+    expect(techMultipliers(["council_oversight"]).gold).toBeCloseTo(1.08, 5);
   });
 
-  it("stacks yield bonuses", () => {
-    const m = techMultipliers(["agriculture", "currency"]);
-    expect(m.food).toBeCloseTo(1.2, 5);
-    expect(m.gold).toBeCloseTo(1.15, 5);
+  it("ware and trade multipliers stack from 1.0", () => {
+    expect(techWareMult([])).toBe(1);
+    expect(techWareMult(["bulk_mining"])).toBeCloseTo(1.1, 5);
+    expect(techTradeMult([])).toBe(1);
+    expect(techTradeMult(["free_trade"])).toBeCloseTo(1.08, 5);
   });
-});
 
-describe("techUnrestReduction", () => {
-  it("sums unrest tools", () => {
-    expect(techUnrestReduction(["masonry", "civil_service"])).toBe(10);
+  it("unrest reduction sums (negative nodes raise it)", () => {
     expect(techUnrestReduction([])).toBe(0);
+    expect(techUnrestReduction(["council_oversight", "monastic_orders"])).toBe(7); // 3 + 4
+    expect(techUnrestReduction(["exclusive_charters"])).toBe(-2); // resentment
+  });
+
+  it("ignores unknown ids (an old save from before the overhaul)", () => {
+    const stale = ["writing", "agriculture"] as unknown as TechId[];
+    expect(techMultipliers(stale)).toEqual({ food: 1, gold: 1, knowledge: 1 });
+    expect(techWareMult(stale)).toBe(1);
+    expect(techTradeMult(stale)).toBe(1);
+    expect(techUnrestReduction(stale)).toBe(0);
   });
 });
 
 describe("unlocks", () => {
-  it("gates advanced units behind tech", () => {
-    expect(isUnitUnlockedFor([], "militia")).toBe(true);
-    expect(isUnitUnlockedFor([], "ranged")).toBe(false);
-    expect(isUnitUnlockedFor(["bronze_working"], "ranged")).toBe(true);
+  it("the militia/infantry/ranged/cavalry core is ungated", () => {
+    for (const u of ["militia", "infantry", "ranged", "cavalry"] as const) {
+      expect(isUnitUnlockedFor([], u)).toBe(true);
+    }
   });
 
-  it("gates units wired via requiresTech (not just tech.unlockUnit)", () => {
-    // Pikemen/Handgunners/Swordsmen/Knights gate through the unit's own
-    // requiresTech; isUnitUnlockedFor must honour that, not report them unlocked.
-    expect(isUnitUnlockedFor([], "pikeman")).toBe(false);
-    expect(isUnitUnlockedFor(["feudalism"], "pikeman")).toBe(true);
-    expect(isUnitUnlockedFor([], "handgunner")).toBe(false);
-    expect(isUnitUnlockedFor(["gunpowder"], "handgunner")).toBe(true);
-    expect(isUnitUnlockedFor([], "swordsman")).toBe(false);
-    expect(isUnitUnlockedFor(["standing_army"], "swordsman")).toBe(true);
+  it("gates the five premium units behind their doctrine node", () => {
     expect(isUnitUnlockedFor([], "knight")).toBe(false);
-    expect(isUnitUnlockedFor(["feudalism"], "knight")).toBe(true);
+    expect(isUnitUnlockedFor(["knightly_orders"], "knight")).toBe(true);
+    expect(isUnitUnlockedFor([], "pikeman")).toBe(false);
+    expect(isUnitUnlockedFor(["town_watch"], "pikeman")).toBe(true);
+    expect(isUnitUnlockedFor([], "handgunner")).toBe(false);
+    expect(isUnitUnlockedFor(["gunpowder_shot"], "handgunner")).toBe(true);
   });
 
-  it("gates advanced buildings behind tech", () => {
-    expect(isBuildingUnlockedFor([], "market")).toBe(true);
+  it("everyday buildings and resource works are ungated", () => {
+    for (const b of ["market", "granary", "barracks", "mine", "bloomery", "stable"] as const) {
+      expect(isBuildingUnlockedFor([], b)).toBe(true);
+    }
+  });
+
+  it("gates advanced buildings behind their doctrine node", () => {
     expect(isBuildingUnlockedFor([], "bank")).toBe(false);
-    expect(isBuildingUnlockedFor(["banking"], "bank")).toBe(true);
+    expect(isBuildingUnlockedFor(["low_tariffs"], "bank")).toBe(true);
+    expect(isBuildingUnlockedFor([], "hanse_hall")).toBe(false);
+    expect(isBuildingUnlockedFor(["lubeck_law"], "hanse_hall")).toBe(true);
+  });
+});
+
+describe("doctrine commitment", () => {
+  it("no path is committed with an empty done-list", () => {
+    expect(committedPath([], "commerce")).toBeNull();
   });
 
-  it("gates the new resource works behind their techs (C2)", () => {
-    expect(isBuildingUnlockedFor([], "stable")).toBe(false);
-    expect(isBuildingUnlockedFor(["husbandry"], "stable")).toBe(true);
-    expect(isBuildingUnlockedFor([], "bloomery")).toBe(false);
-    expect(isBuildingUnlockedFor(["metallurgy"], "bloomery")).toBe(true);
+  it("taking any node commits its path and rejects the siblings", () => {
+    const done: TechId[] = ["free_trade"];
+    expect(committedPath(done, "commerce")).toBe("open_markets");
+    expect(isPathRejected(done, "open_markets")).toBe(false);
+    expect(isPathRejected(done, "regulated_guilds")).toBe(true);
+    expect(isPathRejected(done, "staple_monopoly")).toBe(true);
+    // a different category is unaffected
+    expect(isPathRejected(done, "merchant_marine")).toBe(false);
+  });
+
+  it("nextNodeInPath walks the tiers in order", () => {
+    expect(nextNodeInPath([], "open_markets")).toBe("free_trade");
+    expect(nextNodeInPath(["free_trade"], "open_markets")).toBe("low_tariffs");
+    expect(nextNodeInPath(["free_trade", "low_tariffs"], "open_markets")).toBe("open_prosperity");
+    expect(nextNodeInPath(["free_trade", "low_tariffs", "open_prosperity"], "open_markets")).toBeNull();
+    expect(pathDoneCount(["free_trade", "low_tariffs"], "open_markets")).toBe(2);
   });
 });
 
 describe("researchFrontier", () => {
-  it("starts with the tier-0 techs", () => {
+  it("offers every path's opener while a category is uncommitted", () => {
     const f = researchFrontier([]);
-    expect(f).toContain("agriculture");
-    expect(f).not.toContain("engineering"); // needs prerequisites
+    expect(f).toContain("free_trade");
+    expect(f).toContain("council_oversight");
+    expect(f).toContain("exclusive_charters");
+    expect(f).toContain("monastic_orders");
+    expect(f).not.toContain("low_tariffs"); // a tier-1 node
   });
 
-  it("opens prerequisites as they complete", () => {
-    expect(canResearch([], "irrigation")).toBe(false);
-    expect(canResearch(["agriculture"], "irrigation")).toBe(true);
+  it("narrows to the committed path's next node and hides siblings", () => {
+    const f = researchFrontier(["free_trade"]);
+    expect(f).toContain("low_tariffs");
+    expect(f).not.toContain("council_oversight"); // sibling now rejected
+    expect(f).not.toContain("exclusive_charters");
+  });
+
+  it("respects the age gate on deeper tiers", () => {
+    // Every opener is Age-of-Founding (era 0); low_tariffs (tier 1) is era 2.
+    expect(researchFrontier([], 0)).toContain("free_trade");
+    expect(researchFrontier(["free_trade"], 0)).not.toContain("low_tariffs");
+    expect(researchFrontier(["free_trade"], 2)).toContain("low_tariffs");
+  });
+
+  it("eraLockedTechs lists the committed next node when its age hasn't dawned", () => {
+    // free_trade done → next is low_tariffs (era 2), age-locked at era 0/1.
+    expect(eraLockedTechs(["free_trade"], 0)).toContain("low_tariffs");
+    expect(researchFrontier(["free_trade"], 0)).not.toContain("low_tariffs");
+  });
+});
+
+describe("canResearch / selectTech", () => {
+  it("blocks a node whose predecessor is unfinished", () => {
+    expect(canResearch([], "low_tariffs")).toBe(false);
+    expect(canResearch(["free_trade"], "low_tariffs", 2)).toBe(true);
+  });
+
+  it("blocks a rejected sibling and honours the age gate", () => {
+    expect(canResearch(["free_trade"], "council_oversight")).toBe(false); // sibling rejected
+    expect(canResearch(["free_trade"], "low_tariffs", 1)).toBe(false); // era 1 < needed era 2
+  });
+
+  it("selectTech only sets a researchable node", () => {
+    expect(selectTech({ current: null, progress: 0, done: [] }, "low_tariffs").current).toBeNull();
+    expect(selectTech({ current: null, progress: 0, done: [] }, "free_trade").current).toBe("free_trade");
+    // committing to open_markets, a sibling opener cannot then be selected
+    expect(selectTech({ current: null, progress: 0, done: ["free_trade"] }, "council_oversight").current).toBeNull();
   });
 });
 
@@ -84,114 +169,101 @@ describe("advanceResearch", () => {
     expect(step.research.progress).toBe(5);
   });
 
-  it("completes a tech when the cost is met", () => {
-    const cost = TECHS.writing.cost;
-    const step = advanceResearch({ current: "writing", progress: cost - 1, done: [] }, 5);
-    expect(step.completed).toBe("writing");
-    expect(step.research.done).toContain("writing");
+  it("completes a node when the cost is met and adds it to done", () => {
+    const cost = TECHS.free_trade.cost;
+    const step = advanceResearch({ current: "free_trade", progress: cost - 1, done: [] }, 5);
+    expect(step.completed).toBe("free_trade");
+    expect(step.research.done).toContain("free_trade");
     expect(step.research.current).toBeNull();
   });
 
   it("rolls surplus knowledge over as banked progress on completion", () => {
-    const cost = TECHS.writing.cost;
-    const step = advanceResearch({ current: "writing", progress: cost, done: [] }, 30);
-    expect(step.completed).toBe("writing");
-    expect(step.research.current).toBeNull();
-    // The 30 knowledge past the cost is kept as head-start, not discarded.
-    expect(step.research.progress).toBe(30);
-  });
-
-  it("accumulates progress otherwise", () => {
-    const step = advanceResearch({ current: "writing", progress: 0, done: [] }, 4);
-    expect(step.completed).toBeNull();
-    expect(step.research.progress).toBe(4);
+    const cost = TECHS.free_trade.cost;
+    const step = advanceResearch({ current: "free_trade", progress: cost, done: [] }, 30);
+    expect(step.completed).toBe("free_trade");
+    expect(step.research.progress).toBe(30); // the 30 past cost is kept, not discarded
   });
 });
 
-describe("selectTech", () => {
-  it("only selects a tech on the frontier", () => {
-    const r = selectTech({ current: null, progress: 0, done: [] }, "engineering");
-    expect(r.current).toBeNull(); // prerequisites unmet
-    const ok = selectTech({ current: null, progress: 0, done: [] }, "writing");
-    expect(ok.current).toBe("writing");
+describe("queue + recommendation", () => {
+  it("queues nodes (dedup; skips done/current)", () => {
+    let r = queueResearch({ current: null, progress: 0, done: [], queue: [] }, "free_trade");
+    r = queueResearch(r, "free_trade"); // dedup
+    r = queueResearch(r, "cog_fleets");
+    expect(r.queue).toEqual(["free_trade", "cog_fleets"]);
+    expect(clearQueue(r).queue).toEqual([]);
+  });
+
+  it("dequeues the next valid node, skipping age-locked ones", () => {
+    // low_tariffs (era 2) is age-locked at era 1; free_trade (era 0) is valid.
+    const r = { current: null, progress: 0, done: [] as TechId[], queue: ["low_tariffs", "free_trade"] as TechId[] };
+    expect(dequeueResearch(r, 1).current).toBe("free_trade");
+  });
+
+  it("recommends the cheapest available node in the realm's category", () => {
+    // At era 0 the cheapest commerce opener is free_trade (28).
+    expect(recommendedTech([], 0, "commerce")).toBe("free_trade");
+    // The cheapest scholarship opener is monastic_orders (26) over town_schools (28).
+    expect(recommendedTech([], 0, "scholarship")).toBe("monastic_orders");
   });
 });
 
-import { eraLockedTechs } from "@/systems/tech";
-import type { TechId } from "@/data/techs";
-
-describe("era-gated research", () => {
-  const done: TechId[] = ["agriculture"];
-
-  it("only offers age-appropriate techs on the frontier", () => {
-    // Agriculture done → Irrigation's prereq is met, but it belongs to a later age.
-    expect(researchFrontier(done, 0)).not.toContain("irrigation"); // Age of Founding
-    expect(researchFrontier(done, 1)).toContain("irrigation"); // Age of Banners
+// --- Data integrity: the catalog and the building/unit gates must agree -------
+describe("catalog integrity", () => {
+  it("every node's path/tier/category is internally consistent", () => {
+    for (const id of TECH_IDS) {
+      const d = TECHS[id];
+      const path = PATHS[d.path];
+      expect(path, `path ${d.path} for node ${id}`).toBeDefined();
+      expect(path.category).toBe(d.category);
+      expect(path.nodes[d.tier]).toBe(id); // tier === index in the path
+      expect(CATEGORIES[d.category].paths).toContain(d.path);
+    }
   });
 
-  it("lists prereq-met-but-age-locked techs separately", () => {
-    const locked = eraLockedTechs(done, 0);
-    expect(locked).toContain("irrigation");
-    expect(locked).not.toContain("agriculture"); // already done
-  });
-
-  it("canResearch and selectTech respect the age gate", () => {
-    expect(canResearch(done, "irrigation", 0)).toBe(false);
-    expect(canResearch(done, "irrigation", 1)).toBe(true);
-    // selectTech refuses an out-of-age pick, keeps a valid one.
-    const r = { current: null, progress: 0, done };
-    expect(selectTech(r, "irrigation", 0).current).toBeNull();
-    expect(selectTech(r, "irrigation", 1).current).toBe("irrigation");
-  });
-
-  it("omitting the era ignores the gate (prereqs only)", () => {
-    expect(researchFrontier(done).includes("irrigation")).toBe(true);
-  });
-
-  it("every tech's prerequisites belong to an equal or earlier age", () => {
-    for (const id of Object.keys(TECHS) as (keyof typeof TECHS)[]) {
-      for (const req of TECHS[id].requires) {
-        expect(TECHS[req].era).toBeLessThanOrEqual(TECHS[id].era);
+  it("each path's tiers are non-decreasing in era", () => {
+    for (const pid of PATH_IDS) {
+      const nodes = PATHS[pid].nodes;
+      for (let i = 1; i < nodes.length; i++) {
+        expect(TECHS[nodes[i]!].era).toBeGreaterThanOrEqual(TECHS[nodes[i - 1]!].era);
       }
     }
   });
-});
 
-import { queueResearch, dequeueResearch, clearQueue, recommendedTech } from "@/systems/tech";
-
-describe("research queue + recommendation", () => {
-  const r0 = { current: null as string | null, progress: 0, done: [] as string[], queue: [] as string[] };
-
-  it("queues techs (dedup; skips done/current)", () => {
-    let r = queueResearch({ ...r0 } as never, "agriculture");
-    r = queueResearch(r, "agriculture"); // dedup
-    r = queueResearch(r, "currency");
-    expect(r.queue).toEqual(["agriculture", "currency"]);
-    // skip a completed tech
-    expect(queueResearch({ ...r0, done: ["writing"] } as never, "writing").queue ?? []).toEqual([]);
+  it("every category lists real paths and every path a real category", () => {
+    for (const cid of CATEGORY_IDS) {
+      for (const pid of CATEGORIES[cid].paths) {
+        expect(PATHS[pid]).toBeDefined();
+        expect(PATHS[pid].category).toBe(cid);
+      }
+    }
   });
 
-  it("selectTech drops the picked tech from the queue", () => {
-    const r = { current: null, progress: 0, done: [], queue: ["agriculture", "currency"] } as never;
-    expect(selectTech(r, "agriculture", 0).queue).toEqual(["currency"]);
+  it("building tech-gates and node unlockBuilding agree both ways", () => {
+    for (const b of BUILDING_IDS) {
+      const req = BUILDINGS[b].requiresTech;
+      if (req) {
+        expect(TECHS[req], `building ${b} requiresTech ${req}`).toBeDefined();
+        expect(TECHS[req].unlockBuilding).toBe(b);
+      }
+    }
+    for (const id of TECH_IDS) {
+      const ub = TECHS[id].unlockBuilding;
+      if (ub) expect(BUILDINGS[ub].requiresTech).toBe(id);
+    }
   });
 
-  it("dequeues the next valid tech when idle, skipping invalid/age-locked", () => {
-    // irrigation (era 1) is age-locked at era 0; currency (era 0) is next valid.
-    const r = { current: null, progress: 0, done: [], queue: ["irrigation", "currency"] } as never;
-    const d0 = dequeueResearch(r, 0);
-    expect(d0.current).toBe("currency"); // irrigation skipped (wrong age at era 0... its prereq also missing)
-  });
-
-  it("does nothing while a tech is in progress", () => {
-    const r = { current: "agriculture", progress: 5, done: [], queue: ["currency"] } as never;
-    expect(dequeueResearch(r, 0)).toBe(r);
-  });
-
-  it("recommends the cheapest tech in the realm's branch", () => {
-    // At era 0 with nothing done, military branch's cheapest frontier tech is bronze_working (22 < warcraft 26).
-    expect(recommendedTech([], 0, "military")).toBe("bronze_working");
-    expect(recommendedTech([], 0, "civics")).toBe("writing");
-    expect(clearQueue({ ...r0, queue: ["currency"] } as never).queue).toEqual([]);
+  it("unit tech-gates and node unlockUnit agree both ways", () => {
+    for (const u of UNIT_TYPES) {
+      const req = UNITS[u].requiresTech;
+      if (req) {
+        expect(TECHS[req], `unit ${u} requiresTech ${req}`).toBeDefined();
+        expect(TECHS[req].unlockUnit).toBe(u);
+      }
+    }
+    for (const id of TECH_IDS) {
+      const uu = TECHS[id].unlockUnit;
+      if (uu) expect(UNITS[uu].requiresTech).toBe(id);
+    }
   });
 });

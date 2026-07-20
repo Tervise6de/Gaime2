@@ -61,11 +61,11 @@ describe("summarizeTurn", () => {
       ...before,
       nations: before.nations.map((n) =>
         n.id === PLAYER_ID
-          ? { ...n, research: { ...n.research, done: [...n.research.done, "agriculture"] } }
+          ? { ...n, research: { ...n.research, done: [...n.research.done, "free_trade"] } }
           : n,
       ),
     };
-    expect(summarizeTurn(before, after).techsCompleted).toContain("agriculture");
+    expect(summarizeTurn(before, after).techsCompleted).toContain("free_trade");
   });
 
   it("is a pure read (does not mutate its inputs)", () => {

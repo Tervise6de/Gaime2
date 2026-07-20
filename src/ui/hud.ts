@@ -39,14 +39,13 @@ import { LENSES, lensGradient, type LensId } from "@/ui/lenses";
 import { FOCUSES, type FocusId } from "@/data/focuses";
 import { cbSafe } from "@/data/palette";
 import { OCEAN } from "@/data/mapstyle";
-import { badgeArt, BRANCH_ART, crestSvg, eventVignette, MOMENT_ART, safeColor, TERRAIN_ART, TREATY_ART } from "@/data/art";
+import { badgeArt, crestSvg, eventVignette, MOMENT_ART, safeColor, TERRAIN_ART, TREATY_ART } from "@/data/art";
 import {
   escapeHtml,
   glyphEl,
   glyphHtml,
   iconBtn,
   iconEl,
-  iconHtml,
   setIconBtnLabel,
   resourceIconEl,
   resourceIconHtml,
@@ -82,12 +81,12 @@ import { inLeague } from "@/systems/state";
 import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
 import type { TurnSummary } from "@/systems/summary";
 import { deriveAlerts, type Alert } from "@/ui/alerts";
-import { researchFrontier, recommendedTech, isBuildingUnlockedFor } from "@/systems/tech";
+import { researchFrontier, recommendedTech, isBuildingUnlockedFor, committedPath, isPathRejected, nextNodeInPath, pathDoneCount } from "@/systems/tech";
 import { eraIndexForTurn, eraByIndex } from "@/data/eras";
 import { ARCHETYPE_LABEL } from "@/data/personalities";
 import { eraForTurn, yearForTurn } from "@/data/eras";
 import { TRAITS } from "@/data/traits";
-import { TECHS, TECH_IDS, type TechId, type TechBranch } from "@/data/techs";
+import { TECHS, CATEGORIES, PATHS, CATEGORY_IDS, type TechId, type ResearchCategory, type DoctrinePathId } from "@/data/techs";
 import { DOMINATION_FRACTION, TURN_LIMIT, MODIFIER_LABEL, MAX_ENTRENCH } from "@/systems/state";
 import {
   commanderAttack,
@@ -196,12 +195,6 @@ export interface HudCallbacks {
   /** Map lens changed — the parent recolours the board by the chosen metric. */
   onLensChange(lens: LensId): void;
 }
-
-const BRANCH_COLOR: Record<string, string> = {
-  economy: "#e0b74a",
-  military: "#e8776b",
-  civics: "#63c7d6",
-};
 
 /** Fixed gift size the diplomacy panel offers. */
 const GIFT_AMOUNT = 30;
@@ -1256,10 +1249,23 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   let lastPlayer: Nation | null = null;
   // Latest player knowledge/turn, so the tech tree can show turns-to-complete.
   let lastKnowledgeFlow = 0;
+  // Which research category is open, and which doctrine path the detail panel
+  // shows — persisted across re-renders (a turn resolving, or picking a node).
+  const techUi: { category: ResearchCategory; path: DoctrinePathId | null } = { category: "commerce", path: null };
+
+  /** (Re)draw the research screen from the latest state. `animate` only on a
+      fresh open — a live re-render must not replay the rise or jump the scroll. */
+  function renderTechScreen(animate: boolean): void {
+    if (!lastPlayer) return;
+    renderTechTree(
+      techOverlay, lastPlayer, eraIndexForTurn(lastState?.turn ?? 1), lastKnowledgeFlow,
+      callbacks, closeTechTree, techUi, () => renderTechScreen(false), { animate },
+    );
+  }
 
   function openTechTree(): void {
     if (!lastPlayer) return;
-    renderTechTree(techOverlay, lastPlayer, eraIndexForTurn(lastState?.turn ?? 1), lastKnowledgeFlow, callbacks, closeTechTree);
+    renderTechScreen(true);
     techOverlay.style.display = "flex";
     techOverlay.scrollTop = 0;
     researchRail.btn.classList.add("active");
@@ -2470,7 +2476,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     // Keep an open tech tree in sync with the latest research state (it's now the
     // sole research page — opened straight from the Research button).
     if (techOverlay.style.display !== "none") {
-      renderTechTree(techOverlay, player, eraIndexForTurn(state.turn), flow.knowledge, callbacks, closeTechTree, { animate: false });
+      renderTechScreen(false);
     }
     // Keep an open standings overlay live as turns resolve.
     if (standingsOverlay.style.display !== "none") renderStandingsOverlay();
@@ -4119,17 +4125,53 @@ function renderDiplomacy(
   }
 }
 
-const TECH_BRANCHES: TechBranch[] = ["economy", "military", "civics"];
+/** The research category a realm's trait leans toward (for the recommended pick). */
+function recommendedCategory(trait: Nation["trait"]): ResearchCategory {
+  switch (trait) {
+    case "martial": return "military";
+    case "scholarly": return "scholarship";
+    case "industrious":
+    case "fertile": return "production";
+    default: return "commerce";
+  }
+}
+
+/** Human-readable "KEY EFFECTS" lines for a set of doctrine nodes (a whole path,
+    or a single node): the aggregated bonuses and every building/unit it unlocks. */
+function effectLines(nodeIds: TechId[]): string[] {
+  let gold = 0, food = 0, knowledge = 0, ware = 0, trade = 0, unrest = 0;
+  const unlocks: string[] = [];
+  for (const id of nodeIds) {
+    const d = TECHS[id];
+    gold += d.yieldMult?.gold ?? 0;
+    food += d.yieldMult?.food ?? 0;
+    knowledge += d.yieldMult?.knowledge ?? 0;
+    ware += d.wareMult ?? 0;
+    trade += d.tradeMult ?? 0;
+    unrest += d.unrestReduction ?? 0;
+    if (d.unlockBuilding) unlocks.push(BUILDINGS[d.unlockBuilding].name);
+    if (d.unlockUnit) unlocks.push(UNITS[d.unlockUnit].name);
+  }
+  const pct = (v: number) => `${v > 0 ? "+" : "−"}${Math.abs(Math.round(v * 100))}%`;
+  const out: string[] = [];
+  if (trade) out.push(`${pct(trade)} trade income`);
+  if (gold) out.push(`${pct(gold)} gold`);
+  if (ware) out.push(`${pct(ware)} ware output`);
+  if (knowledge) out.push(`${pct(knowledge)} knowledge`);
+  if (food) out.push(`${pct(food)} food`);
+  if (unrest) out.push(`${unrest > 0 ? "−" : "+"}${Math.abs(unrest)} unrest (${unrest > 0 ? "calmer" : "restless"})`);
+  if (unlocks.length) out.push(`Unlocks ${unlocks.join(", ")}`);
+  return out;
+}
 
 /**
- * The tech tree — the sole research page (opened straight from the Research
- * button). Leads with the live research status: the current study's progress
- * bar and its turns-to-complete (cost remaining ÷ knowledge income), or a
- * prompt to pick when none is set. Then every tech laid out by branch (row) ×
- * tier, each node tagged done / in-progress / available / age-locked / locked
- * and — for the ones you could study now — its ETA in turns. Clicking an
- * available node sets research (the page stays open so its bar starts filling).
- * Read-only otherwise.
+ * The research screen — the **Doctrines** page (opened from the Research button).
+ * A category sidebar (Commerce, Maritime, …) picks which set of doctrine paths
+ * shows; the centre lays those paths out as commitment columns; the right panel
+ * details the selected path with its KEY EFFECTS and a Start/Continue button.
+ * Taking any node in a category commits that path and rejects its siblings.
+ * Read-only otherwise. `ui` (category + selected path) persists across renders;
+ * `rerender` redraws in place when the player switches category or path.
  */
 function renderTechTree(
   container: HTMLElement,
@@ -4138,38 +4180,38 @@ function renderTechTree(
   knowledgeFlow: number,
   callbacks: HudCallbacks,
   onClose: () => void,
+  ui: { category: ResearchCategory; path: DoctrinePathId | null },
+  rerender: () => void,
   opts: { animate?: boolean } = {},
 ): void {
-  // A live re-render (picking a tech, or a turn resolving while the tree is
-  // open) must not replay the panel's rise animation or snap the scroll back to
-  // the top — that read as the whole page "refreshing". Only a fresh open animates.
+  // A live re-render (picking a node, switching tab, or a turn resolving) must
+  // not replay the rise animation or snap the scroll — only a fresh open does.
   const animate = opts.animate !== false;
-  const prevScroll = container.querySelector<HTMLElement>(".hud-techtree-panel")?.scrollTop ?? 0;
+  const prevScroll = container.querySelector<HTMLElement>(".hud-doctrine-scroll")?.scrollTop ?? 0;
   container.innerHTML = "";
   const research = player.research;
   const done = new Set(research.done);
   const current = research.current;
   const total = Object.keys(TECHS).length;
+  const frontier = new Set(researchFrontier(research.done, era));
+  const rec = recommendedTech(research.done, era, recommendedCategory(player.trait));
 
-  // Turns to finish a tech at the current knowledge income (null = no income → stalled).
   const etaTurns = (cost: number, progress = 0): number | null =>
     knowledgeFlow > 0 ? Math.max(1, Math.ceil((cost - progress) / knowledgeFlow)) : null;
 
-  const panel = el("div", "hud-techtree-panel" + (animate ? "" : " hud-noanim"));
+  const panel = el("div", "hud-techtree-panel hud-doctrine-panel" + (animate ? "" : " hud-noanim"));
   const head = el("div", "hud-techtree-head");
   const ttTitle = el("h2", "hud-techtree-title");
-  ttTitle.textContent = "Research — Technology tree";
+  ttTitle.textContent = "Research — Doctrines";
   head.append(ttTitle, closeButton(onClose));
   panel.append(head);
 
-  // --- Live research status: what's studying now and how long it has left ----
-  const frontier = researchFrontier(research.done, era);
-  const mustChoose = !current && frontier.length > 0;
+  // --- Live research status: the current study, or a prompt to pick ----------
+  const mustChoose = !current && frontier.size > 0;
   const status = el("div", "hud-research-status" + (mustChoose ? " choose" : ""));
-  if (current) {
+  if (current && TECHS[current]) {
     const def = TECHS[current];
     const pct = Math.min(100, (research.progress / def.cost) * 100);
-    // Progress can overshoot the cost mid-turn (completion lands at resolve).
     const shown = Math.min(Math.floor(research.progress), def.cost);
     const eta = etaTurns(def.cost, research.progress);
     const l = el("div", "hud-research-status-line");
@@ -4182,95 +4224,176 @@ function renderTechTree(
     const bar = el("div", "hud-research-bar");
     const fill = el("div", "hud-research-fill");
     fill.style.width = `${pct}%`;
-    fill.style.background = BRANCH_COLOR[def.branch];
+    fill.style.background = CATEGORIES[def.category].color;
     bar.append(fill);
     status.append(l, bar);
-    status.title =
-      eta !== null
-        ? `Your ${fmt(knowledgeFlow)} knowledge/turn flows into this technology each End turn.`
-        : "No knowledge income — build Libraries or work hills/mountains to research at all.";
+    status.title = eta !== null
+      ? `Your ${fmt(knowledgeFlow)} knowledge/turn flows into this doctrine each End turn.`
+      : "No knowledge income — build Scriptoria/Universities or work hills to research at all.";
   } else {
     const l = el("div", "hud-research-status-line");
-    // Knowledge banks into progress even with nothing selected, so it is never
-    // lost — the nudge is to spend the pile, and we show how much is waiting.
     const banked = Math.floor(research.progress);
     l.innerHTML = mustChoose
-      ? `<span class="hud-research-status-tech">${glyphHtml("book", "📖")} Pick a technology below` +
+      ? `<span class="hud-research-status-tech">${glyphHtml("book", "📖")} Choose a doctrine to research` +
         (banked > 0
           ? ` — your ${banked}${resourceIconHtml("knowledge", "📖")} banked knowledge pours straight in.</span>`
           : ` to start turning knowledge into progress.</span>`)
-      : `<span class="hud-research-status-tech">${resourceIconHtml("knowledge", "📖")} All technologies researched.</span>`;
+      : `<span class="hud-research-status-tech">${resourceIconHtml("knowledge", "📖")} Every doctrine path is complete.</span>`;
     status.append(l);
   }
   const counts = el("span", "hud-research-status-counts");
-  counts.textContent = `${done.size}/${total} techs · +${fmt(knowledgeFlow)} 📖/turn`;
+  counts.textContent = `${done.size}/${total} doctrines · +${fmt(knowledgeFlow)} 📖/turn`;
   status.append(counts);
   panel.append(status);
 
-  // Recommended next pick — the cheapest available tech in the realm's branch.
-  const recBranch: TechBranch =
-    player.trait === "martial" ? "military" : player.trait === "scholarly" ? "civics" : "economy";
-  const rec = recommendedTech(research.done, era, recBranch);
+  // --- Body: category sidebar | doctrine columns | detail panel --------------
+  const body = el("div", "hud-doctrine-body");
 
-  const grid = el("div", "hud-techtree-grid");
-  for (const branch of TECH_BRANCHES) {
-    const row = el("div", "hud-techtree-row");
-    const label = el("div", "hud-techtree-branch");
-    label.textContent = branch;
-    label.style.color = BRANCH_COLOR[branch];
-    row.append(label);
+  const sidebar = el("div", "hud-doctrine-sidebar");
+  const sideTitle = el("div", "hud-doctrine-sidetitle");
+  sideTitle.textContent = "Categories";
+  sidebar.append(sideTitle);
+  for (const catId of CATEGORY_IDS) {
+    const cat = CATEGORIES[catId];
+    const committed = committedPath(research.done, catId);
+    const b = el("button", "hud-doctrine-cat" + (catId === ui.category ? " active" : ""));
+    b.style.setProperty("--cat", cat.color);
+    b.innerHTML =
+      `<span class="hud-doctrine-cat-glyph">${cat.glyph}</span>` +
+      `<span class="hud-doctrine-cat-name">${escapeHtml(cat.name)}</span>` +
+      (committed ? `<span class="hud-doctrine-cat-tag">${escapeHtml(PATHS[committed].name)}</span>` : "");
+    b.addEventListener("click", () => { ui.category = catId; ui.path = null; rerender(); });
+    sidebar.append(b);
+  }
+  body.append(sidebar);
 
-    const track = el("div", "hud-techtree-track");
-    const ids = TECH_IDS.filter((id) => TECHS[id].branch === branch).sort(
-      (a, b) => TECHS[a].tier - TECHS[b].tier || TECHS[a].cost - TECHS[b].cost,
-    );
-    for (const id of ids) {
+  const cat = CATEGORIES[ui.category];
+  const committedHere = committedPath(research.done, ui.category);
+  // The path the detail panel describes: the last one the player selected (if it
+  // belongs to this category), else the committed path, else the first path.
+  const selPath: DoctrinePathId =
+    (ui.path && PATHS[ui.path]?.category === ui.category ? ui.path : null) ?? committedHere ?? cat.paths[0]!;
+
+  // Centre: the category's doctrine columns.
+  const centre = el("div", "hud-doctrine-centre");
+  const cTitle = el("div", "hud-doctrine-ctitle");
+  cTitle.innerHTML = `<h3>${escapeHtml(cat.name)} Doctrines</h3><p>${escapeHtml(cat.blurb)}</p>`;
+  centre.append(cTitle);
+  const columns = el("div", "hud-doctrine-columns");
+  for (const pid of cat.paths) {
+    const path = PATHS[pid];
+    const rejected = isPathRejected(research.done, pid);
+    const isCommitted = committedHere === pid;
+    const col = el("div",
+      "hud-doctrine-col" + (rejected ? " rejected" : "") + (isCommitted ? " committed" : "") + (pid === selPath ? " sel" : ""));
+    col.style.setProperty("--cat", cat.color);
+    const ch = el("button", "hud-doctrine-colhead");
+    ch.innerHTML = `<span class="hud-doctrine-pname">${escapeHtml(path.name)}</span><span class="hud-doctrine-ptag">${escapeHtml(path.tagline)}</span>`;
+    ch.addEventListener("click", () => { ui.path = pid; rerender(); });
+    col.append(ch);
+    path.nodes.forEach((id, tier) => {
       const def = TECHS[id];
       const isDone = done.has(id);
       const isCurrent = current === id;
-      const unlocked = def.requires.every((r) => done.has(r));
-      const ageReached = def.era <= era;
-      const available = !isDone && !isCurrent && unlocked && ageReached;
-      // A tech of a future age reads as age-locked (whether or not its prereqs
-      // are met), so the whole tree is legible by age at a glance.
-      const ageLocked = !isDone && !isCurrent && !ageReached;
+      const predDone = tier === 0 || done.has(path.nodes[tier - 1]!);
+      const available = frontier.has(id);
+      const ageLocked = !isDone && !isCurrent && !rejected && predDone && def.era > era;
+      const state = rejected ? "rejected" : isDone ? "done" : isCurrent ? "current"
+        : available ? "available" : ageLocked ? "agelocked" : "locked";
       const isRec = available && id === rec;
-      const state = isDone ? "done" : isCurrent ? "current" : available ? "available" : ageLocked ? "agelocked" : "locked";
-
-      const node = el("div", "hud-tt-node " + state + (isRec ? " recommended" : ""));
-      node.style.borderColor = BRANCH_COLOR[branch];
-      const missing = def.requires.filter((r) => !done.has(r)).map((r) => TECHS[r].name);
-      // Turns-to-complete shown for the current study (remaining) and anything
-      // you could pick right now, so cost reads as time, not just a raw number.
       const eta = isCurrent ? etaTurns(def.cost, research.progress) : available ? etaTurns(def.cost) : null;
-      node.title =
-        def.blurb +
-        (eta !== null ? ` — ~${eta} turn${eta === 1 ? "" : "s"} at your current knowledge income` : "") +
-        (missing.length ? ` (needs ${missing.join(", ")})` : "") +
-        (ageLocked ? ` — awaits the ${eraByIndex(def.era).name}` : "") +
-        (isRec ? " — recommended for your realm." : "");
+      const node = el("button", "hud-doctrine-node " + state + (isRec ? " recommended" : ""));
       node.innerHTML =
-        `<span class="hud-tt-name">${isDone ? "✓ " : ""}${ageLocked ? "🔒 " : ""}${escapeHtml(def.name)}${isRec ? ' <span class="hud-tt-rec">★</span>' : ""}</span>` +
-        `<span class="hud-tt-meta">${eraByIndex(def.era).name.replace("Age of ", "")} · ${def.cost}${resourceIconHtml("knowledge", "📖")}${eta !== null ? ` · ~${eta}t` : ""} · ${iconHtml(BRANCH_ART[def.branch], "")}</span>`;
-      if (available) {
-        // Selecting keeps the page open so its progress bar starts filling in.
-        node.addEventListener("click", () => callbacks.onChooseResearch(id));
-      }
-      track.append(node);
-    }
-    row.append(track);
-    grid.append(row);
+        `<span class="hud-doctrine-nname">${isDone ? "✓ " : isCurrent ? "◐ " : ageLocked ? "🔒 " : ""}${escapeHtml(def.name)}${isRec ? ' <span class="hud-tt-rec">★</span>' : ""}</span>` +
+        `<span class="hud-doctrine-nmeta">${eraByIndex(def.era).name} · ${def.cost}${resourceIconHtml("knowledge", "📖")}${eta !== null ? ` · ~${eta}t` : ""}</span>`;
+      node.title = def.blurb +
+        (ageLocked ? ` — awaits the ${eraByIndex(def.era).name}` : "") +
+        (rejected ? ` — locked; you chose ${PATHS[committedHere!].name}` : "");
+      node.addEventListener("click", () => {
+        ui.path = pid;
+        if (available) callbacks.onChooseResearch(id);
+        else rerender();
+      });
+      col.append(node);
+    });
+    columns.append(col);
   }
-  panel.append(grid);
-  panel.append(
-    line(
-      "✓ researched · glowing = in progress · ★ recommended · bright = available (~Nt = turns to complete) · 🔒 = awaits its age · dim = locked",
-      "hud-techtree-legend",
-    ),
-  );
+  centre.append(columns);
+  const foot = el("p", "hud-doctrine-foot");
+  foot.textContent = "⚑ You may follow only one doctrine path in each category — the first node you take commits you.";
+  centre.append(foot);
+  body.append(centre);
+
+  // Right: the selected path's detail — description, KEY EFFECTS, action.
+  const detail = el("div", "hud-doctrine-detail");
+  detail.style.setProperty("--cat", cat.color);
+  const path = PATHS[selPath];
+  const rejected = isPathRejected(research.done, selPath);
+  const doneCount = pathDoneCount(research.done, selPath);
+  const nextId = nextNodeInPath(research.done, selPath);
+  detail.append((() => {
+    const h = el("div", "hud-doctrine-dhead");
+    h.innerHTML = `<span class="hud-doctrine-dglyph">${cat.glyph}</span>` +
+      `<div><h3>${escapeHtml(path.name)}</h3><span class="hud-doctrine-dtag">${escapeHtml(path.tagline)}</span></div>`;
+    return h;
+  })());
+  const desc = el("p", "hud-doctrine-ddesc");
+  desc.textContent = path.blurb;
+  detail.append(desc);
+  const effTitle = el("div", "hud-doctrine-dsub");
+  effTitle.textContent = "Key effects (full path)";
+  detail.append(effTitle);
+  // A downside reads red: rising unrest, or a negative percentage (e.g. -4% trade).
+  // "−3 unrest (calmer)" starts with "−" but is a *good* effect, so it stays neutral.
+  const isBad = (li: string) => li.includes("restless") || (li.startsWith("−") && li.includes("%"));
+  const effList = el("ul", "hud-doctrine-effects");
+  for (const li of effectLines(path.nodes)) {
+    const e = el("li", isBad(li) ? "bad" : "");
+    e.textContent = li;
+    effList.append(e);
+  }
+  detail.append(effList);
+
+  // Action row: commit / continue / rejected / complete, plus progress.
+  const prog = el("div", "hud-doctrine-dprog");
+  prog.textContent = `${doneCount}/${path.nodes.length} nodes researched`;
+  detail.append(prog);
+  const action = el("div", "hud-doctrine-daction");
+  if (rejected) {
+    const b = btn(`Locked — you chose ${PATHS[committedHere!].name}`, "hud-end-btn", () => {});
+    b.disabled = true;
+    action.append(b);
+  } else if (!nextId) {
+    const b = btn("Path complete ✓", "hud-end-btn", () => {});
+    b.disabled = true;
+    action.append(b);
+  } else {
+    const nd = TECHS[nextId];
+    const ageOk = nd.era <= era;
+    const isNextCurrent = current === nextId;
+    const label = isNextCurrent ? "Researching this now…"
+      : !ageOk ? `Awaits the ${eraByIndex(nd.era).name}`
+      : committedHere ? `Continue: ${nd.name} — ${nd.cost}📖`
+      : `Start this path: ${nd.name} — ${nd.cost}📖`;
+    const b = btn(label, "hud-end-btn primary", () => callbacks.onChooseResearch(nextId));
+    b.disabled = isNextCurrent || !ageOk;
+    action.append(b);
+    const nextEff = el("ul", "hud-doctrine-effects next");
+    const subt = el("div", "hud-doctrine-dsub");
+    subt.textContent = isNextCurrent ? "In progress" : "Next node grants";
+    for (const li of effectLines([nextId])) { const e = el("li", isBad(li) ? "bad" : ""); e.textContent = li; nextEff.append(e); }
+    detail.append(subt, nextEff);
+  }
+  detail.append(action);
+  body.append(detail);
+
+  // Whole body scrolls as one so the sidebar/columns/detail stay aligned.
+  const scroll = el("div", "hud-doctrine-scroll");
+  scroll.append(body);
+  panel.append(scroll);
+
   container.append(panel);
-  // Keep the pre-rebuild scroll on a live re-render so the tree stays put.
-  if (!animate) panel.scrollTop = prevScroll;
+  if (!animate) scroll.scrollTop = prevScroll;
 }
 
 // --- helpers ----------------------------------------------------------------

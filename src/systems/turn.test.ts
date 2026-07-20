@@ -340,29 +340,27 @@ describe("construction", () => {
     expect(canQueueBuilding({ ...owned, terrain: "plains" }, "harbor")).toBe(false);
   });
 
-  it("canQueueBuilding needs BOTH the terrain and the tech for the Mine", () => {
+  it("canQueueBuilding needs the mountain terrain for the Mine (ungated by research)", () => {
     const g = createGame({ seed: 1 });
     const peak = { ...g.regions[ownedId(g)]!, terrain: "mountains" as const };
-    expect(canQueueBuilding(peak, "mine")).toBe(false); // no Masonry yet
-    expect(canQueueBuilding(peak, "mine", ["masonry"])).toBe(true);
+    expect(canQueueBuilding(peak, "mine")).toBe(true); // mountains → allowed, no research
     const flat = { ...peak, terrain: "plains" as const };
-    expect(canQueueBuilding(flat, "mine", ["masonry"])).toBe(false);
+    expect(canQueueBuilding(flat, "mine")).toBe(false); // wrong terrain
   });
 
-  it("canQueueBuilding needs BOTH the resource and the tech for the resource works (C2)", () => {
+  it("canQueueBuilding needs the matching resource for the resource works (ungated by research)", () => {
     const g = createGame({ seed: 1 });
     const owned = g.regions[ownedId(g)]!;
     const ironLand = { ...owned, resource: "iron" as const };
     const horseLand = { ...owned, resource: "horses" as const };
     const barren = { ...owned, resource: null };
-    // Bloomery needs iron on the region AND Metallurgy.
-    expect(canQueueBuilding(ironLand, "bloomery", ["metallurgy"])).toBe(true);
-    expect(canQueueBuilding(ironLand, "bloomery", [])).toBe(false); // no tech
-    expect(canQueueBuilding(barren, "bloomery", ["metallurgy"])).toBe(false); // no iron
-    expect(canQueueBuilding(horseLand, "bloomery", ["metallurgy"])).toBe(false); // wrong resource
-    // Stable needs horses on the region AND Husbandry.
-    expect(canQueueBuilding(horseLand, "stable", ["husbandry"])).toBe(true);
-    expect(canQueueBuilding(ironLand, "stable", ["husbandry"])).toBe(false); // wrong resource
+    // Bloomery needs iron on the region (no research gate).
+    expect(canQueueBuilding(ironLand, "bloomery", [])).toBe(true);
+    expect(canQueueBuilding(barren, "bloomery", [])).toBe(false); // no iron
+    expect(canQueueBuilding(horseLand, "bloomery", [])).toBe(false); // wrong resource
+    // Stable needs horses on the region.
+    expect(canQueueBuilding(horseLand, "stable", [])).toBe(true);
+    expect(canQueueBuilding(ironLand, "stable", [])).toBe(false); // wrong resource
   });
 
   it("queueBuilding refuses a terrain-bound building off its terrain", () => {

@@ -11,6 +11,11 @@
  *   - `popCapacity` raises the sustainable population cap
  *   - `unrest`     is subtracted from the region's unrest target (order)
  *
+ * The everyday buildings, resource works and focus capstones are *ungated* —
+ * buildable from the start where terrain / resource / focus allow. Only the
+ * ~dozen advanced buildings gate behind a research doctrine node (`requiresTech`),
+ * so a realm's doctrine choices decide which advanced buildings it may raise.
+ *
  * Numbers are illustrative starting values for tuning.
  */
 
@@ -75,7 +80,7 @@ export interface BuildingDef {
   unrest: number;
   /** Fortification levels added to the region on completion (one-time). */
   fortification?: number;
-  /** Tech that must be researched before this can be built. */
+  /** Research doctrine node that must be completed before this can be built. */
   requiresTech?: TechId;
   /** Terrain the region must have — hidden entirely elsewhere (not just locked). */
   requiresTerrain?: TerrainId;
@@ -144,9 +149,8 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     wareYield: { iron: 4, copper: 1 },
     popCapacity: 0,
     unrest: 0,
-    requiresTech: "masonry",
     requiresTerrain: "mountains",
-    blurb: "+4 iron, +2 gold. Mountain regions only. (Masonry)",
+    blurb: "+4 iron, +2 gold. Mountain regions only.",
   },
   library: {
     id: "library",
@@ -173,8 +177,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     yield: { food: 3 },
     popCapacity: 6,
     unrest: 0,
-    requiresTech: "irrigation",
-    blurb: "+3 food, +6 population capacity — wells and a cistern water a growing town. (Irrigation)",
+    blurb: "+3 food, +6 population capacity — wells and a cistern water a growing town.",
   },
   university: {
     id: "university",
@@ -183,8 +186,8 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     yield: { knowledge: 4 },
     popCapacity: 0,
     unrest: 0,
-    requiresTech: "mathematics",
-    blurb: "+4 knowledge per turn. (Mathematics)",
+    requiresTech: "town_schools",
+    blurb: "+4 knowledge per turn. (Town Schools)",
   },
   bank: {
     id: "bank",
@@ -193,8 +196,8 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     yield: { gold: 5 },
     popCapacity: 0,
     unrest: 0,
-    requiresTech: "banking",
-    blurb: "+5 gold per turn — merchant banking and the bill of exchange. (Banking)",
+    requiresTech: "low_tariffs",
+    blurb: "+5 gold per turn — merchant banking and the bill of exchange. (Low Tariffs)",
   },
   guildhall: {
     id: "guildhall",
@@ -204,8 +207,8 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     wareYield: { timber: 3 },
     popCapacity: 0,
     unrest: 0,
-    requiresTech: "economics",
-    blurb: "+3 gold, +3 timber — the economy branch's workshop-and-market in one. (Economics)",
+    requiresTech: "regulated_guilds_charter",
+    blurb: "+3 gold, +3 timber — the chartered guilds' workshop-and-market in one. (Regulated Guilds)",
   },
   hanse_hall: {
     id: "hanse_hall",
@@ -224,8 +227,8 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     yield: { knowledge: 2 },
     popCapacity: 0,
     unrest: 6,
-    requiresTech: "philosophy",
-    blurb: "+2 knowledge, -6 unrest — burghers govern themselves under Lübeck Law. (Philosophy)",
+    requiresTech: "town_charters",
+    blurb: "+2 knowledge, -6 unrest — burghers govern themselves under their charter. (Town Charters)",
   },
   fortress: {
     id: "fortress",
@@ -236,8 +239,8 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     popCapacity: 0,
     unrest: 0,
     fortification: 2,
-    requiresTech: "engineering",
-    blurb: "+2 fortification — brick walls and a gatehouse (a Holstentor) a besieger dreads. (Engineering)",
+    requiresTech: "forge_works",
+    blurb: "+2 fortification — brick walls and a gatehouse (a Holstentor) a besieger dreads. (Forge Works)",
   },
   granary: {
     id: "granary",
@@ -246,8 +249,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     yield: { food: 2 },
     popCapacity: 4,
     unrest: 0,
-    requiresTech: "pottery",
-    blurb: "+2 food, +4 population capacity — a gabled Speicher against lean years. (Pottery)",
+    blurb: "+2 food, +4 population capacity — a gabled Speicher against lean years.",
   },
   barracks: {
     id: "barracks",
@@ -256,8 +258,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     yield: {},
     popCapacity: 0,
     unrest: 8,
-    requiresTech: "warcraft",
-    blurb: "-8 unrest — a drilled town watch keeps a martial town in order. (Warcraft)",
+    blurb: "-8 unrest — a drilled town watch keeps a martial town in order.",
   },
   lighthouse: {
     id: "lighthouse",
@@ -267,9 +268,9 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     yield: { gold: 3, food: 1 },
     popCapacity: 2,
     unrest: 0,
-    requiresTech: "cartography",
+    requiresTech: "cog_fleets",
     requiresTerrain: "coast",
-    blurb: "+3 gold, +1 food, +2 population. Coast only. (Cartography)",
+    blurb: "+3 gold, +1 food, +2 population. Coast only. (Cog Fleets)",
   },
   monastery: {
     id: "monastery",
@@ -278,8 +279,8 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     yield: { knowledge: 3 },
     popCapacity: 0,
     unrest: 6,
-    requiresTech: "scholasticism",
-    blurb: "+3 knowledge, -6 unrest — scholars and quiet order. (Scholasticism)",
+    requiresTech: "monastic_orders",
+    blurb: "+3 knowledge, -6 unrest — scholars and quiet order. (Monastic Orders)",
   },
   watchtower: {
     id: "watchtower",
@@ -290,8 +291,8 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     popCapacity: 0,
     unrest: 3,
     fortification: 1,
-    requiresTech: "castles",
-    blurb: "+1 fortification, -3 unrest — a warded, watched shore. (Castles)",
+    requiresTech: "sea_escorts",
+    blurb: "+1 fortification, -3 unrest — a warded, watched shore. (Sea Escorts)",
   },
   courthouse: {
     id: "courthouse",
@@ -301,8 +302,8 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     yield: {},
     popCapacity: 0,
     unrest: 14,
-    requiresTech: "common_law",
-    blurb: "-14 unrest — the Rathaus and Lübeck Law tame a restless province. (Common Law)",
+    requiresTech: "territorial_lordship",
+    blurb: "-14 unrest — the Rathaus and the lord's law tame a restless province. (Territorial Lordship)",
   },
   printing_house: {
     id: "printing_house",
@@ -311,8 +312,8 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     yield: { knowledge: 6 },
     popCapacity: 0,
     unrest: 0,
-    requiresTech: "printing",
-    blurb: "+6 knowledge per turn — the press multiplies learning. (Printing)",
+    requiresTech: "the_press",
+    blurb: "+6 knowledge per turn — the press multiplies learning. (The Printing Press)",
   },
   cathedral: {
     id: "cathedral",
@@ -322,16 +323,15 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     yield: { knowledge: 2, gold: 1 },
     popCapacity: 0,
     unrest: 10,
-    requiresTech: "theology",
-    blurb: "+2 knowledge, +1 gold, -10 unrest — a great brick Dom. (Theology)",
+    requiresTech: "cathedral_schools",
+    blurb: "+2 knowledge, +1 gold, -10 unrest — a great brick Dom. (Cathedral Schools)",
   },
 
   // --- Strategic-resource works ----------------------------------------------
   // Each exploits the resource that already gates a premium unit, so holding
   // iron/horse land is worth *developing*, not just mustering from — deepening the
   // "specific territory worth fighting for" decision (design §3.2). Both yield build
-  // wares (timber / iron → armies & works), so they aid the military/expansion
-  // path without swelling gold.
+  // wares (timber / iron → armies & works). Ungated (the resource is the gate).
   stable: {
     id: "stable",
     name: "Stable",
@@ -340,9 +340,8 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     wareYield: { timber: 2 },
     popCapacity: 2,
     unrest: 0,
-    requiresTech: "husbandry",
     requiresResource: "horses",
-    blurb: "+2 timber, +2 gold, +2 population. Horse country only. (Husbandry)",
+    blurb: "+2 timber, +2 gold, +2 population. Horse country only.",
   },
   bloomery: {
     id: "bloomery",
@@ -352,14 +351,13 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     wareYield: { iron: 5 },
     popCapacity: 0,
     unrest: 0,
-    requiresTech: "metallurgy",
     requiresResource: "iron",
-    blurb: "+5 iron — ironworks that forge the realm's arms. Iron country only. (Metallurgy)",
+    blurb: "+5 iron — ironworks that forge the realm's arms. Iron country only.",
   },
 
   // --- Focus capstones -------------------------------------------------------
-  // Each needs BOTH the matching region focus and an Age-of-Crowns tech — the
-  // reward for committing a province to a specialisation and researching into it.
+  // Each needs the matching region focus — the reward for committing a province
+  // to a specialisation. Ungated by research (the focus is the commitment).
   manor: {
     id: "manor",
     name: "Manor",
@@ -367,9 +365,8 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     yield: { food: 4, gold: 1 },
     popCapacity: 8,
     unrest: 0,
-    requiresTech: "feudalism",
     requiresFocus: "farmland",
-    blurb: "+4 food, +1 gold, +8 population — a great manorial estate. Farmland focus. (Feudalism)",
+    blurb: "+4 food, +1 gold, +8 population — a great manorial estate. Farmland focus.",
   },
   charter_fair: {
     id: "charter_fair",
@@ -378,9 +375,8 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     yield: { gold: 7 },
     popCapacity: 0,
     unrest: 0,
-    requiresTech: "guilds",
     requiresFocus: "market",
-    blurb: "+7 gold — a chartered fair that draws merchants for leagues. Market focus. (Guilds)",
+    blurb: "+7 gold — a chartered fair that draws merchants for leagues. Market focus.",
   },
   foundry: {
     id: "foundry",
@@ -390,9 +386,8 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     wareYield: { iron: 6 },
     popCapacity: 0,
     unrest: 0,
-    requiresTech: "engineering",
     requiresFocus: "workshop",
-    blurb: "+6 iron, +1 gold — furnaces and casting works. Workshops focus. (Engineering)",
+    blurb: "+6 iron, +1 gold — furnaces and casting works. Workshops focus.",
   },
   athenaeum: {
     id: "athenaeum",
@@ -401,9 +396,8 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     yield: { knowledge: 6 },
     popCapacity: 0,
     unrest: 3,
-    requiresTech: "philosophy",
     requiresFocus: "academy",
-    blurb: "+6 knowledge, -3 unrest — a great house of learning. Academy focus. (Philosophy)",
+    blurb: "+6 knowledge, -3 unrest — a great house of learning. Academy focus.",
   },
   citadel: {
     id: "citadel",
@@ -414,9 +408,8 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     popCapacity: 0,
     unrest: 8,
     fortification: 3,
-    requiresTech: "castles",
     requiresFocus: "garrison",
-    blurb: "+3 fortification, -8 unrest — an impregnable stronghold. Garrison focus. (Castles)",
+    blurb: "+3 fortification, -8 unrest — an impregnable stronghold. Garrison focus.",
   },
 
   // --- Signature Hansa buildings ---------------------------------------------
@@ -451,8 +444,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     wareYield: { cloth: 3 },
     popCapacity: 1,
     unrest: 0,
-    requiresTech: "guilds",
-    blurb: "+3 cloth, +1 gold — a weaving hall spins upland wool into the great western cloth. (Guilds)",
+    blurb: "+3 cloth, +1 gold — a weaving hall spins upland wool into the great western cloth.",
   },
   canal: {
     id: "canal",
@@ -462,8 +454,8 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     yield: { gold: 3, food: 1 },
     popCapacity: 2,
     unrest: 0,
-    requiresTech: "engineering",
-    blurb: "+3 gold, +1 food, +2 population — a Stecknitz-style canal carries salt and goods inland. (Engineering)",
+    requiresTech: "bulk_shipping",
+    blurb: "+3 gold, +1 food, +2 population — a Stecknitz-style canal carries salt and goods inland. (Bulk Shipping)",
   },
   roland: {
     id: "roland",

@@ -119,7 +119,7 @@ describe("focus-capstone buildings", () => {
     expect(focusCapstone("balanced")).toBeUndefined();
   });
 
-  it("every specialised focus has a capstone gated by that focus and a tech", () => {
+  it("every specialised focus has a capstone gated by that focus (research-ungated)", () => {
     for (const f of FOCUS_IDS) {
       const cap = focusCapstone(f);
       if (f === "balanced") {
@@ -128,22 +128,20 @@ describe("focus-capstone buildings", () => {
       }
       expect(cap).toBeTruthy();
       expect(BUILDINGS[cap!].requiresFocus).toBe(f);
-      expect(BUILDINGS[cap!].requiresTech).toBeTruthy();
+      expect(BUILDINGS[cap!].requiresTech).toBeFalsy(); // the focus is the only gate now
     }
   });
 
-  it("isBuildingUnlockedFor honours a capstone's own requiresTech", () => {
-    expect(isBuildingUnlockedFor([], "manor")).toBe(false);
-    expect(isBuildingUnlockedFor(["feudalism"], "manor")).toBe(true);
+  it("treats an ungated focus capstone as research-unlocked", () => {
+    // Focus capstones no longer gate on research — only on the region focus.
+    expect(isBuildingUnlockedFor([], "manor")).toBe(true);
   });
 
-  it("canQueueBuilding gates a capstone on BOTH the focus and the tech", () => {
-    // Right focus + tech → allowed.
-    expect(canQueueBuilding(plains("farmland"), "manor", ["feudalism"])).toBe(true);
-    // Wrong focus, even with the tech → refused.
-    expect(canQueueBuilding(plains("market"), "manor", ["feudalism"])).toBe(false);
-    // Right focus, missing tech → refused.
-    expect(canQueueBuilding(plains("farmland"), "manor", [])).toBe(false);
+  it("canQueueBuilding gates a focus capstone on the region focus alone", () => {
+    // Right focus → allowed (no research needed).
+    expect(canQueueBuilding(plains("farmland"), "manor", [])).toBe(true);
+    // Wrong focus → refused.
+    expect(canQueueBuilding(plains("market"), "manor", [])).toBe(false);
     // An ordinary building ignores focus entirely.
     expect(canQueueBuilding(plains("garrison"), "farm", [])).toBe(true);
   });
