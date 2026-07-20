@@ -47,9 +47,10 @@ import {
 } from "@/systems/diplomacy";
 import { researchFrontier, selectTech, isBuildingUnlockedFor } from "@/systems/tech";
 import { createRoute, laneFor, regionSources, distanceFactor } from "@/systems/trade";
-import { buyWare, marketBuyPrice } from "@/systems/market";
+import { buyWare, sellWare, marketBuyPrice } from "@/systems/market";
+import { luxuryAppetite, resolveContentment } from "@/systems/prosperity";
 import { foundLeague, joinLeague, canFoundLeague, canJoinLeague, kontoreHeldBy, hasHanseHall } from "@/systems/league";
-import { GOODS, GOOD_IDS, type GoodId } from "@/data/goods";
+import { GOODS, GOOD_IDS, contentmentWares, type GoodId } from "@/data/goods";
 import { KONTORE } from "@/data/kontore";
 import { eraIndexForTurn } from "@/data/eras";
 import { TECHS, type TechId, type TechBranch } from "@/data/techs";
@@ -181,6 +182,23 @@ const AI_BUILD_WARE_LOW = 24;
 const AI_MARKET_MIN_GOLD = 60;
 /** Units of a ware a rival imports in one market purchase. */
 const AI_MARKET_BATCH = 10;
+/** Gold above which a war-minded rival converts coin into arms (iron) so recruitment isn't ware-blocked. */
+const AI_ARMS_GOLD = 150;
+/** Iron stock below which a war-minded, flush rival tops up on the market. */
+const AI_ARMS_IRON_LOW = 20;
+/** Iron a war-minded rival buys in one go, and the reserve it keeps doing so. */
+const AI_ARMS_BATCH = 20;
+const AI_ARMS_FLOOR = 100;
+/** Gold above which a flush rival spends coin topping up burgher contentment (luxuries → prestige). */
+const AI_LUXURY_GOLD = 220;
+/** Working reserve a rival keeps when buying luxuries for contentment (a discretionary spend). */
+const AI_LUXURY_FLOOR = 140;
+/** Contentment below which a flush rival tops up luxuries from the market. */
+const AI_CONTENT_TARGET = 0.85;
+/** Gold below which a near-broke rival liquidates a ware glut for emergency coin. */
+const AI_SELL_GOLD = 40;
+/** Stock above which a ware counts as a "glut" a broke rival will dump. */
+const AI_GLUT_STOCK = 40;
 
 function manageEconomy(state: GameState, nationId: number): GameState {
   const nation = state.nations.find((n) => n.id === nationId);
@@ -219,6 +237,9 @@ function manageEconomy(state: GameState, nationId: number): GameState {
   const hints: BuildHints = {
     needFood: cur.famine || cur.stocks.food < AI_FOOD_LOW,
     needBuildWares: buildWareStock < AI_BUILD_WARE_LOW,
+    // Develop luxury industry when the burghers are well short of contentment (R5.1),
+    // so a realm's own land keeps its towns comfortable rather than only imports.
+    needLuxury: contentRatio(cur, nationPop(s, nationId)) < 0.6,
   };
   for (const region of s.regions) {
     if (region.ownerId !== nationId || region.construction) continue;
@@ -238,11 +259,28 @@ function manageEconomy(state: GameState, nationId: number): GameState {
   return s;
 }
 
+/** A nation's total population — scales its luxury appetite (contentment). */
+function nationPop(state: GameState, nationId: number): number {
+  return state.regions.filter((r) => r.ownerId === nationId).reduce((s, r) => s + r.population, 0);
+}
+
+/** A nation's current burgher-contentment ratio (0..1), the read the score/unrest use. */
+function contentRatio(nation: Nation, pop: number): number {
+  return resolveContentment(nation.wares, luxuryAppetite(pop)).ratio;
+}
+
 /**
- * The rival's use of the town market (R5): a realm with coin covers a shortfall it
- * cannot produce fast enough — importing a grain reserve when its larder is low
- * (against famine) and build wares when construction is starved. Always keeps a
- * working gold reserve (AI_MARKET_MIN_GOLD), so it never buys itself broke. Pure.
+ * The rival's use of the town market (R5 / R5.1) — how a realm's treasury actually
+ * does work, the way a player's would. In priority order, each keeping a working
+ * reserve so it never buys itself broke:
+ *   1. a grain reserve when the larder is low (against famine);
+ *   2. build wares when construction is starved;
+ *   3. arms (iron) when war-minded and flush, so recruitment isn't ware-blocked —
+ *      the gold→military pipeline a rich warlord should run;
+ *   4. luxuries when flush and its towns are short of contentment — spending the
+ *      hoard on burgher comfort (contentment → unrest relief and prestige);
+ *   5. as a last resort when near-broke, liquidating a ware glut for coin.
+ * Pure.
  */
 export function manageMarket(state: GameState, nationId: number): GameState {
   const nat = state.nations.find((n) => n.id === nationId);
@@ -250,25 +288,50 @@ export function manageMarket(state: GameState, nationId: number): GameState {
   let s = state;
   const cur = (): Nation => s.nations.find((n) => n.id === nationId)!;
 
-  // Import a grain reserve against a lean larder / famine.
+  // 1. Grain reserve against a lean larder / famine.
   if (cur().famine || cur().stocks.food < AI_FOOD_LOW) s = aiImport(s, nationId, "grain");
 
-  // Import build wares when the chest that funds construction runs thin.
+  // 2. Build wares when the chest that funds construction runs thin.
   const buildStock = (): number => {
     const w = cur().wares;
     return w.timber + w.brick + w.iron + w.naval_stores;
   };
   if (buildStock() < AI_BUILD_WARE_LOW) s = aiImport(s, nationId, "timber");
 
+  // 3. Arms: a war-minded, flush realm buys iron so it can keep mustering.
+  const wantsWar =
+    (cur().personality?.aggression ?? 0.4) > 0.5 ||
+    s.nations.some((o) => !o.isBarbarian && o.id !== nationId && atWar(s, nationId, o.id));
+  if (wantsWar && cur().wares.iron < AI_ARMS_IRON_LOW && cur().stocks.gold > AI_ARMS_GOLD) {
+    s = aiImport(s, nationId, "iron", AI_ARMS_FLOOR, AI_ARMS_BATCH);
+  }
+
+  // 4. Luxuries: a flush realm tops up burgher contentment from the market — a real,
+  //    bounded job for a big treasury (capped at full contentment, so no runaway).
+  if (cur().stocks.gold > AI_LUXURY_GOLD && contentRatio(cur(), nationPop(s, nationId)) < AI_CONTENT_TARGET) {
+    const cheapest = contentmentWares().reduce((a, b) => (marketBuyPrice(a) <= marketBuyPrice(b) ? a : b));
+    s = aiImport(s, nationId, cheapest, AI_LUXURY_FLOOR);
+  }
+
+  // 5. Emergency liquidity: near-broke, dump the biggest ware glut for coin.
+  if (cur().stocks.gold < AI_SELL_GOLD) {
+    let glut: GoodId | null = null;
+    let most = AI_GLUT_STOCK;
+    for (const g of GOOD_IDS) {
+      if (cur().wares[g] > most) { most = cur().wares[g]; glut = g; }
+    }
+    if (glut) s = sellWare(s, nationId, glut, AI_MARKET_BATCH);
+  }
+
   return s;
 }
 
-/** Import up to AI_MARKET_BATCH units of `good`, keeping AI_MARKET_MIN_GOLD in reserve. */
-function aiImport(state: GameState, nationId: number, good: GoodId): GameState {
+/** Import up to `batch` units of `good`, keeping `floor` gold in reserve. */
+function aiImport(state: GameState, nationId: number, good: GoodId, floor = AI_MARKET_MIN_GOLD, batch = AI_MARKET_BATCH): GameState {
   const nat = state.nations.find((n) => n.id === nationId)!;
-  const spendable = nat.stocks.gold - AI_MARKET_MIN_GOLD;
+  const spendable = nat.stocks.gold - floor;
   if (spendable <= 0) return state;
-  const qty = Math.min(AI_MARKET_BATCH, Math.floor(spendable / marketBuyPrice(good)));
+  const qty = Math.min(batch, Math.floor(spendable / marketBuyPrice(good)));
   return qty > 0 ? buyWare(state, nationId, good, qty) : state;
 }
 
@@ -407,6 +470,9 @@ const FOOD_BUILDINGS: BuildingId[] = ["manor", "farm", "aqueduct", "harbor", "gr
 /** Ware-yielding industry, best first — what a realm short of build wares (or eager
     to trade) develops to feed its construction and its Kontor routes. */
 const WARE_BUILDINGS: BuildingId[] = ["foundry", "bloomery", "mine", "workshop", "guildhall", "stable"];
+/** Luxury industry — what a realm builds to keep its burghers content (R5.1). The
+    Weaving Works spins wool into cloth (a contentment luxury). */
+const LUXURY_BUILDINGS: BuildingId[] = ["weaving_works"];
 
 /**
  * Produce-to-need hints from the nation's economy: build food when the larder runs
@@ -416,6 +482,8 @@ const WARE_BUILDINGS: BuildingId[] = ["foundry", "bloomery", "mine", "workshop",
 export interface BuildHints {
   needFood?: boolean;
   needBuildWares?: boolean;
+  /** Burghers are short of contentment — develop luxury industry (a Weaving Works). */
+  needLuxury?: boolean;
 }
 
 export function chooseBuilding(
@@ -450,6 +518,11 @@ export function chooseBuilding(
   if (hints?.needBuildWares) {
     const ware = firstOf(WARE_BUILDINGS);
     if (ware) return ware;
+  }
+  // Burghers short of luxuries: raise a Weaving Works to spin cloth for contentment.
+  if (hints?.needLuxury) {
+    const lux = firstOf(LUXURY_BUILDINGS);
+    if (lux) return lux;
   }
   // Trait-preferred buildings first, then the generalist order.
   const order = [...new Set([...(trait ? TRAIT_BUILD_PRIORITY[trait] : []), ...BASE_BUILD_ORDER])];
@@ -1092,9 +1165,14 @@ function recruit(state: GameState, nationId: number, rng: Rng): GameState {
     .reduce((sum, a) => sum + armySize(a.units), 0);
 
   // Warlords keep a bigger standing army; everyone raises more in wartime; a
-  // Martial realm (cheaper units) fields a larger host and leans on it.
+  // Martial realm (cheaper units) fields a larger host and leans on it. R5.1: a rich,
+  // aggressive realm turns its treasury into military weight — gold finally buys a
+  // bigger host (drawn on by ongoing upkeep) instead of piling up unused. Capped and
+  // aggression-scaled, so a peaceful realm's hoard doesn't militarise.
+  const wealthLevies = Math.min(8, Math.max(0, Math.floor((nation.stocks.gold - 400) / 600)));
   const wanted =
-    3 + Math.round(aggression * 6) + (atWarNow ? 3 : 0) + (nation.trait === "martial" ? 3 : 0);
+    3 + Math.round(aggression * 6) + (atWarNow ? 3 : 0) + (nation.trait === "martial" ? 3 : 0) +
+    Math.round(aggression * wealthLevies);
   if (myUnits >= wanted) return state;
   if (nation.stocks.gold < 30) return state;
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { checkVictory, endGameSummary, nationScore, victoryProgress, victoryRaces } from "@/systems/victory";
 import { createGame } from "@/systems/turn";
-import { DOMINATION_FRACTION, PLAYER_ID, TURN_LIMIT } from "@/systems/state";
+import { DOMINATION_FRACTION, PLAYER_ID, TURN_LIMIT, emptyWares } from "@/systems/state";
 
 describe("nationScore", () => {
   it("is positive for a going concern", () => {
@@ -28,6 +28,16 @@ describe("nationScore", () => {
       ],
     };
     expect(nationScore(withLux, PLAYER_ID)).toBeGreaterThan(base);
+  });
+
+  it("rewards burgher contentment — luxuries kept in store are renown (R5.1)", () => {
+    const g = createGame({ seed: 1, rivals: 2 });
+    const bare = { ...g, nations: g.nations.map((n) => (n.id === PLAYER_ID ? { ...n, wares: emptyWares() } : n)) };
+    const stocked = {
+      ...g,
+      nations: g.nations.map((n) => (n.id === PLAYER_ID ? { ...n, wares: { ...emptyWares(), furs: 300, cloth: 300 } } : n)),
+    };
+    expect(nationScore(stocked, PLAYER_ID)).toBeGreaterThan(nationScore(bare, PLAYER_ID));
   });
 });
 

@@ -16,11 +16,20 @@ import {
   type GameState,
 } from "@/systems/state";
 import { GOODS } from "@/data/goods";
+import { luxuryAppetite, resolveContentment } from "@/systems/prosperity";
 
 /** Prestige earned per gold of luxury-ware trade income — the Hansa's wealth as renown. */
 const LUXURY_PRESTIGE_WEIGHT = 2;
+/**
+ * Prestige per head of a *content* burgher population (R5.1). A realm that keeps its
+ * towns in furs, cloth, wax, amber and wool flaunts that comfort as renown — so
+ * luxuries matter for winning even when unrest is already low (where the unrest
+ * easing does nothing). Naturally capped at full contentment (ratio ≤ 1), so it is
+ * a bounded gold→luxuries→prestige sink, not a money pump.
+ */
+const CONTENT_PRESTIGE_PER_POP = 1.0;
 
-/** Prestige score — territory, tech, treasury, population, and luxury trade. */
+/** Prestige score — territory, tech, treasury, population, luxury trade, and burgher contentment. */
 export function nationScore(state: GameState, id: number): number {
   const regions = state.regions.filter((r) => r.ownerId === id);
   const nation = state.nations.find((n) => n.id === id);
@@ -31,12 +40,15 @@ export function nationScore(state: GameState, id: number): number {
   const luxuryIncome = (state.routes ?? [])
     .filter((r) => r.ownerId === id && GOODS[r.good].roles.includes("luxury"))
     .reduce((s, r) => s + (r.lastIncome ?? 0), 0);
+  // Burgher contentment: keeping the towns supplied with luxuries is itself renown.
+  const contentment = resolveContentment(nation.wares, luxuryAppetite(population)).ratio;
   return Math.round(
     regions.length * 10 +
       nation.research.done.length * 15 +
       Math.max(0, nation.stocks.gold) / 10 +
       population +
-      luxuryIncome * LUXURY_PRESTIGE_WEIGHT,
+      luxuryIncome * LUXURY_PRESTIGE_WEIGHT +
+      contentment * population * CONTENT_PRESTIGE_PER_POP,
   );
 }
 

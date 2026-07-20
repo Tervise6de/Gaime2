@@ -37,7 +37,7 @@ import {
   type Region,
 } from "@/systems/state";
 import type { UnitType } from "@/data/units";
-import { GOODS } from "@/data/goods";
+import { GOODS, contentmentWares } from "@/data/goods";
 
 const RIVAL = 2;
 
@@ -114,6 +114,23 @@ describe("manageMarket (R5 town market)", () => {
   it("keeps a working reserve — a near-broke realm imports nothing", () => {
     const s = mkState(mkNation({ stocks: { gold: 40, food: 0, knowledge: 0 } }));
     expect(manageMarket(s, RIVAL)).toBe(s);
+  });
+
+  it("spends a hoard on luxuries to reach contentment when flush (R5.1)", () => {
+    const n = mkNation({ stocks: { gold: 1000, food: 40, knowledge: 0 } });
+    const s = { ...mkState(n), regions: [region({ id: 0, ownerId: RIVAL, population: 30 })] } as unknown as GameState;
+    const nn = manageMarket(s, RIVAL).nations[0]!;
+    expect(contentmentWares().reduce((a, g) => a + nn.wares[g], 0)).toBeGreaterThan(0);
+    expect(nn.stocks.gold).toBeLessThan(1000);
+  });
+});
+
+describe("chooseBuilding — luxury industry (R5.1)", () => {
+  it("develops a Weaving Works when burghers want contentment", () => {
+    expect(chooseBuilding({ unrest: 0, buildings: [], terrain: "plains" }, ["guilds"], undefined, { needLuxury: true })).toBe("weaving_works");
+  });
+  it("does not force luxury industry without the hint", () => {
+    expect(chooseBuilding({ unrest: 0, buildings: [], terrain: "plains" }, ["guilds"], undefined, {})).not.toBe("weaving_works");
   });
 });
 

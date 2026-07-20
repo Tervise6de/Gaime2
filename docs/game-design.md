@@ -197,6 +197,28 @@ Each R-milestone leaves the game runnable, tested and playable end-to-end.
     stocked or market-bought larder rides out a bad turn. It only ever *reduces* famine.
   - HUD: the Goods Ledger shows each ware's stock and per-ware Buy/Sell controls, plus a
     burgher-contentment readout; the stability breakdown folds in the contentment easing.
+- **R5.1 — Make it bite (landed, from balance sims).** Headless full-game runs showed
+  R5's carrots were near-inert: unrest sat so low (~4) that contentment's only reward
+  (−unrest) did nothing, the market was never exercised in healthy play, and the AI
+  hoarded tens of thousands of gold with nothing to spend it on. Three fixes, each
+  re-validated by the sims:
+  - **Contentment → prestige** (`systems/victory.ts`, `CONTENT_PRESTIGE_PER_POP`): a
+    realm that keeps its towns supplied with luxuries flaunts that comfort as renown, so
+    luxuries matter for *winning* even when unrest is already low. Bounded (capped at full
+    contentment), so it is a gold→luxuries→prestige sink, not a money pump.
+  - **The AI plays its treasury** (`systems/ai.ts` `manageMarket`): a rival now spends
+    gold like a player — buying luxuries to keep its burghers content, arms (iron) when
+    war-minded and flush, a grain reserve or build wares on a shortfall, and dumping a
+    glut when near-broke. It also builds a **Weaving Works** when short of contentment
+    (`needLuxury` build hint). Rival contentment rose from ~70–90% to ~100%.
+  - **Wealth → military** (`recruit` `wealthLevies`): a rich, aggressive realm turns its
+    treasury into a bigger standing host (bought arms + ongoing upkeep), so gold buys
+    power instead of piling up. Capped and aggression-scaled — a peaceful realm's hoard
+    does not militarise. Sims confirmed warlike realms drain their hoards, rivals stay
+    diverse (no snowball), and a wealth-using player ranks higher.
+  *Open (a macro-economy question, not R5's):* a peaceful merchant realm can still
+  accumulate gold — a rich trade republic has genuinely few sinks — a candidate for a
+  future economy pass (gold-rushed construction, higher upkeep, or tax-income scaling).
 
 Guardrails unchanged: deterministic seeded RNG only, pure `GameState → GameState`
 turn pipeline, `systems/` never touch the DOM, `data/` stays serialisable, tests
