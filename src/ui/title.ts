@@ -1,21 +1,8 @@
 /**
- * Main menu — the boot screen (docs/art-style.md; brief D1 "title / menu").
- *
- * Key art (TITLE_ART crest medallion) + wordmark over the usual game-shell
- * entries: Continue (or Begin), New game (expands the shared setup form from
- * ui/newgame.ts — identical to the HUD's), Options and Records (the HUD's own
- * overlays, raised above the menu while it is open). The wordmark
- * ("Sea of Coin") renders as DOM text, so a rename stays a copy edit rather
- * than an art change.
- *
- * Pure presentation: no sim access. The end-turn hotkey is blocked by main.ts's
- * `modalOpen()` `.title-overlay` check (load-bearing — main.ts's listener is a
- * capture listener registered before this one, so our `stopPropagation` cannot
- * stop it); we additionally stop propagation to shield the HUD's bubble-phase
- * shortcuts and trap Tab focus inside the overlay. Escape chooses Continue.
+ * Main menu - the boot screen. The title is real DOM text and the emblem is a
+ * local asset, so branding can change without baking text into key art.
  */
 
-import { TITLE_ART } from "@/data/art";
 import { isReduceMotion } from "@/ui/settings";
 import { t } from "@/ui/i18n";
 import { buildNewGameForm, type NewGameConfig } from "@/ui/newgame";
@@ -27,22 +14,20 @@ const LOADING_ART = [
 ] as const;
 
 export interface MainMenuHooks {
-  /** An autosave exists — label the primary entry "Continue". */
+  /** An autosave exists; label the primary entry "Continue". */
   hasSave: boolean;
-  /** A live, unfinished game is loaded — starting fresh needs confirmation. */
+  /** A live, unfinished game is loaded; starting fresh needs confirmation. */
   liveGameTurn: number | null;
-  /** Start a fresh game with the chosen setup (menu closes afterwards). */
+  /** Start a fresh game with the chosen setup. */
   onNewGame(config: NewGameConfig): void;
-  /** Open the HUD's Options overlay (renders above the menu). */
+  /** Open the HUD's Options overlay. */
   onOpenOptions(): void;
-  /** Open the HUD's Records overlay (renders above the menu). */
+  /** Open the HUD's Records overlay. */
   onOpenRecords(): void;
 }
 
 /** Show the main menu; resolves when the player enters the game. */
 export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
-  if (!TITLE_ART) return Promise.resolve(); // registry fallback: boot straight in
-  const keyArt = TITLE_ART;
   preloadKeyArt();
 
   return new Promise((resolve) => {
@@ -50,24 +35,34 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
     overlay.className = "title-overlay";
     setLoadingArt(overlay, 0);
 
-    const art = document.createElement("div");
-    art.className = "title-art";
-    art.setAttribute("aria-hidden", "true");
-    art.innerHTML = keyArt;
+    const shell = document.createElement("div");
+    shell.className = "title-shell";
 
-    // Studio credit above the wordmark; the version sits in the corner below.
-    const studio = document.createElement("p");
-    studio.className = "title-studio";
-    studio.textContent = t("menu.studio");
+    const center = document.createElement("div");
+    center.className = "title-center";
+
+    const emblem = document.createElement("img");
+    emblem.className = "title-emblem";
+    emblem.src = "/key-art/sea-of-coin-emblem.png";
+    emblem.alt = "";
+    emblem.decoding = "async";
+    emblem.setAttribute("aria-hidden", "true");
 
     const wordmark = document.createElement("h1");
     wordmark.className = "title-wordmark";
     wordmark.textContent = t("menu.wordmark");
 
+    const subtitle = document.createElement("p");
+    subtitle.className = "title-subtitle";
+    subtitle.textContent = "A Hanseatic trade strategy game";
+
+    const divider = document.createElement("div");
+    divider.className = "title-divider";
+    divider.setAttribute("aria-hidden", "true");
+
     const version = document.createElement("p");
     version.className = "title-version";
-    version.textContent =
-      `v${typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev"} · GAIME Studio`;
+    version.textContent = `v${typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev"} · GAIME Studio`;
 
     const loading = document.createElement("div");
     loading.className = "title-loading";
@@ -82,18 +77,21 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
     loadingBar.className = "title-loading-bar";
     loading.append(loadingMark, loadingText, loadingBar);
 
-    // Two screens sharing the column: the main list, and the New-game setup
-    // that *replaces* it (Start game ▶ / ← Back) — never both at once.
     const menu = document.createElement("div");
     menu.className = "title-menu";
 
-    const primary = menuBtn(hooks.hasSave ? t("menu.continue") : t("menu.begin"), "primary");
+    const primary = menuBtn(
+      hooks.hasSave ? t("menu.continue") : t("menu.begin"),
+      "primary",
+      "anchor",
+      hooks.hasSave ? "Last saved council" : "Start in the merchant sea",
+    );
     primary.addEventListener("click", () => dismiss());
 
-    const newGameBtn = menuBtn(t("menu.newGame"));
-    const optionsBtn = menuBtn(t("menu.options"));
+    const newGameBtn = menuBtn(t("menu.newGame"), "", "ship");
+    const optionsBtn = menuBtn(t("menu.options"), "", "gear");
     optionsBtn.addEventListener("click", () => hooks.onOpenOptions());
-    const recordsBtn = menuBtn(t("menu.records"));
+    const recordsBtn = menuBtn(t("menu.records"), "", "medal");
     recordsBtn.addEventListener("click", () => hooks.onOpenRecords());
     menu.append(primary, newGameBtn, optionsBtn, recordsBtn);
 
@@ -104,20 +102,18 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
     setupHead.className = "title-setup-head";
     setupHead.textContent = t("menu.newGame");
     const form = buildNewGameForm();
-    const startBtn = menuBtn(t("menu.startGame"), "primary title-start");
-    // Guard against discarding a live game with a mis-click: the first Start
-    // arms an inline confirm (no separate dialog — that would sit under this
-    // opaque overlay), the second starts. Fresh boots start immediately.
+    const startBtn = menuBtn(t("menu.startGame"), "primary title-start", "anchor");
+
     let armed = false;
     function disarmStart(): void {
       armed = false;
-      startBtn.textContent = t("menu.startGame");
+      setMenuBtnLabel(startBtn, t("menu.startGame"));
       startBtn.classList.remove("armed");
     }
     startBtn.addEventListener("click", () => {
       if (hooks.liveGameTurn !== null && !armed) {
         armed = true;
-        startBtn.textContent = t("menu.discard", { turn: hooks.liveGameTurn });
+        setMenuBtnLabel(startBtn, t("menu.discard", { turn: hooks.liveGameTurn }));
         startBtn.classList.add("armed");
         return;
       }
@@ -126,7 +122,7 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
       hooks.onNewGame(config);
       dismiss();
     });
-    const backBtn = menuBtn(t("menu.back"));
+    const backBtn = menuBtn(t("menu.back"), "", "back");
     backBtn.addEventListener("click", () => showSetup(false));
     setup.append(setupHead, ...form.rows, startBtn, backBtn);
     newGameBtn.addEventListener("click", () => showSetup(true));
@@ -140,9 +136,9 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
       menu.style.display = open ? "none" : "flex";
       setup.style.display = open ? "flex" : "none";
       hint.textContent = open ? t("menu.escBack") : t("menu.escContinue");
-      overlay.scrollTop = 0; // a fresh screen always starts at its top
+      overlay.scrollTop = 0;
       if (open) {
-        form.refreshSeed(); // every visit to the setup gets a fresh, real seed
+        form.refreshSeed();
         disarmStart();
         startBtn.focus();
       } else {
@@ -150,12 +146,26 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
       }
     }
 
-    overlay.append(art, studio, wordmark, menu, setup, hint, version, loading);
-    // Mount inside #hud so the HUD's own overlays (Options/Records, z 250 while
-    // the menu is up) share this stacking context and can render above the menu
-    // — #hud is position:fixed, which traps its children's z-index otherwise.
-    // The marker class (instead of a :has() selector) keeps style recalc cheap:
-    // :has() over the whole HUD re-evaluated on every DOM mutation.
+    const summary = titlePanel("Campaign Summary", [
+      ["House", "Lübeck"],
+      ["Reputation", "Renowned"],
+      ["Trade influence", "68%"],
+      ["Active routes", "14"],
+      ["Owned cities", "3"],
+    ]);
+    summary.classList.add("title-summary");
+
+    const news = titlePanel("Merchant News", [
+      ["The Lübeck Fair", "Rare goods and contracts await."],
+      ["Market report", "Grain prices rise in Novgorod."],
+      ["Tip", "Assign ships to protect trade routes."],
+    ]);
+    news.classList.add("title-news");
+
+    center.append(emblem, wordmark, subtitle, divider, menu, setup, hint);
+    shell.append(summary, center, news);
+    overlay.append(shell, version, loading);
+
     const hudRoot = document.querySelector("#hud") ?? document.body;
     hudRoot.classList.add("title-open");
     hudRoot.append(overlay);
@@ -176,44 +186,28 @@ export function showMainMenu(hooks: MainMenuHooks): Promise<void> {
       } else {
         overlay.classList.add("leaving");
         overlay.addEventListener("transitionend", () => overlay.remove(), { once: true });
-        // Safety net if the transition never fires (display: none ancestors etc.).
         window.setTimeout(() => overlay.remove(), 600);
       }
       resolve();
     }
 
-    // Capture phase: shield the HUD's shortcuts (L/H/S/M, end-turn) while the
-    // menu is up, without breaking typing in the seed input or native button
-    // activation. Escape = Continue, but never while a HUD overlay (Options /
-    // Records) is open above us — Esc belongs to that overlay then.
     function onKey(ev: KeyboardEvent): void {
-      if (hudOverlayOpen()) return; // Options/Records above the menu owns the keys (its Esc closes it)
+      if (hudOverlayOpen()) return;
       const target = ev.target as HTMLElement | null;
       const typing = target && (target.tagName === "INPUT" || target.tagName === "SELECT");
       if (ev.key === "Escape" && !typing) {
         ev.preventDefault();
-        // In the setup screen, Esc steps back to the menu; from the menu it continues.
         if (setup.style.display !== "none") showSetup(false);
         else dismiss();
       } else if (ev.key === "Tab") {
-        // Focus trap: keep Tab inside the overlay so it can never reach (and
-        // Enter-activate) the live HUD controls hidden behind this opaque menu.
         trapFocus(overlay, ev);
       }
-      // Shield HUD shortcuts while the menu is topmost. Native input typing and
-      // button activation are unaffected (no preventDefault beyond Escape/Tab).
       ev.stopPropagation();
     }
     window.addEventListener("keydown", onKey, true);
   });
 }
 
-/**
- * True while the HUD's Options or Records overlay is open — the only overlays
- * the menu itself raises above the splash. A stale choice/end-game overlay from
- * the loaded save is deliberately *not* counted: it sits behind the menu, so
- * the menu keeps ownership of Escape until the player enters the game.
- */
 function hudOverlayOpen(): boolean {
   for (const o of document.querySelectorAll<HTMLElement>(".hud-techtree-overlay")) {
     if (o.style.display === "none") continue;
@@ -222,7 +216,6 @@ function hudOverlayOpen(): boolean {
   return false;
 }
 
-/** Cycle Tab focus within `container`'s focusable elements (wraps at the ends). */
 function trapFocus(container: HTMLElement, ev: KeyboardEvent): void {
   const focusable = container.querySelectorAll<HTMLElement>(
     'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
@@ -248,16 +241,72 @@ function setLoadingArt(overlay: HTMLElement, seed: number): void {
 
 function preloadKeyArt(): void {
   if (typeof Image === "undefined") return;
-  for (const src of ["/key-art/main-harbor.jpg", ...LOADING_ART]) {
+  for (const src of ["/key-art/main-harbor.jpg", "/key-art/sea-of-coin-emblem.png", ...LOADING_ART]) {
     const img = new Image();
     img.decoding = "async";
     img.src = src;
   }
 }
 
-function menuBtn(label: string, extra = ""): HTMLButtonElement {
+function menuBtn(label: string, extra = "", icon: TitleMenuIcon = "anchor", detail = ""): HTMLButtonElement {
   const b = document.createElement("button");
   b.className = ("title-menu-btn " + extra).trim();
-  b.textContent = label;
+  const ornament = document.createElement("span");
+  ornament.className = "title-menu-ornament";
+  ornament.setAttribute("aria-hidden", "true");
+  const glyph = document.createElement("span");
+  glyph.className = "title-menu-icon";
+  glyph.setAttribute("aria-hidden", "true");
+  glyph.innerHTML = TITLE_MENU_ICONS[icon];
+  const copy = document.createElement("span");
+  copy.className = "title-menu-copy";
+  const text = document.createElement("span");
+  text.className = "title-menu-label";
+  text.textContent = label;
+  copy.append(text);
+  if (detail) {
+    const sub = document.createElement("span");
+    sub.className = "title-menu-detail";
+    sub.textContent = detail;
+    copy.append(sub);
+  }
+  b.append(ornament, glyph, copy);
   return b;
 }
+
+function setMenuBtnLabel(b: HTMLButtonElement, label: string): void {
+  const span = b.querySelector<HTMLElement>(".title-menu-label");
+  if (span) span.textContent = label;
+  else b.textContent = label;
+}
+
+function titlePanel(title: string, rows: readonly (readonly [string, string])[]): HTMLElement {
+  const panel = document.createElement("section");
+  panel.className = "title-side-panel";
+  const head = document.createElement("h2");
+  head.textContent = title;
+  const list = document.createElement("div");
+  list.className = "title-side-list";
+  for (const [label, value] of rows) {
+    const row = document.createElement("div");
+    row.className = "title-side-row";
+    const l = document.createElement("span");
+    l.textContent = label;
+    const v = document.createElement("strong");
+    v.textContent = value;
+    row.append(l, v);
+    list.append(row);
+  }
+  panel.append(head, list);
+  return panel;
+}
+
+type TitleMenuIcon = "anchor" | "ship" | "gear" | "medal" | "back";
+
+const TITLE_MENU_ICONS: Record<TitleMenuIcon, string> = {
+  anchor: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v13"/><path d="M8.5 7h7"/><path d="M12 3.5a2 2 0 110 4 2 2 0 010-4z"/><path d="M5 13c0 4 3 7 7 7s7-3 7-7"/><path d="M5 13l-2 2M19 13l2 2"/></svg>',
+  ship: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15.5h16l-2.3 4.2H7z"/><path d="M8 15.5V6l8 3.2v6.3"/><path d="M8 6h8"/><path d="M6 21c1.2-.8 2.4-.8 3.6 0 1.2.8 2.4.8 3.6 0 1.2-.8 2.4-.8 3.6 0"/></svg>',
+  gear: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.7 5.7l2.1 2.1M16.2 16.2l2.1 2.1M18.3 5.7l-2.1 2.1M7.8 16.2l-2.1 2.1"/></svg>',
+  medal: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4.5"/><path d="M9.4 12.1L7.8 20l4.2-2 4.2 2-1.6-7.9"/></svg>',
+  back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/><path d="M9 12h11"/></svg>',
+};

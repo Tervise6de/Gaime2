@@ -11,6 +11,7 @@ local game assets.
 | `public/key-art/loading-map-table.jpg` | `ChatGPT Image 19. juuli 2026, 21_35_34.png` | Loading/transition background |
 | `public/key-art/loading-harbor-dark.jpg` | `ChatGPT Image 19. juuli 2026, 21_35_53.png` | Loading/transition background |
 | `public/key-art/loading-cog-arrival.jpg` | `ChatGPT Image 19. juuli 2026, 21_36_12.png` | Loading/transition background |
+| `public/key-art/sea-of-coin-emblem.png` | `8505f188-d44c-4d77-8bc3-538dfe155834.png` | Main menu emblem |
 
 ## AI-Generated Event Art
 
