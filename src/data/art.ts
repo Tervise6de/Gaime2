@@ -20,8 +20,8 @@ import type { TerrainId } from "@/data/terrain";
 import type { UnitType } from "@/data/units";
 import type { BuildingId } from "@/data/buildings";
 
-/** Resource ids carrying art: the four stockpiles + the two strategic resources. */
-export type ResourceArtId = "gold" | "food" | "materials" | "knowledge" | "iron" | "horses" | "salt" | "amber";
+/** Resource ids carrying art: stockpiles, HUD metrics, and strategic resources. */
+export type ResourceArtId = "gold" | "food" | "materials" | "knowledge" | "stability" | "iron" | "horses" | "salt" | "amber";
 
 /** UI glyph vocabulary — one designed set replacing the emoji grab-bag. */
 export type GlyphId =
@@ -89,6 +89,9 @@ export const RESOURCE_ART: Record<ResourceArtId, string | null> = {
     '<path d="M6 6.8C9.7 3.6 15.6 3.7 19.2 7.4"/><path d="M6 6.8l1.7 1.9M19.2 7.4l-2 1.4"/><path d="M12.5 5.1L5.3 20.2"/>',
   ),
   knowledge: BOOK,
+  stability: ico(
+    '<path d="M12 5.4v12.3M8.4 17.7h7.2"/><path d="M5.8 8.1h12.4"/><path d="M6.1 8.1l-2.1 5a2.8 2.8 0 005.6 0zM17.9 8.1l-2.1 5a2.8 2.8 0 005.6 0z"/>',
+  ),
   // Anvil — filled silhouette; strokes vanish at marker size.
   iron: ico(
     '<path d="M3.3 6.2h12.9c2.3 0 4-.7 5.5-2-.3 3.6-2.7 5.9-6.5 6.2v3.4c2 .4 3.3 1.3 3.8 3.1H5.9c.5-1.8 1.8-2.7 3.8-3.1v-3.4C6.6 10.1 4.1 8.7 3.3 6.2z"/>',
@@ -352,8 +355,9 @@ export const BUILDING_ART: Record<BuildingId, string | null> = {
 };
 
 // ---------------------------------------------------------------------------
-// Nation crests. Keyed by nation id (fixed roster: 0 player, 1 barbarians,
-// 2..6 the RIVAL_NAMES order in systems/turn.ts). Templates carry the
+// Nation crests. Named entries cover the Hansa factions used by the map.
+// Numeric entries are fallback slots for the player/free towns and legacy
+// saves. Templates carry the
 // `__C__` token where the nation's display colour goes — pass the *resolved*
 // colour (after `cbSafe`) so crests follow the colour-blind palette exactly
 // like map ownership does. Sigils are white-on-colour so shape distinguishes
@@ -377,22 +381,32 @@ export const CREST_ART: Record<number, string | null> = {
   1: crest(
     '<path d="M9 8.2l6.4 7M15 8.2l-6.4 7"/><path d="M9.8 7.4c-1.2.3-2 .8-2.6 1.7M14.2 7.4c1.2.3 2 .8 2.6 1.7"/>',
   ),
-  // Valdheim — mountain peaks.
-  2: crest('<path d="M6.8 14.6l3.1-5.4 2 3.2 1.9-3.7 3.4 5.9z"/>'),
-  // Suzerain of Kael — crescent moon.
-  3: crest('<path d="M14.8 7.6a4.9 4.9 0 100 7.6 5.7 5.7 0 010-7.6z"/>'),
-  // Sundered League — a ring broken in two.
-  4: crest(
-    '<path d="M14.9 8.3a4.4 4.4 0 011.5 3.3 4.4 4.4 0 01-1.5 3.3M9.1 14.9a4.4 4.4 0 01-1.5-3.3 4.4 4.4 0 011.5-3.3"/>',
-  ),
-  // Emberhold — flame.
-  5: crest(
-    '<path d="M12 6.6c1.9 1.9 3.4 3.7 3.4 5.7a3.4 3.4 0 11-6.8 0c0-2 1.5-3.8 3.4-5.7z"/><path d="M12 11.2c.7.8 1.1 1.5 1.1 2.2a1.1 1.1 0 11-2.2 0c0-.7.4-1.4 1.1-2.2z"/>',
-  ),
-  // Korrath Hegemony — battlemented tower.
-  6: crest(
-    '<path d="M9.3 15.4v-4.6h-.9V7.6h1.6v1.1h1.2V7.6h1.6v1.1H14V7.6h1.6v3.2h-.9v4.6z"/>',
-  ),
+  2: null,
+  3: null,
+  4: null,
+  5: null,
+  6: null,
+};
+
+export const FACTION_CREST_ART: Record<string, string | null> = {
+  "Lübeck": crest('<path d="M7.2 15.8V9.4L12 6l4.8 3.4v6.4"/><path d="M9 15.8v-3.1h6v3.1"/><path d="M8.4 9.4h7.2"/><path d="M12 6V4.4"/>'),
+  England: crest('<path d="M8.1 15.9c1.6-1.1 2.3-2.8 2-5.1l1.9-2.5 1.9 2.5c-.3 2.3.4 4 2 5.1"/><path d="M9.4 9.8l-2.1-.9M14.6 9.8l2.1-.9"/>'),
+  Flanders: crest('<path d="M7.1 15.4l4.9-8.7 4.9 8.7"/><path d="M8.7 12.4h6.6"/><path d="M7.4 8.4c3.1 1.4 6.1 1.4 9.2 0"/>'),
+  Saxony: crest('<path d="M7.1 15.6l9.8-9.8M7.1 5.8l9.8 9.8"/><path d="M9.1 7.8l-1.7-1.7M14.9 13.6l1.7 1.7"/>'),
+  Cologne: crest('<path d="M8.1 16.1V9.3L12 6.2l3.9 3.1v6.8"/><path d="M10 16.1v-4h4v4"/><path d="M8.1 9.3h7.8"/><path d="M12 6.2V4.1M10.8 5.1h2.4"/>'),
+  Denmark: crest('<path d="M7.6 14.2v-4.4l2.4 1.8 2-3.4 2 3.4 2.4-1.8v4.4z" fill="#f7f4ea" stroke="none"/><path d="M8 16.3h8"/>'),
+  Norway: crest('<path d="M6.9 15.1l3-5.2 1.9 3.1 2.1-4.3 3.2 6.4z"/><path d="M7 16.6h10"/>'),
+  Sweden: crest('<path d="M8.2 8.1h.1M12 7.1h.1M15.8 8.1h.1"/><path d="M8.2 14.5h7.6"/><path d="M10.2 12.3h3.6"/>'),
+  Gotland: crest('<path d="M7.1 13.8c2.8 1.6 6.9 1.6 9.8 0"/><path d="M9 12.9l2.4-4.3 2.4 4.3"/><path d="M8.7 8.6h5.8"/>'),
+  Finland: crest('<path d="M12 6v10.2"/><path d="M7.5 14.8h9"/><path d="M8.4 10.6h7.2"/><path d="M12 6l-1.8 2.2M12 6l1.8 2.2"/>'),
+  Estonia: crest('<path d="M7.2 9.2h9.6M7.2 12h9.6M7.2 14.8h9.6"/><path d="M8.5 16.8h7"/>'),
+  Livonia: crest('<path d="M12 6v10.6"/><path d="M8 9.6h8"/><path d="M9.7 14.7h4.6"/>'),
+  Lithuania: crest('<path d="M7.2 15.3h9.6"/><path d="M8.3 13.4c1.8-3 4.2-4.9 7.2-5.8"/><path d="M11.7 8.9l3.8 3.8"/>'),
+  Novgorod: crest('<path d="M8 15.8V8.4h8v7.4"/><path d="M8 8.4l4-2.4 4 2.4"/><path d="M10 11.2h4M10 13.6h4"/>'),
+  Prussia: crest('<path d="M12 5.8v10.4"/><path d="M7.2 10h9.6"/><path d="M9.1 7.4l2.9 2.6 2.9-2.6"/><path d="M9.1 14.6l2.9-2.6 2.9 2.6"/>'),
+  Poland: crest('<path d="M8.2 15.8c1.5-1.1 2.2-2.7 2-4.9l1.8-2.4 1.8 2.4c-.2 2.2.5 3.8 2 4.9"/><path d="M9.5 10.2l-2-.8M14.5 10.2l2-.8"/><path d="M12 8.5V6.4"/>'),
+  Curonia: crest('<path d="M7.5 14.6l4.5-8.3 4.5 8.3"/><path d="M9 12.8c2 .7 4 .7 6 0"/><path d="M7.4 16.3h9.2"/>'),
+  Samogitia: crest('<path d="M8.1 15.9c.9-4.1 2.2-6.9 3.9-8.4 1.7 1.5 3 4.3 3.9 8.4"/><path d="M9.8 11.2h4.4"/><path d="M9.1 14h5.8"/>'),
 };
 
 /**
@@ -407,8 +421,16 @@ export function safeColor(color: string): string {
     : "#8a8f99";
 }
 
+/** Resolve a faction crest SVG in its display colour, or null when none is registered. */
+export function factionCrestSvg(factionName: string | null | undefined, color: string): string | null {
+  const tpl = factionName ? FACTION_CREST_ART[factionName] : null;
+  return tpl ? tpl.replaceAll("__C__", safeColor(color)) : null;
+}
+
 /** Resolve a nation's crest SVG in its display colour, or null (fallback: colour swatch). */
-export function crestSvg(nationId: number, color: string): string | null {
+export function crestSvg(nationId: number, color: string, factionName?: string | null): string | null {
+  const named = factionCrestSvg(factionName, color);
+  if (named) return named;
   const tpl = CREST_ART[nationId];
   return tpl ? tpl.replaceAll("__C__", safeColor(color)) : null;
 }

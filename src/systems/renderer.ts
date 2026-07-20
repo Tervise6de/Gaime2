@@ -1697,7 +1697,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         r: 11.5,
         text: `Capital of ${ownerNation?.isPlayer ? "your realm" : (ownerNation?.name ?? "a realm")} — its seat of power.`,
       });
-      const crestArt = owner === null ? null : crestSvg(owner, ownerColor(owner));
+      const crestArt = owner === null ? null : crestSvg(owner, ownerColor(owner), ownerNation?.name);
       iconChip(cx, cy, 10.5);
       context.beginPath();
       context.arc(cx, cy, 10.5, 0, Math.PI * 2);

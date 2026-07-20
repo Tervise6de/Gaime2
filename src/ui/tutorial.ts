@@ -24,7 +24,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     target: ".hud-topbar",
     title: "Your treasury & production",
-    body: "The top strip: gold, food, materials and knowledge with per-turn flows, the turn readout in the centre, and victory progress + the ☰ menu (standings, legend, help, options) on the right. Watch food (famine bites) and gold (bankruptcy disbands troops).",
+    body: "The top strip: treasury, food, knowledge and stability with per-turn flows, the turn readout in the centre, and the main command buttons on the right. Watch food (famine bites), gold (bankruptcy disbands troops), and stability (unrest throttles towns).",
   },
   {
     target: ".hud-tax-slider",

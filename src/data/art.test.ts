@@ -5,6 +5,7 @@ import {
   BUILDING_ART,
   CREST_ART,
   EVENT_VIGNETTE,
+  FACTION_CREST_ART,
   GLYPH_ART,
   MOMENT_ART,
   RESOURCE_ART,
@@ -15,6 +16,7 @@ import {
   UNIT_ART,
   badgeArt,
   crestSvg,
+  factionCrestSvg,
   safeColor,
   eventVignette,
   ico,
@@ -22,6 +24,7 @@ import {
 import { TERRAIN_IDS } from "@/data/terrain";
 import { UNITS } from "@/data/units";
 import { BUILDINGS } from "@/data/buildings";
+import { FACTIONS } from "@/data/factions";
 import { ACHIEVEMENTS } from "@/data/achievements";
 import { CHOICE_EVENT_IDS } from "@/systems/events";
 
@@ -50,6 +53,7 @@ describe("art registry", () => {
     for (const v of Object.values(TERRAIN_MOTIF)) expectSvgOrNull(v);
     for (const v of Object.values(MOMENT_ART)) expectSvgOrNull(v);
     for (const v of Object.values(EVENT_VIGNETTE)) expectSvgOrNull(v);
+    for (const v of Object.values(FACTION_CREST_ART)) expectSvgOrNull(v);
     for (const v of Object.values(BADGE_ART)) expectSvgOrNull(v);
     for (const v of Object.values(BRANCH_ART)) expectSvgOrNull(v);
     for (const v of Object.values(TREATY_ART)) expectSvgOrNull(v);
@@ -90,6 +94,14 @@ describe("art registry", () => {
 
   it("has a crest slot for the full fixed nation roster (ids 0..6)", () => {
     for (let id = 0; id <= 6; id++) expect(id in CREST_ART).toBe(true);
+  });
+
+  it("has a named crest for every Hansa faction", () => {
+    for (const faction of FACTIONS) {
+      const svg = factionCrestSvg(faction.name, faction.color);
+      expect(svg, `missing crest for ${faction.name}`).not.toBeNull();
+      expect(svg).toContain(faction.color);
+    }
   });
 
   it("crestSvg substitutes the display colour and never leaks the token", () => {

@@ -16,7 +16,7 @@ import { BUILDINGS, BUILDING_IDS, BUILD_RATE, buildingFocusOk, buildingResourceO
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
 import { TERRAIN, TERRAIN_IDS, STRATEGIC_RESOURCES } from "@/data/terrain";
 import { regionProduction, nationalProduction, nationYieldMult, yieldFactors, singleModifierMult, unrestPenalty } from "@/systems/economy";
-import { garrisonCalm, overexpansionUnrest } from "@/systems/stability";
+import { garrisonCalm, nextUnrest, overexpansionUnrest } from "@/systems/stability";
 import { techUnrestReduction } from "@/systems/tech";
 import { runTutorial } from "@/ui/tutorial";
 import { confirmAction } from "@/ui/confirm";
@@ -239,7 +239,12 @@ export interface Hud {
   minimapCanvas: HTMLCanvasElement;
 }
 
-const RESOURCE_META: Record<ResourceKey, { label: string; icon: string; tip: string }> = {
+type TopbarResourceKey = "gold" | "food" | "knowledge" | "stability";
+type ResourceDisplayKey = ResourceKey | "stability";
+
+const TOPBAR_RESOURCE_KEYS: readonly TopbarResourceKey[] = ["gold", "food", "knowledge", "stability"];
+
+const RESOURCE_META: Record<ResourceDisplayKey, { label: string; icon: string; tip: string }> = {
   gold: {
     label: "Treasury",
     icon: "🪙",
@@ -250,9 +255,14 @@ const RESOURCE_META: Record<ResourceKey, { label: string; icon: string; tip: str
     icon: "🌾",
     tip: "Food feeds population. Surplus grows your regions up to their capacity; a shortfall causes famine — population starves and unrest climbs. Stored food is capped by granaries.",
   },
+  stability: {
+    label: "Stability",
+    icon: "⚖",
+    tip: "Stability is 100 minus your average regional unrest. Low stability means unrest is close to throttling production or revolt.",
+  },
   materials: {
     label: "Materials",
-    icon: "⛏️",
+    icon: "⛏",
     tip: "Materials build structures and raise units. Buildings and armies both draw on this stockpile.",
   },
   knowledge: {
@@ -281,9 +291,9 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   realmText.append(realmName, realmSub);
   realmBlock.append(realmCrest, realmText);
   barLeft.append(realmBlock);
-  const resourceEls: Record<ResourceKey, { stock: HTMLElement; flow: HTMLElement }> =
+  const resourceEls: Record<TopbarResourceKey, { stock: HTMLElement; flow: HTMLElement }> =
     {} as never;
-  for (const key of RESOURCE_KEYS) {
+  for (const key of TOPBAR_RESOURCE_KEYS) {
     const meta = RESOURCE_META[key];
     const cell = el("div", "hud-resource");
     const icon = resourceIconEl(key, meta.icon, "hud-resource-icon");
@@ -308,9 +318,12 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const resourceTipEl = el("div", "hud-restip");
   resourceTipEl.style.display = "none";
   root.append(resourceTipEl);
-  function showResourceTip(key: ResourceKey, x: number, y: number): void {
+  function showResourceTip(key: TopbarResourceKey, x: number, y: number): void {
     if (!lastState || !lastPlayer) return;
-    resourceTipEl.innerHTML = resourceTipHtml(lastState, lastPlayer, key);
+    resourceTipEl.innerHTML =
+      key === "stability"
+        ? stabilityTipHtml(lastState, lastPlayer)
+        : resourceTipHtml(lastState, lastPlayer, key);
     resourceTipEl.style.display = "block";
     positionResourceTip(x, y);
   }
@@ -335,15 +348,15 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   // Resource-count tweening: the displayed stock eases toward the live value so the
   // numbers count up/down instead of snapping. Skipped (snaps) under reduce-motion.
   // The RAF idles itself once every value has settled, so a static HUD costs nothing.
-  const displayedStock: Record<ResourceKey, number> = {} as never;
-  const targetStock: Record<ResourceKey, number> = {} as never;
+  const displayedStock: Record<TopbarResourceKey, number> = {} as never;
+  const targetStock: Record<TopbarResourceKey, number> = {} as never;
   let stockInitialized = false;
   let stockRaf: number | null = null;
-  function writeStock(key: ResourceKey, value: number, exact: boolean): void {
+  function writeStock(key: TopbarResourceKey, value: number, exact: boolean): void {
     resourceEls[key].stock.textContent = exact ? fmt(value) : String(Math.round(value));
   }
   function snapStocks(): void {
-    for (const key of RESOURCE_KEYS) {
+    for (const key of TOPBAR_RESOURCE_KEYS) {
       displayedStock[key] = targetStock[key];
       writeStock(key, targetStock[key], true);
     }
@@ -358,7 +371,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       return;
     }
     let moving = false;
-    for (const key of RESOURCE_KEYS) {
+    for (const key of TOPBAR_RESOURCE_KEYS) {
       const target = targetStock[key];
       const cur = displayedStock[key] ?? target;
       const diff = target - cur;
@@ -2357,7 +2370,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     const player = playerNation(state);
     lastPlayer = player;
     lastState = state;
-    const crest = crestSvg(player.id, cbSafe(player.color, isColourblind()));
+    const crest = crestSvg(player.id, cbSafe(player.color, isColourblind()), player.name);
     realmCrest.innerHTML = crest ? crest : "";
     realmCrest.classList.toggle("fallback", !crest);
     if (!crest) realmCrest.textContent = player.name.slice(0, 1).toUpperCase();
@@ -2455,7 +2468,14 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     }
     // Keep the save-slot labels' turn markers current (e.g. after autosave/load).
     refreshSlotLabels();
-    for (const key of RESOURCE_KEYS) {
+    const stability = nationalStability(state, PLAYER_ID);
+    for (const key of TOPBAR_RESOURCE_KEYS) {
+      if (key === "stability") {
+        targetStock[key] = stability.value;
+        resourceEls[key].flow.textContent = `${stability.flow >= 0 ? "+" : ""}${fmt(stability.flow)}/turn`;
+        resourceEls[key].flow.classList.toggle("negative", stability.flow < 0);
+        continue;
+      }
       targetStock[key] = player.stocks[key];
       const f = key === "gold" ? round1(flow.gold - upkeep) : flow[key];
       resourceEls[key].flow.textContent = `${f >= 0 ? "+" : ""}${fmt(f)}/turn`;
@@ -2977,6 +2997,72 @@ function resourceTipHtml(state: GameState, player: Nation, key: ResourceKey): st
     upkeepBlock +
     `<div class="hud-restip-total"><span class="hud-restip-name">${key === "gold" ? "Net / turn" : "Total / turn"}</span>` +
     `<span class="hud-restip-val${totalVal < 0 ? " neg" : " pos"}">${totalVal >= 0 ? "+" : ""}${fmt(totalVal)}</span></div>`
+  );
+}
+
+interface StabilitySummary {
+  value: number;
+  flow: number;
+  avgUnrest: number;
+  nextAvgUnrest: number;
+  owned: number;
+  strained: number;
+  revolting: number;
+}
+
+function nationalStability(state: GameState, nationId: number): StabilitySummary {
+  const nation = state.nations.find((n) => n.id === nationId);
+  const owned = state.regions.filter((r) => r.ownerId === nationId);
+  if (!nation || owned.length === 0) {
+    return { value: 100, flow: 0, avgUnrest: 0, nextAvgUnrest: 0, owned: 0, strained: 0, revolting: 0 };
+  }
+  const avgUnrest = avg(owned.map((r) => r.unrest));
+  const ownedCount = owned.length;
+  const techCalm = techUnrestReduction(nation.research.done);
+  const nextAvgUnrest = avg(
+    owned.map((r) =>
+      nextUnrest(r, nation.taxRate, nation.famine, ownedCount, techCalm, garrisonSizeInRegion(state, nationId, r.id)),
+    ),
+  );
+  return {
+    value: clamp(round1(100 - avgUnrest), 0, 100),
+    flow: round1(avgUnrest - nextAvgUnrest),
+    avgUnrest: round1(avgUnrest),
+    nextAvgUnrest: round1(nextAvgUnrest),
+    owned: owned.length,
+    strained: owned.filter((r) => r.unrest >= UNREST_PENALTY_START).length,
+    revolting: owned.filter((r) => r.unrest >= UNREST_REVOLT).length,
+  };
+}
+
+function garrisonSizeInRegion(state: GameState, nationId: number, regionId: number): number {
+  return state.armies
+    .filter((a) => a.ownerId === nationId && a.regionId === regionId)
+    .reduce((sum, a) => sum + armySize(a.units), 0);
+}
+
+function avg(values: number[]): number {
+  return values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : 0;
+}
+
+function clamp(value: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, value));
+}
+
+function stabilityTipHtml(state: GameState, player: Nation): string {
+  const s = nationalStability(state, player.id);
+  const icon = resourceIconHtml("stability", RESOURCE_META.stability.icon);
+  const trendClass = s.flow < 0 ? " neg" : " pos";
+  return (
+    `<div class="hud-restip-head">${icon} Stability</div>` +
+    `<div class="hud-restip-rows">` +
+    `<div class="hud-restip-row"><span class="hud-restip-name">Average unrest now</span><span class="hud-restip-val">${fmt(s.avgUnrest)}</span></div>` +
+    `<div class="hud-restip-row"><span class="hud-restip-name">Projected unrest next turn</span><span class="hud-restip-val">${fmt(s.nextAvgUnrest)}</span></div>` +
+    `<div class="hud-restip-row"><span class="hud-restip-name">Restless regions</span><span class="hud-restip-val">${s.strained}/${s.owned}</span></div>` +
+    `<div class="hud-restip-row"><span class="hud-restip-name">Revolting regions</span><span class="hud-restip-val${s.revolting > 0 ? " neg" : ""}">${s.revolting}</span></div>` +
+    `</div>` +
+    `<div class="hud-restip-total"><span class="hud-restip-name">National stability</span>` +
+    `<span class="hud-restip-val${trendClass}">${fmt(s.value)} (${s.flow >= 0 ? "+" : ""}${fmt(s.flow)}/turn)</span></div>`
   );
 }
 
@@ -4260,7 +4346,7 @@ function compositionLine(army: Army): HTMLElement {
  */
 function nationMark(n: Nation): HTMLElement {
   const color = cbSafe(n.color, isColourblind());
-  const crest = crestSvg(n.id, color);
+  const crest = crestSvg(n.id, color, n.name);
   if (crest) {
     const span = el("span", "hud-crest ico-svg");
     span.setAttribute("aria-hidden", "true");

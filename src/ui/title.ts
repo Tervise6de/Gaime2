@@ -7,6 +7,7 @@ import { isReduceMotion } from "@/ui/settings";
 import { t } from "@/ui/i18n";
 import { buildNewGameForm, type NewGameConfig } from "@/ui/newgame";
 import { factionByName } from "@/data/factions";
+import { factionCrestSvg } from "@/data/art";
 import { TRAITS, type TraitId } from "@/data/traits";
 import { fullscreenAvailable, isFullscreen, toggleFullscreen } from "@/ui/fullscreen";
 
@@ -368,6 +369,11 @@ function renderSelectedRealm(card: HTMLElement, factionName: string): void {
   const crest = document.createElement("div");
   crest.className = "title-realm-crest";
   crest.style.setProperty("--realm-color", def?.color ?? "#b0273b");
+  const crestArt = factionCrestSvg(def?.name, def?.color ?? "#b0273b");
+  if (crestArt) {
+    crest.classList.add("has-art");
+    crest.innerHTML = crestArt;
+  }
   const names = document.createElement("div");
   names.className = "title-realm-nameblock";
   const name = document.createElement("h2");
