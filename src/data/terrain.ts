@@ -128,14 +128,3 @@ export const TERRAIN: Record<TerrainId, TerrainDef> = {
 };
 
 export const TERRAIN_IDS = Object.keys(TERRAIN) as TerrainId[];
-
-/** Pick a terrain id from a weighted roll in [0, 1). */
-export function terrainFromRoll(roll: number): TerrainId {
-  const total = TERRAIN_IDS.reduce((sum, id) => sum + TERRAIN[id].weight, 0);
-  let cursor = roll * total;
-  for (const id of TERRAIN_IDS) {
-    cursor -= TERRAIN[id].weight;
-    if (cursor <= 0) return id;
-  }
-  return "plains";
-}

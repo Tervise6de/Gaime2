@@ -59,14 +59,6 @@ export function buildingIconHtml(id: BuildingId, fallbackText: string, className
   return iconHtml(BUILDING_ART[id], fallbackText, className);
 }
 
-export function unitIconEl(id: UnitType, fallbackText: string, className = "ico"): HTMLElement {
-  return iconEl(UNIT_ART[id], fallbackText, className);
-}
-
-export function buildingIconEl(id: BuildingId, fallbackText: string, className = "ico"): HTMLElement {
-  return iconEl(BUILDING_ART[id], fallbackText, className);
-}
-
 /** A button whose label is `[icon] text` — the emoji fallback keeps today's look. */
 export function iconBtn(
   glyph: GlyphId,

@@ -94,8 +94,6 @@ export const FORT_PER_LEVEL = 0.2;
 export const MAX_ENTRENCH = 3;
 /** Random swing applied to the attacker's strength ratio in combat. */
 export const COMBAT_VARIANCE = 0.15;
-/** Fraction of the losing side's army destroyed in a decisive fight. */
-export const CASUALTY_SCALE = 0.6;
 /** Phased-battle tuning (combat v2). A fight opens with a volley (ranged +
     siege first strike), then up to MAX rounds of melee attrition. */
 export const MAX_COMBAT_ROUNDS = 5;
@@ -121,14 +119,10 @@ export const BANKRUPTCY_UNREST = 15;
  */
 export const RELATION_MIN = -100;
 export const RELATION_MAX = 100;
-/** Each turn, relations decay this much toward 0 (grudges and goodwill fade). */
-export const RELATION_DRIFT = 1;
 /** Relation hit for declaring war / breaking a treaty. */
 export const RELATION_WAR_HIT = 45;
 /** Relation gain from a gift (per unit, scaled by amount). */
 export const GIFT_RELATION = 1; // per gold, capped in diplomacy.ts
-/** Border friction: relation drag per shared border with a nation. */
-export const BORDER_FRICTION = 0.5;
 /** Below this relation an AI will consider war; above it, treaties. */
 export const HOSTILE_THRESHOLD = -30;
 export const FRIENDLY_THRESHOLD = 40;

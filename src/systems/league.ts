@@ -38,7 +38,6 @@ import {
 const BOYCOTT_LEVY = 8; // Pfundzoll — each member's ad-hoc contribution when a boycott is called
 const BOYCOTT_RELATION_HIT = -12; // the cut-off realm's resentment of each member
 const LEAVE_PENALTY = -14; // relations hit with each member on leaving
-const EXPEL_PENALTY = -26; // the sharper hit of Verhansung (expulsion)
 const DEFENCE_ENMITY = -2; // per-turn relations slide with each member while you war one of them
 
 // --- membership queries ------------------------------------------------------
@@ -115,11 +114,6 @@ export function joinLeague(state: GameState, ownerId: number): GameState {
 /** Leave the League (relations cool with former partners). Dissolves it if it empties. Pure. */
 export function leaveLeague(state: GameState, ownerId: number): GameState {
   return removeMember(state, ownerId, LEAVE_PENALTY, ownerId === PLAYER_ID ? "You leave" : `${nameOf(state, ownerId)} leaves`);
-}
-
-/** Expel a member (Verhansung) — a sharper relations hit than leaving. Pure. */
-export function expelFromLeague(state: GameState, ownerId: number): GameState {
-  return removeMember(state, ownerId, EXPEL_PENALTY, `${nameOf(state, ownerId)} is cast out of`);
 }
 
 function removeMember(state: GameState, ownerId: number, penalty: number, verb: string): GameState {

@@ -41,7 +41,7 @@ import { generateRuler } from "@/data/rulers";
 import { recordChronicle, chronicleName } from "@/systems/chronicle";
 import { driftRelations, decayOpinions, atWar } from "@/systems/diplomacy";
 import { runNationTurn } from "@/systems/ai";
-import { advanceResearch, dequeueResearch, techUnrestReduction, isBuildingUnlockedFor, selectTech, queueResearch as queueResearchTech, clearQueue } from "@/systems/tech";
+import { advanceResearch, dequeueResearch, techUnrestReduction, isBuildingUnlockedFor, selectTech } from "@/systems/tech";
 import { fireEvent } from "@/systems/events";
 import { checkVictory, nationScore } from "@/systems/victory";
 import { createRng, type Rng } from "@/systems/rng";
@@ -568,20 +568,6 @@ export function chooseResearch(state: GameState, tech: TechId, nationId = PLAYER
   return { ...state, nations };
 }
 
-/** Append a tech to a nation's research queue (auto-starts after the current). Pure. */
-export function queueResearch(state: GameState, tech: TechId, nationId = PLAYER_ID): GameState {
-  const nations = state.nations.map((n) =>
-    n.id === nationId ? { ...n, research: queueResearchTech(n.research, tech) } : n,
-  );
-  return { ...state, nations };
-}
-
-/** Clear a nation's research queue. Pure. */
-export function clearResearchQueue(state: GameState, nationId = PLAYER_ID): GameState {
-  const nations = state.nations.map((n) => (n.id === nationId ? { ...n, research: clearQueue(n.research) } : n));
-  return { ...state, nations };
-}
-
 /** Clear a region's construction order (progress is lost). Pure. */
 export function cancelConstruction(state: GameState, regionId: number): GameState {
   const region = state.regions[regionId];
@@ -880,6 +866,3 @@ function zeroStocks(): ResourceStocks {
 function fmtSigned(n: number): string {
   return `${n >= 0 ? "+" : ""}${n}`;
 }
-
-/** Re-export so callers have one import site for building content. */
-export { BUILDINGS };
