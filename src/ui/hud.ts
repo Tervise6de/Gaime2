@@ -436,7 +436,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const menuWrap = el("div", "hud-menu-wrap");
   const menuToggle = document.createElement("button");
   menuToggle.className = "hud-legend-toggle hud-menu-toggle";
-  menuToggle.textContent = "☰";
+  menuToggle.innerHTML = glyphHtml("options", "⚙");
   menuToggle.title = "Tutorial, records and options.";
   menuToggle.setAttribute("aria-label", "Menu");
   const topMenu = el("div", "hud-topmenu");

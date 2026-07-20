@@ -6,7 +6,7 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
-## 2026-07-20 — R3 + R2: Food from the food wares (salt→fish chain) & AI produce-to-need (v0.86.0)
+## 2026-07-20 — R3 + R2: Food from the food wares (salt→fish chain) & AI produce-to-need (v0.89.0)
 
 Two follow-ups to the wares overhaul, landed together.
 
@@ -40,6 +40,40 @@ tests); 0 `fetch`; deps `{}`. Two temporary self-play probes (10–12 seeds, sin
 **Next:** R4 — refined-ware chains (salted herring, hopped beer, wool→cloth), luxury
 demand feeding prestige/stability, and a food-scarcity tighten so famine becomes an
 occasional real pressure (the model currently runs with ample headroom).
+
+---
+
+## 2026-07-20 — Stronger crest enamel + redesigned sigils (v0.88.0)
+
+Second crest pass (`data/art.ts`, art data only). Pushed the `crest()` finish
+further — a brighter graded top sheen (two stacked highlight bands), a deeper
+shadow at the point, and a stronger gilt rim — so shields read as domed, struck
+enamel. Redesigned four vague/duplicate sigils for distinctness (England and
+Poland were near-identical eagle-ish marks): England → St George's cross;
+Poland → the White Eagle (head, raised spread wings, fanned tail); Sweden → Tre
+Kronor (three crowns, 2 over 1); Lithuania → the Jagiellon double cross. Verified
+at 64/34/18px. 685 tests green, typecheck + build clean.
+
+## 2026-07-20 — Crest enamel finish + bolder resource icons (v0.87.0)
+
+First crest pass + icon weight (`data/art.ts`). The shared `crest()` template
+gained a lit "chief" band, a soft point shadow, a dark rim (map contrast at
+~17px) and a fine gilt inner line, turning the flat colour shields into enamel
+badges — upgrading every crest at once (map capital markers, the top-bar
+medallion, standings and diplomacy). Bumped the stroke weight of the treasury /
+food / knowledge / stability (and materials) icons for more presence at HUD sizes.
+
+## 2026-07-20 — Gilded top bar: navbar + resource strip reskin (v0.86.0)
+
+Reskinned the in-game top bar (`ui/hud.ts` / `ui/style.css`) to the title
+screen's premium gilded look: a deep-navy ground with a gold gradient frame (top
+hairline + bottom rail), the crest in a gold-ringed medallion, a serif
+gold-gradient realm name + turn read-out, a gilded resource strip (gold icons /
+labels, cream values, engraved fading dividers), and the right cluster (nav ·
+End turn · settings) framed as one strip with a prominent End turn and a gear
+toggle (was `☰`). The compact base fits ~1366px laptops without clipping End
+turn; a `min-width:1660px` block widens the nav on wide displays. The redundant
+bar tax shortcut was dropped (tax stays on the Politics page), matching the mockup.
 
 ---
 

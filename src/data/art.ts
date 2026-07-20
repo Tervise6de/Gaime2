@@ -68,6 +68,7 @@ function ico(inner: string, opts: { fill?: boolean; sw?: number } = {}): string 
 /** Open book — shared by the knowledge resource and the `book` glyph. */
 const BOOK = ico(
   '<path d="M12 6.3C10.1 4.7 7.2 4.2 4.3 4.5v13.1c2.9-.3 5.8.2 7.7 1.8 1.9-1.6 4.8-2.1 7.7-1.8V4.5c-2.9-.3-5.8.2-7.7 1.8z"/><path d="M12 6.3v13.1"/>',
+  { sw: 1.95 },
 );
 
 /** Rosette medal — shared by the Records toolbar glyph and achievement badges. */
@@ -79,18 +80,22 @@ export const RESOURCE_ART: Record<ResourceArtId, string | null> = {
   // Coin stack — the treasury, not a single coin, so it reads at 14px.
   gold: ico(
     '<ellipse cx="12" cy="7.3" rx="6.9" ry="2.9"/><path d="M5.1 7.3v9.2c0 1.7 3.1 3 6.9 3s6.9-1.3 6.9-3V7.3"/><path d="M5.1 11.9c0 1.7 3.1 3 6.9 3s6.9-1.3 6.9-3"/>',
+    { sw: 2 },
   ),
   // Wheat stalk: stem + two grain pairs + head.
   food: ico(
     '<path d="M12 21V6.5"/><path d="M12 10.8C9.9 10.8 8.1 9.3 8.1 6.7c2.1 0 3.9 1.5 3.9 4.1z"/><path d="M12 10.8c2.1 0 3.9-1.5 3.9-4.1-2.1 0-3.9 1.5-3.9 4.1z"/><path d="M12 15.4c-2.1 0-3.9-1.5-3.9-4.1 2.1 0 3.9 1.5 3.9 4.1z"/><path d="M12 15.4c2.1 0 3.9-1.5 3.9-4.1-2.1 0-3.9 1.5-3.9 4.1z"/><path d="M12 6.5c-.9-.9-.9-2.4 0-3.3.9.9.9 2.4 0 3.3z"/>',
+    { sw: 2 },
   ),
   // Pickaxe: broad head arc + handle through the apex.
   materials: ico(
     '<path d="M6 6.8C9.7 3.6 15.6 3.7 19.2 7.4"/><path d="M6 6.8l1.7 1.9M19.2 7.4l-2 1.4"/><path d="M12.5 5.1L5.3 20.2"/>',
+    { sw: 2 },
   ),
   knowledge: BOOK,
   stability: ico(
     '<path d="M12 5.4v12.3M8.4 17.7h7.2"/><path d="M5.8 8.1h12.4"/><path d="M6.1 8.1l-2.1 5a2.8 2.8 0 005.6 0zM17.9 8.1l-2.1 5a2.8 2.8 0 005.6 0z"/>',
+    { sw: 2 },
   ),
   // Anvil — filled silhouette; strokes vanish at marker size.
   iron: ico(
@@ -364,12 +369,28 @@ export const BUILDING_ART: Record<BuildingId, string | null> = {
 // factions even under palette remaps.
 // ---------------------------------------------------------------------------
 
-/** Shared shield template; the sigil group is drawn in off-white over `__C__`. */
+/**
+ * Shared shield template. The field is the nation colour (`__C__`); over it a
+ * lit "chief" band and a shadow at the point give the enamelled, domed look of a
+ * struck badge, and a dark rim + fine gilt inner line frame it (the rim keeps it
+ * legible over the map at ~17px; the gilt ties it to the HUD's gold). The sigil
+ * is drawn off-white on top so shape distinguishes factions under palette remaps.
+ */
+const CREST_SHIELD = "M12 2.6l8 2.8v6.1c0 4.9-3.2 8.6-8 9.9-4.8-1.3-8-5-8-9.9V5.4z";
 function crest(sigil: string): string {
   return (
     '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">' +
-    '<path d="M12 2.6l8 2.8v6.1c0 4.9-3.2 8.6-8 9.9-4.8-1.3-8-5-8-9.9V5.4z" fill="__C__" stroke="rgba(10,12,16,0.6)" stroke-width="1.2" stroke-linejoin="round"/>' +
-    `<g fill="none" stroke="#f7f4ea" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${sigil}</g>` +
+    `<path d="${CREST_SHIELD}" fill="__C__"/>` +
+    // Lit band across the top plus a brighter strip at the very edge → a glossy,
+    // graded sheen so the enamel clearly catches light.
+    '<path d="M12 3.6L19 6v3.5C16.7 10.6 14.4 11.1 12 11.1S7.3 10.6 5 9.5V6z" fill="#ffffff" opacity="0.22"/>' +
+    '<path d="M12 3.6L19 6v1.5C16.4 8.3 14.2 8.8 12 8.8S7.6 8.3 5 7.5V6z" fill="#ffffff" opacity="0.16"/>' +
+    // Shadow gathering toward the point.
+    '<path d="M5.4 12.6C7 16.2 9.4 18.6 12 19.8c2.6-1.2 5-3.6 6.6-7.2-1.6 2-4 3.6-6.6 4.4-2.6-.8-5-2.4-6.6-4.4z" fill="#000000" opacity="0.22"/>' +
+    // Dark rim (map contrast) then a fine gilt inner line.
+    `<path d="${CREST_SHIELD}" fill="none" stroke="rgba(8,10,14,0.62)" stroke-width="1.3" stroke-linejoin="round"/>` +
+    `<path d="${CREST_SHIELD}" fill="none" stroke="rgba(248,229,176,0.62)" stroke-width="0.65" stroke-linejoin="round"/>` +
+    `<g fill="none" stroke="#f7f4ea" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${sigil}</g>` +
     "</svg>"
   );
 }
@@ -390,21 +411,27 @@ export const CREST_ART: Record<number, string | null> = {
 
 export const FACTION_CREST_ART: Record<string, string | null> = {
   "Lübeck": crest('<path d="M7.2 15.8V9.4L12 6l4.8 3.4v6.4"/><path d="M9 15.8v-3.1h6v3.1"/><path d="M8.4 9.4h7.2"/><path d="M12 6V4.4"/>'),
-  England: crest('<path d="M8.1 15.9c1.6-1.1 2.3-2.8 2-5.1l1.9-2.5 1.9 2.5c-.3 2.3.4 4 2 5.1"/><path d="M9.4 9.8l-2.1-.9M14.6 9.8l2.1-.9"/>'),
+  // St George's cross — the recognisable English mark (was an eagle-like shape
+  // near-identical to Poland's).
+  England: crest('<path d="M10.6 5.4h2.8v3.8h3.8v2.8h-3.8v3.8h-2.8v-3.8H6.8v-2.8h3.8z" fill="#f7f4ea" stroke="none"/>'),
   Flanders: crest('<path d="M7.1 15.4l4.9-8.7 4.9 8.7"/><path d="M8.7 12.4h6.6"/><path d="M7.4 8.4c3.1 1.4 6.1 1.4 9.2 0"/>'),
   Saxony: crest('<path d="M7.1 15.6l9.8-9.8M7.1 5.8l9.8 9.8"/><path d="M9.1 7.8l-1.7-1.7M14.9 13.6l1.7 1.7"/>'),
   Cologne: crest('<path d="M8.1 16.1V9.3L12 6.2l3.9 3.1v6.8"/><path d="M10 16.1v-4h4v4"/><path d="M8.1 9.3h7.8"/><path d="M12 6.2V4.1M10.8 5.1h2.4"/>'),
   Denmark: crest('<path d="M7.6 14.2v-4.4l2.4 1.8 2-3.4 2 3.4 2.4-1.8v4.4z" fill="#f7f4ea" stroke="none"/><path d="M8 16.3h8"/>'),
   Norway: crest('<path d="M6.9 15.1l3-5.2 1.9 3.1 2.1-4.3 3.2 6.4z"/><path d="M7 16.6h10"/>'),
-  Sweden: crest('<path d="M8.2 8.1h.1M12 7.1h.1M15.8 8.1h.1"/><path d="M8.2 14.5h7.6"/><path d="M10.2 12.3h3.6"/>'),
+  // Tre Kronor — three crowns, 2 over 1 (was three dots + bars).
+  Sweden: crest('<path d="M7.3 9.3v-2.3l.85.8.85-1.4.85 1.4.85-.8v2.3z" fill="#f7f4ea" stroke="none"/><path d="M13.3 9.3v-2.3l.85.8.85-1.4.85 1.4.85-.8v2.3z" fill="#f7f4ea" stroke="none"/><path d="M10.3 14.8v-2.3l.85.8.85-1.4.85 1.4.85-.8v2.3z" fill="#f7f4ea" stroke="none"/>'),
   Gotland: crest('<path d="M7.1 13.8c2.8 1.6 6.9 1.6 9.8 0"/><path d="M9 12.9l2.4-4.3 2.4 4.3"/><path d="M8.7 8.6h5.8"/>'),
   Finland: crest('<path d="M12 6v10.2"/><path d="M7.5 14.8h9"/><path d="M8.4 10.6h7.2"/><path d="M12 6l-1.8 2.2M12 6l1.8 2.2"/>'),
   Estonia: crest('<path d="M7.2 9.2h9.6M7.2 12h9.6M7.2 14.8h9.6"/><path d="M8.5 16.8h7"/>'),
   Livonia: crest('<path d="M12 6v10.6"/><path d="M8 9.6h8"/><path d="M9.7 14.7h4.6"/>'),
-  Lithuania: crest('<path d="M7.2 15.3h9.6"/><path d="M8.3 13.4c1.8-3 4.2-4.9 7.2-5.8"/><path d="M11.7 8.9l3.8 3.8"/>'),
+  // Double cross of the Jagiellons — the Lithuanian mark (was a bare diagonal).
+  Lithuania: crest('<path d="M12 5.6v11.2M8.6 9.2h6.8M9.7 12.6h4.6"/>'),
   Novgorod: crest('<path d="M8 15.8V8.4h8v7.4"/><path d="M8 8.4l4-2.4 4 2.4"/><path d="M10 11.2h4M10 13.6h4"/>'),
   Prussia: crest('<path d="M12 5.8v10.4"/><path d="M7.2 10h9.6"/><path d="M9.1 7.4l2.9 2.6 2.9-2.6"/><path d="M9.1 14.6l2.9-2.6 2.9 2.6"/>'),
-  Poland: crest('<path d="M8.2 15.8c1.5-1.1 2.2-2.7 2-4.9l1.8-2.4 1.8 2.4c-.2 2.2.5 3.8 2 4.9"/><path d="M9.5 10.2l-2-.8M14.5 10.2l2-.8"/><path d="M12 8.5V6.4"/>'),
+  // White Eagle — head, raised spread wings and a fanned tail (was near-
+  // identical to England's old mark).
+  Poland: crest('<circle cx="12" cy="6" r="1"/><path d="M12 7v6.6"/><path d="M12 8.6C9.7 7.6 7.2 6.6 5.2 6.6c.9 1 1.4 2.1 1.6 3.4M12 8.6c2.3-1 4.8-2 6.8-2-.9 1-1.4 2.1-1.6 3.4"/><path d="M9.8 13.6l2.2 3 2.2-3z"/>'),
   Curonia: crest('<path d="M7.5 14.6l4.5-8.3 4.5 8.3"/><path d="M9 12.8c2 .7 4 .7 6 0"/><path d="M7.4 16.3h9.2"/>'),
   Samogitia: crest('<path d="M8.1 15.9c.9-4.1 2.2-6.9 3.9-8.4 1.7 1.5 3 4.3 3.9 8.4"/><path d="M9.8 11.2h4.4"/><path d="M9.1 14h5.8"/>'),
 };

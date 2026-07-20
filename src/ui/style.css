@@ -10,6 +10,11 @@
   --accent: #f4d27a;
   /* Gold CTA gradient (End turn, Move/Attack, primary actions). */
   --gold-grad: linear-gradient(180deg, #f7df9a, #e5bc60 55%, #cc9a41);
+  /* Gilded top-bar tokens — the title screen's premium look, brought in-game.
+     Gold-clip text, plus horizontal/vertical hairline rules that fade at the
+     ends so section dividers read as engraved gold rather than flat borders. */
+  --gold-text: linear-gradient(180deg, #f6e3ad, #e0b45c 58%, #b98a34);
+  --bar-rule-v: linear-gradient(180deg, rgba(207, 164, 86, 0), rgba(214, 174, 96, 0.55) 26%, rgba(214, 174, 96, 0.55) 74%, rgba(207, 164, 86, 0));
   --muted: #99a2b4;
   --negative: #e8776b;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -90,13 +95,20 @@ body {
   gap: 10px;
   align-items: stretch;
   justify-content: space-between;
-  min-height: 76px;
-  padding: 7px 10px;
+  min-height: 78px;
+  padding: 7px 12px;
   background:
-    linear-gradient(180deg, rgba(6, 15, 24, 0.98), rgba(7, 13, 19, 0.94)),
-    radial-gradient(circle at 50% 0, rgba(230, 177, 78, 0.12), transparent 50%);
-  border-bottom: 1px solid rgba(214, 158, 62, 0.58);
-  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.48), inset 0 -1px 0 rgba(255, 225, 150, 0.16);
+    radial-gradient(130% 210% at 50% -70%, rgba(232, 190, 108, 0.16), transparent 52%),
+    linear-gradient(180deg, #142a45 0%, #0f2036 52%, #0b1626 100%);
+  /* Gold gradient frame: a hairline along the top edge, a thicker rail along
+     the bottom — the "gilded banner" the title screen already uses. */
+  border-width: 1px 0 3px 0;
+  border-style: solid;
+  border-image: linear-gradient(90deg, rgba(139, 98, 38, 0.2), #cfa456 16%, #f4d88c 50%, #cfa456 84%, rgba(139, 98, 38, 0.2)) 1;
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 233, 170, 0.14),
+    inset 0 -6px 16px rgba(90, 60, 18, 0.26);
   /* The z-index keeps the bar's ☰ dropdown above later-added panels (the
      region inspector) — and its stacking context makes that reliable.
      Deliberately no backdrop-filter anywhere in the HUD: at these near-opaque
@@ -113,51 +125,99 @@ body {
 }
 
 .hud-realm-block {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
-  min-width: 206px;
-  max-width: 264px;
+  min-width: 186px;
+  max-width: 246px;
   height: 100%;
-  padding: 4px 18px 4px 4px;
-  border-right: 1px solid rgba(214, 158, 62, 0.42);
+  padding: 4px 15px 4px 4px;
 }
 
+/* Engraved gold divider closing every top-bar section (fades at both ends). */
+.hud-realm-block::after,
+.hud-resource::after,
+.hud-turnblock::before,
+.hud-turnblock::after {
+  content: "";
+  position: absolute;
+  top: 15%;
+  bottom: 15%;
+  width: 1px;
+  background: var(--bar-rule-v);
+  pointer-events: none;
+}
+.hud-realm-block::after,
+.hud-resource::after,
+.hud-turnblock::after {
+  right: 0;
+}
+.hud-turnblock::before {
+  left: 0;
+}
+/* The last resource abuts the turn block, which draws its own left rule. */
+.hud-topbar-left .hud-resource:last-of-type::after {
+  display: none;
+}
+
+/* Crest sits in a gold-ringed medallion — a framed seal, as on the mockup. */
 .hud-realm-crest {
-  flex: 0 0 46px;
-  width: 46px;
-  height: 46px;
+  position: relative;
+  flex: 0 0 50px;
+  width: 50px;
+  height: 50px;
   display: grid;
   place-items: center;
   color: var(--accent);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 34%, #1d3150, #0b1524 78%);
+  border: 1.5px solid rgba(228, 188, 112, 0.72);
+  box-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 3px rgba(9, 15, 25, 0.55),
+    inset 0 0 13px rgba(232, 190, 108, 0.2);
+}
+
+.hud-realm-crest::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1px solid rgba(228, 188, 112, 0.34);
+  pointer-events: none;
 }
 
 .hud-realm-crest svg {
-  width: 46px;
-  height: 46px;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.55));
+  width: 34px;
+  height: 34px;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6));
 }
 
 .hud-realm-crest.fallback {
-  border: 1px solid rgba(214, 158, 62, 0.52);
-  border-radius: 5px;
-  background: rgba(255, 255, 255, 0.05);
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 22px;
   font-weight: 800;
+  color: var(--accent);
 }
 
 .hud-realm-text {
   min-width: 0;
-  line-height: 1.12;
+  line-height: 1.14;
 }
 
 .hud-realm-name {
   overflow: hidden;
-  color: var(--accent);
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: var(--gold-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -165,8 +225,11 @@ body {
 .hud-realm-sub {
   margin-top: 3px;
   overflow: hidden;
-  color: var(--muted);
-  font-size: 11px;
+  color: rgba(228, 198, 132, 0.72);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -181,42 +244,53 @@ body {
 .hud-topbar-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
   min-width: 0;
+  padding: 4px 5px;
+  background: linear-gradient(180deg, rgba(14, 26, 44, 0.4), rgba(8, 16, 28, 0.5));
+  border: 1px solid rgba(214, 170, 92, 0.3);
+  border-radius: 9px;
+  box-shadow: inset 0 1px 0 rgba(255, 233, 170, 0.06);
 }
 
 /* Labelled resource segment: icon beside a small column of name / value /
    +flow per turn, divided from its neighbour like a card. */
 .hud-resource {
+  position: relative;
   display: flex;
-  gap: 8px;
+  gap: 7px;
   align-items: center;
-  min-width: 78px;
-  padding: 4px 10px 4px 8px;
-  border-right: 1px solid rgba(214, 158, 62, 0.24);
+  min-width: 70px;
+  padding: 4px 9px 4px 7px;
 }
 
 .hud-resource-icon {
-  font-size: 18px;
+  font-size: 19px;
+  color: #ecc978;
+}
+
+.hud-resource-icon .ico-svg svg {
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
 }
 
 .hud-resource-body {
   display: flex;
   flex-direction: column;
-  line-height: 1.18;
+  line-height: 1.2;
 }
 
 .hud-resource-label {
-  font-size: 9.5px;
-  font-weight: 600;
+  font-size: 9px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--muted);
+  letter-spacing: 0.12em;
+  color: rgba(228, 198, 132, 0.66);
 }
 
 .hud-resource-stock {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 700;
+  color: #f4eede;
   font-variant-numeric: tabular-nums;
 }
 
@@ -232,14 +306,14 @@ body {
 
 /* The turn block: turn·year / age·difficulty·trait / active modifiers. */
 .hud-turnblock {
+  position: relative;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-width: 180px;
-  padding: 4px 18px;
-  border-left: 1px solid rgba(214, 158, 62, 0.28);
-  border-right: 1px solid rgba(214, 158, 62, 0.28);
-  line-height: 1.25;
+  gap: 2px;
+  min-width: 166px;
+  padding: 5px 16px;
+  line-height: 1.3;
   white-space: nowrap;
   text-align: center;
 }
@@ -264,31 +338,37 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  flex: 0 0 76px;
-  width: 76px;
-  min-width: 76px;
-  height: 58px;
-  padding: 5px 6px;
-  font-size: 9.5px;
+  justify-content: center;
+  gap: 4px;
+  flex: 0 0 66px;
+  width: 66px;
+  min-width: 66px;
+  height: 60px;
+  padding: 5px 4px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 9px;
   font-weight: 600;
-  letter-spacing: 0.03em;
-  color: var(--fg);
-  background: rgba(5, 13, 22, 0.72);
-  border: 1px solid rgba(214, 158, 62, 0.38);
-  border-radius: 5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #e7ddc7;
+  background: linear-gradient(180deg, rgba(30, 46, 70, 0.72), rgba(13, 25, 41, 0.82));
+  border: 1px solid rgba(214, 170, 92, 0.4);
+  border-radius: 6px;
+  box-shadow: inset 0 1px 0 rgba(255, 233, 170, 0.08);
   cursor: pointer;
-  transition: border-color 0.12s ease, background 0.12s ease;
+  transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
 }
 
 .hud-navbtn:hover {
-  border-color: rgba(230, 200, 116, 0.55);
-  background: rgba(244, 210, 122, 0.11);
+  border-color: rgba(240, 214, 148, 0.7);
+  background: linear-gradient(180deg, rgba(48, 68, 96, 0.85), rgba(22, 37, 56, 0.9));
+  box-shadow: inset 0 1px 0 rgba(255, 233, 170, 0.14), 0 0 12px rgba(226, 180, 90, 0.16);
 }
 
 .hud-navbtn.active {
-  border-color: var(--accent);
-  background: rgba(244, 210, 122, 0.14);
+  border-color: #e6c874;
+  background: linear-gradient(180deg, rgba(62, 84, 112, 0.9), rgba(28, 45, 66, 0.92));
+  box-shadow: inset 0 1px 0 rgba(255, 233, 170, 0.2), 0 0 14px rgba(226, 180, 90, 0.22);
 }
 
 .hud-navbtn.attention {
@@ -298,8 +378,12 @@ body {
 
 .hud-navbtn .ico,
 .hud-navbtn .ico-svg svg {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
+}
+
+.hud-navbtn .ico-svg {
+  color: #ecc978;
 }
 
 .hud-navbtn .hud-railbadge {
@@ -631,20 +715,24 @@ body {
 }
 
 .hud-turn-main {
-  font-size: 14.5px;
-  font-weight: 800;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
   font-variant-numeric: tabular-nums;
-  background: linear-gradient(180deg, #f2dfa8, #d8ab55);
+  background: var(--gold-text);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  -webkit-text-fill-color: transparent;
 }
 
 .hud-turn-sub {
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(228, 198, 132, 0.62);
 }
 
 /* --- Panels --------------------------------------------------------------- */
@@ -670,11 +758,10 @@ body {
 .hud-topbar .hud-actions {
   position: static;
   width: auto;
-  min-width: 190px;
-  max-width: 214px;
-  height: 58px;
-  display: grid;
-  grid-template-columns: minmax(76px, 1fr) 102px;
+  min-width: 0;
+  max-width: none;
+  height: 60px;
+  display: flex;
   align-items: stretch;
   gap: 6px;
   padding: 0;
@@ -686,6 +773,12 @@ body {
 
 .hud-topbar .hud-advisor {
   display: none !important;
+}
+
+/* Tax read-out lives on the Politics page (as on the mockup); the bar keeps
+   only the primary End-turn action, so the right cluster stays uncluttered. */
+.hud-topbar .hud-taxjump {
+  display: none;
 }
 
 .hud-actions .hud-hint {
@@ -1339,12 +1432,14 @@ body {
 
 .hud-topbar .hud-endturn {
   width: auto;
-  min-width: 112px;
+  min-width: 96px;
   height: 100%;
-  padding: 7px 10px;
-  border-radius: 5px;
+  padding: 7px 13px;
+  border-radius: 6px;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 12px;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
 }
 
@@ -2751,8 +2846,28 @@ body {
 }
 
 .hud-menu-toggle {
-  min-width: 34px;
-  font-size: 14px;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  min-width: 38px;
+  height: 60px;
+  padding: 0;
+  color: #ecc978;
+  background: linear-gradient(180deg, rgba(30, 46, 70, 0.72), rgba(13, 25, 41, 0.82));
+  border: 1px solid rgba(214, 170, 92, 0.4);
+  border-radius: 6px;
+  box-shadow: inset 0 1px 0 rgba(255, 233, 170, 0.08);
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.hud-menu-toggle:hover {
+  border-color: rgba(240, 214, 148, 0.7);
+  background: linear-gradient(180deg, rgba(48, 68, 96, 0.85), rgba(22, 37, 56, 0.9));
+}
+
+.hud-menu-toggle .ico-svg svg {
+  width: 20px;
+  height: 20px;
 }
 
 .hud-topmenu {
@@ -4304,6 +4419,31 @@ a:focus-visible,
   }
 }
 
+/* Wide desktops (the common in-game width): the compact base fits ~1366px
+   laptops without clipping End turn; here there is room to spare, so let the
+   nav labels breathe (Production/Diplomacy read in full) and give the resource
+   values a touch more presence. */
+@media (min-width: 1660px) {
+  .hud-navbtn {
+    flex-basis: 82px;
+    width: 82px;
+    min-width: 82px;
+    font-size: 9.5px;
+    letter-spacing: 0.05em;
+  }
+  .hud-resource {
+    min-width: 82px;
+    gap: 9px;
+    padding: 4px 13px 4px 10px;
+  }
+  .hud-resource-stock {
+    font-size: 18px;
+  }
+  .hud-turnblock {
+    min-width: 200px;
+  }
+}
+
 /* Narrow laptops: the centre readout cedes its space first (it ellipsises). */
 @media (max-width: 1180px) {
   .hud-topbar {
@@ -4384,8 +4524,8 @@ a:focus-visible,
     height: 34px;
   }
   .hud-realm-crest svg {
-    width: 34px;
-    height: 34px;
+    width: 23px;
+    height: 23px;
   }
   .hud-realm-name {
     font-size: 13px;
