@@ -16,7 +16,7 @@
  */
 
 import { BUILDINGS } from "@/data/buildings";
-import { focusYieldMult } from "@/data/focuses";
+import { focusYieldMult, focusWareMult } from "@/data/focuses";
 import { TERRAIN, type ResourceYield } from "@/data/terrain";
 import {
   PROSPERITY_GOLD_MULT,
@@ -31,10 +31,10 @@ import {
   type Region,
   type ResourceFlow,
 } from "@/systems/state";
-import { techMultipliers } from "@/systems/tech";
-import { traitYield } from "@/data/traits";
+import { techMultipliers, techWareMult } from "@/systems/tech";
+import { traitYield, traitWareMult } from "@/data/traits";
 
-const NO_MULT: ResourceYield = { food: 1, materials: 1, gold: 1, knowledge: 1 };
+const NO_MULT: ResourceYield = { food: 1, gold: 1, knowledge: 1 };
 
 /**
  * The yield multipliers a single active modifier applies (NO_MULT = no effect,
@@ -62,7 +62,6 @@ export function modifierMultipliers(modifiers: NationModifier[] = []): ResourceY
   for (const m of modifiers) {
     const s = singleModifierMult(m);
     out.food *= s.food;
-    out.materials *= s.materials;
     out.gold *= s.gold;
     out.knowledge *= s.knowledge;
   }
@@ -71,7 +70,6 @@ export function modifierMultipliers(modifiers: NationModifier[] = []): ResourceY
 
 /** Each unit of population works the land at these per-head rates. */
 const FOOD_PER_WORKER = 0.6;
-const MAT_PER_WORKER = 0.4;
 const GOLD_PER_WORKER = 0.3;
 /** Every head of population eats this much food per turn. */
 const FOOD_PER_HEAD = 0.5;
@@ -93,7 +91,6 @@ function buildingYield(region: Region): ResourceFlow {
   for (const id of region.buildings) {
     const y = BUILDINGS[id].yield;
     acc.food += y.food ?? 0;
-    acc.materials += y.materials ?? 0;
     acc.gold += y.gold ?? 0;
     acc.knowledge += y.knowledge ?? 0;
   }
@@ -117,13 +114,11 @@ export function regionProduction(
   const f = focusYieldMult(region.focus);
 
   const food = (base.food + b.food + pop * FOOD_PER_WORKER - pop * FOOD_PER_HEAD) * m * mult.food * f.food;
-  const materials = (base.materials + b.materials + pop * MAT_PER_WORKER) * m * mult.materials * f.materials;
   const gold = ((base.gold + b.gold) * (1 + taxRate) + pop * GOLD_PER_WORKER) * m * mult.gold * f.gold;
   const knowledge = (base.knowledge + b.knowledge) * m * mult.knowledge * f.knowledge;
 
   return {
     food: round1(food),
-    materials: round1(materials),
     gold: round1(gold),
     knowledge: round1(knowledge),
   };
@@ -137,10 +132,27 @@ export function nationYieldMult(nation: Nation): ResourceYield {
   const { tech, trait, modifier } = yieldFactors(nation);
   return {
     food: tech.food * trait.food * modifier.food,
-    materials: tech.materials * trait.materials * modifier.materials,
     gold: tech.gold * trait.gold * modifier.gold,
     knowledge: tech.knowledge * trait.knowledge * modifier.knowledge,
   };
+}
+
+/**
+ * A nation's ware-output multiplier: research ware bonuses × its national trait ×
+ * (currently no modifier boosts wares). Scales every ware a region produces, the
+ * wares analogue of `nationYieldMult`. Pure.
+ */
+export function nationWareMult(nation: Nation): number {
+  return techWareMult(nation.research.done) * traitWareMult(nation.trait);
+}
+
+/**
+ * The ware multiplier for a *single region* a nation owns: the national ware
+ * multiplier times the region's focus ware bias. What turn.ts scales a region's
+ * ware output by before it accrues to the stockpile. Pure.
+ */
+export function regionWareMult(nation: Nation, region: Region): number {
+  return nationWareMult(nation) * focusWareMult(region.focus);
 }
 
 /** The three multiplier sources `nationYieldMult` folds together, kept separate so
@@ -167,7 +179,6 @@ export function nationalProduction(
       const flow = regionProduction(region, taxRate, mult);
       return {
         food: round1(acc.food + flow.food),
-        materials: round1(acc.materials + flow.materials),
         gold: round1(acc.gold + flow.gold),
         knowledge: round1(acc.knowledge + flow.knowledge),
       };

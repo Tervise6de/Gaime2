@@ -15,17 +15,23 @@ import { UNITS, type UnitType } from "@/data/units";
 import type { ResourceYield } from "@/data/terrain";
 import type { Nation, Research } from "@/systems/state";
 
-/** Combined multiplicative yield modifiers from a nation's completed techs. */
+/** Combined multiplicative yield modifiers (gold/food/knowledge) from a nation's completed techs. */
 export function techMultipliers(done: TechId[]): ResourceYield {
-  const mult: ResourceYield = { food: 1, materials: 1, gold: 1, knowledge: 1 };
+  const mult: ResourceYield = { food: 1, gold: 1, knowledge: 1 };
   for (const id of done) {
     const y = TECHS[id].yieldMult;
     if (!y) continue;
     if (y.food) mult.food += y.food;
-    if (y.materials) mult.materials += y.materials;
     if (y.gold) mult.gold += y.gold;
     if (y.knowledge) mult.knowledge += y.knowledge;
   }
+  return mult;
+}
+
+/** Combined ware-output multiplier from a nation's completed techs (the materials successor). */
+export function techWareMult(done: TechId[]): number {
+  let mult = 1;
+  for (const id of done) mult += TECHS[id].wareMult ?? 0;
   return mult;
 }
 

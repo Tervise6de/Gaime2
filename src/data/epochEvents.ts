@@ -19,7 +19,7 @@ export type EpochEffect =
   | { kind: "plague"; regions: number; popLoss: number; unrest: number }
   | { kind: "trade_boom"; goldPerRegion: number }
   | { kind: "pirates"; goldLoss: number; unrest: number }
-  | { kind: "great_fire"; popLoss: number; materialsLoss: number; unrest: number }
+  | { kind: "great_fire"; popLoss: number; wareLoss: number; unrest: number }
   | { kind: "kontor_closed"; kontor: KontorId };
 
 export interface EpochEventDef {
@@ -99,7 +99,7 @@ export const EPOCH_EVENTS: readonly EpochEventDef[] = [
     year: 1476, // the wooden Bryggen (Bergen) burned repeatedly (§4)
     windowYears: 40,
     chance: 0.55,
-    effect: { kind: "great_fire", popLoss: 0.2, materialsLoss: 20, unrest: 6 },
+    effect: { kind: "great_fire", popLoss: 0.2, wareLoss: 20, unrest: 6 },
     headline: "Fire tears through the crowded wharves of {place} — warehouses and homes are lost.",
     icon: "🔥",
     description:

@@ -260,17 +260,23 @@ const RESOURCE_META: Record<ResourceDisplayKey, { label: string; icon: string; t
     icon: "⚖",
     tip: "Stability is 100 minus your average regional unrest. Low stability means unrest is close to throttling production or revolt.",
   },
-  materials: {
-    label: "Materials",
-    icon: "⛏",
-    tip: "Materials build structures and raise units. Buildings and armies both draw on this stockpile.",
-  },
   knowledge: {
     label: "Knowledge",
     icon: "📖",
     tip: "Knowledge funds research — the /turn figure is invested into your current technology each turn.",
   },
 };
+
+/** The build wares surfaced in the production summary, in display order. */
+const BUILD_WARES: readonly GoodId[] = ["timber", "brick", "naval_stores", "iron"];
+
+/** Inline "N🪵 M⚒️" cost for a ware basket (unit arms cost, etc.), using ware glyphs. */
+function wareCostHtml(wares: Partial<Record<GoodId, number>>): string {
+  return (Object.keys(wares) as GoodId[])
+    .filter((w) => (wares[w] ?? 0) > 0)
+    .map((w) => `${wares[w]}<span class="hud-ware-glyph">${GOODS[w].glyph}</span>`)
+    .join(" ");
+}
 
 export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   root.innerHTML = "";
@@ -1675,9 +1681,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     const player = playerNation(state);
     const owned = state.regions.filter((r) => r.ownerId === PLAYER_ID);
     const summaryLine = el("p", "hud-hint hud-prod-summary");
-    summaryLine.textContent =
-      `Materials: ${fmt(player.stocks.materials)} in store · ` +
-      `each project draws up to ${BUILD_RATE}/turn from that stockpile at End turn.`;
+    summaryLine.innerHTML =
+      "Build wares in store — " +
+      BUILD_WARES.map((w) => `${GOODS[w].glyph} ${fmt(player.wares[w])}`).join(" · ") +
+      ` · each project draws up to ${BUILD_RATE}/turn of its build ware at End turn.`;
     panel.append(summaryLine);
 
     const list = el("div", "hud-prod-list");
@@ -1734,12 +1741,13 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
         for (const id of buildOptions(state, region.id)) {
           const def = BUILDINGS[id];
           const eta = Math.max(1, Math.ceil(def.cost / BUILD_RATE));
+          const ware = def.buildWare ?? "timber";
           const card = document.createElement("button");
           card.className = "hud-build-btn";
-          card.title = `${def.blurb}\n\nCosts ${def.cost} materials over ~${eta} turn${eta === 1 ? "" : "s"}.`;
+          card.title = `${def.blurb}\n\nCosts ${def.cost} ${GOODS[ware].name.toLowerCase()} over ~${eta} turn${eta === 1 ? "" : "s"}.`;
           card.innerHTML =
             `<span class="hud-build-name">${buildingIconHtml(id, "")}${def.name}</span>` +
-            `<span class="hud-build-cost">${def.cost}${resourceIconHtml("materials", "⛏")} · ${eta}t</span>`;
+            `<span class="hud-build-cost">${def.cost}<span class="hud-ware-glyph">${GOODS[ware].glyph}</span> · ${eta}t</span>`;
           card.addEventListener("click", () => {
             prodExpanded = null;
             callbacks.onQueueBuilding(region.id, id);
@@ -3278,7 +3286,7 @@ function raiseUnitMenu(state: GameState, region: Region, callbacks: HudCallbacks
     const resourceLocked = !!def.requires && !access.has(def.requires);
     const costHtml = resourceLocked
       ? `needs ${resourceIconHtml(def.requires!, def.requires === "iron" ? "⚒" : "🐎")}`
-      : `${cost.gold}g ${cost.materials}${resourceIconHtml("materials", "⛏")}`;
+      : `${cost.gold}g ${wareCostHtml(cost.wares)}`;
     btn.innerHTML =
       `<span class="hud-unit-name">${unitIconHtml(t, "")}${def.short}</span>` +
       `<span class="hud-unit-cost">${costHtml}</span>`;
@@ -3345,13 +3353,14 @@ function renderBuildSection(region: Region, done: TechId[], callbacks: HudCallba
   if (order) {
     const def = BUILDINGS[order.building];
     const remaining = def.cost - order.progress;
-    // Best-case pace: BUILD_RATE materials flow into a site per turn while the
-    // stockpile lasts — so the estimate is a floor, not a promise.
+    const ware = def.buildWare ?? "timber";
+    // Best-case pace: BUILD_RATE units of the build ware flow into a site per turn
+    // while the stockpile lasts — so the estimate is a floor, not a promise.
     const eta = Math.max(1, Math.ceil(remaining / BUILD_RATE));
     const wrap = el("div", "hud-build-progress");
     wrap.append(
       line(
-        `Building ${def.name} — ${fmt(order.progress)}/${def.cost} materials · ~${eta} turn${eta === 1 ? "" : "s"} left`,
+        `Building ${def.name} — ${fmt(order.progress)}/${def.cost} ${GOODS[ware].name.toLowerCase()} · ~${eta} turn${eta === 1 ? "" : "s"} left`,
         "hud-build-progress-label",
       ),
     );
@@ -3391,10 +3400,11 @@ function renderBuildSection(region: Region, done: TechId[], callbacks: HudCallba
     btn.className = "hud-build-btn";
     btn.disabled = !addable;
     const eta = Math.max(1, Math.ceil(def.cost / BUILD_RATE));
+    const ware = def.buildWare ?? "timber";
     btn.title = !unlocked
       ? `Locked — research ${def.requiresTech?.replace(/_/g, " ")}.`
       : addable
-        ? `${def.blurb}\n\nCosts ${def.cost} materials over ~${eta} turn${eta === 1 ? "" : "s"} (up to ${BUILD_RATE}/turn). ${order ? "Adds to the build queue." : "Starts now."}`
+        ? `${def.blurb}\n\nCosts ${def.cost} ${GOODS[ware].name.toLowerCase()} over ~${eta} turn${eta === 1 ? "" : "s"} (up to ${BUILD_RATE}/turn). ${order ? "Adds to the build queue." : "Starts now."}`
         : def.blurb;
     const costLabel = already
       ? "built"
@@ -3404,7 +3414,7 @@ function renderBuildSection(region: Region, done: TechId[], callbacks: HudCallba
           ? "queued"
           : !unlocked
             ? glyphHtml("lock", "🔒")
-            : `${def.cost}${resourceIconHtml("materials", "⛏")} · ${eta}t`;
+            : `${def.cost}<span class="hud-ware-glyph">${GOODS[ware].glyph}</span> · ${eta}t`;
     btn.innerHTML =
       `<span class="hud-build-name">${buildingIconHtml(id, "")}${def.name}</span>` +
       `<span class="hud-build-cost">${costLabel}</span>`;

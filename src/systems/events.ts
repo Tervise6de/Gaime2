@@ -25,6 +25,7 @@ import {
 import { atWar, adjustRelation, getRelation, getTreaty, setPact } from "@/systems/diplomacy";
 import { round1 } from "@/systems/economy";
 import type { TraitId } from "@/data/traits";
+import type { GoodId } from "@/data/goods";
 
 /** Add (or refresh) a temporary national modifier for `turns` turns. Pure. */
 function addModifier(state: GameState, nationId: number, id: ModifierId, turns: number): GameState {
@@ -70,17 +71,32 @@ function hasTrait(trait: TraitId): (state: GameState, nationId: number) => boole
   return (state, nationId) => state.nations.find((n) => n.id === nationId)?.trait === trait;
 }
 
-/** Add a flat amount to one of a nation's stockpiles. */
+/** Add a flat amount to one of a nation's core stockpiles (gold/food/knowledge). */
 function addStock(
   state: GameState,
   nationId: number,
-  key: "food" | "materials" | "gold" | "knowledge",
+  key: "food" | "gold" | "knowledge",
   amount: number,
   cap = Infinity,
 ): GameState {
   const nations = state.nations.map((n) =>
     n.id === nationId
       ? { ...n, stocks: { ...n.stocks, [key]: round1(Math.min(cap, n.stocks[key] + amount)) } }
+      : n,
+  );
+  return { ...state, nations };
+}
+
+/** Add (or, with a negative amount, spend) a ware in a nation's stockpile (floored at 0). */
+function addWare(
+  state: GameState,
+  nationId: number,
+  ware: GoodId,
+  amount: number,
+): GameState {
+  const nations = state.nations.map((n) =>
+    n.id === nationId
+      ? { ...n, wares: { ...n.wares, [ware]: Math.max(0, round1(n.wares[ware] + amount)) } }
       : n,
   );
   return { ...state, nations };
@@ -215,12 +231,7 @@ const EVENTS: EventDef[] = [
     id: "ore_discovery",
     weight: 3,
     apply: (state, nationId) => {
-      const nations = state.nations.map((n) =>
-        n.id === nationId
-          ? { ...n, stocks: { ...n.stocks, materials: round1(n.stocks.materials + 15) } }
-          : n,
-      );
-      return { state: { ...state, nations }, message: "Ore discovery — a windfall of materials." };
+      return { state: addWare(state, nationId, "iron", 15), message: "Ore discovery — a windfall of iron." };
     },
   },
   {
@@ -541,7 +552,7 @@ const EVENTS: EventDef[] = [
     },
   },
   {
-    // DECISION: convert gold into materials + knowledge via an expedition.
+    // DECISION: convert gold into timber + knowledge via an expedition.
     id: "expedition",
     weight: 2,
     choice: {
@@ -550,16 +561,16 @@ const EVENTS: EventDef[] = [
         {
           id: "fund",
           label: "Fund it (−30g)",
-          detail: "Spend 30 gold; return with 25 materials and 15 knowledge.",
+          detail: "Spend 30 gold; return with 25 timber and 15 knowledge.",
           apply: (state, nationId) => {
             const n = state.nations.find((x) => x.id === nationId);
             if (!n || n.stocks.gold < 30) {
               return { state, message: "The coffers are too bare to fund an expedition." };
             }
             let s = addStock(state, nationId, "gold", -30);
-            s = addStock(s, nationId, "materials", 25);
+            s = addWare(s, nationId, "timber", 25);
             s = addStock(s, nationId, "knowledge", 15);
-            return { state: s, message: "The expedition returns laden with materials and lore." };
+            return { state: s, message: "The expedition returns laden with timber and lore." };
           },
         },
         {
@@ -656,23 +667,23 @@ const EVENTS: EventDef[] = [
     },
   },
   {
-    // DECISION: invest materials in fortifying your most exposed border region —
+    // DECISION: invest brick in fortifying your most exposed border region —
     // the only source of fortification besides the tech-gated Fortress building.
     id: "reinforce_walls",
     weight: 2,
     choice: {
-      prompt: "Master masons offer to reinforce a frontier stronghold — fund the works for 20 materials?",
+      prompt: "Master masons offer to reinforce a frontier stronghold — fund the works for 20 brick?",
       options: [
         {
           id: "fund",
-          label: "Reinforce the walls (−20 materials)",
-          detail: "Spend 20 materials; +1 fortification on your most exposed border region.",
+          label: "Reinforce the walls (−20 brick)",
+          detail: "Spend 20 brick; +1 fortification on your most exposed border region.",
           apply: (state, nationId) => {
             const n = state.nations.find((x) => x.id === nationId);
-            if (!n || n.stocks.materials < 20) return { state, message: "Too few materials to reinforce the walls." };
+            if (!n || n.wares.brick < 20) return { state, message: "Too few brick to reinforce the walls." };
             const target = frontierRegion(state, nationId);
             if (!target) return { state, message: "No frontier stronghold needs reinforcing." };
-            const paid = addStock(state, nationId, "materials", -20);
+            const paid = addWare(state, nationId, "brick", -20);
             const regions = paid.regions.map((r) =>
               r.id === target.id ? { ...r, fortification: r.fortification + 1 } : r,
             );
@@ -686,10 +697,10 @@ const EVENTS: EventDef[] = [
           apply: (state) => ({ state, message: "You defer the wall-works." }),
         },
       ],
-      // A materials-rich nation with an exposed frontier invests in its walls.
+      // A brick-rich nation with an exposed frontier invests in its walls.
       aiPick: (state, nationId) => {
         const n = state.nations.find((x) => x.id === nationId);
-        return n && n.stocks.materials >= 35 && frontierRegion(state, nationId) !== null ? "fund" : "decline";
+        return n && n.wares.brick >= 35 && frontierRegion(state, nationId) !== null ? "fund" : "decline";
       },
     },
   },
@@ -822,16 +833,16 @@ const EVENTS: EventDef[] = [
     weight: 2,
     eligible: hasTrait("scholarly"),
     choice: {
-      prompt: "Your savants petition to found a grand academy — endow it with 30 materials?",
+      prompt: "Your savants petition to found a grand academy — endow it with 30 timber?",
       options: [
         {
           id: "endow",
-          label: "Endow the academy (−30 materials)",
-          detail: `Spend 30 materials; +40% knowledge for ${RESEARCH_SURGE_TURNS} turns.`,
+          label: "Endow the academy (−30 timber)",
+          detail: `Spend 30 timber; +40% knowledge for ${RESEARCH_SURGE_TURNS} turns.`,
           apply: (state, nationId) => {
             const n = state.nations.find((x) => x.id === nationId);
-            if (!n || n.stocks.materials < 30) return { state, message: "Too few materials to endow an academy." };
-            const paid = addStock(state, nationId, "materials", -30);
+            if (!n || n.wares.timber < 30) return { state, message: "Too few timber to endow an academy." };
+            const paid = addWare(state, nationId, "timber", -30);
             return {
               state: addModifier(paid, nationId, "research_surge", RESEARCH_SURGE_TURNS),
               message: "A grand academy is founded — learning quickens across the realm.",
@@ -841,14 +852,14 @@ const EVENTS: EventDef[] = [
         {
           id: "decline",
           label: "Not now",
-          detail: "Keep the materials for walls and workshops.",
+          detail: "Keep the timber for walls and workshops.",
           apply: (state) => ({ state, message: "You set the academy aside for now." }),
         },
       ],
-      // A scholarly AI with materials to spare endows the academy.
+      // A scholarly AI with timber to spare endows the academy.
       aiPick: (state, nationId) => {
         const n = state.nations.find((x) => x.id === nationId);
-        return n && n.stocks.materials >= 45 ? "endow" : "decline";
+        return n && n.wares.timber >= 45 ? "endow" : "decline";
       },
     },
   },
@@ -926,7 +937,7 @@ const EVENTS: EventDef[] = [
     },
   },
   {
-    // TRAIT DECISION (Industrious): spend materials on public works that calm the realm.
+    // TRAIT DECISION (Industrious): spend timber on public works that calm the realm.
     id: "public_works",
     weight: 2,
     eligible: hasTrait("industrious"),
@@ -935,12 +946,12 @@ const EVENTS: EventDef[] = [
       options: [
         {
           id: "commission",
-          label: "Commission works (−24 materials)",
-          detail: "Spend 24 materials; eases unrest 8 across the realm.",
+          label: "Commission works (−24 timber)",
+          detail: "Spend 24 timber; eases unrest 8 across the realm.",
           apply: (state, nationId) => {
             const n = state.nations.find((x) => x.id === nationId);
-            if (!n || n.stocks.materials < 24) return { state, message: "Too few materials for public works." };
-            const paid = addStock(state, nationId, "materials", -24);
+            if (!n || n.wares.timber < 24) return { state, message: "Too few timber for public works." };
+            const paid = addWare(state, nationId, "timber", -24);
             const regions = paid.regions.map((r) =>
               r.ownerId === nationId ? { ...r, unrest: Math.max(0, round1(r.unrest - 8)) } : r,
             );
@@ -950,16 +961,16 @@ const EVENTS: EventDef[] = [
         {
           id: "defer",
           label: "Defer",
-          detail: "Save the materials for war and walls.",
+          detail: "Save the timber for war and walls.",
           apply: (state) => ({ state, message: "You defer the public works." }),
         },
       ],
-      // An industrious AI with materials to spare invests when the realm is restless.
+      // An industrious AI with timber to spare invests when the realm is restless.
       aiPick: (state, nationId) => {
         const n = state.nations.find((x) => x.id === nationId);
         const owned = state.regions.filter((r) => r.ownerId === nationId);
         const avg = owned.length ? owned.reduce((a, r) => a + r.unrest, 0) / owned.length : 0;
-        return n && n.stocks.materials >= 40 && avg > 15 ? "commission" : "defer";
+        return n && n.wares.timber >= 40 && avg > 15 ? "commission" : "defer";
       },
     },
   },
@@ -980,8 +991,8 @@ const EVENTS: EventDef[] = [
     weight: 1,
     eligible: hasTrait("industrious"),
     apply: (state, nationId) => ({
-      state: addStock(state, nationId, "materials", 18),
-      message: "Master craftsmen deliver a surge of materials.",
+      state: addWare(state, nationId, "timber", 18),
+      message: "Master craftsmen deliver a surge of timber and worked goods.",
     }),
   },
   {

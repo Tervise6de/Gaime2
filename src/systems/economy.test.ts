@@ -33,15 +33,13 @@ describe("region production", () => {
     const taxed = regionProduction(region({ population: 0 }), 0.4);
     expect(taxed.gold).toBeGreaterThan(untaxed.gold);
     expect(taxed.food).toBe(untaxed.food);
-    expect(taxed.materials).toBe(untaxed.materials);
     expect(taxed.knowledge).toBe(untaxed.knowledge);
   });
 
-  it("population increases food, materials, and gold output", () => {
+  it("population increases food and gold output", () => {
     const empty = regionProduction(region({ population: 0 }), 0);
     const peopled = regionProduction(region({ population: 6 }), 0);
     expect(peopled.food).toBeGreaterThan(empty.food);
-    expect(peopled.materials).toBeGreaterThan(empty.materials);
     expect(peopled.gold).toBeGreaterThan(empty.gold);
   });
 
@@ -74,7 +72,7 @@ describe("national production", () => {
 describe("prosperity modifier", () => {
   it("multiplies only gold while active, and is inert once expired", () => {
     expect(modifierMultipliers([{ id: "prosperity", turnsLeft: 3 }])).toEqual({
-      food: 1, materials: 1, gold: PROSPERITY_GOLD_MULT, knowledge: 1,
+      food: 1, gold: PROSPERITY_GOLD_MULT, knowledge: 1,
     });
     expect(modifierMultipliers([{ id: "prosperity", turnsLeft: 0 }]).gold).toBe(1);
     expect(modifierMultipliers([]).gold).toBe(1);
@@ -115,7 +113,7 @@ describe("prosperity modifier", () => {
 
   it("singleModifierMult isolates one modifier's effect and modifierMultipliers folds them", () => {
     expect(singleModifierMult({ id: "prosperity", turnsLeft: 2 })).toEqual({
-      food: 1, materials: 1, gold: PROSPERITY_GOLD_MULT, knowledge: 1,
+      food: 1, gold: PROSPERITY_GOLD_MULT, knowledge: 1,
     });
     // Expired modifier is inert.
     expect(singleModifierMult({ id: "prosperity", turnsLeft: 0 }).gold).toBe(1);

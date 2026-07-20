@@ -15,15 +15,17 @@
  * early game is the tidy four-unit loop and the late game adds heavy specialists.
  *
  * Composition matters, so "just spam the strongest unit" is never optimal.
- * Costs are gold + materials to raise; every unit also draws gold upkeep each
- * turn, so armies are an ongoing economic drag, not a one-time buy. Some units
- * require access to a strategic resource (iron / horses), which makes specific
- * territory worth fighting for.
+ * Costs are gold + arms wares (timber for the levy; iron/copper for the heavy and
+ * gunpowder troops) to raise; every unit also draws gold upkeep each turn, so
+ * armies are an ongoing economic drag, not a one-time buy. Some units require
+ * access to a strategic resource (iron / horses), which makes specific territory
+ * worth fighting for.
  *
  * Numbers are illustrative starting values for tuning.
  */
 
 import type { StrategicResource } from "@/data/terrain";
+import type { GoodId } from "@/data/goods";
 import type { TechId } from "@/data/techs";
 
 export type UnitType =
@@ -41,7 +43,8 @@ export interface UnitDef {
   id: UnitType;
   name: string;
   short: string;
-  cost: { gold: number; materials: number };
+  /** Gold plus the arms wares needed to raise one unit (data/goods.ts). */
+  cost: { gold: number; wares: Partial<Record<GoodId, number>> };
   /** Gold drawn from the treasury each turn per unit. */
   upkeep: number;
   attack: number;
@@ -65,7 +68,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     id: "militia",
     name: "Militia",
     short: "Mil",
-    cost: { gold: 10, materials: 5 },
+    cost: { gold: 10, wares: { timber: 4 } },
     upkeep: 1,
     attack: 2,
     defense: 4,
@@ -80,7 +83,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     id: "infantry",
     name: "Infantry",
     short: "Inf",
-    cost: { gold: 20, materials: 10 },
+    cost: { gold: 20, wares: { timber: 8 } },
     upkeep: 2,
     attack: 5,
     defense: 5,
@@ -95,7 +98,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     id: "ranged",
     name: "Ranged",
     short: "Rng",
-    cost: { gold: 20, materials: 8 },
+    cost: { gold: 20, wares: { timber: 6 } },
     upkeep: 2,
     attack: 6,
     defense: 2,
@@ -110,7 +113,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     id: "cavalry",
     name: "Cavalry",
     short: "Cav",
-    cost: { gold: 30, materials: 10 },
+    cost: { gold: 30, wares: { timber: 8 } },
     upkeep: 3,
     attack: 7,
     defense: 4,
@@ -125,7 +128,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     id: "siege",
     name: "Siege",
     short: "Sge",
-    cost: { gold: 30, materials: 20 },
+    cost: { gold: 30, wares: { timber: 10, iron: 4 } },
     upkeep: 3,
     attack: 4,
     defense: 2,
@@ -142,7 +145,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     id: "pikeman",
     name: "Pikemen",
     short: "Pik",
-    cost: { gold: 16, materials: 10 },
+    cost: { gold: 16, wares: { timber: 8 } },
     upkeep: 2,
     attack: 4,
     defense: 7,
@@ -159,7 +162,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     id: "handgunner",
     name: "Handgunners",
     short: "Gun",
-    cost: { gold: 24, materials: 12 },
+    cost: { gold: 24, wares: { iron: 6, copper: 2 } },
     upkeep: 3,
     attack: 8,
     defense: 3,
@@ -176,7 +179,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     id: "swordsman",
     name: "Swordsmen",
     short: "Swd",
-    cost: { gold: 26, materials: 14 },
+    cost: { gold: 26, wares: { iron: 10 } },
     upkeep: 3,
     attack: 7,
     defense: 6,
@@ -193,7 +196,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     id: "knight",
     name: "Knights",
     short: "Kni",
-    cost: { gold: 40, materials: 16 },
+    cost: { gold: 40, wares: { timber: 4, iron: 8 } },
     upkeep: 4,
     attack: 9,
     defense: 5,

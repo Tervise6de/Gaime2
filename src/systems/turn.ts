@@ -28,9 +28,10 @@ import type { ScriptedMap } from "@/data/maps/types";
 import { KONTORE } from "@/data/kontore";
 import { SOUND } from "@/data/sound";
 import type { StrategicResource } from "@/data/terrain";
+import { GOOD_IDS, type GoodId } from "@/data/goods";
 import { nationalProduction, round1 } from "@/systems/economy";
 import { advanceConstruction } from "@/systems/construction";
-import { stepTrade, seedKontore } from "@/systems/trade";
+import { stepTrade, seedKontore, nationalWareOutput } from "@/systems/trade";
 import { stepLeague } from "@/systems/league";
 import { scheduleEpochs, stepEpochs } from "@/systems/epochs";
 import { nextPopulation } from "@/systems/population";
@@ -65,6 +66,9 @@ import {
   clampTax,
   emptyResearch,
   emptyUnits,
+  emptyWares,
+  addWares,
+  spendWares,
   type Army,
   type Difficulty,
   type GameLength,
@@ -73,6 +77,7 @@ import {
   type NationModifier,
   type Region,
   type ResourceStocks,
+  type Wares,
 } from "@/systems/state";
 
 const BARBARIAN_NATION: Nation = {
@@ -83,13 +88,16 @@ const BARBARIAN_NATION: Nation = {
   isBarbarian: true,
   alive: true,
   stocks: zeroStocks(),
+  wares: emptyWares(),
   taxRate: 0,
   research: emptyResearch(),
   famine: false,
   bankrupt: false,
 };
 
-const STARTING_STOCKS: ResourceStocks = { gold: 60, food: 20, materials: 15, knowledge: 0 };
+const STARTING_STOCKS: ResourceStocks = { gold: 60, food: 20, knowledge: 0 };
+/** Opening ware stores: enough build wares (timber/brick + ports/arms) for the first turns. */
+const STARTING_WARES: Wares = { ...emptyWares(), timber: 20, brick: 8, naval_stores: 4, iron: 8 };
 
 export interface NewGameOptions {
   seed: number;
@@ -157,12 +165,13 @@ function createScriptedGame(map: ScriptedMap, regions: Region[], options: NewGam
       isBarbarian: false,
       alive: true,
       stocks: { ...STARTING_STOCKS },
+      wares: { ...STARTING_WARES },
       taxRate: clampTax(options.taxRate ?? DEFAULT_TAX),
       research: emptyResearch(),
       famine: false,
       bankrupt: false,
     },
-    { ...BARBARIAN_NATION, stocks: zeroStocks(), research: emptyResearch() },
+    { ...BARBARIAN_NATION, stocks: zeroStocks(), wares: emptyWares(), research: emptyResearch() },
   ];
   const personalities = shuffled(ARCHETYPES, rng);
   const factionToNation = new Map<number, number>([[playerIdx, PLAYER_ID]]);
@@ -178,6 +187,7 @@ function createScriptedGame(map: ScriptedMap, regions: Region[], options: NewGam
       isBarbarian: false,
       alive: true,
       stocks: { ...STARTING_STOCKS },
+      wares: { ...STARTING_WARES },
       taxRate: DEFAULT_TAX,
       // Seat the realm's signature disposition (looked up by name), else round-robin.
       personality: factionByName(f.name)?.disposition
@@ -634,13 +644,19 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
   const stocks: ResourceStocks = {
     gold: round1(nation.stocks.gold + flow.gold * econMult - upkeep),
     food: nation.stocks.food,
-    materials: round1(nation.stocks.materials + flow.materials * econMult),
     knowledge: round1(research.progress), // display: invested in current tech
   };
 
-  // Construction (this nation's regions only).
-  const built = advanceConstruction(state.regions, stocks.materials, nationId);
-  stocks.materials = round1(stocks.materials - built.materialsSpent);
+  // Ware production accrues to the stockpile (difficulty scales rival output).
+  const wareOut = nationalWareOutput(state, nationId);
+  const wareGain: Partial<Record<GoodId, number>> = {};
+  for (const id of GOOD_IDS) wareGain[id] = wareOut[id] * econMult;
+  let wares = addWares(nation.wares, wareGain);
+  const waresProduced = round1(GOOD_IDS.reduce((sum, id) => sum + (wareGain[id] ?? 0), 0));
+
+  // Construction (this nation's regions only) — funded from the ware stockpiles.
+  const built = advanceConstruction(state.regions, wares, nationId);
+  wares = spendWares(wares, built.waresSpent);
   // A completed build pulls the next still-valid entry off the region's queue.
   let regions = startQueuedBuildings(built.regions, nationId, research.done);
 
@@ -682,7 +698,7 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
 
   const nations = state.nations.map((n) =>
     n.id === nationId
-      ? { ...n, stocks, research, famine, bankrupt, modifiers: tickModifiers(n.modifiers) }
+      ? { ...n, stocks, wares, research, famine, bankrupt, modifiers: tickModifiers(n.modifiers) }
       : n,
   );
 
@@ -694,7 +710,7 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
     if (famine) notes.push("Famine — population starving");
     if (bankrupt) notes.push("Bankruptcy — troops disbanded, unrest spikes");
     const entry =
-      `Turn ${state.turn} — +${flow.gold}g (−${upkeep} upkeep) +${flow.materials}m ` +
+      `Turn ${state.turn} — +${flow.gold}g (−${upkeep} upkeep) +${waresProduced} wares ` +
       `+${flow.knowledge}k, food ${fmtSigned(flow.food)}. Treasury ${stocks.gold}g.` +
       (notes.length ? ` ${notes.join("; ")}.` : "");
     log = [...state.log, entry].slice(-50);
@@ -874,7 +890,7 @@ function shuffled<T>(items: readonly T[], rng: Rng): T[] {
 }
 
 function zeroStocks(): ResourceStocks {
-  return { gold: 0, food: 0, materials: 0, knowledge: 0 };
+  return { gold: 0, food: 0, knowledge: 0 };
 }
 
 function fmtSigned(n: number): string {

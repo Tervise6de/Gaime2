@@ -81,3 +81,83 @@ economic board game. Hansa should choose the second lane: fast turns, readable
 systems, hard trade-offs, and a strong map. If the game keeps land conquest
 as the main fun, it competes badly with much larger games. If trade control is
 the main pressure, it has a real niche.
+
+## Resources — the Wares economy (v0.85 overhaul)
+
+The abstract **"Materials"** resource is retired. In its place the game runs a
+single, unified layer of **era wares** — the real commodities of the Hanseatic
+trade (grounded in `hansa times.md` §5/§13). This *unifies* the two former
+layers: the four-resource economy and the parallel trade-goods system become one.
+A ware is now produced regionally, **stockpiled per nation**, and either
+**consumed** to meet a need or **traded** to a Kontor for gold. What you can build
+and whom you can arm now depends on which land you hold and what it yields.
+
+### Three kinds of resource
+
+1. **Gold** — the universal medium (treasury). Taxes + trade + tolls in; recruitment,
+   upkeep and diplomacy out. Unchanged role.
+2. **Knowledge** — research points toward techs. Abstract, not a physical ware. Unchanged.
+3. **Wares (~16 physical commodities)** — the unified physical economy. Each has one
+   or more **roles**:
+   - **food** — feeds population (grain, herring, stockfish, beer).
+   - **build** — construction & shipbuilding (timber, iron, brick, naval stores).
+   - **arms** — recruitment beyond gold (iron, copper).
+   - **luxury** — high-value export, little domestic use (furs, wax, amber, cloth, wine).
+   Most wares are multi-role: iron builds *and* arms *and* trades; grain feeds *and*
+   trades; timber builds *and* trades.
+
+### The ware table (design targets; live numbers in `data/goods.ts`)
+
+| Ware | Glyph | Roles | Sourced from | Trades to (Kontor) |
+|------|-------|-------|--------------|--------------------|
+| Grain | 🌾 | food, trade | plains | Bergen, Bruges |
+| Herring | 🐟 | food, trade | coast | Bruges, London |
+| Stockfish | 🐠 | food, trade | coast (north) / fishery | Bruges, London |
+| Beer | 🍺 | food, luxury | plains + brewery | Bergen, Novgorod |
+| Timber | 🪵 | build, trade | forest | Novgorod |
+| Iron | ⚒️ | build, arms, trade | iron resource / hills / mountains | Bruges, London |
+| Brick | 🧱 | build | hills / mountains + kiln | — (local) |
+| Naval stores | 🛢️ | build, trade | forest / coast | London |
+| Copper | 🟤 | arms, luxury | mountains + mine | Bruges |
+| Salt | 🧂 | industry, trade | salt resource | Bergen, Bruges |
+| Furs | 🦫 | luxury | forest | Novgorod, London |
+| Wax | 🕯️ | luxury | forest | Bruges, London |
+| Amber | 🟠 | luxury | amber resource | London, Bruges |
+| Cloth | 🧵 | luxury, civic | weaving works | Bergen, Novgorod |
+| Wine | 🍷 | luxury | vineyard works | Novgorod, Bergen |
+| Honey | 🍯 | food, trade | forest | Bruges |
+
+Consumption rules (targets): a building costs a small basket of **build** wares
+(e.g. City Walls = brick + iron; a Shipyard = timber + naval stores); a unit costs
+gold + **arms** wares (militia = a little iron; knights = iron + copper). Food is
+reviewed below.
+
+### Reviewing "Food"
+
+Today food is an abstract terrain scalar. Under the wares model, food becomes the
+**pooled supply of food-wares** (grain + herring + stockfish + beer) a nation lands
+and stores; population eats from that pool, and a shortfall drives famine/unrest
+exactly as now. The historical hook is real: fish only preserves with **salt**, so
+the salt→fish chain gates the food economy. This is a follow-up milestone (R3) so
+the population/famine tests move in one deliberate step, not mixed into the
+Materials removal.
+
+## Build plan — resource overhaul (R-series)
+
+Each R-milestone leaves the game runnable, tested and playable end-to-end.
+
+- **R1 — Wares foundation & Materials removal.** Ship the ~16-ware catalog, per-nation
+  ware stockpiles, regional ware production, and rewire construction + recruitment
+  onto build/arms wares. Remove `materials` from the core economy. HUD gains a wares
+  ledger; build/unit costs show ware glyphs. Trade automatically enriches from the
+  bigger catalog. Food stays abstract for now.
+- **R2 — Trade & market depth.** Tune ware values, Kontor demand and scarcity for the
+  full catalog; surface ware flows in the trade UI; teach the AI to produce-to-demand.
+- **R3 — Food review.** Replace abstract food with the food-ware pool; wire the
+  salt→fish preservation chain; move population/famine onto it.
+- **R4 — Production chains & luxuries.** Salted herring, hopped beer, wool→cloth as
+  refined wares; luxury demand feeding prestige/stability, not just gold.
+
+Guardrails unchanged: deterministic seeded RNG only, pure `GameState → GameState`
+turn pipeline, `systems/` never touch the DOM, `data/` stays serialisable, tests
+stay green, minor version bumps on every user-visible batch.

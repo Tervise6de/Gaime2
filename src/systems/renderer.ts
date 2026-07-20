@@ -22,6 +22,7 @@
 
 import { TERRAIN, STRATEGIC_RESOURCES, type TerrainId } from "@/data/terrain";
 import { BUILDINGS, BUILD_RATE } from "@/data/buildings";
+import { GOODS } from "@/data/goods";
 import { GLYPH_ART, RESOURCE_ART, TERRAIN_ART, TERRAIN_MOTIF, crestSvg } from "@/data/art";
 import { cbSafe } from "@/data/palette";
 import {
@@ -1801,8 +1802,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     if (region.construction) {
       const def = BUILDINGS[region.construction.building];
       const buildEta = Math.max(1, Math.ceil((def.cost - region.construction.progress) / BUILD_RATE));
+      const buildWareName = GOODS[def.buildWare ?? "timber"].name.toLowerCase();
       slots.push({
-        tip: `Under construction: ${def.name} (${Math.floor(region.construction.progress)}/${def.cost} materials, ~${buildEta} turn${buildEta === 1 ? "" : "s"} left). Building advances each End turn.`,
+        tip: `Under construction: ${def.name} (${Math.floor(region.construction.progress)}/${def.cost} ${buildWareName}, ~${buildEta} turn${buildEta === 1 ? "" : "s"} left). Building advances each End turn.`,
         draw: (x, y) => {
           iconChip(x, y, 8.5);
           if (!drawIcon(context, "glyph:hammer", GLYPH_ART.hammer, MAP_ICON_COLOR, x, y, 11)) {

@@ -20,7 +20,7 @@ import type { TraitId } from "@/data/traits";
 import type { Personality } from "@/systems/state";
 import type { BuildingId } from "@/data/buildings";
 import { atWar } from "@/systems/diplomacy";
-import { emptyResearch } from "@/systems/state";
+import { emptyResearch, emptyWares } from "@/systems/state";
 import { createGame, resolveTurn } from "@/systems/turn";
 import { createRng } from "@/systems/rng";
 import {
@@ -357,7 +357,8 @@ describe("trait-aware tech selection", () => {
       isPlayer: false,
       isBarbarian: false,
       alive: true,
-      stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 },
+      stocks: { gold: 0, food: 0, knowledge: 0 },
+      wares: emptyWares(),
       taxRate: 0.15,
       research: emptyResearch(),
       famine: false,
@@ -847,7 +848,8 @@ describe("gang up on a runaway leader", () => {
       isPlayer: id === 0,
       isBarbarian: id === BARBARIAN_ID,
       alive: true,
-      stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 },
+      stocks: { gold: 0, food: 0, knowledge: 0 },
+      wares: emptyWares(),
       taxRate: 0.15,
       research: emptyResearch(),
       famine: false,
@@ -991,7 +993,8 @@ describe("tribute demands", () => {
   const P = 0, R = 2;
   const nat = (id: number, over: Partial<Nation> = {}): Nation => ({
     id, name: `N${id}`, color: "#fff", isPlayer: id === P, isBarbarian: id === BARBARIAN_ID, alive: true,
-    stocks: { gold: id === R ? 200 : 20, food: 20, materials: 10, knowledge: 0 },
+    stocks: { gold: id === R ? 200 : 20, food: 20, knowledge: 0 },
+    wares: { ...emptyWares(), timber: 40, iron: 40 },
     taxRate: 0.1, research: emptyResearch(), famine: false, bankrupt: false, ...over,
   });
 

@@ -15,7 +15,7 @@ import type { BuildingId } from "@/data/buildings";
 import type { Commander } from "@/data/commanders";
 import type { Ruler } from "@/data/rulers";
 import type { FocusId } from "@/data/focuses";
-import type { GoodId } from "@/data/goods";
+import { GOOD_IDS, type GoodId } from "@/data/goods";
 import type { KontorId } from "@/data/kontore";
 import type { ResourceYield, StrategicResource, TerrainId } from "@/data/terrain";
 import { UNIT_TYPES, type UnitType } from "@/data/units";
@@ -420,9 +420,15 @@ export interface FiredEpochNote {
 export interface ResourceStocks {
   gold: number;
   food: number;
-  materials: number;
   knowledge: number;
 }
+
+/**
+ * Per-nation ware stockpiles — the unified physical economy (data/goods.ts).
+ * Every ware has an entry; `emptyWares()` seeds them to zero. Build wares fund
+ * construction, arms wares fund recruitment, the rest are traded for gold.
+ */
+export type Wares = Record<GoodId, number>;
 
 /**
  * AI personality archetype (docs/game-design.md §5). Weights shift decision
@@ -450,8 +456,10 @@ export interface Nation {
   isBarbarian: boolean;
   /** Eliminated once a nation holds no regions. */
   alive: boolean;
-  /** Per-nation treasury and stockpiles. */
+  /** Per-nation treasury and stockpiles (gold/food/knowledge). */
   stocks: ResourceStocks;
+  /** Per-nation ware stockpiles — the physical commodity economy (data/goods.ts). */
+  wares: Wares;
   /** Per-nation tax rate in [TAX_MIN, TAX_MAX]. */
   taxRate: number;
   /** AI archetype; undefined for the player and barbarians. */
@@ -720,14 +728,54 @@ export function clampTax(rate: number): number {
   return Math.min(TAX_MAX, Math.max(TAX_MIN, rate));
 }
 
-/** The four core resources, in display order. */
+/** The core (non-ware) resources, in display order. */
 export const RESOURCE_KEYS = [
   "gold",
   "food",
-  "materials",
   "knowledge",
 ] as const;
 export type ResourceKey = (typeof RESOURCE_KEYS)[number];
+
+/** A zeroed ware stockpile (every ware present at 0) — the wares analogue of ZERO_FLOW. */
+export function emptyWares(): Wares {
+  const w = {} as Wares;
+  for (const id of GOOD_IDS) w[id] = 0;
+  return w;
+}
+
+/** Round to one decimal place — keeps ware/stock numbers readable and stable. */
+function ware1(v: number): number {
+  return Math.round(v * 10) / 10;
+}
+
+/** A copy of `wares` with `cost` subtracted (each floored at 0). Pure. */
+export function spendWares(wares: Wares, cost: Partial<Record<GoodId, number>>): Wares {
+  const out = { ...wares };
+  for (const id of GOOD_IDS) {
+    const c = cost[id];
+    if (c) out[id] = Math.max(0, ware1(out[id] - c));
+  }
+  return out;
+}
+
+/** A copy of `wares` with `gain` added. Pure. */
+export function addWares(wares: Wares, gain: Partial<Record<GoodId, number>>): Wares {
+  const out = { ...wares };
+  for (const id of GOOD_IDS) {
+    const g = gain[id];
+    if (g) out[id] = ware1(out[id] + g);
+  }
+  return out;
+}
+
+/** Whether `wares` can cover every ware in `cost`. Pure. */
+export function canAfford(wares: Wares, cost: Partial<Record<GoodId, number>>): boolean {
+  for (const id of GOOD_IDS) {
+    const c = cost[id];
+    if (c && wares[id] < c) return false;
+  }
+  return true;
+}
 
 /** A zeroed unit-count record. */
 export function emptyUnits(): Record<UnitType, number> {
@@ -748,7 +796,6 @@ export type ResourceFlow = ResourceYield;
 
 export const ZERO_FLOW: ResourceFlow = {
   food: 0,
-  materials: 0,
   gold: 0,
   knowledge: 0,
 };

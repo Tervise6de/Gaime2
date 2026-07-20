@@ -22,8 +22,10 @@ export interface FocusDef {
   icon: string;
   /** One-line description of the lean. */
   blurb: string;
-  /** Per-resource output multiplier for the region (1 = unchanged). */
+  /** Per-resource output multiplier for the region on gold/food/knowledge (1 = unchanged). */
   yield: Partial<ResourceYield>;
+  /** Multiplier on the region's ware output (1 = unchanged) — the wares analogue (Workshops). */
+  wareMult?: number;
   /** Added to the region's population capacity (Farmland). */
   popCapacity?: number;
   /** Change to the region's unrest target — negative = calmer (Garrison). */
@@ -59,8 +61,9 @@ export const FOCUSES: Record<FocusId, FocusDef> = {
     id: "workshop",
     label: "Workshops",
     icon: "⛏",
-    blurb: "+30% materials — craftsmen and forges.",
-    yield: { materials: 1.3 },
+    blurb: "+30% ware output — craftsmen and forges.",
+    yield: {},
+    wareMult: 1.3,
   },
   academy: {
     id: "academy",
@@ -87,10 +90,14 @@ export function focusYieldMult(focus: FocusId | undefined): ResourceYield {
   const y = focus ? FOCUSES[focus].yield : undefined;
   return {
     food: y?.food ?? 1,
-    materials: y?.materials ?? 1,
     gold: y?.gold ?? 1,
     knowledge: y?.knowledge ?? 1,
   };
+}
+
+/** A focus's ware-output multiplier, or 1 when unset / balanced (Workshops). */
+export function focusWareMult(focus: FocusId | undefined): number {
+  return focus ? FOCUSES[focus].wareMult ?? 1 : 1;
 }
 
 /** Population-capacity bonus from a focus (Farmland). */

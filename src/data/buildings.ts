@@ -15,6 +15,7 @@
  */
 
 import type { ResourceYield, StrategicResource, TerrainId } from "@/data/terrain";
+import type { GoodId } from "@/data/goods";
 import type { TechId } from "@/data/techs";
 import type { FocusId } from "@/data/focuses";
 
@@ -59,10 +60,14 @@ export type BuildingId =
 export interface BuildingDef {
   id: BuildingId;
   name: string;
-  /** Total materials required to complete construction. */
+  /** Total units of the build ware required to complete construction. */
   cost: number;
-  /** Additive per-turn yield once built. */
+  /** The ware construction consumes (default "timber"; brick for masonry, naval stores for ports). */
+  buildWare?: GoodId;
+  /** Additive per-turn yield of core resources (gold/food/knowledge) once built. */
   yield: Partial<ResourceYield>;
+  /** Additive per-turn ware output once built — the wares an industry building produces. */
+  wareYield?: Partial<Record<GoodId, number>>;
   /** Added to the region's population capacity. */
   popCapacity: number;
   /** Subtracted from the region's unrest target (an order-keeping effect). */
@@ -104,10 +109,11 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     id: "workshop",
     name: "Workshop",
     cost: 16,
-    yield: { materials: 3 },
+    yield: {},
+    wareYield: { timber: 3 },
     popCapacity: 0,
     unrest: 0,
-    blurb: "+3 materials per turn.",
+    blurb: "+3 timber per turn — carpentry and joinery.",
   },
   market: {
     id: "market",
@@ -122,6 +128,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     id: "harbor",
     name: "Harbor",
     cost: 20,
+    buildWare: "naval_stores",
     yield: { gold: 3, food: 2 },
     popCapacity: 2,
     unrest: 0,
@@ -132,12 +139,13 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     id: "mine",
     name: "Mine",
     cost: 22,
-    yield: { materials: 4, gold: 2 },
+    yield: { gold: 2 },
+    wareYield: { iron: 4, copper: 1 },
     popCapacity: 0,
     unrest: 0,
     requiresTech: "masonry",
     requiresTerrain: "mountains",
-    blurb: "+4 materials, +2 gold. Mountain regions only. (Masonry)",
+    blurb: "+4 iron, +2 gold. Mountain regions only. (Masonry)",
   },
   library: {
     id: "library",
@@ -191,11 +199,12 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     id: "guildhall",
     name: "Guildhall",
     cost: 30,
-    yield: { gold: 3, materials: 3 },
+    yield: { gold: 3 },
+    wareYield: { timber: 3 },
     popCapacity: 0,
     unrest: 0,
     requiresTech: "economics",
-    blurb: "+3 gold, +3 materials — the economy branch's workshop-and-market in one. (Economics)",
+    blurb: "+3 gold, +3 timber — the economy branch's workshop-and-market in one. (Economics)",
   },
   hanse_hall: {
     id: "hanse_hall",
@@ -221,6 +230,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     id: "fortress",
     name: "City Walls",
     cost: 28,
+    buildWare: "brick",
     yield: {},
     popCapacity: 0,
     unrest: 0,
@@ -252,6 +262,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     id: "lighthouse",
     name: "Lighthouse",
     cost: 20,
+    buildWare: "naval_stores",
     yield: { gold: 3, food: 1 },
     popCapacity: 2,
     unrest: 0,
@@ -273,6 +284,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     id: "watchtower",
     name: "Coastal Beacon",
     cost: 18,
+    buildWare: "brick",
     yield: {},
     popCapacity: 0,
     unrest: 3,
@@ -284,6 +296,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     id: "courthouse",
     name: "Rathaus",
     cost: 24,
+    buildWare: "brick",
     yield: {},
     popCapacity: 0,
     unrest: 14,
@@ -304,6 +317,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     id: "cathedral",
     name: "Dom",
     cost: 34,
+    buildWare: "brick",
     yield: { knowledge: 2, gold: 1 },
     popCapacity: 0,
     unrest: 10,
@@ -314,30 +328,32 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   // --- Strategic-resource works ----------------------------------------------
   // Each exploits the resource that already gates a premium unit, so holding
   // iron/horse land is worth *developing*, not just mustering from — deepening the
-  // "specific territory worth fighting for" decision (design §3.2). Both pay in
-  // materials (production → armies & works), so they aid the military/expansion
+  // "specific territory worth fighting for" decision (design §3.2). Both yield build
+  // wares (timber / iron → armies & works), so they aid the military/expansion
   // path without swelling gold.
   stable: {
     id: "stable",
     name: "Stable",
     cost: 20,
-    yield: { materials: 2, gold: 2 },
+    yield: { gold: 2 },
+    wareYield: { timber: 2 },
     popCapacity: 2,
     unrest: 0,
     requiresTech: "husbandry",
     requiresResource: "horses",
-    blurb: "+2 materials, +2 gold, +2 population. Horse country only. (Husbandry)",
+    blurb: "+2 timber, +2 gold, +2 population. Horse country only. (Husbandry)",
   },
   bloomery: {
     id: "bloomery",
     name: "Bloomery",
     cost: 24,
-    yield: { materials: 5 },
+    yield: {},
+    wareYield: { iron: 5 },
     popCapacity: 0,
     unrest: 0,
     requiresTech: "metallurgy",
     requiresResource: "iron",
-    blurb: "+5 materials — ironworks that forge the realm's arms. Iron country only. (Metallurgy)",
+    blurb: "+5 iron — ironworks that forge the realm's arms. Iron country only. (Metallurgy)",
   },
 
   // --- Focus capstones -------------------------------------------------------
@@ -369,12 +385,13 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     id: "foundry",
     name: "Foundry",
     cost: 30,
-    yield: { materials: 6, gold: 1 },
+    yield: { gold: 1 },
+    wareYield: { iron: 6 },
     popCapacity: 0,
     unrest: 0,
     requiresTech: "engineering",
     requiresFocus: "workshop",
-    blurb: "+6 materials, +1 gold — furnaces and casting works. Workshops focus. (Engineering)",
+    blurb: "+6 iron, +1 gold — furnaces and casting works. Workshops focus. (Engineering)",
   },
   athenaeum: {
     id: "athenaeum",
@@ -391,6 +408,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     id: "citadel",
     name: "Citadel",
     cost: 32,
+    buildWare: "brick",
     yield: {},
     popCapacity: 0,
     unrest: 8,
@@ -427,6 +445,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     id: "canal",
     name: "Canal",
     cost: 30,
+    buildWare: "naval_stores",
     yield: { gold: 3, food: 1 },
     popCapacity: 2,
     unrest: 0,
@@ -475,5 +494,5 @@ export function buildingResourceOk(
   return !req || req === regionResource;
 }
 
-/** Materials invested into a region's queued building each turn (if funded). */
+/** Units of the build ware invested into a region's queued building each turn (if funded). */
 export const BUILD_RATE = 6;

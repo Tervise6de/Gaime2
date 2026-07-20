@@ -13,7 +13,7 @@ import { TECHS } from "@/data/techs";
 
 describe("techMultipliers", () => {
   it("is 1.0 with no techs", () => {
-    expect(techMultipliers([])).toEqual({ food: 1, materials: 1, gold: 1, knowledge: 1 });
+    expect(techMultipliers([])).toEqual({ food: 1, gold: 1, knowledge: 1 });
   });
 
   it("stacks yield bonuses", () => {

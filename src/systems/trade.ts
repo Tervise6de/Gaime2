@@ -17,9 +17,10 @@
  */
 
 import { GOODS, GOOD_IDS, type GoodId } from "@/data/goods";
+import { BUILDINGS } from "@/data/buildings";
 import { KONTORE, KONTOR_IDS, type KontorId } from "@/data/kontore";
 import { SOUND } from "@/data/sound";
-import { round1, unrestPenalty } from "@/systems/economy";
+import { round1, unrestPenalty, regionWareMult } from "@/systems/economy";
 import { atWar } from "@/systems/diplomacy";
 import { kontorBlockedFor, leagueSeversRoute, isLeagueMonopoly } from "@/systems/league";
 import {
@@ -30,10 +31,12 @@ import {
   TRADE_DIST_COEF,
   inLeague,
   nationById,
+  emptyWares,
   type GameState,
   type KontorState,
   type Region,
   type TradeRoute,
+  type Wares,
 } from "@/systems/state";
 
 // --- region → goods ---------------------------------------------------------
@@ -47,21 +50,56 @@ export function regionSources(region: Region, good: GoodId): boolean {
   const src = GOODS[good].source;
   const byTerrain = src.terrain?.includes(region.terrain) ?? false;
   const byResource = src.resource !== undefined && region.resource === src.resource;
-  return byTerrain || byResource;
+  // An industry building (workshop → timber, mine → iron …) also lets a region
+  // source — and therefore trade — the ware it produces.
+  const byBuilding = region.buildings.some((b) => (BUILDINGS[b].wareYield?.[good] ?? 0) > 0);
+  return byTerrain || byResource || byBuilding;
+}
+
+/** The raw (pre-unrest, pre-multiplier) ware output of a region: terrain/resource
+ *  base plus any industry building's ware yield. Pure. */
+function regionWareBase(region: Region, good: GoodId): number {
+  const src = GOODS[good].source;
+  const byTerrain = src.terrain?.includes(region.terrain) ?? false;
+  const byResource = src.resource !== undefined && region.resource === src.resource;
+  let base = byTerrain || byResource ? src.baseOutput : 0;
+  for (const b of region.buildings) base += BUILDINGS[b].wareYield?.[good] ?? 0;
+  return base;
 }
 
 /**
- * The goods a region produces this turn and how much of each, in GOOD_IDS order.
- * The quantity is the good's base output scaled by the SAME `unrestPenalty` the
- * economy uses — so a region in full revolt ships nothing (empty list). Pure.
+ * The wares a region produces this turn and how much of each, in GOOD_IDS order.
+ * The quantity is the ware's base output (terrain/resource + buildings) scaled by
+ * the SAME `unrestPenalty` the economy uses and an optional owner ware multiplier
+ * (`regionWareMult`) — so a region in full revolt ships nothing (empty list). Pure.
  */
-export function regionGoodOutput(region: Region): { good: GoodId; amount: number }[] {
+export function regionGoodOutput(region: Region, mult = 1): { good: GoodId; amount: number }[] {
   const penalty = unrestPenalty(region.unrest);
   const out: { good: GoodId; amount: number }[] = [];
   for (const id of GOOD_IDS) {
-    if (!regionSources(region, id)) continue;
-    const amount = round1(GOODS[id].source.baseOutput * penalty);
+    const base = regionWareBase(region, id);
+    if (base <= 0) continue;
+    const amount = round1(base * penalty * mult);
     if (amount > 0) out.push({ good: id, amount });
+  }
+  return out;
+}
+
+/**
+ * A nation's total ware production this turn: every owned region's output scaled
+ * by that region's owner ware multiplier (national trait/tech × region focus).
+ * What turn.ts accrues into `nation.wares`. Pure.
+ */
+export function nationalWareOutput(state: GameState, ownerId: number): Wares {
+  const nation = nationById(state, ownerId);
+  const out = emptyWares();
+  if (!nation) return out;
+  const mult = (region: Region): number => regionWareMult(nation, region);
+  for (const region of state.regions) {
+    if (region.ownerId !== ownerId) continue;
+    for (const { good, amount } of regionGoodOutput(region, mult(region))) {
+      out[good] = round1(out[good] + amount);
+    }
   }
   return out;
 }

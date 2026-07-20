@@ -29,11 +29,15 @@ import {
   PLAYER_ID,
   armySize,
   emptyUnits,
+  emptyWares,
   pairKey,
   type Army,
   type GameState,
   type Region,
 } from "@/systems/state";
+
+/** A well-stocked ware chest so recruit fixtures can always pay a unit's arms cost. */
+const WARES = { ...emptyWares(), timber: 60, iron: 60, brick: 40, copper: 20, naval_stores: 20 };
 
 function region(id: number, overrides: Partial<Region> = {}): Region {
   return {
@@ -64,14 +68,14 @@ function battlefield(playerUnits: Partial<Record<string, number>>, barbUnits: Pa
   if (Object.keys(barbUnits).length) {
     armies.push({ id: 1, ownerId: BARBARIAN_ID, regionId: 1, units: { ...emptyUnits(), ...barbUnits }, movesLeft: 0 });
   }
-  const stocks = { gold: 200, food: 20, materials: 50, knowledge: 0 };
+  const stocks = { gold: 200, food: 20, knowledge: 0 };
   return {
     seed: 1,
     rngState: 12345,
     turn: 1,
     nations: [
-      { id: PLAYER_ID, name: "Realm", color: "#000", isPlayer: true, isBarbarian: false, alive: true, stocks: { ...stocks }, taxRate: 0, research: { current: null, progress: 0, done: [] }, famine: false, bankrupt: false },
-      { id: BARBARIAN_ID, name: "Barbarians", color: "#000", isPlayer: false, isBarbarian: true, alive: true, stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, taxRate: 0, research: { current: null, progress: 0, done: [] }, famine: false, bankrupt: false },
+      { id: PLAYER_ID, name: "Realm", color: "#000", isPlayer: true, isBarbarian: false, alive: true, stocks: { ...stocks }, wares: { ...WARES }, taxRate: 0, research: { current: null, progress: 0, done: [] }, famine: false, bankrupt: false },
+      { id: BARBARIAN_ID, name: "Barbarians", color: "#000", isPlayer: false, isBarbarian: true, alive: true, stocks: { gold: 0, food: 0, knowledge: 0 }, wares: emptyWares(), taxRate: 0, research: { current: null, progress: 0, done: [] }, famine: false, bankrupt: false },
     ],
     regions: [r0, r1],
     armies,
@@ -99,7 +103,7 @@ function realm(r0Army: Partial<Record<string, number>>): GameState {
     rngState: 123,
     turn: 1,
     nations: [
-      { id: PLAYER_ID, name: "Realm", color: "#000", isPlayer: true, isBarbarian: false, alive: true, stocks: { gold: 200, food: 20, materials: 50, knowledge: 0 }, taxRate: 0, research: { current: null, progress: 0, done: [] }, famine: false, bankrupt: false },
+      { id: PLAYER_ID, name: "Realm", color: "#000", isPlayer: true, isBarbarian: false, alive: true, stocks: { gold: 200, food: 20, knowledge: 0 }, wares: { ...WARES }, taxRate: 0, research: { current: null, progress: 0, done: [] }, famine: false, bankrupt: false },
     ],
     regions: [r0, r1, r2],
     armies,
@@ -375,10 +379,10 @@ function rallyField(
   if (Object.keys(reserve).length) {
     armies.push({ id: 2, ownerId: RIVAL, regionId: 2, units: { ...emptyUnits(), ...reserve }, movesLeft: reserveMoves });
   }
-  const stocks = { gold: 200, food: 20, materials: 50, knowledge: 0 };
+  const stocks = { gold: 200, food: 20, knowledge: 0 };
   const nation = (id: number, name: string, isPlayer: boolean) => ({
     id, name, color: "#000", isPlayer, isBarbarian: false, alive: true,
-    stocks: { ...stocks }, taxRate: 0, research: { current: null, progress: 0, done: [] },
+    stocks: { ...stocks }, wares: { ...WARES }, taxRate: 0, research: { current: null, progress: 0, done: [] },
     famine: false, bankrupt: false,
   });
   return {
@@ -459,10 +463,10 @@ function allianceField(reserve: Partial<Record<string, number>>, allied: boolean
   const r0 = region(0, { ownerId: PLAYER_ID, adjacency: [1] });
   const r1 = region(1, { ownerId: RIVAL, adjacency: [0, 2] });
   const r2 = region(2, { ownerId: ALLY, adjacency: [1] });
-  const stocks = { gold: 200, food: 20, materials: 50, knowledge: 0 };
+  const stocks = { gold: 200, food: 20, knowledge: 0 };
   const nation = (id: number, name: string, isPlayer: boolean) => ({
     id, name, color: "#000", isPlayer, isBarbarian: false, alive: true,
-    stocks: { ...stocks }, taxRate: 0, research: { current: null, progress: 0, done: [] },
+    stocks: { ...stocks }, wares: { ...WARES }, taxRate: 0, research: { current: null, progress: 0, done: [] },
     famine: false, bankrupt: false,
   });
   return {
@@ -545,7 +549,7 @@ describe("zone of control (M3)", () => {
     g.regions[3] = region(3, { ownerId: RIVAL, adjacency: enemyBordersR1 ? [1] : [2] });
     g.regions[1]!.adjacency = enemyBordersR1 ? [0, 2, 3] : [0, 2];
     g.regions[2]!.adjacency = enemyBordersR1 ? [1] : [1, 3];
-    g.nations.push({ id: RIVAL, name: "Rival", color: "#000", isPlayer: false, isBarbarian: false, alive: true, stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, taxRate: 0, research: { current: null, progress: 0, done: [] }, famine: false, bankrupt: false });
+    g.nations.push({ id: RIVAL, name: "Rival", color: "#000", isPlayer: false, isBarbarian: false, alive: true, stocks: { gold: 0, food: 0, knowledge: 0 }, wares: emptyWares(), taxRate: 0, research: { current: null, progress: 0, done: [] }, famine: false, bankrupt: false });
     g.armies.push({ id: 9, ownerId: RIVAL, regionId: 3, units: { ...emptyUnits(), infantry: 3 }, movesLeft: 0 });
     // At war so the enemy actually exerts control.
     g.treaties = { [pairKey(PLAYER_ID, RIVAL)]: "war" };

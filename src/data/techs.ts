@@ -66,8 +66,10 @@ export interface TechDef {
   tier: number;
   /** The age (0-based era index) this tech becomes researchable in. */
   era: number;
-  /** Multiplicative yield bonus, e.g. { gold: 0.15 } = +15% gold. */
+  /** Multiplicative yield bonus on gold/food/knowledge, e.g. { gold: 0.15 } = +15% gold. */
   yieldMult?: Partial<ResourceYield>;
+  /** Additive bonus to all ware output, e.g. 0.1 = +10% wares (the materials successor). */
+  wareMult?: number;
   unlockBuilding?: BuildingId;
   unlockUnit?: UnitType;
   /** Flat reduction to every owned region's unrest target. */
@@ -151,13 +153,13 @@ export const TECHS: Record<TechId, TechDef> = {
   },
   metallurgy: {
     id: "metallurgy", name: "Metallurgy", branch: "military", tier: 2, era: 2, cost: 50,
-    requires: ["masonry"], yieldMult: { materials: 0.1 }, unlockBuilding: "bloomery",
-    blurb: "+10% materials; unlocks the Bloomery — forge your iron country into arms.",
+    requires: ["masonry"], wareMult: 0.1, unlockBuilding: "bloomery",
+    blurb: "+10% ware output; unlocks the Bloomery — forge your iron country into arms.",
   },
   economics: {
     id: "economics", name: "Economics", branch: "economy", tier: 2, era: 2, cost: 54,
-    requires: ["banking"], yieldMult: { gold: 0.2, materials: 0.1 }, unlockBuilding: "guildhall",
-    blurb: "+20% gold, +10% materials; unlocks the Guildhall.",
+    requires: ["banking"], yieldMult: { gold: 0.2 }, wareMult: 0.1, unlockBuilding: "guildhall",
+    blurb: "+20% gold, +10% ware output; unlocks the Guildhall.",
   },
   philosophy: {
     id: "philosophy", name: "Philosophy", branch: "civics", tier: 2, era: 2, cost: 50,
@@ -166,8 +168,8 @@ export const TECHS: Record<TechId, TechDef> = {
   },
   feudalism: {
     id: "feudalism", name: "Feudalism", branch: "military", tier: 2, era: 2, cost: 48,
-    requires: ["horseback"], yieldMult: { materials: 0.15 }, unrestReduction: 3,
-    blurb: "+15% materials, -3 unrest.",
+    requires: ["horseback"], wareMult: 0.15, unrestReduction: 3,
+    blurb: "+15% ware output, -3 unrest.",
   },
   castles: {
     id: "castles", name: "Castles", branch: "military", tier: 2, era: 2, cost: 46,
@@ -181,8 +183,8 @@ export const TECHS: Record<TechId, TechDef> = {
   },
   guilds: {
     id: "guilds", name: "Guilds", branch: "economy", tier: 2, era: 2, cost: 48,
-    requires: ["banking"], yieldMult: { gold: 0.15, materials: 0.1 },
-    blurb: "+15% gold, +10% materials — chartered trade guilds.",
+    requires: ["banking"], yieldMult: { gold: 0.15 }, wareMult: 0.1,
+    blurb: "+15% gold, +10% ware output — chartered trade guilds.",
   },
   lubeck_law: {
     id: "lubeck_law", name: "Lübeck Law", branch: "civics", tier: 2, era: 1, cost: 44,
@@ -208,8 +210,8 @@ export const TECHS: Record<TechId, TechDef> = {
   },
   standing_army: {
     id: "standing_army", name: "Standing Army", branch: "military", tier: 3, era: 3, cost: 68,
-    requires: ["feudalism"], yieldMult: { materials: 0.15 }, unrestReduction: 4,
-    blurb: "+15% materials, -4 unrest — a paid, drilled army.",
+    requires: ["feudalism"], wareMult: 0.15, unrestReduction: 4,
+    blurb: "+15% ware output, -4 unrest — a paid, drilled army.",
   },
 
   // --- Age of Legacy (era 4) -----------------------------------------------
@@ -225,8 +227,8 @@ export const TECHS: Record<TechId, TechDef> = {
   },
   gunpowder: {
     id: "gunpowder", name: "Gunpowder", branch: "military", tier: 4, era: 4, cost: 88,
-    requires: ["engineering", "standing_army"], yieldMult: { materials: 0.2 }, unrestReduction: 4,
-    blurb: "+20% materials, -4 unrest — cannon foundries and drilled shot.",
+    requires: ["engineering", "standing_army"], wareMult: 0.2, unrestReduction: 4,
+    blurb: "+20% ware output, -4 unrest — cannon foundries and drilled shot.",
   },
 };
 

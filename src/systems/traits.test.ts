@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest";
 import { createGame } from "@/systems/turn";
 import { nationYieldMult, regionProduction } from "@/systems/economy";
 import { unitCost } from "@/systems/military";
-import { traitYield, traitUnitCostMult, TRAIT_IDS, TRAITS } from "@/data/traits";
+import { traitYield, traitUnitCostMult, traitWareMult, TRAIT_IDS, TRAITS } from "@/data/traits";
 import { factionByName } from "@/data/factions";
 import { UNITS } from "@/data/units";
-import { PLAYER_ID, emptyResearch, type Nation, type Region } from "@/systems/state";
+import { PLAYER_ID, emptyResearch, emptyWares, type Nation, type Region } from "@/systems/state";
 
 function nation(over: Partial<Nation> = {}): Nation {
   return {
@@ -15,7 +15,8 @@ function nation(over: Partial<Nation> = {}): Nation {
     isPlayer: true,
     isBarbarian: false,
     alive: true,
-    stocks: { gold: 100, food: 0, materials: 100, knowledge: 0 },
+    stocks: { gold: 100, food: 0, knowledge: 0 },
+    wares: emptyWares(),
     taxRate: 0,
     research: emptyResearch(),
     famine: false,
@@ -47,15 +48,17 @@ describe("trait data", () => {
     expect(TRAIT_IDS.length).toBe(5);
     for (const id of TRAIT_IDS) {
       const y = TRAITS[id].yield;
-      for (const k of ["food", "materials", "gold", "knowledge"] as const) {
+      for (const k of ["food", "gold", "knowledge"] as const) {
         expect(y[k]).toBeGreaterThan(0);
       }
+      expect(TRAITS[id].wareMult).toBeGreaterThan(0);
       expect(TRAITS[id].unitCostMult).toBeGreaterThan(0);
     }
   });
 
   it("identity multipliers when no trait is set", () => {
-    expect(traitYield(undefined)).toEqual({ food: 1, materials: 1, gold: 1, knowledge: 1 });
+    expect(traitYield(undefined)).toEqual({ food: 1, gold: 1, knowledge: 1 });
+    expect(traitWareMult(undefined)).toBe(1);
     expect(traitUnitCostMult(undefined)).toBe(1);
   });
 });
@@ -65,24 +68,23 @@ describe("trait production effects", () => {
     const base = regionProduction(plains(), 0, nationYieldMult(nation({ trait: undefined })));
     const fertile = regionProduction(plains(), 0, nationYieldMult(nation({ trait: "fertile" })));
     expect(fertile.food).toBeGreaterThan(base.food);
-    expect(fertile.materials).toBeCloseTo(base.materials, 5);
     expect(fertile.gold).toBeCloseTo(base.gold, 5);
   });
 
-  it("Mercantile boosts gold, Scholarly boosts knowledge, Industrious boosts materials", () => {
+  it("Mercantile boosts gold, Scholarly boosts knowledge, Industrious boosts ware output", () => {
     const base = nationYieldMult(nation({ trait: undefined }));
     expect(nationYieldMult(nation({ trait: "mercantile" })).gold).toBeGreaterThan(base.gold);
     expect(nationYieldMult(nation({ trait: "scholarly" })).knowledge).toBeGreaterThan(base.knowledge);
-    expect(nationYieldMult(nation({ trait: "industrious" })).materials).toBeGreaterThan(base.materials);
+    expect(traitWareMult("industrious")).toBeGreaterThan(traitWareMult(undefined));
   });
 
   it("Martial leaves production untouched", () => {
     expect(nationYieldMult(nation({ trait: "martial" }))).toEqual({
       food: 1,
-      materials: 1,
       gold: 1,
       knowledge: 1,
     });
+    expect(traitWareMult("martial")).toBe(1);
   });
 });
 
@@ -91,8 +93,9 @@ describe("trait military effects", () => {
     const plain = unitCost(nation({ trait: undefined }), "infantry");
     const martial = unitCost(nation({ trait: "martial" }), "infantry");
     expect(martial.gold).toBeLessThan(plain.gold);
-    expect(martial.materials).toBeLessThan(plain.materials);
-    expect(plain).toEqual({ gold: UNITS.infantry.cost.gold, materials: UNITS.infantry.cost.materials });
+    // Infantry's arms ware is timber; the Martial discount cuts it too.
+    expect(martial.wares.timber!).toBeLessThan(plain.wares.timber!);
+    expect(plain).toEqual({ gold: UNITS.infantry.cost.gold, wares: UNITS.infantry.cost.wares });
     expect(unitCost(nation({ trait: "fertile" }), "infantry")).toEqual(plain);
   });
 });

@@ -1,17 +1,23 @@
 import { describe, it, expect } from "vitest";
 import { GOODS, GOOD_IDS, type GoodId } from "@/data/goods";
 import { KONTORE, KONTOR_IDS } from "@/data/kontore";
+import { BUILDINGS, BUILDING_IDS } from "@/data/buildings";
 
 describe("goods table", () => {
-  it("has the eight Hansa goods with positive value and base output", () => {
-    expect(GOOD_IDS).toEqual(["grain", "timber", "furs", "iron", "salt", "herring", "amber", "beer"]);
+  it("has the Hansa wares with positive value and base output", () => {
+    expect(GOOD_IDS).toEqual([
+      "grain", "herring", "stockfish", "beer", "timber", "naval_stores", "brick",
+      "iron", "copper", "salt", "furs", "wax", "amber", "cloth", "honey",
+    ]);
     for (const id of GOOD_IDS) {
       const g = GOODS[id];
       expect(g.id).toBe(id);
       expect(g.value).toBeGreaterThan(0);
       expect(g.source.baseOutput).toBeGreaterThan(0);
-      // Every good is sourced by a terrain and/or a strategic resource.
-      expect((g.source.terrain?.length ?? 0) > 0 || g.source.resource !== undefined).toBe(true);
+      // Every ware is sourced by a terrain, a strategic resource, or an industry
+      // building's ware yield (e.g. copper from the Mine).
+      const byBuilding = BUILDING_IDS.some((b) => (BUILDINGS[b].wareYield?.[id] ?? 0) > 0);
+      expect((g.source.terrain?.length ?? 0) > 0 || g.source.resource !== undefined || byBuilding).toBe(true);
     }
   });
 

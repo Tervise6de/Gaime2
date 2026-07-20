@@ -11,7 +11,7 @@ describe("map lenses", () => {
     const ids = LENSES.map((l) => l.id);
     expect(ids[0]).toBe("none"); // political is first / default
     expect(new Set(ids).size).toBe(ids.length); // unique
-    for (const want of ["population", "gold", "materials", "food", "unrest"] as LensId[]) {
+    for (const want of ["population", "gold", "wares", "food", "unrest"] as LensId[]) {
       expect(ids).toContain(want);
     }
   });
@@ -24,7 +24,7 @@ describe("map lenses", () => {
 
   it("colours every region for a heat lens, as valid hex", () => {
     const g = createGame({ seed: 7 });
-    for (const id of ["population", "gold", "materials", "food", "unrest"] as LensId[]) {
+    for (const id of ["population", "gold", "wares", "food", "unrest"] as LensId[]) {
       const colors = lensColorsFor(g, id);
       expect(colors).not.toBeNull();
       for (const r of g.regions) {

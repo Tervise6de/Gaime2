@@ -202,14 +202,15 @@ describe("choice events", () => {
     }
   });
 
-  it("funding an expedition trades 30 gold for materials and knowledge", () => {
+  it("funding an expedition trades 30 gold for timber and knowledge", () => {
     const s = pendingChoiceState("expedition");
     const g0 = s.nations[PLAYER_ID]!.stocks;
+    const w0 = s.nations[PLAYER_ID]!.wares;
     expect(g0.gold).toBeGreaterThanOrEqual(30);
     const funded = resolveChoice(s, "fund");
     expect(funded.pendingChoice).toBeUndefined();
     expect(funded.nations[PLAYER_ID]!.stocks.gold).toBe(g0.gold - 30);
-    expect(funded.nations[PLAYER_ID]!.stocks.materials).toBeGreaterThan(g0.materials);
+    expect(funded.nations[PLAYER_ID]!.wares.timber).toBeGreaterThan(w0.timber);
     expect(funded.nations[PLAYER_ID]!.stocks.knowledge).toBeGreaterThan(g0.knowledge);
   });
 
@@ -312,32 +313,32 @@ describe("choice events", () => {
     expect(burned.nations[PLAYER_ID]!.stocks.knowledge).toBe(know0);
   });
 
-  it("Scholarly grand academy: spends 30 materials for a research-surge modifier", () => {
+  it("Scholarly grand academy: spends 30 timber for a research-surge modifier", () => {
     const base = pendingTraitChoice("grand_academy", "scholarly");
     const s = {
       ...base,
       nations: base.nations.map((n) =>
-        n.id === PLAYER_ID ? { ...n, stocks: { ...n.stocks, materials: 40 } } : n,
+        n.id === PLAYER_ID ? { ...n, wares: { ...n.wares, timber: 40 } } : n,
       ),
     };
     const endowed = resolveChoice(s, "endow");
     expect(endowed.pendingChoice).toBeUndefined();
-    expect(endowed.nations[PLAYER_ID]!.stocks.materials).toBe(10);
+    expect(endowed.nations[PLAYER_ID]!.wares.timber).toBe(10);
     const surge = endowed.nations[PLAYER_ID]!.modifiers?.find((m) => m.id === "research_surge");
     expect(surge?.turnsLeft).toBe(RESEARCH_SURGE_TURNS);
   });
 
-  it("Grand academy with too few materials is a safe no-op beyond clearing the prompt", () => {
+  it("Grand academy with too few timber is a safe no-op beyond clearing the prompt", () => {
     const base = pendingTraitChoice("grand_academy", "scholarly");
     const s = {
       ...base,
       nations: base.nations.map((n) =>
-        n.id === PLAYER_ID ? { ...n, stocks: { ...n.stocks, materials: 5 }, modifiers: undefined } : n,
+        n.id === PLAYER_ID ? { ...n, wares: { ...n.wares, timber: 5 }, modifiers: undefined } : n,
       ),
     };
     const tried = resolveChoice(s, "endow");
     expect(tried.pendingChoice).toBeUndefined();
-    expect(tried.nations[PLAYER_ID]!.stocks.materials).toBe(5);
+    expect(tried.nations[PLAYER_ID]!.wares.timber).toBe(5);
     expect(tried.nations[PLAYER_ID]!.modifiers).toBeUndefined();
   });
 
@@ -363,19 +364,19 @@ describe("choice events", () => {
     expect(pop1 - pop0).toBe(2 * Math.min(3, owned)); // +2 in up to three regions
   });
 
-  it("Industrious public works: spends 24 materials to ease unrest by 8", () => {
+  it("Industrious public works: spends 24 timber to ease unrest by 8", () => {
     const base = pendingTraitChoice("public_works", "industrious");
     const s = {
       ...base,
       nations: base.nations.map((n) =>
-        n.id === PLAYER_ID ? { ...n, stocks: { ...n.stocks, materials: 40 } } : n,
+        n.id === PLAYER_ID ? { ...n, wares: { ...n.wares, timber: 40 } } : n,
       ),
       regions: base.regions.map((r) => (r.ownerId === PLAYER_ID ? { ...r, unrest: 20 } : r)),
     };
-    const mat0 = s.nations[PLAYER_ID]!.stocks.materials;
+    const mat0 = s.nations[PLAYER_ID]!.wares.timber;
     const built = resolveChoice(s, "commission");
     expect(built.pendingChoice).toBeUndefined();
-    expect(built.nations[PLAYER_ID]!.stocks.materials).toBe(mat0 - 24);
+    expect(built.nations[PLAYER_ID]!.wares.timber).toBe(mat0 - 24);
     expect(built.regions.filter((r) => r.ownerId === PLAYER_ID).every((r) => r.unrest === 12)).toBe(true);
   });
 
@@ -408,18 +409,18 @@ describe("choice events", () => {
     }
   });
 
-  it("Reinforce walls: spends 20 materials for +1 fortification on a border region", () => {
+  it("Reinforce walls: spends 20 brick for +1 fortification on a border region", () => {
     const base = pendingChoiceState("reinforce_walls");
     const s = {
       ...base,
       nations: base.nations.map((n) =>
-        n.id === PLAYER_ID ? { ...n, stocks: { ...n.stocks, materials: 30 } } : n,
+        n.id === PLAYER_ID ? { ...n, wares: { ...n.wares, brick: 30 } } : n,
       ),
     };
     const fortBefore = s.regions.filter((r) => r.ownerId === PLAYER_ID).reduce((a, r) => a + r.fortification, 0);
     const funded = resolveChoice(s, "fund");
     expect(funded.pendingChoice).toBeUndefined();
-    expect(funded.nations[PLAYER_ID]!.stocks.materials).toBe(10);
+    expect(funded.nations[PLAYER_ID]!.wares.brick).toBe(10);
     const fortAfter = funded.regions.filter((r) => r.ownerId === PLAYER_ID).reduce((a, r) => a + r.fortification, 0);
     expect(fortAfter).toBe(fortBefore + 1);
     // The reinforced region is a genuine border region (borders land it doesn't own).
@@ -429,17 +430,17 @@ describe("choice events", () => {
     expect(raised.adjacency.some((nb) => funded.regions[nb]!.ownerId !== PLAYER_ID)).toBe(true);
   });
 
-  it("Reinforce walls with too few materials is a safe no-op beyond clearing the prompt", () => {
+  it("Reinforce walls with too few brick is a safe no-op beyond clearing the prompt", () => {
     const base = pendingChoiceState("reinforce_walls");
     const s = {
       ...base,
       nations: base.nations.map((n) =>
-        n.id === PLAYER_ID ? { ...n, stocks: { ...n.stocks, materials: 5 } } : n,
+        n.id === PLAYER_ID ? { ...n, wares: { ...n.wares, brick: 5 } } : n,
       ),
     };
     const tried = resolveChoice(s, "fund");
     expect(tried.pendingChoice).toBeUndefined();
-    expect(tried.nations[PLAYER_ID]!.stocks.materials).toBe(5);
+    expect(tried.nations[PLAYER_ID]!.wares.brick).toBe(5);
     const fortBefore = s.regions.reduce((a, r) => a + r.fortification, 0);
     expect(tried.regions.reduce((a, r) => a + r.fortification, 0)).toBe(fortBefore);
   });

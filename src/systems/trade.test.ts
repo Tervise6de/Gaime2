@@ -75,31 +75,35 @@ describe("regionGoodOutput", () => {
     ]);
   });
 
-  it("coast sources herring; salt/amber come from their strategic resource", () => {
-    expect(regionGoodOutput(reg({ terrain: "coast" })).map((g) => g.good)).toEqual(["herring"]);
-    expect(regionGoodOutput(reg({ terrain: "hills", resource: "salt" })).map((g) => g.good)).toEqual(["salt"]);
+  it("coast sources the fishery/naval/cloth wares; salt/amber come from their strategic resource", () => {
+    expect(regionGoodOutput(reg({ terrain: "coast" })).map((g) => g.good)).toEqual([
+      "herring", "stockfish", "naval_stores", "cloth",
+    ]);
+    expect(regionGoodOutput(reg({ terrain: "hills", resource: "salt" })).map((g) => g.good)).toEqual(["brick", "salt"]);
     expect(regionGoodOutput(reg({ terrain: "coast", resource: "amber" })).map((g) => g.good)).toEqual([
-      "herring", "amber",
+      "herring", "stockfish", "naval_stores", "amber", "cloth",
     ]);
   });
 
-  it("forest sources both timber and furs (in GOOD_IDS order)", () => {
+  it("forest sources timber, furs, wax and honey (in GOOD_IDS order)", () => {
     expect(regionGoodOutput(reg({ terrain: "forest" }))).toEqual([
       { good: "timber", amount: GOODS.timber.source.baseOutput },
       { good: "furs", amount: GOODS.furs.source.baseOutput },
+      { good: "wax", amount: GOODS.wax.source.baseOutput },
+      { good: "honey", amount: GOODS.honey.source.baseOutput },
     ]);
   });
 
-  it("an iron-resource region sources iron (terrain aside)", () => {
-    expect(regionGoodOutput(reg({ terrain: "hills", resource: "iron" }))).toEqual([
+  it("an iron-resource region sources iron (barren terrain aside)", () => {
+    expect(regionGoodOutput(reg({ terrain: "mountains", resource: "iron" }))).toEqual([
       { good: "iron", amount: GOODS.iron.source.baseOutput },
     ]);
   });
 
   it("a region can source terrain AND resource goods at once", () => {
-    // Forest + iron: timber, furs (forest) and iron (resource).
+    // Forest + iron: timber, furs, wax, honey (forest) and iron (resource), GOOD_IDS order.
     expect(regionGoodOutput(reg({ terrain: "forest", resource: "iron" })).map((g) => g.good)).toEqual([
-      "timber", "furs", "iron",
+      "timber", "iron", "furs", "wax", "honey",
     ]);
   });
 

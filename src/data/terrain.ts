@@ -45,7 +45,6 @@ export const STRATEGIC_RESOURCES: Record<StrategicResource, { label: string; gly
 
 export interface ResourceYield {
   food: number;
-  materials: number;
   gold: number;
   knowledge: number;
 }
@@ -73,7 +72,7 @@ export const TERRAIN: Record<TerrainId, TerrainDef> = {
     name: "Plains",
     // Pale wheat — the base parchment tone (vintage-map land, not saturated green).
     color: "#e6d7ab",
-    base: { food: 4, materials: 1, gold: 2, knowledge: 0 },
+    base: { food: 4, gold: 2, knowledge: 0 },
     popCapacity: 12,
     defense: 1.0,
     strategic: "horses",
@@ -84,7 +83,7 @@ export const TERRAIN: Record<TerrainId, TerrainDef> = {
     name: "Forest",
     // Muted sage — a greyed green that sits in the aged-paper family.
     color: "#a6b884",
-    base: { food: 2, materials: 4, gold: 1, knowledge: 0 },
+    base: { food: 2, gold: 1, knowledge: 0 },
     popCapacity: 8,
     defense: 1.2,
     strategic: null,
@@ -95,7 +94,7 @@ export const TERRAIN: Record<TerrainId, TerrainDef> = {
     name: "Hills",
     // Warm tan — dry upland parchment, a shade deeper than the plains wheat.
     color: "#d2b98c",
-    base: { food: 1, materials: 3, gold: 2, knowledge: 1 },
+    base: { food: 1, gold: 2, knowledge: 1 },
     popCapacity: 7,
     defense: 1.25,
     strategic: "iron",
@@ -106,7 +105,7 @@ export const TERRAIN: Record<TerrainId, TerrainDef> = {
     name: "Mountains",
     // Warm grey-taupe — neutral stony parchment, the least saturated terrain.
     color: "#b4a996",
-    base: { food: 0, materials: 2, gold: 1, knowledge: 2 },
+    base: { food: 0, gold: 1, knowledge: 2 },
     popCapacity: 4,
     defense: 1.4,
     strategic: "iron",
@@ -119,7 +118,7 @@ export const TERRAIN: Record<TerrainId, TerrainDef> = {
     // deliberately NOT ocean-blue so coast cells read as wet *land* rather than
     // lakes inside the island silhouette.
     color: "#cfd6ac",
-    base: { food: 3, materials: 1, gold: 4, knowledge: 1 },
+    base: { food: 3, gold: 4, knowledge: 1 },
     popCapacity: 10,
     defense: 1.0,
     strategic: null,

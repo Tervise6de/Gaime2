@@ -6,6 +6,54 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-20 — R1: the Wares economy — "Materials" retired for ~15 era wares (v0.85.0)
+
+The abstract **"Materials"** resource is gone. In its place the game runs a single
+unified layer of **era wares** — the real Hanseatic commodities — so what you build
+and whom you arm now depends on which land you hold and what it yields. This unifies
+the two former layers (the four-resource economy and the parallel trade-goods
+system) into one. Grounded in `hansa times.md` §5/§13; design in
+`docs/game-design.md` "Resources — the Wares economy" + the R-series build plan.
+
+**The catalog (`data/goods.ts`, now 15 wares).** grain, herring, stockfish, beer,
+timber, naval stores, brick, iron, copper, salt, furs, wax, amber, cloth, honey —
+each tagged with `roles` (food / build / arms / luxury / industry). Sourced from
+terrain, strategic resources, and — new — **industry buildings** (a Mine now yields
+iron + copper; workshops/bloomery/foundry yield timber/iron). Kontor demand
+(`data/kontore.ts`) extended to buy the new wares; `goods.test.ts` still proves
+goods⇄kontore never drift.
+
+**The cut.** `materials` removed from `ResourceStocks` / `ResourceYield` /
+`ResourceFlow` / `RESOURCE_KEYS`. Nations gain a per-ware stockpile `Nation.wares`
+(`emptyWares`/`spendWares`/`addWares`/`canAfford` helpers). Region ware production
+(`trade.ts nationalWareOutput`, scaled by a new `regionWareMult` from tech/trait/
+focus) accrues each turn in `turn.ts`. The "industrious" trait and "workshop" focus,
+and the six production techs, now drive a **ware-output multiplier** instead of a
+materials one.
+
+**Consumption.** Buildings carry a `buildWare` (default timber; brick for masonry
+monuments, naval stores for ports) and cost is drawn from that ware's stockpile at
+`BUILD_RATE`/turn (`construction.ts`). Units cost gold + **arms wares** (timber for
+the levy; iron/copper for siege, handgunners, swordsmen, knights) — basic troops
+stay timber-funded so an iron-poor realm can still field an army. Material-flavoured
+events/epochs now grant/burn wares (ore→iron, expedition/academy/public-works→timber,
+walls→brick, great fire→timber). `save.ts` back-fills `wares` onto pre-wares saves.
+
+**UI.** The production panel shows a build-wares ledger; build and unit costs render
+with ware glyphs; the old "Materials" map lens became a **Wares** (total ware output)
+lens.
+
+**Verification.** `typecheck` + `build` clean; **686 unit tests green**; built bundle
+still makes **0 `fetch`** calls; `dependencies` stays `{}`. A temporary self-play
+probe (40 turns, since deleted) confirmed wares accrue, construction funds and
+completes, recruitment spends, and rivals run the same ware economy.
+
+**Next (R2+):** balance-tune ware values/outputs and starting stores via a self-play
+probe; surface per-ware flows in the trade UI and teach the AI to produce-to-demand;
+then R3 — review "Food" onto the food-ware pool with the salt→fish preservation chain.
+
+---
+
 ## 2026-07-18 — D4: performance profiling harness + findings (partial) (v0.56.0)
 
 Roadmap D4 (profile at the largest configs; optimise hot paths *only if measured

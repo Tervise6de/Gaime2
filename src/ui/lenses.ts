@@ -9,14 +9,14 @@
  */
 
 import { PLAYER_ID, BARBARIAN_ID, armySize, type GameState, type Region } from "@/systems/state";
-import { regionProduction, nationYieldMult } from "@/systems/economy";
+import { regionProduction, nationYieldMult, regionWareMult } from "@/systems/economy";
 import { getRelation, getTreaty } from "@/systems/diplomacy";
-import { regionSources } from "@/systems/trade";
+import { regionSources, regionGoodOutput } from "@/systems/trade";
 import { KONTORE, KONTOR_IDS } from "@/data/kontore";
 import type { GoodId } from "@/data/goods";
 
 /** Heat lenses colour by a normalised scalar; relations/military/trade are categorical. */
-type HeatLens = "population" | "gold" | "materials" | "food" | "unrest";
+type HeatLens = "population" | "gold" | "wares" | "food" | "unrest";
 export type LensId = "none" | HeatLens | "relations" | "military" | "trade";
 
 export interface LensDef {
@@ -34,7 +34,7 @@ export const LENSES: LensDef[] = [
   { id: "none", label: "Political", glyph: "map", fallback: "🗺", hint: "Who owns what — the default map." },
   { id: "population", label: "Population", glyph: "region", fallback: "👥", hint: "How populous each region is." },
   { id: "gold", label: "Gold", glyph: "gold", fallback: "🪙", hint: "Gold produced per turn." },
-  { id: "materials", label: "Materials", glyph: "materials", fallback: "⛏", hint: "Materials produced per turn." },
+  { id: "wares", label: "Wares", glyph: "materials", fallback: "📦", hint: "Total ware output produced per turn." },
   { id: "food", label: "Food", glyph: "food", fallback: "🌾", hint: "Food produced per turn." },
   { id: "unrest", label: "Unrest", glyph: "warning", fallback: "🔥", hint: "How restless each region is (red = revolt risk)." },
   { id: "relations", label: "Relations", glyph: "diplomacy", fallback: "🤝", hint: "How each realm stands with you — allies green, enemies red." },
@@ -61,7 +61,7 @@ const TRADE_GOODS: { good: GoodId; color: string }[] = [
 const RAMPS: Record<HeatLens, string[]> = {
   population: ["#26332e", "#3f8f6a", "#63d29a"],
   gold: ["#332b18", "#b08b32", "#f0cf63"],
-  materials: ["#2f2b26", "#9c6a3e", "#d99a5f"],
+  wares: ["#2f2b26", "#9c6a3e", "#d99a5f"],
   food: ["#26331d", "#5b9b3e", "#93d466"],
   unrest: ["#33503c", "#d7a53f", "#e8776b"],
 };
@@ -95,6 +95,12 @@ function metric(state: GameState, region: Region, id: HeatLens): number {
   // Income lenses: use the region owner's tax + yield multipliers where owned,
   // else a neutral baseline, so the heat reflects what the land actually pays.
   const owner = region.ownerId != null ? state.nations.find((n) => n.id === region.ownerId) : null;
+  // Wares: total ware output the land produces this turn, scaled by the owner's
+  // ware multiplier (national trait/tech × region focus).
+  if (id === "wares") {
+    const wareMult = owner && !owner.isBarbarian ? regionWareMult(owner, region) : 1;
+    return regionGoodOutput(region, wareMult).reduce((sum, w) => sum + w.amount, 0);
+  }
   const tax = owner && !owner.isBarbarian ? owner.taxRate : 0.1;
   const flow =
     owner && !owner.isBarbarian

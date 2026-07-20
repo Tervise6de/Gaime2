@@ -138,7 +138,7 @@ function applyEpoch(state: GameState, def: EpochEventDef, rng: Rng): GameState {
       );
       const nations = state.nations.map((n) =>
         n.id === town.ownerId
-          ? { ...n, stocks: { ...n.stocks, materials: round1(Math.max(0, n.stocks.materials - eff.materialsLoss)) } }
+          ? { ...n, wares: { ...n.wares, timber: round1(Math.max(0, n.wares.timber - eff.wareLoss)) } }
           : n,
       );
       return announce({ ...state, regions, nations }, def, def.headline.replace("{place}", town.name));

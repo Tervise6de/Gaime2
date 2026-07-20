@@ -7,7 +7,7 @@
  * exported/imported as a JSON string for sharing or backup.
  */
 
-import { emptyUnits, TURN_LIMIT, type GameState } from "@/systems/state";
+import { emptyUnits, emptyWares, TURN_LIMIT, type GameState } from "@/systems/state";
 import { SOUND } from "@/data/sound";
 
 const SAVE_VERSION = 1;
@@ -95,6 +95,14 @@ export function deserializeGame(json: string): GameState | null {
       for (const a of s.armies) {
         if (a && a.units) a.units = { ...emptyUnits(), ...a.units };
       }
+    }
+    // The wares economy replaced the abstract "materials" resource: a pre-wares
+    // save has nations with no `wares` (and a now-dead stocks.materials). Back-fill
+    // an empty ware stockpile so every nation.wares access is safe. Any present
+    // wares record is completed to the full ware set so a save from before a ware
+    // existed doesn't read that slot as undefined (→ NaN) in ware arithmetic.
+    for (const n of s.nations) {
+      if (n) n.wares = { ...emptyWares(), ...(n.wares ?? {}) };
     }
     return s;
   } catch {

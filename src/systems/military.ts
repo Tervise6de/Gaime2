@@ -3,7 +3,7 @@
  * back into the economy (docs/game-design.md §3.4).
  *
  * These are state transitions (intents) used by the UI and, later, the AI:
- *   - `raiseUnit`  spends gold+materials to add a unit to a region's army
+ *   - `raiseUnit`  spends gold+arms wares to add a unit to a region's army
  *   - `moveArmy`   walks an army along the adjacency graph; entering a hostile
  *                  region triggers `resolveCombat`, and wiping the defender (or
  *                  walking into an undefended enemy region) captures it.
@@ -13,6 +13,7 @@
  */
 
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
+import { GOODS, type GoodId } from "@/data/goods";
 import {
   COMMANDER_DISLOYAL,
   COMMANDER_LOYALTY_EROSION,
@@ -41,21 +42,27 @@ import {
   UNREST_REVOLT,
   armySize,
   emptyUnits,
+  canAfford,
+  spendWares,
   type Army,
   type GameState,
   type Nation,
   type Region,
 } from "@/systems/state";
 
-/** Unit gold+materials cost after the owner's national trait (Martial discount). */
+/** Unit gold+ware cost after the owner's national trait (Martial discount). */
 export function unitCost(
   nation: Nation | undefined,
   unit: UnitType,
   focus?: FocusId,
-): { gold: number; materials: number } {
+): { gold: number; wares: Partial<Record<GoodId, number>> } {
   const c = UNITS[unit].cost;
   const m = traitUnitCostMult(nation?.trait) * focusUnitCostMult(focus); // Garrison focus discounts musters
-  return { gold: Math.round(c.gold * m), materials: Math.round(c.materials * m) };
+  const wares: Partial<Record<GoodId, number>> = {};
+  for (const id of Object.keys(c.wares) as GoodId[]) {
+    wares[id] = Math.round((c.wares[id] ?? 0) * m);
+  }
+  return { gold: Math.round(c.gold * m), wares };
 }
 
 /** The army of a given owner standing in a region, if any. */
@@ -117,8 +124,9 @@ export function canRaiseUnit(
   }
   const cost = unitCost(nation, unit, region.focus);
   if (nation.stocks.gold < cost.gold) return { ok: false, reason: "Not enough gold." };
-  if (nation.stocks.materials < cost.materials) {
-    return { ok: false, reason: "Not enough materials." };
+  if (!canAfford(nation.wares, cost.wares)) {
+    const short = (Object.keys(cost.wares) as GoodId[]).find((id) => nation.wares[id] < (cost.wares[id] ?? 0));
+    return { ok: false, reason: `Not enough ${short ? GOODS[short].name.toLowerCase() : "wares"}.` };
   }
   if (def.requires && !strategicAccess(state, ownerId).has(def.requires)) {
     return { ok: false, reason: `Requires access to ${def.requires}.` };
@@ -141,11 +149,8 @@ export function raiseUnit(
     n.id === ownerId
       ? {
           ...n,
-          stocks: {
-            ...n.stocks,
-            gold: round1(n.stocks.gold - cost.gold),
-            materials: round1(n.stocks.materials - cost.materials),
-          },
+          stocks: { ...n.stocks, gold: round1(n.stocks.gold - cost.gold) },
+          wares: spendWares(n.wares, cost.wares),
         }
       : n,
   );

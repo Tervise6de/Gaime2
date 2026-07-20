@@ -3,6 +3,7 @@ import {
   FOCUSES,
   FOCUS_IDS,
   focusYieldMult,
+  focusWareMult,
   focusPopCapacity,
   focusCalm,
   focusUnitCostMult,
@@ -14,13 +15,13 @@ import { unrestTarget } from "@/systems/stability";
 import { unitCost } from "@/systems/military";
 import { isBuildingUnlockedFor } from "@/systems/tech";
 import { createGame, setRegionFocus, canQueueBuilding } from "@/systems/turn";
-import { PLAYER_ID, emptyResearch, type Nation, type Region } from "@/systems/state";
+import { PLAYER_ID, emptyResearch, emptyWares, type Nation, type Region } from "@/systems/state";
 import type { FocusId } from "@/data/focuses";
 
 function nation(over: Partial<Nation> = {}): Nation {
   return {
     id: 0, name: "N", color: "#fff", isPlayer: true, isBarbarian: false, alive: true,
-    stocks: { gold: 100, food: 0, materials: 100, knowledge: 0 }, taxRate: 0,
+    stocks: { gold: 100, food: 0, knowledge: 0 }, wares: emptyWares(), taxRate: 0,
     research: emptyResearch(), famine: false, bankrupt: false, ...over,
   };
 }
@@ -44,7 +45,8 @@ describe("focus roster", () => {
 
   it("balanced has no effect; helpers return neutral for it and undefined", () => {
     for (const f of [undefined, "balanced"] as (FocusId | undefined)[]) {
-      expect(focusYieldMult(f)).toEqual({ food: 1, materials: 1, gold: 1, knowledge: 1 });
+      expect(focusYieldMult(f)).toEqual({ food: 1, gold: 1, knowledge: 1 });
+      expect(focusWareMult(f)).toBe(1);
       expect(focusPopCapacity(f)).toBe(0);
       expect(focusCalm(f)).toBe(0);
       expect(focusUnitCostMult(f)).toBe(1);
@@ -58,9 +60,9 @@ describe("focus production effects", () => {
     expect(regionProduction(plains("farmland"), 0, mult).food).toBeGreaterThan(regionProduction(plains(), 0, mult).food);
     expect(regionCapacity(plains("farmland"))).toBeGreaterThan(regionCapacity(plains()));
   });
-  it("Market lifts gold; Workshops lift materials; Academy lifts knowledge", () => {
+  it("Market lifts gold; Workshops lift ware output; Academy lifts knowledge", () => {
     expect(regionProduction(plains("market"), 0, mult).gold).toBeGreaterThan(regionProduction(plains(), 0, mult).gold);
-    expect(regionProduction(plains("workshop"), 0, mult).materials).toBeGreaterThan(regionProduction(plains(), 0, mult).materials);
+    expect(focusWareMult("workshop")).toBeGreaterThan(focusWareMult("balanced"));
     // Plains produce no base knowledge, so verify the Academy multiplier itself.
     expect(focusYieldMult("academy").knowledge).toBeCloseTo(1.4, 5);
     expect(focusYieldMult("balanced").knowledge).toBe(1);

@@ -14,7 +14,8 @@ import {
   applySecession,
 } from "@/systems/turn";
 import { nationalProduction } from "@/systems/economy";
-import { routeIncome } from "@/systems/trade";
+import { routeIncome, nationalWareOutput } from "@/systems/trade";
+import { GOOD_IDS } from "@/data/goods";
 import { factionByName } from "@/data/factions";
 import { totalUpkeep } from "@/systems/military";
 import { regionCapacity } from "@/systems/population";
@@ -253,12 +254,16 @@ describe("resolveTurn", () => {
   it("adds national production to stocks, net of army upkeep", () => {
     const g = createGame({ seed: 1, rivals: 0 });
     const flow = nationalProduction(g, PLAYER_ID);
+    const wareOut = nationalWareOutput(g, PLAYER_ID);
     const upkeep = totalUpkeep(g, PLAYER_ID);
     const next = resolveTurn(g);
     const p0 = playerNation(g);
     const p1 = playerNation(next);
     expect(p1.stocks.gold).toBeCloseTo(p0.stocks.gold + flow.gold - upkeep, 5);
-    expect(p1.stocks.materials).toBeCloseTo(p0.stocks.materials + flow.materials, 5);
+    // No construction is queued at game start, so every ware accrues exactly.
+    for (const id of GOOD_IDS) {
+      expect(p1.wares[id]).toBeCloseTo(p0.wares[id] + wareOut[id], 5);
+    }
   });
 
   it("does not mutate the input state", () => {
