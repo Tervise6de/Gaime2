@@ -132,15 +132,18 @@ Consumption rules (targets): a building costs a small basket of **build** wares
 gold + **arms** wares (militia = a little iron; knights = iron + copper). Food is
 reviewed below.
 
-### Reviewing "Food"
+### Reviewing "Food" (landed, R3)
 
-Today food is an abstract terrain scalar. Under the wares model, food becomes the
-**pooled supply of food-wares** (grain + herring + stockfish + beer) a nation lands
-and stores; population eats from that pool, and a shortfall drives famine/unrest
-exactly as now. The historical hook is real: fish only preserves with **salt**, so
-the salt→fish chain gates the food economy. This is a follow-up milestone (R3) so
-the population/famine tests move in one deliberate step, not mixed into the
-Materials removal.
+Food is no longer an abstract terrain scalar. It now comes from the **food wares**
+a realm produces — grain (the staple), salted herring and stockfish, beer and honey
+— each with a `foodValue` (data/goods.ts). Terrain gives only a little subsistence;
+population eats from the food produced, and a shortfall drives famine/unrest exactly
+as before. The historical hook is real and live: **fish only feeds a town if you
+hold salt to preserve it** (`FISH_UNSALTED_MULT`), so the salt→fish chain gates a
+fishery's food. The effect is a real **food geography** — plains feed themselves on
+grain, a salted coast is a breadbasket, and forest/hill/mountain realms must trade
+for grain or build farms. (Making famine bite harder is a future balance lever; the
+model currently runs with ample headroom.)
 
 ## Build plan — resource overhaul (R-series)
 
@@ -151,12 +154,16 @@ Each R-milestone leaves the game runnable, tested and playable end-to-end.
   onto build/arms wares. Remove `materials` from the core economy. HUD gains a wares
   ledger; build/unit costs show ware glyphs. Trade automatically enriches from the
   bigger catalog. Food stays abstract for now.
-- **R2 — Trade & market depth.** Tune ware values, Kontor demand and scarcity for the
-  full catalog; surface ware flows in the trade UI; teach the AI to produce-to-demand.
-- **R3 — Food review.** Replace abstract food with the food-ware pool; wire the
-  salt→fish preservation chain; move population/famine onto it.
+- **R2 — Trade & market depth (partly landed).** The AI now **produces to need** —
+  it plants food buildings when its larder is low and develops ware industry when
+  short of build wares (systems/ai.ts `chooseBuilding` hints). The Goods Ledger shows
+  true (multiplier-scaled) per-ware output and income. *Still open:* deeper Kontor
+  price/scarcity tuning and teaching the AI to open routes toward the richest demand.
+- **R3 — Food review (landed).** Food now flows from the food-ware pool with the
+  salt→fish preservation chain (see "Reviewing Food" above); population/famine ride on it.
 - **R4 — Production chains & luxuries.** Salted herring, hopped beer, wool→cloth as
-  refined wares; luxury demand feeding prestige/stability, not just gold.
+  refined wares; luxury demand feeding prestige/stability, not just gold; tighten food
+  scarcity so famine becomes a real, occasional pressure.
 
 Guardrails unchanged: deterministic seeded RNG only, pure `GameState → GameState`
 turn pipeline, `systems/` never touch the DOM, `data/` stays serialisable, tests

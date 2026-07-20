@@ -6,6 +6,43 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-20 — R3 + R2: Food from the food wares (salt→fish chain) & AI produce-to-need (v0.86.0)
+
+Two follow-ups to the wares overhaul, landed together.
+
+**R3 — Food review.** Food is no longer an abstract terrain scalar; it now flows from
+the realm's **food wares**. Each food ware carries a `foodValue` (grain 1.2, stockfish
+0.7, herring 0.6, beer 0.5, honey 0.4); terrain base food is cut to a little
+subsistence (`data/terrain.ts`). The turn pipeline adds `nationFoodOutput`
+(`systems/trade.ts`) to the food balance, keeping the existing famine/population
+pipeline unchanged. The historical **salt→fish chain is live**: herring and stockfish
+feed a town at full value only when the realm holds salt, else at `FISH_UNSALTED_MULT`
+(0.4) — so salt land underwrites a fishery. The result is a real food geography:
+grain-plains feed themselves, a salted coast is a breadbasket, and forest/hill/mountain
+realms must trade for grain or build farms. HUD food tip updated.
+
+**R2 (part) — AI produce-to-need.** `chooseBuilding` takes optional hints so a realm
+**plants food** when its larder is low (`stocks.food < AI_FOOD_LOW`, or famine) and
+**develops ware industry** when its build-ware chest is thin
+(`timber+brick+iron+naval < AI_BUILD_WARE_LOW`) — with food need outranking ware need,
+and unrest/temple and focus-capstones still first. `manageEconomy` computes the hints
+from the nation's live stores. The Goods Ledger also now scales region output by the
+owner's `regionWareMult`, so it matches what actually accrues.
+
+**Verification.** typecheck + build clean; **689 unit tests green** (3 new produce-to-need
+tests); 0 `fetch`; deps `{}`. Two temporary self-play probes (10–12 seeds, since deleted):
+- R3 food: avg length ~156, population *tripled* (no starvation), 0% famine, salt→fish
+  gate confirmed to bite.
+- R2/R3 combined: avg length 146, **10/10 games decisive** (no economic stalemate), 0%
+  famine, and realms actively built ~1,200 food buildings + ~864 ware-industry buildings —
+  produce-to-need is firing.
+
+**Next:** R4 — refined-ware chains (salted herring, hopped beer, wool→cloth), luxury
+demand feeding prestige/stability, and a food-scarcity tighten so famine becomes an
+occasional real pressure (the model currently runs with ample headroom).
+
+---
+
 ## 2026-07-20 — R1: the Wares economy — "Materials" retired for ~15 era wares (v0.85.0)
 
 The abstract **"Materials"** resource is gone. In its place the game runs a single

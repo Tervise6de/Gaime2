@@ -104,6 +104,39 @@ export function nationalWareOutput(state: GameState, ownerId: number): Wares {
   return out;
 }
 
+/** Fraction of fish food that survives without salt to preserve it (spoilage). */
+export const FISH_UNSALTED_MULT = 0.4;
+
+/** Whether a realm holds a salt-producing region (salt to preserve fish). Pure. */
+export function hasSaltAccess(state: GameState, ownerId: number): boolean {
+  return state.regions.some((r) => r.ownerId === ownerId && r.resource === "salt");
+}
+
+/**
+ * A nation's food produced from its food wares this turn (docs/game-design.md R3):
+ * each food ware's output × its `foodValue`, scaled by the same owner ware
+ * multiplier as production. Fish (herring, stockfish) is cut to FISH_UNSALTED_MULT
+ * unless the realm holds salt — the historical salt→fish preservation chain, so
+ * salt land underwrites a fishery's food. Pure.
+ */
+export function nationFoodOutput(state: GameState, ownerId: number): number {
+  const nation = nationById(state, ownerId);
+  if (!nation) return 0;
+  const salted = hasSaltAccess(state, ownerId);
+  let food = 0;
+  for (const region of state.regions) {
+    if (region.ownerId !== ownerId) continue;
+    const mult = regionWareMult(nation, region);
+    for (const { good, amount } of regionGoodOutput(region, mult)) {
+      const fv = GOODS[good].foodValue ?? 0;
+      if (fv <= 0) continue;
+      const fish = good === "herring" || good === "stockfish";
+      food += amount * fv * (fish && !salted ? FISH_UNSALTED_MULT : 1);
+    }
+  }
+  return round1(food);
+}
+
 // --- lanes (BFS shortest path) ----------------------------------------------
 
 /**

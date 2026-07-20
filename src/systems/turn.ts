@@ -31,7 +31,7 @@ import type { StrategicResource } from "@/data/terrain";
 import { GOOD_IDS, type GoodId } from "@/data/goods";
 import { nationalProduction, round1 } from "@/systems/economy";
 import { advanceConstruction } from "@/systems/construction";
-import { stepTrade, seedKontore, nationalWareOutput } from "@/systems/trade";
+import { stepTrade, seedKontore, nationalWareOutput, nationFoodOutput } from "@/systems/trade";
 import { stepLeague } from "@/systems/league";
 import { scheduleEpochs, stepEpochs } from "@/systems/epochs";
 import { nextPopulation } from "@/systems/population";
@@ -646,8 +646,11 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
   // A completed build pulls the next still-valid entry off the region's queue.
   let regions = startQueuedBuildings(built.regions, nationId, research.done);
 
-  // Food balance → famine.
-  const rawFood = round1(nation.stocks.food + flow.food);
+  // Food balance → famine. Food now comes chiefly from the realm's food wares
+  // (grain, salted fish, beer, honey — R3), on top of any building/subsistence food
+  // in flow.food, minus the population's consumption already netted into flow.food.
+  const foodFromWares = round1(nationFoodOutput(state, nationId) * econMult);
+  const rawFood = round1(nation.stocks.food + flow.food + foodFromWares);
   const famine = rawFood < 0;
   stocks.food = round1(Math.max(0, Math.min(GRANARY_CAP, rawFood)));
 
@@ -697,7 +700,7 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
     if (bankrupt) notes.push("Bankruptcy — troops disbanded, unrest spikes");
     const entry =
       `Turn ${state.turn} — +${flow.gold}g (−${upkeep} upkeep) +${waresProduced} wares ` +
-      `+${flow.knowledge}k, food ${fmtSigned(flow.food)}. Treasury ${stocks.gold}g.` +
+      `+${flow.knowledge}k, food ${fmtSigned(round1(flow.food + foodFromWares))}. Treasury ${stocks.gold}g.` +
       (notes.length ? ` ${notes.join("; ")}.` : "");
     log = [...state.log, entry].slice(-50);
   } else if (step.completed) {

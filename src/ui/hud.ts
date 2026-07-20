@@ -253,7 +253,7 @@ const RESOURCE_META: Record<ResourceDisplayKey, { label: string; icon: string; t
   food: {
     label: "Food",
     icon: "🌾",
-    tip: "Food feeds population. Surplus grows your regions up to their capacity; a shortfall causes famine — population starves and unrest climbs. Stored food is capped by granaries.",
+    tip: "Food feeds population — it comes from your food wares (grain, salted fish, beer, honey) and farms. Fish only feeds a town if you hold salt to preserve it. Surplus grows regions to their capacity; a shortfall causes famine (population starves, unrest climbs). Stored food is capped by granaries.",
   },
   stability: {
     label: "Stability",

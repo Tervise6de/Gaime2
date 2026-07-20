@@ -2,8 +2,10 @@
  * Terrain types and their economic modifiers.
  *
  * Terrain is the root of the production web (docs/game-design.md §3.7):
- * terrain → production → food/gold/materials/knowledge. These are the base
- * per-region outputs before population, buildings, and tax are applied.
+ * terrain → production → gold/knowledge (+ a little subsistence food). Food and
+ * the tradeable wares now come from the food/build wares a terrain sources
+ * (data/goods.ts); this base is the per-region gold/knowledge before population,
+ * buildings, and tax are applied.
  *
  * Numbers are illustrative starting values for tuning, not final balance.
  * Balancing this game is meant to be editing this table, not the systems.
@@ -72,7 +74,7 @@ export const TERRAIN: Record<TerrainId, TerrainDef> = {
     name: "Plains",
     // Pale wheat — the base parchment tone (vintage-map land, not saturated green).
     color: "#e6d7ab",
-    base: { food: 4, gold: 2, knowledge: 0 },
+    base: { food: 0, gold: 2, knowledge: 0 }, // food comes from its grain (data/goods.ts)
     popCapacity: 12,
     defense: 1.0,
     strategic: "horses",
@@ -83,7 +85,7 @@ export const TERRAIN: Record<TerrainId, TerrainDef> = {
     name: "Forest",
     // Muted sage — a greyed green that sits in the aged-paper family.
     color: "#a6b884",
-    base: { food: 2, gold: 1, knowledge: 0 },
+    base: { food: 0, gold: 1, knowledge: 0 }, // forest feeds little (honey aside) — needs grain
     popCapacity: 8,
     defense: 1.2,
     strategic: null,
@@ -94,7 +96,7 @@ export const TERRAIN: Record<TerrainId, TerrainDef> = {
     name: "Hills",
     // Warm tan — dry upland parchment, a shade deeper than the plains wheat.
     color: "#d2b98c",
-    base: { food: 1, gold: 2, knowledge: 1 },
+    base: { food: 0, gold: 2, knowledge: 1 }, // hill country feeds itself only by trade or farms
     popCapacity: 7,
     defense: 1.25,
     strategic: "iron",
@@ -118,7 +120,7 @@ export const TERRAIN: Record<TerrainId, TerrainDef> = {
     // deliberately NOT ocean-blue so coast cells read as wet *land* rather than
     // lakes inside the island silhouette.
     color: "#cfd6ac",
-    base: { food: 3, gold: 4, knowledge: 1 },
+    base: { food: 1, gold: 4, knowledge: 1 }, // inshore fishing subsistence; salted fish adds the rest
     popCapacity: 10,
     defense: 1.0,
     strategic: null,

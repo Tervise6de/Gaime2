@@ -172,6 +172,11 @@ function manageTrade(state: GameState, nationId: number): GameState {
 
 // --- economy ---------------------------------------------------------------
 
+/** Stored food below which the AI plants food buildings before anything else. */
+const AI_FOOD_LOW = 12;
+/** Total build-ware stock (timber+brick+iron+naval stores) below which the AI develops industry. */
+const AI_BUILD_WARE_LOW = 24;
+
 function manageEconomy(state: GameState, nationId: number): GameState {
   const nation = state.nations.find((n) => n.id === nationId);
   if (!nation) return state;
@@ -200,11 +205,19 @@ function manageEconomy(state: GameState, nationId: number): GameState {
   // than marching an army to garrison it).
   s = setTax(s, nationId, desiredTaxRate(nation, owned));
 
-  // Buildings: fill empty slots with the best unlocked option.
+  // Buildings: fill empty slots with the best unlocked option, biased by what the
+  // realm actually needs — food if the larder is low (food comes from food wares
+  // now, R3), industry if it is short of the build wares that fund construction.
   const done = s.nations.find((n) => n.id === nationId)!.research.done;
+  const cur = s.nations.find((n) => n.id === nationId)!;
+  const buildWareStock = cur.wares.timber + cur.wares.brick + cur.wares.iron + cur.wares.naval_stores;
+  const hints: BuildHints = {
+    needFood: cur.famine || cur.stocks.food < AI_FOOD_LOW,
+    needBuildWares: buildWareStock < AI_BUILD_WARE_LOW,
+  };
   for (const region of s.regions) {
     if (region.ownerId !== nationId || region.construction) continue;
-    const choice = chooseBuilding(region, done, nation.trait);
+    const choice = chooseBuilding(region, done, nation.trait, hints);
     if (choice) s = queueFor(s, region.id, choice, nationId);
   }
 
@@ -344,10 +357,28 @@ const TRAIT_BUILD_PRIORITY: Record<TraitId, BuildingId[]> = {
   martial: ["fortress", "workshop"],
 };
 
+/** Food-yielding buildings, best first — what a starving realm reaches for (fits()
+    still gates the focus/terrain-locked ones like the Manor and Harbor). */
+const FOOD_BUILDINGS: BuildingId[] = ["manor", "farm", "aqueduct", "harbor", "granary", "lighthouse", "canal"];
+/** Ware-yielding industry, best first — what a realm short of build wares (or eager
+    to trade) develops to feed its construction and its Kontor routes. */
+const WARE_BUILDINGS: BuildingId[] = ["foundry", "bloomery", "mine", "workshop", "guildhall", "stable"];
+
+/**
+ * Produce-to-need hints from the nation's economy: build food when the larder runs
+ * low (food now comes from the food wares — R3), and develop ware industry when the
+ * build-ware chest is thin (so construction and trade keep flowing).
+ */
+export interface BuildHints {
+  needFood?: boolean;
+  needBuildWares?: boolean;
+}
+
 export function chooseBuilding(
   region: { unrest: number; buildings: BuildingId[]; terrain: TerrainId; focus?: FocusId; resource?: StrategicResource | null },
   done: TechId[],
   trait?: TraitId,
+  hints?: BuildHints,
 ): BuildingId | null {
   const has = (b: BuildingId) => region.buildings.includes(b);
   const unlocked = (b: BuildingId) => isBuildingUnlockedFor(done, b);
@@ -357,12 +388,24 @@ export function chooseBuilding(
     if (!buildingResourceOk(region.resource, b)) return false;
     return buildingFocusOk(region.focus, b);
   };
+  const firstOf = (list: BuildingId[]) => list.find((b) => unlocked(b) && !has(b) && fits(b)) ?? null;
+
   if (region.unrest > 35 && !has("temple")) return "temple";
   // Build this province's focus capstone as soon as it's available — the payoff
   // for having specialised it (a martial garrison raises its Citadel, etc.).
   if (region.focus) {
     const cap = focusCapstone(region.focus);
     if (cap && unlocked(cap) && !has(cap) && fits(cap)) return cap;
+  }
+  // Produce-to-need: a hungry realm plants food first; one short of build wares
+  // develops industry before its generalist order.
+  if (hints?.needFood) {
+    const food = firstOf(FOOD_BUILDINGS);
+    if (food) return food;
+  }
+  if (hints?.needBuildWares) {
+    const ware = firstOf(WARE_BUILDINGS);
+    if (ware) return ware;
   }
   // Trait-preferred buildings first, then the generalist order.
   const order = [...new Set([...(trait ? TRAIT_BUILD_PRIORITY[trait] : []), ...BASE_BUILD_ORDER])];

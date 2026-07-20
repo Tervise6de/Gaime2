@@ -260,6 +260,22 @@ describe("trait-aware AI openings", () => {
     expect(chooseBuilding({ unrest: 40, buildings: [], terrain: "plains" }, [], "scholarly")).toBe("temple");
   });
 
+  it("produce-to-need: a hungry realm plants food before its generalist order", () => {
+    // No trait on empty plains normally opens on the market; a food-short hint plants a farm.
+    expect(chooseBuilding(empty(), [])).toBe("market");
+    expect(chooseBuilding(empty(), [], undefined, { needFood: true })).toBe("farm");
+  });
+
+  it("produce-to-need: a realm short of build wares develops industry", () => {
+    expect(chooseBuilding(empty(), [], undefined, { needBuildWares: true })).toBe("workshop");
+  });
+
+  it("produce-to-need: food need outranks ware need, and neither overrides a temple", () => {
+    expect(chooseBuilding(empty(), [], undefined, { needFood: true, needBuildWares: true })).toBe("farm");
+    // Unrest still trumps the hints (order must be kept: temple first).
+    expect(chooseBuilding({ unrest: 40, buildings: [], terrain: "plains" }, [], undefined, { needFood: true })).toBe("temple");
+  });
+
   it("skips a building it already has and moves to the next preference", () => {
     expect(chooseBuilding(empty(["farm"]), [], "fertile")).not.toBe("farm");
   });
@@ -306,7 +322,7 @@ describe("trait-aware AI openings", () => {
 describe("desiredTaxRate (eases tax to save a province)", () => {
   const CALM: Personality = { archetype: "builder", aggression: 0.2, expansion: 0.3, economy: 0.9, trustworthiness: 0.6 };
   const nat = (over: Partial<Nation> = {}): Nation =>
-    ({ id: RIVAL, personality: CALM, stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, ...over } as unknown as Nation);
+    ({ id: RIVAL, personality: CALM, stocks: { gold: 0, food: 0, knowledge: 0 }, wares: emptyWares(), ...over } as unknown as Nation);
 
   it("cuts tax hard when one province is in revolt, even if the average is low", () => {
     // One province at 90, three calm at 5 → average is low, but the worst is revolting.
@@ -611,8 +627,8 @@ describe("concentration of force", () => {
         relations: {},
         log: [],
         nations: [
-          { id: RIVAL, name: "R", color: "#000", isPlayer: false, isBarbarian: false, alive: true, stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, taxRate: 0.2, research: emptyResearch(), famine: false, bankrupt: false, personality: { archetype: "warlord", aggression: 0.9, expansion: 0.8, economy: 0.3, trustworthiness: 0.2 } },
-          { id: ENEMY, name: "E", color: "#fff", isPlayer: false, isBarbarian: false, alive: true, stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, taxRate: 0.2, research: emptyResearch(), famine: false, bankrupt: false },
+          { id: RIVAL, name: "R", color: "#000", isPlayer: false, isBarbarian: false, alive: true, stocks: { gold: 0, food: 0, knowledge: 0 }, wares: emptyWares(), taxRate: 0.2, research: emptyResearch(), famine: false, bankrupt: false, personality: { archetype: "warlord", aggression: 0.9, expansion: 0.8, economy: 0.3, trustworthiness: 0.2 } },
+          { id: ENEMY, name: "E", color: "#fff", isPlayer: false, isBarbarian: false, alive: true, stocks: { gold: 0, food: 0, knowledge: 0 }, wares: emptyWares(), taxRate: 0.2, research: emptyResearch(), famine: false, bankrupt: false },
         ],
         regions: [
           region({ id: 0, ownerId: RIVAL, adjacency: [1, 2] }),
@@ -768,7 +784,7 @@ describe("overstretched restraint (hold new wars while a province revolts)", () 
   const nat = (id: number, over: Partial<Nation> = {}): Nation =>
     ({
       id, name: `N${id}`, color: "#fff", isPlayer: false, isBarbarian: false, alive: true,
-      stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, taxRate: 0.15,
+      stocks: { gold: 0, food: 0, knowledge: 0 }, wares: emptyWares(), taxRate: 0.15,
       research: emptyResearch(), famine: false, bankrupt: false, ...over,
     }) as Nation;
 
@@ -806,7 +822,7 @@ describe("opportunistic strike on a weak rival (target instability)", () => {
   const nat = (id: number, over: Partial<Nation> = {}): Nation =>
     ({
       id, name: `N${id}`, color: "#fff", isPlayer: false, isBarbarian: false, alive: true,
-      stocks: { gold: 0, food: 0, materials: 0, knowledge: 0 }, taxRate: 0.15,
+      stocks: { gold: 0, food: 0, knowledge: 0 }, wares: emptyWares(), taxRate: 0.15,
       research: emptyResearch(), famine: false, bankrupt: false, ...over,
     }) as Nation;
 
