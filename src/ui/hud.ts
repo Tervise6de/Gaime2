@@ -531,8 +531,12 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     title: string,
     onClick: () => void,
   ): RailEntry {
-    const btn = iconBtn(glyph, fb, label, "hud-navbtn", onClick);
-    btn.title = title;
+    // Icon-only buttons: the caption moves into the hover tooltip (led by the
+    // panel name, so "what is this?" is always one hover away) and into an
+    // aria-label for screen readers.
+    const btn = iconBtn(glyph, fb, "", "hud-navbtn", onClick);
+    btn.title = title.startsWith(label) ? title : `${label} — ${title}`;
+    btn.setAttribute("aria-label", label);
     const badge = el("span", "hud-railbadge");
     badge.style.display = "none";
     btn.append(badge);
@@ -542,7 +546,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   const diploRail = railBtn("flag", "⚑", t("nav.diplomacy"), t("nav.diplomacy.tip"), () =>
     toggleScreen("diplo"),
   );
-  const ledgerRail = railBtn("book", "▤", "Ledger", "Goods ledger: local output, routes and trade income.", () =>
+  const ledgerRail = railBtn("ledger", "▤", "Ledger", "Goods ledger: local output, routes and trade income.", () =>
     toggleLedger(),
   );
   // D5 keeps the label/​tip localised; the fixes make the button open the tree

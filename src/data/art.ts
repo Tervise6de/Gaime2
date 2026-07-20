@@ -26,6 +26,7 @@ export type ResourceArtId = "gold" | "food" | "materials" | "knowledge" | "stabi
 /** UI glyph vocabulary — one designed set replacing the emoji grab-bag. */
 export type GlyphId =
   | "legend" // ❔ toolbar
+  | "ledger" // ▤ goods ledger (top-bar nav)
   | "help" // 💡
   | "tutorial" // 🎓
   | "standings" // 📊
@@ -120,6 +121,11 @@ export const RESOURCE_ART: Record<ResourceArtId, string | null> = {
 };
 
 export const GLYPH_ART: Record<GlyphId, string | null> = {
+  // Ledger leaf — a receipt page with a zigzag foot and ruled entry lines
+  // (distinct from the open-book research glyph at icon size).
+  ledger: ico(
+    '<path d="M6.6 3.8h10.8v15.4l-2.7-1.9-2.7 1.9-2.7-1.9-2.7 1.9z"/><path d="M9.4 8h5.2M9.4 11h5.2M9.4 14h3.2"/>',
+  ),
   legend: ico(
     '<circle cx="12" cy="12" r="8.6"/><path d="M9.7 9.7a2.4 2.4 0 113.3 2.2c-.8.3-1 .9-1 1.6v.3"/><circle cx="12" cy="16.7" r=".5" fill="currentColor" stroke="none"/>',
   ),

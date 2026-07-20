@@ -6,6 +6,23 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-20 — Icon-only nav + realm-name floor (v0.93.0)
+
+Nav buttons (Ledger · Diplomacy · Research · Production · Armies · Politics)
+are now uniform 44px icon squares — captions moved into the hover tooltip
+(`title`, led by the panel name: "Diplomacy — Relations, treaties and offers.
+Shortcut: D") and an `aria-label` for screen readers. Because Ledger and
+Research shared the open-book glyph and became indistinguishable without
+captions, the ledger got its own `GLYPH_ART` mark — a receipt leaf with a
+zigzag foot and ruled entry lines. The gear matches the new square size.
+
+The realm name also gained a hard min-width floor (with the elastic centre and
+turn subtitle ceding space first), fixing "Lübec…" truncation at squeezed
+window widths; the caption-era responsive rules were retired.
+
+Captures at 1280/1920 + a DOM check of every tooltip. 691 tests green,
+typecheck + build clean.
+
 ## 2026-07-20 — Top bar declutter: no Food chip, unframed read-outs, uniform nav (v0.92.0)
 
 Three requested refinements to the gilt top bar (`ui/hud.ts` + `ui/style.css`):
