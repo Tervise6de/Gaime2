@@ -39,6 +39,13 @@ describe("nationScore", () => {
     };
     expect(nationScore(stocked, PLAYER_ID)).toBeGreaterThan(nationScore(bare, PLAYER_ID));
   });
+
+  it("counts renown one-for-one toward the score (R6)", () => {
+    const g = createGame({ seed: 1, rivals: 2 });
+    const base = nationScore(g, PLAYER_ID);
+    const renowned = { ...g, nations: g.nations.map((n) => (n.id === PLAYER_ID ? { ...n, renown: 200 } : n)) };
+    expect(nationScore(renowned, PLAYER_ID)).toBe(base + 200);
+  });
 });
 
 describe("checkVictory", () => {

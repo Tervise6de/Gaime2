@@ -33,6 +33,7 @@ import {
   TAX_MIN,
   clampTax,
   playerNation,
+  TREASURY_RESERVE,
   type GameState,
   type Region,
   type Army,
@@ -307,6 +308,30 @@ describe("resolveTurn", () => {
     // …and it has spent luxuries from the stockpile doing so.
     const held = (s: GameState): number => contentmentWares().reduce((x, id) => x + playerNation(s).wares[id], 0);
     expect(held(content)).toBeLessThan(500 * 5);
+  });
+
+  it("reinvests surplus treasury into renown, deploying the hoard (R6)", () => {
+    const g = createGame({ seed: 3 });
+    const rich: GameState = {
+      ...g,
+      nations: g.nations.map((n) => (n.id === PLAYER_ID ? { ...n, stocks: { ...n.stocks, gold: 10000 } } : n)),
+    };
+    let s = rich;
+    for (let i = 0; i < 10; i++) s = resolveTurn(s);
+    const p = playerNation(s);
+    expect(p.renown ?? 0).toBeGreaterThan(50); // surplus became lasting renown
+    expect(p.stocks.gold).toBeLessThan(10000); // the idle hoard was deployed
+  });
+
+  it("keeps the working reserve liquid — no renown below it (R6)", () => {
+    const g = createGame({ seed: 3 });
+    const poor: GameState = {
+      ...g,
+      nations: g.nations.map((n) => (n.id === PLAYER_ID ? { ...n, stocks: { ...n.stocks, gold: 500 } } : n)),
+    };
+    // 500 gold is well under the reserve, so nothing is siphoned to renown this turn.
+    expect(playerNation(resolveTurn(poor)).renown ?? 0).toBe(0);
+    expect(TREASURY_RESERVE).toBeGreaterThan(500);
   });
 
   it("does not mutate the input state", () => {

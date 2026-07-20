@@ -176,6 +176,23 @@ export const MARKET_SELL_MULT = 0.5;
 export const MARKET_BUY_MULT = 2;
 
 /**
+ * Renown — the treasury's endgame job (R6). A dominant realm's tax income outruns
+ * every other sink, so gold would otherwise pile up inert (the "nothing to do with
+ * the treasury" problem). Instead, coin held beyond a working reserve is reinvested
+ * each turn into **lasting renown** — civic works, patronage, endowments — which
+ * counts toward the prestige score (systems/victory.ts). Bounded per turn, so a
+ * fortune deploys over the ages rather than at once, and the reserve stays liquid
+ * for the market, musters and gifts. The Hansa's "win by commerce" made concrete:
+ * a merchant republic's wealth becomes its renown.
+ */
+/** Gold kept liquid (for the market, musters, gifts) before surplus turns to renown. */
+export const TREASURY_RESERVE = 2500;
+/** Most gold a realm converts to renown in one turn (a fortune deploys over time). */
+export const RENOWN_INVEST_MAX = 800;
+/** Gold that buys one point of lasting renown through civic works and patronage. */
+export const RENOWN_GOLD_COST = 60;
+
+/**
  * Tech / victory / events tuning (M5, docs/game-design.md §3.6, §6).
  */
 /** Fraction of all regions a nation must hold for a domination victory. */
@@ -498,6 +515,11 @@ export interface Nation {
   /** Last turn's flags, for the HUD. */
   famine: boolean;
   bankrupt: boolean;
+  /**
+   * Lasting renown accrued by reinvesting surplus treasury into civic works (R6).
+   * Counts toward the prestige score; never decays. Absent/0 on legacy saves.
+   */
+  renown?: number;
   /** Temporary effects with a per-turn countdown (undefined = none / legacy saves). */
   modifiers?: NationModifier[];
 }

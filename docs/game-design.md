@@ -219,6 +219,19 @@ Each R-milestone leaves the game runnable, tested and playable end-to-end.
   *Open (a macro-economy question, not R5's):* a peaceful merchant realm can still
   accumulate gold — a rich trade republic has genuinely few sinks — a candidate for a
   future economy pass (gold-rushed construction, higher upkeep, or tax-income scaling).
+- **R6 — Renown: the treasury's endgame job (landed).** The R5.1 "open item" above,
+  closed. Balance sims showed a dominant realm's tax income outruns every sink, so gold
+  piled up inert (rivals hoarding 20k–51k). Now coin held beyond a **working reserve**
+  (`TREASURY_RESERVE`) is reinvested each turn into **lasting renown** — civic works,
+  patronage, endowments — at a bounded rate (`RENOWN_INVEST_MAX` gold → `renown` at
+  `RENOWN_GOLD_COST` per point). Renown never decays and counts one-for-one toward the
+  prestige score (`systems/victory.ts`), so a merchant republic's wealth becomes its
+  renown — the "win by commerce" fantasy made concrete. The reserve stays liquid for the
+  market, musters and gifts, so nothing is starved. Sims (160-turn runs): peak rival
+  hoards fell from ~51k to ~5k, renown settled at ~28% (max 39%) of a rich realm's score
+  — a real trade-victory path, not a dominant one — with no bankruptcies and rivals as
+  diverse as before. Serialisable (`Nation.renown`, no back-fill needed); the HUD's "This
+  world" card shows it once earned.
 
 Guardrails unchanged: deterministic seeded RNG only, pure `GameState → GameState`
 turn pipeline, `systems/` never touch the DOM, `data/` stays serialisable, tests

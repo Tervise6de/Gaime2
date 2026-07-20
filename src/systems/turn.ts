@@ -63,6 +63,9 @@ import {
   GAME_LENGTH_TURNS,
   GRANARY_CAP,
   PLAYER_ID,
+  RENOWN_GOLD_COST,
+  RENOWN_INVEST_MAX,
+  TREASURY_RESERVE,
   UNREST_MAX,
   clampTax,
   emptyResearch,
@@ -706,9 +709,24 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
     stocks.gold = 0;
   }
 
+  // R6: surplus treasury → lasting renown. Coin held beyond the working reserve is
+  // reinvested into civic works and patronage — turning an idle hoard into prestige
+  // (nationScore) instead of piling up unused. Bounded per turn, so a fortune deploys
+  // over the ages; the reserve stays liquid for the market, musters and gifts. Skipped
+  // when bankrupt (no surplus to invest).
+  let renown = nation.renown ?? 0;
+  let renownGain = 0;
+  const surplus = round1(stocks.gold - TREASURY_RESERVE);
+  if (!bankrupt && surplus > 0) {
+    const invest = Math.min(surplus, RENOWN_INVEST_MAX);
+    renownGain = round1(invest / RENOWN_GOLD_COST);
+    stocks.gold = round1(stocks.gold - invest);
+    renown = round1(renown + renownGain);
+  }
+
   const nations = state.nations.map((n) =>
     n.id === nationId
-      ? { ...n, stocks, wares, research, famine, bankrupt, modifiers: tickModifiers(n.modifiers) }
+      ? { ...n, stocks, wares, research, famine, bankrupt, renown, modifiers: tickModifiers(n.modifiers) }
       : n,
   );
 
@@ -719,6 +737,7 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
     if (step.completed) notes.push(`researched ${TECHS[step.completed].name}`);
     if (reserveFood > 0) notes.push(`larder reserve fed +${reserveFood} food`);
     if (content.consumed > 0) notes.push(`burghers ${Math.round(content.ratio * 100)}% content (−${contentCalm} unrest)`);
+    if (renownGain > 0) notes.push(`+${renownGain} renown from civic works`);
     if (famine) notes.push("Famine — population starving");
     if (bankrupt) notes.push("Bankruptcy — troops disbanded, unrest spikes");
     const entry =

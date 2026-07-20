@@ -2601,6 +2601,13 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     worldRow("Regions", String(state.regions.length));
     worldRow("Age", `${era.name} · ${yearForTurn(state.turn)} AD`, era.blurb);
     if (player.trait) worldRow("Trait", TRAITS[player.trait].label, TRAITS[player.trait].blurb);
+    if ((player.renown ?? 0) > 0) {
+      worldRow(
+        "Renown",
+        String(Math.round(player.renown ?? 0)),
+        "Lasting prestige from reinvesting surplus treasury into civic works (R6). Counts toward your score — the merchant's road to a prestige victory.",
+      );
+    }
     worldRow("Build", `v${typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev"}`);
 
     renderVictoryProgress(victoryEl, state);

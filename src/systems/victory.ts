@@ -48,7 +48,10 @@ export function nationScore(state: GameState, id: number): number {
       Math.max(0, nation.stocks.gold) / 10 +
       population +
       luxuryIncome * LUXURY_PRESTIGE_WEIGHT +
-      contentment * population * CONTENT_PRESTIGE_PER_POP,
+      contentment * population * CONTENT_PRESTIGE_PER_POP +
+      // Lasting renown bought with surplus treasury over the ages (R6) — already in
+      // prestige points, so it counts one-for-one.
+      (nation.renown ?? 0),
   );
 }
 
