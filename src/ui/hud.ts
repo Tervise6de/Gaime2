@@ -71,6 +71,7 @@ import { getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, natio
 import { nationScore, victoryProgress, victoryRaces, endGameSummary } from "@/systems/victory";
 import { GOODS, type GoodId } from "@/data/goods";
 import { EPOCH_EVENTS } from "@/data/epochEvents";
+import { choiceEventImage } from "@/data/eventArt";
 import { KONTORE, type KontorId } from "@/data/kontore";
 import { SOUND } from "@/data/sound";
 import { routeOptions, regionGoodOutput, soundHolderId, activeEmbargoes, soundPreview, marketOutlook } from "@/systems/trade";
@@ -1430,13 +1431,24 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   function renderChoice(pc: NonNullable<GameState["pendingChoice"]>): void {
     choiceOverlay.innerHTML = "";
     const panel = el("div", "hud-techtree-panel hud-choice-panel");
-    // Themed vignette medallion for the event (falls back to no art).
-    const vig = eventVignette(pc.eventId);
-    if (vig) {
-      const medal = el("div", "hud-choice-vignette");
-      medal.setAttribute("aria-hidden", "true");
-      medal.innerHTML = vig;
-      panel.append(medal);
+    const image = choiceEventImage(pc.eventId);
+    if (image) {
+      const frame = el("div", "hud-choice-image");
+      const img = document.createElement("img");
+      img.src = image;
+      img.alt = "";
+      img.loading = "lazy";
+      frame.append(img);
+      panel.append(frame);
+    } else {
+      // Themed vignette medallion for future events that do not have key art yet.
+      const vig = eventVignette(pc.eventId);
+      if (vig) {
+        const medal = el("div", "hud-choice-vignette");
+        medal.setAttribute("aria-hidden", "true");
+        medal.innerHTML = vig;
+        panel.append(medal);
+      }
     }
     const title = el("h2", "hud-techtree-title");
     title.textContent = "A decision";

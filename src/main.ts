@@ -509,7 +509,7 @@ function main(): void {
   });
 
   // eslint-disable-next-line no-console
-  console.info("Hansa — v1 ready. Build routes, steer the league, and outlast your rivals.");
+  console.info("Sea of Coin — v1 ready. Build routes, steer the league, and outlast your rivals.");
 }
 
 /** A wall-clock stamp for saves. Kept out of the sim (which forbids Date). */

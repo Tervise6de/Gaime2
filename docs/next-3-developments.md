@@ -1,10 +1,11 @@
 # Next 3 developments — handoff brief
 
-This brief scopes the next **three substantial** developments for Gaime2, chosen
-to advance the game *a lot* (not incremental tooltips). Work them **in the order
-below**, one complete verified cycle each. Read `docs/autonomous-dev-prompt.md`
-(the playbook) and the newest `docs/DEVLOG.md` entries first — they define the
-sync procedure, guardrails, and verification recipe you must follow.
+This brief scopes the next **three substantial** developments for Sea of Coin,
+chosen to advance the game *a lot* (not incremental tooltips). Work them **in
+the order below**, one complete verified cycle each. Read
+`docs/autonomous-dev-prompt.md` (the playbook) and the newest `docs/DEVLOG.md`
+entries first — they define the sync procedure, guardrails, and verification
+recipe you must follow.
 
 **Non-negotiable guardrails (repeated for emphasis):** 100% local/offline,
 `package.json` `dependencies` stays `{}`, deterministic seeded RNG only (no

@@ -1,10 +1,10 @@
-# Hansa Marketing Notes
+# Sea of Coin Marketing Notes
 
 ## Positioning
 
-Hansa is a compact browser strategy game about medieval trade power around the
-Baltic and North Sea. Build routes, control Kontore, steer the League, tax the
-Sound, embargo rivals and use war as an economic weapon.
+Sea of Coin is a compact browser strategy game about medieval trade power
+around the Baltic and North Sea. Build routes, control Kontore, steer the
+League, tax the Sound, embargo rivals and use war as an economic weapon.
 
 ## Core Promise
 

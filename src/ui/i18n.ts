@@ -35,7 +35,7 @@ type Catalog = Record<string, string>;
 const EN: Catalog = {
   // Boot screen (ui/title.ts)
   "menu.studio": "GAIME Studio",
-  "menu.wordmark": "Hansa",
+  "menu.wordmark": "Sea of Coin",
   "menu.continue": "Continue your reign",
   "menu.begin": "Begin your reign",
   "menu.newGame": "New game",

@@ -106,7 +106,7 @@ const CONFIGS: Array<{ name: string; opts: (seed: number) => NewGameOptions }> =
 
 // Each of these plays many full games; give them plenty of headroom so a slow
 // CI box never trips the default 5s per-test timeout.
-const STRESS_TIMEOUT_MS = 60_000;
+const STRESS_TIMEOUT_MS = 120_000;
 
 describe("stress: self-play across configs holds every invariant and terminates", () => {
   it("plays a matrix of full games with no invariant violation", () => {

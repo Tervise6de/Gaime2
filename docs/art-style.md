@@ -1,4 +1,4 @@
-# Gaime2 — art style bible
+# Sea of Coin — art style bible
 
 The committed visual direction. Everything drawn for this game — by any agent,
 now or later — conforms to this document. The working plan that produced it is

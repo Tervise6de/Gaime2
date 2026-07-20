@@ -1,11 +1,11 @@
-# Hansa Game Design
+# Sea of Coin Game Design
 
 ## Direction
 
-Hansa is a compact browser strategy game about trade power around the Baltic and
-North Sea. The centre of the game is not "paint the whole map"; it is building
-routes, controlling Kontore, steering or resisting the League, taxing through
-the Sound, embargoing rivals, and using war when trade politics fails.
+Sea of Coin is a compact browser strategy game about trade power around the
+Baltic and North Sea. The centre of the game is not "paint the whole map"; it is
+building routes, controlling Kontore, steering or resisting the League, taxing
+through the Sound, embargoing rivals, and using war when trade politics fails.
 
 The game uses one authored world: `data/maps/hansa.ts`, a fixed real-geography
 board with 74 provinces and 16 historical realms.

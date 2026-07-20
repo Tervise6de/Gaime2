@@ -34,7 +34,7 @@ describe("i18n scaffolding (D5)", () => {
     setLocale("et");
     // "menu.wordmark" is intentionally English-only (a brand); et falls back.
     expect(t("menu.wordmark")).toBe(t("menu.wordmark")); // no throw
-    expect(t("menu.wordmark")).toBe("Hansa");
+    expect(t("menu.wordmark")).toBe("Sea of Coin");
   });
 
   it("interpolation still works in a non-English locale", () => {

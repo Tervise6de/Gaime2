@@ -1,5 +1,5 @@
 /**
- * Service worker — makes Hansa installable and playable offline.
+ * Service worker — makes Sea of Coin installable and playable offline.
  *
  * The whole game is a handful of static, same-origin files with no runtime
  * network calls, so caching is simple: stale-while-revalidate. Serve from cache
@@ -10,7 +10,7 @@
  * Plain JS, no dependencies — consistent with the app's zero-dep philosophy.
  */
 
-const CACHE = "hansa-v1";
+const CACHE = "sea-of-coin-v1";
 
 self.addEventListener("install", () => {
   // Activate the new worker immediately rather than waiting for old tabs to close.

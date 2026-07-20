@@ -1,6 +1,6 @@
 # Art plan — executing the D1 brief (`docs/art-agent-brief.md`)
 
-Working plan for giving Hansa its visual identity. Derived directly from the
+Working plan for giving Sea of Coin its visual identity. Derived directly from the
 brief; this file records the decisions the brief left to the executing agent
 and the order the work lands in.
 
@@ -65,8 +65,8 @@ dependency (`dependencies: {}` stays).
 
 ## Deliberately left for a human (per the brief)
 
-- Final **game name** + logo direction — "Hansa" is the current working title;
-  renaming before store launch is a product call.
+- Final **game name** + logo direction: **Sea of Coin** is the title; logo
+  direction still needs a dedicated pass.
 - Whether any asset gets **commissioned/generated** externally (licence,
   budget) — everything here is hand-authored original SVG, so
   `docs/THIRD_PARTY_ASSETS.md` is not yet needed.

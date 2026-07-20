@@ -1,4 +1,4 @@
-# Hansa Alignment Plan
+# Sea of Coin Hansa Alignment Plan
 
 ## Current Verdict
 

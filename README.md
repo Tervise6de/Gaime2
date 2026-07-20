@@ -1,8 +1,8 @@
-# Hansa
+# Sea of Coin
 
-A browser strategy game by **GAIME** about the Hanseatic world: named Baltic and
-North Sea realms, trade routes to Kontore, Sound tolls, embargoes, league
-politics, armies, diplomacy and prestige.
+**Sea of Coin** is a browser strategy game by **GAIME** about the Hanseatic
+world: named Baltic and North Sea realms, trade routes to Kontore, Sound tolls,
+embargoes, league politics, armies, diplomacy and prestige.
 
 The live game is now **Hansa-only**. It uses the authored `hansa` map with fixed
 real provinces and the full historical realm roster. Retired map modes, setup
@@ -40,7 +40,7 @@ npm run test:watch # run tests in watch mode
 ## Project Structure
 
 ```text
-Gaime2/
+Sea of Coin/
 ├─ index.html
 ├─ src/
 │  ├─ main.ts

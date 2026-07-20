@@ -1,4 +1,4 @@
-# Steam Store Draft - Hansa
+# Steam Store Draft - Sea of Coin
 
 ## Short Description
 
@@ -8,9 +8,9 @@ war.
 
 ## About
 
-Hansa is a browser-first strategy game set around the Baltic and North Sea. The
-map is fixed and authored, the realms are historical, and the central question
-is who controls the merchant sea.
+Sea of Coin is a browser-first strategy game set around the Baltic and North
+Sea. The map is fixed and authored, the realms are historical, and the central
+question is who controls the merchant sea.
 
 Open trade routes from goods-producing regions to demanding Kontore. Protect
 your lanes, raise armies, make treaties, call allies, set embargoes and decide

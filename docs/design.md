@@ -1,13 +1,14 @@
-# Gaime2 — Design Notes
+# Sea of Coin — Design Notes
 
 > Living design document. This file captures intent and direction; it is not a
 > spec. Expect it to change often in early development.
 
 ## Vision
 
-A **Kingdom Management / 4X-lite** strategy game that runs in the browser.
-Depth comes from interacting systems (economy, population, military,
-diplomacy) rather than from art or spectacle. Think spreadsheets-with-a-map:
+A compact browser strategy game about Hanseatic trade power. Depth comes from
+interacting systems (routes, goods, Kontore, league politics, tolls, embargoes,
+armies and diplomacy) rather than from art or spectacle. Think merchant ledger
+with a sharp map:
 low-art, high-decision-density, readable at a glance.
 
 "4X-lite": the classic pillars — **eXplore, eXpand, eXploit, eXterminate** —

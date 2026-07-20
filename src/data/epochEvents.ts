@@ -11,6 +11,7 @@
  * balancing (which events, when, how likely, how hard) is editing this file.
  */
 
+import { epochEventImage } from "@/data/eventArt";
 import type { KontorId } from "@/data/kontore";
 
 /** What an epoch event does when it fires (a data descriptor; logic in epochs.ts). */
@@ -55,6 +56,7 @@ export const EPOCH_EVENTS: readonly EpochEventDef[] = [
   {
     id: "black_death",
     name: "The Black Death",
+    image: epochEventImage("black_death"),
     year: 1350, // reached the Hansa ports in 1350, by the very trade lanes (§11)
     windowYears: 10,
     chance: 0.85,
@@ -67,6 +69,7 @@ export const EPOCH_EVENTS: readonly EpochEventDef[] = [
   {
     id: "herring_monopoly",
     name: "The Herring Monopoly",
+    image: epochEventImage("herring_monopoly"),
     year: 1370, // Peace of Stralsund gave a Baltic fish monopoly (§9)
     windowYears: 12,
     chance: 0.6,
@@ -79,6 +82,7 @@ export const EPOCH_EVENTS: readonly EpochEventDef[] = [
   {
     id: "victual_brothers",
     name: "The Victual Brothers",
+    image: epochEventImage("victual_brothers"),
     year: 1395, // the Vitalienbrüder preyed on the sea-lanes c. 1390s–1400s (§9)
     windowYears: 15,
     chance: 0.6,
@@ -91,6 +95,7 @@ export const EPOCH_EVENTS: readonly EpochEventDef[] = [
   {
     id: "great_fire",
     name: "A Great Fire",
+    image: epochEventImage("great_fire"),
     year: 1476, // the wooden Bryggen (Bergen) burned repeatedly (§4)
     windowYears: 40,
     chance: 0.55,
@@ -103,6 +108,7 @@ export const EPOCH_EVENTS: readonly EpochEventDef[] = [
   {
     id: "novgorod_closed",
     name: "The Peterhof Closed",
+    image: epochEventImage("novgorod_closed"),
     year: 1494, // Ivan III shut the Novgorod Peterhof and deported its merchants (§9)
     windowYears: 12,
     chance: 0.7,

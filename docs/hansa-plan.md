@@ -1,10 +1,11 @@
-# Hansa Plan
+# Sea of Coin Hansa Plan
 
 ## Current Direction
 
-Hansa is the game. The design should no longer keep a second older identity alive
-beside it. The playable board is the authored Hanseatic World, and the feature
-roadmap should deepen trade, league politics, naval pressure and city power.
+Sea of Coin is the game. The design should no longer keep a second older
+identity alive beside it. The playable board is the authored Hanseatic World,
+and the feature roadmap should deepen trade, league politics, naval pressure and
+city power.
 
 ## What Must Stay Central
 
@@ -38,6 +39,6 @@ roadmap should deepen trade, league politics, naval pressure and city power.
 
 ## Open Product Question
 
-The working public title is **Hansa** in the app for now. Before a store launch,
-do a naming scan and decide whether the final title should be more distinctive,
-for example *The Merchant Sea*, *Kontor*, or *Salt & Amber*.
+The public title is **Sea of Coin**. The remaining naming work is logo direction,
+subtitle/store copy, and making sure "Hansa" is used as the historical setting,
+not as the product name.

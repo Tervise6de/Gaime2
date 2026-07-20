@@ -1,42 +1,27 @@
-# Event Illustration Brief
+# Event Illustration Registry
 
-> **What this is.** The historical **epoch events** (`data/epochEvents.ts`) show a
-> notification card when they fire, with an **illustration slot**. None have art
-> yet, so every card currently shows an **open placeholder** ("Illustration
-> coming"). This file lists the events that need a picture and what each should
-> depict, so art can be dropped in one event at a time.
->
-> **Format.** Landscape **16:9**, ~**880×495** (the card is 480 px wide; 2× for
-> crisp displays). Warm, painterly, low-detail — matching the game's Brick-Gothic /
-> Hanseatic look. No text baked into the image.
->
-> **How to wire one in.** Drop the file under `public/events/<id>.jpg` (or use a
-> data URI) and set `image: "/events/<id>.jpg"` on that event in
-> `data/epochEvents.ts`. The card swaps the placeholder for the image
-> automatically — no code change. Remove the row below once done.
+Event illustrations are now wired into the game through `src/data/eventArt.ts`.
+The image files live under `public/event-art/`, so the static client can serve
+them directly with no runtime fetch and no database dependency.
 
----
+## Current Set
 
-## Events needing a picture
+| File | Used for |
+|---|---|
+| `city-fire.jpg` | Great fire, wall, siege and conflict decisions |
+| `kontor-embargo.jpg` | Embargo, mercenary and muster decisions |
+| `storm-at-sea.jpg` | Pirates, risky expeditions and sea-lane danger |
+| `league-diet.jpg` | Envoys, councils, marriages and scholarly decisions |
+| `novgorod-furs.jpg` | Novgorod, eastern trade and settlement beats |
+| `plague-streets.jpg` | Plague and emergency grain-relief beats |
+| `trade-inspection.jpg` | Trade booms, monopolies and charters |
 
-| # | Event `id` | Name · year | Illustration to depict |
-|---|------------|-------------|------------------------|
-| 1 | `black_death` | **The Black Death** · 1350 | A plague-struck Hanseatic port: gabled brick houses under a sick sky, a cart of the dead, a near-empty quay. Grim, muted. |
-| 2 | `herring_monopoly` | **The Herring Monopoly** · 1370 | A wharf heaped with barrels of salted herring; cogs unloading; coins changing hands. Prosperous, bustling, warm light. |
-| 3 | `victual_brothers` | **The Victual Brothers** · 1395 | Pirates in a small craft closing on a laden merchant cog on a grey Baltic; a black flag, drawn blades. Tense. |
-| 4 | `great_fire` | **A Great Fire** · 1476 | Night fire tearing through timber wharf-houses (Bergen's Bryggen); silhouettes with buckets against orange flame and smoke. |
-| 5 | `novgorod_closed` | **The Peterhof Closed** · 1494 | The Novgorod Kontor's gates barred by Muscovite guards; German merchants turned away with their bundles. Cold, final. |
+## Adding More
 
-*(As more epoch events are added to `data/epochEvents.ts`, add a row here so the
-art backlog stays complete.)*
+Use landscape 16:9 images, no baked-in text, and keep the files local unless
+events move to a server/CMS later. Add the image under `public/event-art/`, map
+the event id in `src/data/eventArt.ts`, and let `src/data/eventArt.test.ts`
+verify that the mapped file exists.
 
----
-
-## Notes
-
-- The placeholder is a **deliberate open slot**, not an error — a dashed gold
-  frame with the event's emoji and "Illustration coming". Shipping without art is
-  fine; pictures can land incrementally.
-- Players can silence these cards entirely (the card's **"Don't show event notices
-  again"** toggle, or **Options → Gameplay → Show historical event notices**); the
-  events still fire and log regardless.
+If future event content becomes editable from the database, keep the stable
+default images in GitHub and let the DB optionally override the image path.
