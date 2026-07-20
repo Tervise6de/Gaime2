@@ -6,6 +6,25 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-20 — Top bar declutter: no Food chip, unframed read-outs, uniform nav (v0.92.0)
+
+Three requested refinements to the gilt top bar (`ui/hud.ts` + `ui/style.css`):
+
+- **Food left the bar.** It lives in the goods ledger under the wares economy,
+  so the strip keeps only Treasury · Knowledge · Stability
+  (`TOPBAR_RESOURCE_KEYS` narrowed; the famine crisis chip still surfaces food
+  emergencies). Freed width means the full-caption nav now fits even at 1280px.
+- **Fewer boxes.** The realm mark and the resource read-outs sit directly on
+  the bar again — engraved hairline dividers instead of frames — so only two
+  gilt-framed elements remain on the left: the crest plaque and the Turn panel
+  (End turn stays the gold slab on the right).
+- **Uniform nav buttons.** `.hud-navwrap` became a column grid with `1fr`
+  auto-columns — under shrink-to-fit sizing every track resolves to the widest
+  caption ("Production"), so Ledger through Politics are exactly equal width at
+  every breakpoint, still with zero truncation.
+
+Captures at 1280/1440/1920. 691 tests green, typecheck + build clean.
+
 ## 2026-07-20 — Top bar rebuilt as gilt-framed panels (mockup pass 2) (v0.91.0)
 
 The first gilded pass kept the bar as one continuous strip; the target mockup

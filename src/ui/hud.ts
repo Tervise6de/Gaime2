@@ -239,10 +239,12 @@ export interface Hud {
   minimapCanvas: HTMLCanvasElement;
 }
 
-type TopbarResourceKey = "gold" | "food" | "knowledge" | "stability";
+// Food is deliberately absent: it lives in the goods ledger (the wares
+// economy), so the bar keeps only treasury / knowledge / stability.
+type TopbarResourceKey = "gold" | "knowledge" | "stability";
 type ResourceDisplayKey = ResourceKey | "stability";
 
-const TOPBAR_RESOURCE_KEYS: readonly TopbarResourceKey[] = ["gold", "food", "knowledge", "stability"];
+const TOPBAR_RESOURCE_KEYS: readonly TopbarResourceKey[] = ["gold", "knowledge", "stability"];
 
 const RESOURCE_META: Record<ResourceDisplayKey, { label: string; icon: string; tip: string }> = {
   gold: {
@@ -289,16 +291,16 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   // Standing / Game) and the ☰ menu close the right end.
   const topBar = el("div", "hud-topbar");
   const barLeft = el("div", "hud-topbar-left");
-  // Each top-bar section sits in its own gilt-framed panel (`hud-frame` draws
-  // the ornate gold border): realm crest+name · resources · turn.
-  const realmBlock = el("div", "hud-realm-block hud-frame");
+  // The realm mark and resource read-outs sit directly on the bar; only the
+  // turn block (and End turn) carry the ornate `hud-frame` gold border.
+  const realmBlock = el("div", "hud-realm-block");
   const realmCrest = el("div", "hud-realm-crest");
   const realmText = el("div", "hud-realm-text");
   const realmName = el("div", "hud-realm-name");
   const realmSub = el("div", "hud-realm-sub");
   realmText.append(realmName, realmSub);
   realmBlock.append(realmCrest, realmText);
-  const resWrap = el("div", "hud-reswrap hud-frame");
+  const resWrap = el("div", "hud-reswrap");
   barLeft.append(realmBlock, resWrap);
   const resourceEls: Record<TopbarResourceKey, { stock: HTMLElement; flow: HTMLElement }> =
     {} as never;
@@ -2498,7 +2500,6 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       resourceEls[key].flow.classList.toggle("negative", f < 0);
     }
     syncStockDisplay(); // ease the displayed stock toward the new target (or snap)
-    resourceEls.food.flow.classList.toggle("negative", player.famine || flow.food < 0);
 
     // Crisis chips — persistent while the condition holds, impossible to miss.
     const crises: string[] = [];
