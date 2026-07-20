@@ -95,7 +95,8 @@ and whom you can arm now depends on which land you hold and what it yields.
 ### Three kinds of resource
 
 1. **Gold** — the universal medium (treasury). Taxes + trade + tolls in; recruitment,
-   upkeep and diplomacy out. Unchanged role.
+   upkeep, diplomacy and — since R5 — the **town market** (buying wares) out. A
+   treasury is now working capital, not just a war chest (see R5 below).
 2. **Knowledge** — research points toward techs. Abstract, not a physical ware. Unchanged.
 3. **Wares (~16 physical commodities)** — the unified physical economy. Each has one
    or more **roles**:
@@ -143,7 +144,10 @@ hold salt to preserve it** (`FISH_UNSALTED_MULT`), so the salt→fish chain gate
 fishery's food. The effect is a real **food geography** — plains feed themselves on
 grain, a salted coast is a breadbasket, and forest/hill/mountain realms must trade
 for grain or build farms. (Making famine bite harder is a future balance lever; the
-model currently runs with ample headroom.)
+model currently runs with ample headroom.) **R5** adds a granary *reserve*: on a
+shortfall the food-ware stockpile is consumed (grain first; the salt→fish chain still
+applies) to cover the gap before famine strikes — so a stocked or market-bought larder
+rides out a lean turn, and food wares in store are genuinely consumed, not inert.
 
 ## Build plan — resource overhaul (R-series)
 
@@ -170,6 +174,29 @@ Each R-milestone leaves the game runnable, tested and playable end-to-end.
   without risking mass starvation — population is capacity-limited, so food stays a
   *geographic* constraint (hold food land or trade/farm for it) rather than a famine
   lever; the anti-snowball brake remains unrest, by design.
+- **R5 — Goods that content, gold that works (landed).** Closes the two dead-ends
+  that made most wares "just a thing to trade" and the treasury "just a pile":
+  - **Burgher contentment** (`systems/prosperity.ts`): a realm's towns crave the
+    *pure* luxuries — furs, wax, amber, cloth, wool (`contentmentWares()`) — in
+    proportion to the population they govern (`LUXURY_DEMAND_PER_POP`). Each turn the
+    craving is met from the ware stockpile; the fraction met eases unrest **realm-wide**
+    (`LUXURY_CONTENT_UNREST`, folded into `nextUnrest`). A carrot, never a punishment —
+    unmet demand only forgoes the easing, so it never worsens famine. Luxuries finally
+    have a home use, and the decision is real: **sell them for coin, or keep them to
+    calm your towns.** The demand scales with the empire, so a large realm must invest
+    in luxury industry (a Weaving Works) or import.
+  - **The town market** (`systems/market.ts`): gold buys or sells any ware instantly at
+    a spread deliberately worse than a Kontor route (`MARKET_BUY_MULT` 2× / `MARKET_SELL_MULT`
+    ½× the good's value). The treasury becomes working capital — import grain against a
+    lean turn, buy brick to rush a wall, muster arms in a hurry, or liquidate a glut —
+    while the great Kontor trade stays the profit engine (routes pay far more). The rival
+    AI uses it too (`manageMarket`), so a rival's gold has a job beyond armies.
+  - **The food reserve** (`systems/turn.ts` + `drawFoodReserve`): a food shortfall now
+    taps the food-ware stockpile (grain, salted fish, beer, honey — the salt→fish chain
+    still applies) *before* it bites as famine. Food wares are genuinely consumed, and a
+    stocked or market-bought larder rides out a bad turn. It only ever *reduces* famine.
+  - HUD: the Goods Ledger shows each ware's stock and per-ware Buy/Sell controls, plus a
+    burgher-contentment readout; the stability breakdown folds in the contentment easing.
 
 Guardrails unchanged: deterministic seeded RNG only, pure `GameState → GameState`
 turn pipeline, `systems/` never touch the DOM, `data/` stays serialisable, tests

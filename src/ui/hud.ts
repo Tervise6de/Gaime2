@@ -71,7 +71,9 @@ import {
 } from "@/systems/military";
 import { getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, nationPower, opinionReasons, foreignRelations, casusBelli, CASUS_BELLI, TRIBUTE_DEMAND, atWar } from "@/systems/diplomacy";
 import { nationScore, victoryProgress, victoryRaces, endGameSummary } from "@/systems/victory";
-import { GOODS, GOOD_IDS, type GoodId } from "@/data/goods";
+import { GOODS, GOOD_IDS, contentmentWares, type GoodId } from "@/data/goods";
+import { marketBuyPrice, marketSellPrice } from "@/systems/market";
+import { luxuryAppetite, resolveContentment, contentmentUnrest } from "@/systems/prosperity";
 import { EPOCH_EVENTS } from "@/data/epochEvents";
 import { choiceEventImage } from "@/data/eventArt";
 import { KONTORE, type KontorId } from "@/data/kontore";
@@ -145,6 +147,10 @@ export interface HudCallbacks {
   onOpenRoute(regionId: number, good: GoodId, kontorId: KontorId): void;
   /** Close one of your trade routes by id. */
   onCloseRoute(routeId: number): void;
+  /** Buy `qty` units of a ware on the town market (gold → wares). */
+  onMarketBuy(good: GoodId, qty: number): void;
+  /** Sell `qty` units of a ware on the town market (wares → gold). */
+  onMarketSell(good: GoodId, qty: number): void;
   /** Set the Øresund Sound toll rate (only while you hold the strait). */
   onSetSoundToll(rate: number): void;
   /** Open or close the Sound to a rival realm (embargo) — only while you hold it. */
@@ -205,6 +211,9 @@ const BRANCH_COLOR: Record<string, string> = {
 
 /** Fixed gift size the diplomacy panel offers. */
 const GIFT_AMOUNT = 30;
+
+/** Units bought/sold per click on a Goods-Ledger market button. */
+const MARKET_BATCH = 5;
 
 /** localStorage key marking that the first-time hints have been dismissed. */
 const HINTS_KEY = "gaime2:hintsSeen";
@@ -985,10 +994,32 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     head.append(titleWrap, closeButton(closeLedger));
     ledgerPanel.append(head);
 
+    // Burgher contentment (R5): the towns' luxury appetite and how much of it the
+    // stockpile is meeting this turn — the same read the sim uses for unrest relief.
+    const ownedPop = state.regions.filter((r) => r.ownerId === PLAYER_ID).reduce((s, r) => s + r.population, 0);
+    const appetite = luxuryAppetite(ownedPop);
+    const content = resolveContentment(player.wares, appetite);
+    const calm = contentmentUnrest(content.ratio);
+    const contentLine = el("div", "hud-ledger-content");
+    contentLine.innerHTML =
+      `<span class="hud-ledger-content-title">Burgher contentment</span> ` +
+      `<span class="hud-ledger-content-val">${Math.round(content.ratio * 100)}%</span> ` +
+      `— towns crave ${fmt(appetite)} luxuries/turn` +
+      (calm > 0 ? `, easing unrest by <span class="hud-ledger-content-val">−${fmt(calm)}</span> realm-wide.` : ".");
+    contentLine.title =
+      "Furs, cloth, wax, amber and wool kept in store content your burghers, easing unrest across every province. " +
+      "Supply more (produce, or buy on the market) to raise contentment; sell them off and it falls.";
+    ledgerPanel.append(contentLine);
+
+    const marketNote = el("div", "hud-ledger-marketnote");
+    marketNote.textContent = "Town market — buy dear, sell cheap (a Kontor route pays far more).";
+    ledgerPanel.append(marketNote);
+
     const grid = el("div", "hud-ledger-grid");
     const ordered = GOOD_IDS
-      .map((id) => ({ id, ...rows.get(id)! }))
-      .sort((a, b) => b.income - a.income || b.output - a.output || GOODS[a.id].name.localeCompare(GOODS[b.id].name));
+      .map((id) => ({ id, ...rows.get(id)!, stock: player.wares[id] }))
+      .sort((a, b) => b.income - a.income || b.output - a.output || b.stock - a.stock || GOODS[a.id].name.localeCompare(GOODS[b.id].name));
+    const luxury = new Set<GoodId>(contentmentWares());
     for (const row of ordered) {
       const good = GOODS[row.id];
       const card = el("div", "hud-good-card");
@@ -996,15 +1027,36 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       icon.textContent = good.glyph;
       const body = el("div", "hud-good-body");
       const name = el("span", "hud-good-name");
-      name.textContent = good.name;
+      name.textContent = good.name + (luxury.has(row.id) ? " ✦" : "");
       const sub = el("span", "hud-good-sub");
-      sub.textContent = `${fmt(row.output)} local output · ${row.routes} route${row.routes === 1 ? "" : "s"}`;
+      sub.textContent = `${fmt(row.output)}/turn · ${row.routes} route${row.routes === 1 ? "" : "s"} · ${fmt(row.stock)} in store`;
       body.append(name, sub);
       const value = el("div", "hud-good-value");
       value.textContent = `${row.income >= 0 ? "+" : ""}${fmt(row.income)}g`;
       card.append(icon, body, value);
+
+      // Market controls (R5): buy a batch with gold, or sell a batch of the store.
+      const market = el("div", "hud-good-market");
+      const buyEach = marketBuyPrice(row.id);
+      const sellEach = marketSellPrice(row.id);
+      const buyCost = round1(buyEach * MARKET_BATCH);
+      const sellGain = round1(sellEach * MARKET_BATCH);
+      const buyBtn = btn(`Buy ${MARKET_BATCH} · −${fmt(buyCost)}g`, "hud-market-btn buy", () =>
+        callbacks.onMarketBuy(row.id, MARKET_BATCH),
+      );
+      buyBtn.title = `Buy ${good.name.toLowerCase()} at ${fmt(buyEach)}g/unit (clamped to what your treasury covers).`;
+      buyBtn.disabled = player.stocks.gold < buyEach;
+      const sellBtn = btn(`Sell ${MARKET_BATCH} · +${fmt(sellGain)}g`, "hud-market-btn sell", () =>
+        callbacks.onMarketSell(row.id, MARKET_BATCH),
+      );
+      sellBtn.title = `Sell ${good.name.toLowerCase()} at ${fmt(sellEach)}g/unit (clamped to your store).`;
+      sellBtn.disabled = row.stock < 1;
+      market.append(buyBtn, sellBtn);
+      card.append(market);
+
       const destinations = good.demandedAt.map((id) => KONTORE[id].name).join(", ");
-      card.title = `${good.name}: value ${good.value}g/unit. Demanded at ${destinations}.`;
+      const use = luxury.has(row.id) ? " Contents your burghers (✦ a luxury)." : "";
+      card.title = `${good.name}: value ${good.value}g/unit. Demanded at ${destinations}.${use}`;
       grid.append(card);
     }
     ledgerPanel.append(grid);
@@ -2566,11 +2618,15 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     // The unrest side of the tax lever, with real numbers: the steady state
     // this policy drifts regions toward (before local calming effects).
     const ownedCount = state.regions.filter((r) => r.ownerId === PLAYER_ID).length;
+    // Luxury contentment eases the target realm-wide (R5) — fold it into the read.
+    const ownedPopForCalm = state.regions.filter((r) => r.ownerId === PLAYER_ID).reduce((s, r) => s + r.population, 0);
+    const contentCalm = contentmentUnrest(resolveContentment(player.wares, luxuryAppetite(ownedPopForCalm)).ratio);
     const unrestPull =
       UNREST_BASE +
       (player.taxRate / TAX_MAX) * UNREST_TAX_MAX +
       overexpansionUnrest(ownedCount) -
-      techUnrestReduction(player.research.done);
+      techUnrestReduction(player.research.done) -
+      contentCalm;
     const pull = Math.max(0, Math.round(unrestPull * 10) / 10);
     taxUnrestLine.textContent = "";
     taxUnrestLine.append(document.createTextNode("Unrest pull: regions drift toward "));
@@ -2582,8 +2638,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       `Every region drifts a few points per turn toward a target set by your policy:\n` +
       `base ${UNREST_BASE} + tax pressure ${fmt(Math.round((player.taxRate / TAX_MAX) * UNREST_TAX_MAX * 10) / 10)}` +
       ` + over-expansion ${fmt(overexpansionUnrest(ownedCount))}` +
-      ` − tech calm ${fmt(techUnrestReduction(player.research.done))}.\n` +
-      `Temples and stationed garrisons lower it further per region. ` +
+      ` − tech calm ${fmt(techUnrestReduction(player.research.done))}` +
+      (contentCalm > 0 ? ` − burgher contentment ${fmt(contentCalm)}` : "") +
+      `.\n` +
+      `Temples and stationed garrisons lower it further per region; luxuries in store content the burghers realm-wide (the Goods Ledger). ` +
       `At ${UNREST_PENALTY_START}+ a region's output suffers; at ${UNREST_REVOLT}+ it revolts.`;
 
     // The narrow right-side inspector is retired: clicking a region now opens the

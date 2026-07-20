@@ -13,9 +13,9 @@ import {
   startQueuedBuildings,
   applySecession,
 } from "@/systems/turn";
-import { nationalProduction } from "@/systems/economy";
+import { nationalProduction, round1 } from "@/systems/economy";
 import { routeIncome, nationalWareOutput } from "@/systems/trade";
-import { GOOD_IDS } from "@/data/goods";
+import { GOOD_IDS, contentmentWares, type GoodId } from "@/data/goods";
 import { factionByName } from "@/data/factions";
 import { totalUpkeep } from "@/systems/military";
 import { regionCapacity } from "@/systems/population";
@@ -260,10 +260,53 @@ describe("resolveTurn", () => {
     const p0 = playerNation(g);
     const p1 = playerNation(next);
     expect(p1.stocks.gold).toBeCloseTo(p0.stocks.gold + flow.gold - upkeep, 5);
-    // No construction is queued at game start, so every ware accrues exactly.
+    // No construction is queued at game start, so build/arms/food wares accrue
+    // exactly. The pure luxuries (furs/wax/amber/cloth/wool) may be drawn down a
+    // little by burgher contentment (R5), so they accrue AT MOST their full output.
+    const luxury = new Set<GoodId>(contentmentWares());
     for (const id of GOOD_IDS) {
-      expect(p1.wares[id]).toBeCloseTo(p0.wares[id] + wareOut[id], 5);
+      const full = round1(p0.wares[id] + wareOut[id]);
+      if (luxury.has(id)) {
+        expect(p1.wares[id]).toBeGreaterThanOrEqual(0);
+        expect(p1.wares[id]).toBeLessThanOrEqual(full + 1e-9);
+      } else {
+        expect(p1.wares[id]).toBeCloseTo(full, 5);
+      }
     }
+  });
+
+  it("luxury contentment eases unrest realm-wide (R5)", () => {
+    // Force the player's provinces to plains (which source no *pure* luxury —
+    // furs/wax/amber/cloth/wool), so contentment can come only from the stockpile.
+    const flat = setTaxRate(createGame({ seed: 7, rivals: 0 }), TAX_MAX);
+    const a: GameState = {
+      ...flat,
+      regions: flat.regions.map((r) => (r.ownerId === PLAYER_ID ? { ...r, terrain: "plains", resource: null } : r)),
+    };
+    // Same board, but this realm holds a deep luxury stockpile to keep it content.
+    const b: GameState = {
+      ...a,
+      nations: a.nations.map((n) =>
+        n.id === PLAYER_ID
+          ? { ...n, wares: { ...n.wares, furs: 500, cloth: 500, wool: 500, wax: 500, amber: 500 } }
+          : n,
+      ),
+    };
+    let poor = a;
+    let content = b;
+    for (let i = 0; i < 8; i++) {
+      poor = resolveTurn(poor);
+      content = resolveTurn(content);
+    }
+    const avgUnrest = (s: GameState): number => {
+      const rs = s.regions.filter((r) => r.ownerId === PLAYER_ID);
+      return rs.reduce((x, r) => x + r.unrest, 0) / rs.length;
+    };
+    // The supplied realm's burghers are content, so its provinces settle lower…
+    expect(avgUnrest(content)).toBeLessThan(avgUnrest(poor));
+    // …and it has spent luxuries from the stockpile doing so.
+    const held = (s: GameState): number => contentmentWares().reduce((x, id) => x + playerNation(s).wares[id], 0);
+    expect(held(content)).toBeLessThan(500 * 5);
   });
 
   it("does not mutate the input state", () => {

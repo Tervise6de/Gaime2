@@ -15,6 +15,7 @@ import {
   bestTarget,
   secessionRiskRegion,
   desiredTaxRate,
+  manageMarket,
 } from "@/systems/ai";
 import type { TraitId } from "@/data/traits";
 import type { Personality } from "@/systems/state";
@@ -83,6 +84,38 @@ function scenario(target: Partial<Region>, enemyArmy?: Partial<Army>, myResource
     ],
   } as unknown as GameState;
 }
+
+describe("manageMarket (R5 town market)", () => {
+  const mkNation = (over: Partial<Nation> = {}): Nation => ({
+    id: RIVAL, name: "R", color: "#000", isPlayer: false, isBarbarian: false, alive: true,
+    stocks: { gold: 200, food: 0, knowledge: 0 }, wares: emptyWares(), taxRate: 0.15,
+    research: emptyResearch(), famine: false, bankrupt: false, ...over,
+  });
+  const mkState = (n: Nation): GameState => ({
+    turn: 10, difficulty: "normal", treaties: {}, relations: {}, offers: [], nextOfferId: 0,
+    armies: [], nations: [n], regions: [], nextArmyId: 0, routes: [], nextRouteId: 0,
+    outcome: "playing", log: [],
+  } as unknown as GameState);
+
+  it("imports a grain reserve when the larder is low", () => {
+    const s = mkState(mkNation({ stocks: { gold: 200, food: 5, knowledge: 0 } }));
+    const n = manageMarket(s, RIVAL).nations[0]!;
+    expect(n.wares.grain).toBeGreaterThan(0);
+    expect(n.stocks.gold).toBeLessThan(200);
+  });
+
+  it("imports build wares when construction is starved (larder fine)", () => {
+    const s = mkState(mkNation({ stocks: { gold: 200, food: 40, knowledge: 0 } }));
+    const n = manageMarket(s, RIVAL).nations[0]!;
+    expect(n.wares.grain).toBe(0); // larder is fine — no grain bought
+    expect(n.wares.timber).toBeGreaterThan(0);
+  });
+
+  it("keeps a working reserve — a near-broke realm imports nothing", () => {
+    const s = mkState(mkNation({ stocks: { gold: 40, food: 0, knowledge: 0 } }));
+    expect(manageMarket(s, RIVAL)).toBe(s);
+  });
+});
 
 describe("runNationTurn", () => {
   it("is deterministic for the same state and rng seed", () => {

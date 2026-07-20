@@ -23,6 +23,7 @@ import {
 } from "@/systems/diplomacy";
 import { resolveChoice } from "@/systems/events";
 import { createRoute, closeRoute, setSoundToll, setSoundEmbargo } from "@/systems/trade";
+import { buyWare, sellWare } from "@/systems/market";
 import { foundLeague, joinLeague, leaveLeague, setLeagueBoycott } from "@/systems/league";
 import { saveToLocal, loadFromLocal, hasLocalSave, clearLocalSave, serializeGame, deserializeGame } from "@/systems/save";
 import { summarizeTurn, type TurnSummary } from "@/systems/summary";
@@ -157,6 +158,16 @@ function main(): void {
     },
     onCloseRoute(routeId) {
       state = closeRoute(state, routeId, PLAYER_ID);
+      commit();
+    },
+    onMarketBuy(good, qty) {
+      state = buyWare(state, PLAYER_ID, good, qty);
+      play("build");
+      commit();
+    },
+    onMarketSell(good, qty) {
+      state = sellWare(state, PLAYER_ID, good, qty);
+      play("build");
       commit();
     },
     onSetSoundToll(rate) {

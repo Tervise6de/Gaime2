@@ -44,13 +44,19 @@ export function garrisonCalm(garrisonSize: number): number {
   return Math.min(GARRISON_CALM_MAX, Math.max(0, garrisonSize) * GARRISON_CALM_PER_UNIT);
 }
 
-/** The steady-state unrest a region trends toward under current policy. */
+/**
+ * The steady-state unrest a region trends toward under current policy.
+ * `contentReduction` is the realm-wide easing from luxury contentment (R5,
+ * systems/prosperity.ts) — the same value for every province, since the burghers'
+ * appetite is met from the national stockpile.
+ */
 export function unrestTarget(
   region: Region,
   taxRate: number,
   ownedRegionCount: number,
   techReduction = 0,
   garrisonSize = 0,
+  contentReduction = 0,
 ): number {
   const taxPressure = (taxRate / TAX_MAX) * UNREST_TAX_MAX;
   const target =
@@ -59,13 +65,15 @@ export function unrestTarget(
     overexpansionUnrest(ownedRegionCount) -
     buildingCalm(region) -
     techReduction -
-    garrisonCalm(garrisonSize);
+    garrisonCalm(garrisonSize) -
+    contentReduction;
   return clampUnrest(target);
 }
 
 /**
- * Next unrest for a region: drift toward the tax/expansion/building/tech/garrison
- * target (capped per turn), then add a famine spike so starvation bites immediately.
+ * Next unrest for a region: drift toward the tax/expansion/building/tech/garrison/
+ * contentment target (capped per turn), then add a famine spike so starvation bites
+ * immediately.
  */
 export function nextUnrest(
   region: Region,
@@ -74,8 +82,9 @@ export function nextUnrest(
   ownedRegionCount: number,
   techReduction = 0,
   garrisonSize = 0,
+  contentReduction = 0,
 ): number {
-  const target = unrestTarget(region, taxRate, ownedRegionCount, techReduction, garrisonSize);
+  const target = unrestTarget(region, taxRate, ownedRegionCount, techReduction, garrisonSize, contentReduction);
   const delta = clamp(target - region.unrest, -UNREST_DRIFT, UNREST_DRIFT);
   let next = region.unrest + delta;
   if (famine) next += FAMINE_UNREST_SPIKE;

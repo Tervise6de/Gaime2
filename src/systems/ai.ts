@@ -47,8 +47,9 @@ import {
 } from "@/systems/diplomacy";
 import { researchFrontier, selectTech, isBuildingUnlockedFor } from "@/systems/tech";
 import { createRoute, laneFor, regionSources, distanceFactor } from "@/systems/trade";
+import { buyWare, marketBuyPrice } from "@/systems/market";
 import { foundLeague, joinLeague, canFoundLeague, canJoinLeague, kontoreHeldBy, hasHanseHall } from "@/systems/league";
-import { GOODS, GOOD_IDS } from "@/data/goods";
+import { GOODS, GOOD_IDS, type GoodId } from "@/data/goods";
 import { KONTORE } from "@/data/kontore";
 import { eraIndexForTurn } from "@/data/eras";
 import { TECHS, type TechId, type TechBranch } from "@/data/techs";
@@ -176,6 +177,10 @@ function manageTrade(state: GameState, nationId: number): GameState {
 const AI_FOOD_LOW = 12;
 /** Total build-ware stock (timber+brick+iron+naval stores) below which the AI develops industry. */
 const AI_BUILD_WARE_LOW = 24;
+/** Gold a rival keeps as a working reserve — it never buys on the market below this. */
+const AI_MARKET_MIN_GOLD = 60;
+/** Units of a ware a rival imports in one market purchase. */
+const AI_MARKET_BATCH = 10;
 
 function manageEconomy(state: GameState, nationId: number): GameState {
   const nation = state.nations.find((n) => n.id === nationId);
@@ -225,7 +230,46 @@ function manageEconomy(state: GameState, nationId: number): GameState {
   // keeps its focus once set (assigned by terrain, with a martial realm mustering
   // on its rough ground), so this is stable, not thrash.
   s = assignAiFocus(s, nationId, nation.trait);
+
+  // The town market (R5): spend some of the treasury to cover a shortfall the
+  // realm cannot produce fast enough — a grain reserve against famine, build
+  // wares when construction is starved. Gives a rival's gold a job beyond armies.
+  s = manageMarket(s, nationId);
   return s;
+}
+
+/**
+ * The rival's use of the town market (R5): a realm with coin covers a shortfall it
+ * cannot produce fast enough — importing a grain reserve when its larder is low
+ * (against famine) and build wares when construction is starved. Always keeps a
+ * working gold reserve (AI_MARKET_MIN_GOLD), so it never buys itself broke. Pure.
+ */
+export function manageMarket(state: GameState, nationId: number): GameState {
+  const nat = state.nations.find((n) => n.id === nationId);
+  if (!nat || nat.isBarbarian) return state;
+  let s = state;
+  const cur = (): Nation => s.nations.find((n) => n.id === nationId)!;
+
+  // Import a grain reserve against a lean larder / famine.
+  if (cur().famine || cur().stocks.food < AI_FOOD_LOW) s = aiImport(s, nationId, "grain");
+
+  // Import build wares when the chest that funds construction runs thin.
+  const buildStock = (): number => {
+    const w = cur().wares;
+    return w.timber + w.brick + w.iron + w.naval_stores;
+  };
+  if (buildStock() < AI_BUILD_WARE_LOW) s = aiImport(s, nationId, "timber");
+
+  return s;
+}
+
+/** Import up to AI_MARKET_BATCH units of `good`, keeping AI_MARKET_MIN_GOLD in reserve. */
+function aiImport(state: GameState, nationId: number, good: GoodId): GameState {
+  const nat = state.nations.find((n) => n.id === nationId)!;
+  const spendable = nat.stocks.gold - AI_MARKET_MIN_GOLD;
+  if (spendable <= 0) return state;
+  const qty = Math.min(AI_MARKET_BATCH, Math.floor(spendable / marketBuyPrice(good)));
+  return qty > 0 ? buyWare(state, nationId, good, qty) : state;
 }
 
 /** Terrain a province leans toward when an AI specialises it. */
