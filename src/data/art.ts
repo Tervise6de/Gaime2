@@ -482,12 +482,6 @@ export const TERRAIN_MOTIF: Record<TerrainId, string | null> = {
   ),
 };
 
-/** World background vignette (`null` = flat renderer BACKGROUND). */
-export const WORLD_BG: { inner: string; outer: string } | null = {
-  inner: "#171d29",
-  outer: "#0b0e14",
-};
-
 // ---------------------------------------------------------------------------
 // Moment art — larger "key art" medallions (docs/art-style.md family rules
 // apply; drawn on the same 24 grid, displayed at 56–140px). A medallion is a

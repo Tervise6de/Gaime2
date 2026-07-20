@@ -13,7 +13,7 @@ import { TECHS, TECH_IDS, type TechId, type TechBranch } from "@/data/techs";
 import { BUILDINGS, type BuildingId } from "@/data/buildings";
 import { UNITS, type UnitType } from "@/data/units";
 import type { ResourceYield } from "@/data/terrain";
-import type { Nation, Research } from "@/systems/state";
+import type { Research } from "@/systems/state";
 
 /** Combined multiplicative yield modifiers (gold/food/knowledge) from a nation's completed techs. */
 export function techMultipliers(done: TechId[]): ResourceYield {
@@ -42,11 +42,6 @@ export function techUnrestReduction(done: TechId[]): number {
   return r;
 }
 
-/** Whether a building has been unlocked (no tech requirement, or tech is done). */
-export function isBuildingUnlocked(nation: Nation, building: BuildingId): boolean {
-  return isBuildingUnlockedFor(nation.research.done, building);
-}
-
 export function isBuildingUnlockedFor(done: TechId[], building: BuildingId): boolean {
   // A building's own requiresTech must be met (lets focus capstones share a tech
   // that already lists a different building as its unlockBuilding).
@@ -55,11 +50,6 @@ export function isBuildingUnlockedFor(done: TechId[], building: BuildingId): boo
   // …and the tech that lists this building as its unlock, if any (legacy link).
   const req = TECH_IDS.find((t) => TECHS[t].unlockBuilding === building);
   return !req || done.includes(req);
-}
-
-/** Whether a unit type has been unlocked. */
-export function isUnitUnlocked(nation: Nation, unit: UnitType): boolean {
-  return isUnitUnlockedFor(nation.research.done, unit);
 }
 
 export function isUnitUnlockedFor(done: TechId[], unit: UnitType): boolean {

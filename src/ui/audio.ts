@@ -142,11 +142,6 @@ export function setMuted(next: boolean): boolean {
   return muted;
 }
 
-/** Flip and persist the master mute; returns the new state. */
-export function toggleMuted(): boolean {
-  return setMuted(!muted);
-}
-
 function audioContext(): AudioContext | null {
   if (typeof window === "undefined") return null;
   const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -294,11 +289,6 @@ export function setAmbientEnabled(next: boolean): boolean {
   if (next) startAmbientLoop();
   else stopAmbientLoop();
   return ambientEnabled;
-}
-
-/** Flip and persist the ambient bed; returns the new state. */
-export function toggleAmbient(): boolean {
-  return setAmbientEnabled(!ambientEnabled);
 }
 
 /**

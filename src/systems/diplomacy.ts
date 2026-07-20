@@ -22,7 +22,6 @@ import {
   RELATION_MAX,
   RELATION_MIN,
   RELATION_WAR_HIT,
-  armySize,
   nationInstability,
   pairKey,
   inLeague,
@@ -458,13 +457,6 @@ export function peaceReparations(state: GameState, from: number, to: number): nu
   return amount >= 10 ? amount : 0; // too small to bother offering
 }
 
-/** Total gold upkeep-scaled strength lost/needed — helper for AI (re-exported). */
-export function armyStrengthOf(units: Record<UnitType, number>): number {
-  let s = 0;
-  for (const t of Object.keys(units) as UnitType[]) s += units[t] * (UNITS[t].attack + UNITS[t].defense);
-  return s;
-}
-
 // --- offers (AI → player, awaiting the player's decision) -------------------
 
 export function addOffer(
@@ -772,6 +764,3 @@ function clamp(v: number, lo: number, hi: number): number {
 function round1(v: number): number {
   return Math.round(v * 10) / 10;
 }
-
-/** Re-export for callers that need army size without importing state. */
-export { armySize };

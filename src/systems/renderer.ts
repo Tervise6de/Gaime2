@@ -2512,8 +2512,3 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     },
   };
 }
-
-/** Exposed for potential reuse/testing of the army badge count. */
-export function stackLabel(army: Army): string {
-  return soldiersCompact(armySize(army.units));
-}
