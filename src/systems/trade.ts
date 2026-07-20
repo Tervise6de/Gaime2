@@ -374,6 +374,19 @@ export function marketOutlook(
   return routes >= 2 ? "glut" : "normal";
 }
 
+/** The salted-herring premium: a realm holding salt ships its fish preserved, so
+    herring and stockfish exports pay more (the Hansa's salted-fish trade). */
+const SALTED_FISH_PREMIUM = 1.4;
+
+/**
+ * The salt premium on a fish route: herring/stockfish pay `SALTED_FISH_PREMIUM`
+ * when the owner holds salt to preserve the catch, else nothing extra. Pure.
+ */
+function saltFishFactor(state: GameState, good: GoodId, ownerId: number): number {
+  if (good !== "herring" && good !== "stockfish") return 1;
+  return hasSaltAccess(state, ownerId) ? SALTED_FISH_PREMIUM : 1;
+}
+
 /**
  * The gold a route `ownerId` would earn if founded now: base income times the
  * market it would *join* (this route added to supply, and its owner counted as a
@@ -391,16 +404,16 @@ export function projectedRouteIncome(
   const scar = scarcityFrom(routes + 1); // this route joins the market
   const sole = owners.size === 0 || (owners.size === 1 && owners.has(ownerId));
   const mono = sole ? MONOPOLY_PREMIUM : 1;
-  return round1(GOODS[good].value * distanceFactor(laneLength) * scar * mono);
+  return round1(GOODS[good].value * distanceFactor(laneLength) * scar * mono * saltFishFactor(state, good, ownerId));
 }
 
 /**
  * Gold a route pays per turn (before disruption): the good's value times the lane
- * distance premium, times the (currently unit) scarcity and monopoly premiums. Pure.
+ * distance premium, times the scarcity, monopoly and salted-fish premiums. Pure.
  */
 export function routeIncome(state: GameState, route: TradeRoute): number {
   const base = GOODS[route.good].value * distanceFactor(route.lane.length);
-  return round1(base * scarcityFactor(state, route) * monopolyFactor(state, route));
+  return round1(base * scarcityFactor(state, route) * monopolyFactor(state, route) * saltFishFactor(state, route.good, route.ownerId));
 }
 
 /**

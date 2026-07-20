@@ -6,6 +6,43 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-20 — R4: Production chains, salted-fish premium & luxury prestige (v0.90.0)
+
+The trade layer gains manufacturing depth and a reason to chase luxuries.
+
+**Production chains.** Two wares are now *manufactured*, not just gathered:
+- **Hopped beer** — the Export Brewery yields beer (`wareYield`, +2 gold), turning a
+  brewing town into a beer exporter.
+- **Wool → cloth** — a new raw ware, **wool** (upland/hill pastures, sold raw to the
+  western wool markets), plus a new **Weaving Works** building (Guilds) that yields
+  cloth. The strategic chain: export raw wool, or build the works to sell far dearer
+  cloth. (16 wares now.)
+
+**Salted-herring premium.** Herring and stockfish trade routes pay
+`SALTED_FISH_PREMIUM` (×1.4) when the realm holds salt to preserve the catch
+(`systems/trade.ts`) — the salt→fish chain now bites on the *export* side as well as
+the food side (R3).
+
+**Luxury → prestige.** `nationScore` gains a term for luxury-ware trade income (furs,
+wax, amber, cloth, copper, honey, wool) — the Hansa's luxury trade is renown as well as
+gold, making the merchant path a real prestige-victory lever.
+
+**Food tighten (adjusted).** foodValues were cut ~30%. A self-play probe (since deleted)
+showed famine stays at 0% even so: population is **capacity-limited**, so food never
+binds into famine without a drastic cut that would risk mass starvation in wartime.
+Kept the reduced surplus and left food as a *geographic* constraint (hold food land or
+trade/farm for it); the anti-snowball brake stays unrest, by design. Noted in the design doc.
+
+**Verification.** typecheck + build clean; **691 unit tests green** (2 new: salted-fish
+premium, luxury prestige); 0 `fetch`; deps `{}`. goods⇄kontore consistency still holds
+with wool added.
+
+**Next:** deeper Kontor price/scarcity tuning; a stability/consumption sink for luxuries;
+optionally a genuine per-turn refine mechanic (consume inputs → refined wares) if the
+stockpile gains more sinks.
+
+---
+
 ## 2026-07-20 — R3 + R2: Food from the food wares (salt→fish chain) & AI produce-to-need (v0.89.0)
 
 Two follow-ups to the wares overhaul, landed together.

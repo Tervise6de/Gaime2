@@ -79,7 +79,7 @@ describe("regionGoodOutput", () => {
     expect(regionGoodOutput(reg({ terrain: "coast" })).map((g) => g.good)).toEqual([
       "herring", "stockfish", "naval_stores", "cloth",
     ]);
-    expect(regionGoodOutput(reg({ terrain: "hills", resource: "salt" })).map((g) => g.good)).toEqual(["brick", "salt"]);
+    expect(regionGoodOutput(reg({ terrain: "hills", resource: "salt" })).map((g) => g.good)).toEqual(["brick", "salt", "wool"]);
     expect(regionGoodOutput(reg({ terrain: "coast", resource: "amber" })).map((g) => g.good)).toEqual([
       "herring", "stockfish", "naval_stores", "amber", "cloth",
     ]);
@@ -248,6 +248,16 @@ describe("routeIncome & distanceFactor", () => {
     // A very long lane is capped at value × TRADE_DIST_CAP.
     const long = Array.from({ length: 100 }, (_, i) => i);
     expect(routeIncome(s, route(long))).toBe(GOODS.grain.value * TRADE_DIST_CAP);
+  });
+
+  it("a realm holding salt earns the salted-fish premium on herring/stockfish routes", () => {
+    const fishRoute: TradeRoute = { id: 0, ownerId: PLAYER_ID, good: "herring", fromRegionId: 5, toKontorId: "bruges", lane: [5, 4] };
+    const noSalt = state(regionsOf(6, { 5: { ownerId: PLAYER_ID, terrain: "coast" } }));
+    const withSalt = state(regionsOf(6, { 5: { ownerId: PLAYER_ID, terrain: "coast", resource: "salt" } }));
+    expect(routeIncome(withSalt, fishRoute)).toBeGreaterThan(routeIncome(noSalt, fishRoute));
+    // A non-fish ware ignores salt entirely.
+    const grainRoute: TradeRoute = { ...fishRoute, good: "grain" };
+    expect(routeIncome(withSalt, grainRoute)).toBe(routeIncome(noSalt, grainRoute));
   });
 });
 

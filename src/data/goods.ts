@@ -39,6 +39,7 @@ export type GoodId =
   | "wax"
   | "amber"
   | "cloth"
+  | "wool"
   | "honey";
 
 /** What a ware is used for (drives consumption and the wares-ledger grouping). */
@@ -91,7 +92,7 @@ export const GOODS: Record<GoodId, GoodDef> = {
     name: "Grain",
     glyph: "🌾",
     roles: ["food"],
-    foodValue: 1.2, // the bread staple — the backbone of a town's food
+    foodValue: 0.85, // the bread staple — the backbone of a town's food
     value: 2,
     source: { terrain: ["plains"], baseOutput: 3 },
     // Grain-poor Norway (Bergen) and the crowded Low Countries (Bruges) buy Baltic grain.
@@ -102,7 +103,7 @@ export const GOODS: Record<GoodId, GoodDef> = {
     name: "Herring",
     glyph: "🐟",
     roles: ["food"],
-    foodValue: 0.6, // salted herring — needs salt to feed a town through the year
+    foodValue: 0.4, // salted herring — needs salt to feed a town through the year
     value: 3,
     source: { terrain: ["coast"], baseOutput: 3 },
     // Salted herring, distributed west through Bruges and London.
@@ -113,7 +114,7 @@ export const GOODS: Record<GoodId, GoodDef> = {
     name: "Stockfish",
     glyph: "🐠",
     roles: ["food"],
-    foodValue: 0.7, // dried cod — the northern protein staple (salt-preserved)
+    foodValue: 0.5, // dried cod — the northern protein staple (salt-preserved)
     value: 3,
     source: { terrain: ["coast"], baseOutput: 2 },
     // Dried cod from the northern coasts, landed at Bergen and sold Europe-wide.
@@ -124,7 +125,7 @@ export const GOODS: Record<GoodId, GoodDef> = {
     name: "Beer",
     glyph: "🍺",
     roles: ["food", "luxury"],
-    foodValue: 0.5, // hopped beer — liquid bread, a real part of the daily ration
+    foodValue: 0.35, // hopped beer — liquid bread, a real part of the daily ration
     value: 3,
     source: { terrain: ["plains"], baseOutput: 2 },
     // Wendish hopped beer, shipped to the grain-poor north and east (Bergen, Novgorod).
@@ -230,16 +231,27 @@ export const GOODS: Record<GoodId, GoodDef> = {
     roles: ["luxury"],
     value: 6,
     source: { terrain: ["coast"], baseOutput: 1 },
-    // Woven in the coastal cloth-towns — the great manufacture, sold to the
-    // grain-poor north and east (Bergen, Novgorod). (R4: refined from wool.)
+    // Woven in the coastal cloth-towns and the Weaving Works (data/buildings.ts) —
+    // the great manufacture, sold to the grain-poor north and east (Bergen, Novgorod).
     demandedAt: ["bergen", "novgorod"],
+  },
+  wool: {
+    id: "wool",
+    name: "Wool",
+    glyph: "🐑",
+    roles: ["luxury"],
+    value: 3,
+    source: { terrain: ["hills"], baseOutput: 2 },
+    // Upland fleece — sold raw to the western wool markets, or woven into far
+    // dearer cloth at a Weaving Works (wool → cloth, the great western chain).
+    demandedAt: ["bruges", "london"],
   },
   honey: {
     id: "honey",
     name: "Honey",
     glyph: "🍯",
     roles: ["food", "luxury"],
-    foodValue: 0.4, // sweetener and mead-stock — a minor but real food
+    foodValue: 0.25, // sweetener and mead-stock — a minor but real food
     value: 3,
     source: { terrain: ["forest"], baseOutput: 1 },
     // Forest honey and mead-stock from the eastern woods — a sweet western import.

@@ -15,6 +15,20 @@ describe("nationScore", () => {
     g.nations[PLAYER_ID]!.research.done = ["agriculture", "currency"];
     expect(nationScore(g, PLAYER_ID)).toBeGreaterThan(base);
   });
+
+  it("rewards the luxury trade (renown as well as gold)", () => {
+    const g = createGame({ seed: 1, rivals: 2 });
+    const base = nationScore(g, PLAYER_ID);
+    // A flowing furs route (a luxury) lifts prestige; a staple route would not.
+    const withLux = {
+      ...g,
+      routes: [
+        ...(g.routes ?? []),
+        { id: 999, ownerId: PLAYER_ID, good: "furs" as const, fromRegionId: 0, toKontorId: "novgorod" as const, lane: [0], lastIncome: 10 },
+      ],
+    };
+    expect(nationScore(withLux, PLAYER_ID)).toBeGreaterThan(base);
+  });
 });
 
 describe("checkVictory", () => {

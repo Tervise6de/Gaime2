@@ -53,6 +53,7 @@ export type BuildingId =
   // Signature Hansa buildings (Brick-Gothic vocabulary; see docs/hansa times.md §6).
   | "salzspeicher"
   | "brewery"
+  | "weaving_works"
   | "canal"
   | "roland"
   | "hanse_hall";
@@ -436,10 +437,22 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     id: "brewery",
     name: "Export Brewery",
     cost: 22,
-    yield: { gold: 4 },
+    yield: { gold: 2 },
+    wareYield: { beer: 3 },
     popCapacity: 1,
     unrest: 0,
-    blurb: "+4 gold — Wendish hopped beer, prized across the north, brewed for export.",
+    blurb: "+3 beer, +2 gold — Wendish hopped beer, prized across the north, brewed for export.",
+  },
+  weaving_works: {
+    id: "weaving_works",
+    name: "Weaving Works",
+    cost: 24,
+    yield: { gold: 1 },
+    wareYield: { cloth: 3 },
+    popCapacity: 1,
+    unrest: 0,
+    requiresTech: "guilds",
+    blurb: "+3 cloth, +1 gold — a weaving hall spins upland wool into the great western cloth. (Guilds)",
   },
   canal: {
     id: "canal",

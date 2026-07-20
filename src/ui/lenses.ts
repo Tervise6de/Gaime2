@@ -55,6 +55,7 @@ const TRADE_GOODS: { good: GoodId; color: string }[] = [
   { good: "iron", color: "#8b97a6" }, // ore country — steel grey
   { good: "copper", color: "#c67a3e" }, // mined copper — burnished orange
   { good: "cloth", color: "#9a5a86" }, // the cloth towns — dyed purple
+  { good: "wool", color: "#d8d0be" }, // upland fleece — undyed cream
   { good: "herring", color: "#5a8fb0" }, // the fisheries — sea blue
   { good: "stockfish", color: "#7fa8b8" }, // dried cod — pale sea grey
   { good: "naval_stores", color: "#4f5a4a" }, // pitch, tar & hemp — dark pine

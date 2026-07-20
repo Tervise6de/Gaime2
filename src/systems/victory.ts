@@ -15,18 +15,28 @@ import {
   TURN_LIMIT,
   type GameState,
 } from "@/systems/state";
+import { GOODS } from "@/data/goods";
 
-/** Prestige score — territory, tech, treasury and population. */
+/** Prestige earned per gold of luxury-ware trade income — the Hansa's wealth as renown. */
+const LUXURY_PRESTIGE_WEIGHT = 2;
+
+/** Prestige score — territory, tech, treasury, population, and luxury trade. */
 export function nationScore(state: GameState, id: number): number {
   const regions = state.regions.filter((r) => r.ownerId === id);
   const nation = state.nations.find((n) => n.id === id);
   if (!nation) return 0;
   const population = regions.reduce((s, r) => s + r.population, 0);
+  // The luxury trade (furs, wax, amber, cloth, copper, honey, wool) is renown as
+  // well as gold: a realm carrying luxuries to the Kontore earns prestige for it.
+  const luxuryIncome = (state.routes ?? [])
+    .filter((r) => r.ownerId === id && GOODS[r.good].roles.includes("luxury"))
+    .reduce((s, r) => s + (r.lastIncome ?? 0), 0);
   return Math.round(
     regions.length * 10 +
       nation.research.done.length * 15 +
       Math.max(0, nation.stocks.gold) / 10 +
-      population,
+      population +
+      luxuryIncome * LUXURY_PRESTIGE_WEIGHT,
   );
 }
 

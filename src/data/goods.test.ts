@@ -7,7 +7,7 @@ describe("goods table", () => {
   it("has the Hansa wares with positive value and base output", () => {
     expect(GOOD_IDS).toEqual([
       "grain", "herring", "stockfish", "beer", "timber", "naval_stores", "brick",
-      "iron", "copper", "salt", "furs", "wax", "amber", "cloth", "honey",
+      "iron", "copper", "salt", "furs", "wax", "amber", "cloth", "wool", "honey",
     ]);
     for (const id of GOOD_IDS) {
       const g = GOODS[id];

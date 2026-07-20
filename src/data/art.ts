@@ -345,6 +345,10 @@ export const BUILDING_ART: Record<BuildingId, string | null> = {
   brewery: ico(
     '<path d="M4 10.6L12 4.6l8 6"/><path d="M5.6 10.6v8.9M18.4 10.6v8.9M3.4 19.5h17.2"/><path d="M9.4 16.8l3.2-3.2M12 12l2.3 2.3 1.5-1.5L13.5 10.5z"/>',
   ),
+  // Weaving loom — an upright frame strung with warp threads.
+  weaving_works: ico(
+    '<path d="M4.5 4.5h15v15h-15z"/><path d="M8 4.5v15M12 4.5v15M16 4.5v15"/><path d="M4.5 9.5h15M4.5 14.5h15"/>',
+  ),
   // Stecknitz canal — an arched waterway (reuses the aqueduct read).
   canal: ico(
     '<path d="M3.4 5.4h17.2M4.6 5.4v2.4M19.4 5.4v2.4M3.4 7.8h17.2"/><path d="M5.2 19.5v-8.1a3.2 3.2 0 016.4 0v8.1M12.4 19.5v-8.1a3.2 3.2 0 016.4 0v8.1"/><path d="M3 19.5h18"/>',

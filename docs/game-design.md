@@ -161,9 +161,15 @@ Each R-milestone leaves the game runnable, tested and playable end-to-end.
   price/scarcity tuning and teaching the AI to open routes toward the richest demand.
 - **R3 — Food review (landed).** Food now flows from the food-ware pool with the
   salt→fish preservation chain (see "Reviewing Food" above); population/famine ride on it.
-- **R4 — Production chains & luxuries.** Salted herring, hopped beer, wool→cloth as
-  refined wares; luxury demand feeding prestige/stability, not just gold; tighten food
-  scarcity so famine becomes a real, occasional pressure.
+- **R4 — Production chains & luxuries (landed).** **Hopped beer** and **wool→cloth**
+  are manufactured wares: the Export Brewery now yields beer and a new **Weaving Works**
+  (Guilds) spins upland **wool** into cloth. **Salted herring** — herring/stockfish
+  routes pay a premium when the realm holds salt. **Luxury trade → prestige**: routes
+  carrying furs/wax/amber/cloth/copper/honey/wool add to the score victory. Food values
+  were tightened. *Adjusted from plan:* reliable "occasional famine" proved impractical
+  without risking mass starvation — population is capacity-limited, so food stays a
+  *geographic* constraint (hold food land or trade/farm for it) rather than a famine
+  lever; the anti-snowball brake remains unrest, by design.
 
 Guardrails unchanged: deterministic seeded RNG only, pure `GameState → GameState`
 turn pipeline, `systems/` never touch the DOM, `data/` stays serialisable, tests
