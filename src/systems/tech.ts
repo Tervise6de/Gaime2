@@ -96,8 +96,9 @@ export interface ResearchStep {
 
 /**
  * Invest `knowledge` into the current tech. Completes it (and clears `current`)
- * when the cost is met, carrying any surplus is discarded for simplicity.
- * If no tech is selected, knowledge is banked into progress for the next pick.
+ * when the cost is met, rolling any surplus over as banked progress toward the
+ * next pick — a large stockpile is never burned to zero by finishing one cheap
+ * tech. If no tech is selected, knowledge is banked into progress the same way.
  */
 export function advanceResearch(research: Research, knowledge: number): ResearchStep {
   if (!research.current) {
@@ -108,7 +109,9 @@ export function advanceResearch(research: Research, knowledge: number): Research
   const progress = research.progress + knowledge;
   if (progress >= cost) {
     return {
-      research: { current: null, progress: 0, done: [...research.done, research.current] },
+      // Surplus rolls over as banked head-start toward the next tech, so
+      // knowledge is never wasted (the HUD's knowledge stock mirrors progress).
+      research: { current: null, progress: round1(progress - cost), done: [...research.done, research.current] },
       completed: research.current,
     };
   }

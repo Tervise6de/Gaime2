@@ -58,20 +58,29 @@ suggested fix / question to resolve. Fold the tractable ones into
   gold animates the number counting down rather than snapping to the new value.
   → Make the value update immediate (or keep the tween but resolve state at once;
   don't gate anything on the animation finishing).
+  **✓ Fixed v0.94.0** — resource tween sped up (~40%/frame, snaps within 1 unit)
+  so a spend reads as immediate.
 - **[7] Game feels laggy / not smooth.** General performance/feel pass — profile
   the render and turn hot paths, find what's dropping frames.
 - **[4c] Selecting a research seems to refresh the whole page.** Picking a tech
   causes a jarring full re-render/"refresh". → Should be a local state update, not
-  a page reload.
+  a page reload. **✓ Fixed v0.94.0** — a live tech-tree re-render no longer
+  replays the panel's rise animation or resets scroll (only a fresh open animates).
 - **[17] Event log is capped at ~50 entries and is confusing.** Only ~50 logs show
   at the bottom, older ones never drop off (or they do, and the leading numbers are
   **not** turn numbers but a 1–50 running order, which reads as if they were turns).
   → Clarify what the leading number means (turn vs. index), decide on retention,
-  and make old-vs-new obvious.
+  and make old-vs-new obvious. **◑ Partly fixed v0.94.0** — the misleading leading
+  index (rolling 1–50 position that read as a turn number) is gone; the newest
+  line stays highlighted. *Still open:* larger retention and real per-entry turn
+  numbers (needs the log to carry a turn, which touches the sim).
 - **[18] Knowledge spend doesn't add up.** Had 200+ knowledge stockpiled; added a
   research; it finished in 1 turn and knowledge dropped to 0 — but it clearly didn't
   cost the full 200+. → Audit how knowledge is spent vs. banked; the cost math and
-  the displayed stockpile disagree.
+  the displayed stockpile disagree. **✓ Fixed v0.94.0** — completing a tech now
+  rolls the *surplus* over as banked head-start (it was reset to 0, silently
+  burning the excess); the research panel names the banked amount and no longer
+  claims idle knowledge is "wasted" (it banks into progress).
 - **[11] War AI walks armies in circles.** Estonian regions' armies went "around and
   around"; Novgorod had all-but-one region annexed yet the AI kept circling instead
   of taking the last one. → Fix the AI's siege/finish logic so it commits to the last
@@ -128,5 +137,8 @@ suggested fix / question to resolve. Fold the tractable ones into
   screenshot).** The fire fired, but nothing visibly changed — what did it damage,
   what's different now? → Give events real, visible mechanical consequences. Also
   **remove the icon badge in the top-left corner of event cards** (all of them).
+  **◑ Partly fixed v0.94.0** — the top-left corner glyph is removed from the epoch
+  event card (the illustration carries identity). *Still open (bigger):* giving
+  events real, visible mechanical consequences.
 - **[15] Add more time/season-driven events.** E.g. winter hits and travel/trade is
   delayed because of it. Tie events to the calendar/seasons.

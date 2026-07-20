@@ -388,11 +388,11 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       const target = targetStock[key];
       const cur = displayedStock[key] ?? target;
       const diff = target - cur;
-      if (Math.abs(diff) < 0.5) {
+      if (Math.abs(diff) < 1) {
         displayedStock[key] = target;
         writeStock(key, target, true); // exact (may be fractional) once settled
       } else {
-        const next = cur + diff * 0.2; // ease ~20%/frame → ~0.3s to settle
+        const next = cur + diff * 0.4; // ease ~40%/frame → snappy ~0.15s so a spend reads as immediate
         displayedStock[key] = next;
         writeStock(key, next, false); // rounded while counting
         moving = true;
@@ -2130,17 +2130,16 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     epochOverlay.innerHTML = "";
     const panel = el("div", "hud-techtree-panel hud-epoch-panel");
 
-    // Header: motif glyph, name, and a year badge.
+    // Header: name and a year badge — no corner motif glyph; the illustration
+    // below carries the event's identity.
     const head = el("div", "hud-epoch-head");
-    const glyph = el("span", "hud-epoch-glyph");
-    glyph.textContent = def?.icon ?? "⚑";
     const titleWrap = el("div", "hud-epoch-titlewrap");
     const title = el("h2", "hud-epoch-title");
     title.textContent = def?.name ?? "A turn of history";
     const yearBadge = el("span", "hud-epoch-year");
     yearBadge.textContent = `${note.year} AD`;
     titleWrap.append(title, yearBadge);
-    head.append(glyph, titleWrap, closeButton(closeEpoch));
+    head.append(titleWrap, closeButton(closeEpoch));
     panel.append(head);
 
     // Illustration — the artwork, or an open placeholder until art exists.
@@ -2440,7 +2439,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       chip.innerHTML = `${glyph} ${escapeHtml(item.label)}`;
       chip.title =
         item.kind === "research"
-          ? "Pick a technology — knowledge income is wasted without one."
+          ? "Pick a technology — your banked knowledge pours straight into it."
           : item.kind === "build"
             ? "Open the production overview and put the idle slots to work."
             : "Open the armies overview — every stack that can still act.";
@@ -2471,7 +2470,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     // Keep an open tech tree in sync with the latest research state (it's now the
     // sole research page — opened straight from the Research button).
     if (techOverlay.style.display !== "none") {
-      renderTechTree(techOverlay, player, eraIndexForTurn(state.turn), flow.knowledge, callbacks, closeTechTree);
+      renderTechTree(techOverlay, player, eraIndexForTurn(state.turn), flow.knowledge, callbacks, closeTechTree, { animate: false });
     }
     // Keep an open standings overlay live as turns resolve.
     if (standingsOverlay.style.display !== "none") renderStandingsOverlay();
@@ -2614,9 +2613,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
   /**
    * Turn-log render: the header count and unseen badge always; the latest line
-   * while collapsed; the full scrollback (newest first, numbered chronologically,
-   * region mentions clickable) only while expanded. The buffer is capped
-   * upstream (~50 entries), so entry #1 is the oldest still kept.
+   * while collapsed; the full scrollback (newest first, region mentions
+   * clickable) only while expanded. The buffer is capped upstream (~50 entries);
+   * the newest line is highlighted so recency is clear without a leading index —
+   * that number read as a turn number but was only the entry's rolling position.
    */
   function renderLog(state: GameState): void {
     const total = state.log.length;
@@ -2639,11 +2639,9 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
         "p",
         "hud-log-line" + (i === total - 1 ? " latest" : "") + (regionId !== null ? " linked" : ""),
       );
-      const num = el("span", "hud-log-num");
-      num.textContent = String(i + 1);
       const txt = el("span", "hud-log-text");
       txt.textContent = text;
-      row.append(num, txt);
+      row.append(txt);
       if (regionId !== null) {
         row.title = `Show ${state.regions[regionId]!.name} on the map`;
         row.addEventListener("click", () => callbacks.onSelectRegion(regionId));
@@ -4140,7 +4138,13 @@ function renderTechTree(
   knowledgeFlow: number,
   callbacks: HudCallbacks,
   onClose: () => void,
+  opts: { animate?: boolean } = {},
 ): void {
+  // A live re-render (picking a tech, or a turn resolving while the tree is
+  // open) must not replay the panel's rise animation or snap the scroll back to
+  // the top — that read as the whole page "refreshing". Only a fresh open animates.
+  const animate = opts.animate !== false;
+  const prevScroll = container.querySelector<HTMLElement>(".hud-techtree-panel")?.scrollTop ?? 0;
   container.innerHTML = "";
   const research = player.research;
   const done = new Set(research.done);
@@ -4151,7 +4155,7 @@ function renderTechTree(
   const etaTurns = (cost: number, progress = 0): number | null =>
     knowledgeFlow > 0 ? Math.max(1, Math.ceil((cost - progress) / knowledgeFlow)) : null;
 
-  const panel = el("div", "hud-techtree-panel");
+  const panel = el("div", "hud-techtree-panel" + (animate ? "" : " hud-noanim"));
   const head = el("div", "hud-techtree-head");
   const ttTitle = el("h2", "hud-techtree-title");
   ttTitle.textContent = "Research — Technology tree";
@@ -4187,8 +4191,14 @@ function renderTechTree(
         : "No knowledge income — build Libraries or work hills/mountains to research at all.";
   } else {
     const l = el("div", "hud-research-status-line");
+    // Knowledge banks into progress even with nothing selected, so it is never
+    // lost — the nudge is to spend the pile, and we show how much is waiting.
+    const banked = Math.floor(research.progress);
     l.innerHTML = mustChoose
-      ? `<span class="hud-research-status-tech">${glyphHtml("book", "📖")} Pick a technology below — knowledge income is wasted without one.</span>`
+      ? `<span class="hud-research-status-tech">${glyphHtml("book", "📖")} Pick a technology below` +
+        (banked > 0
+          ? ` — your ${banked}${resourceIconHtml("knowledge", "📖")} banked knowledge pours straight in.</span>`
+          : ` to start turning knowledge into progress.</span>`)
       : `<span class="hud-research-status-tech">${resourceIconHtml("knowledge", "📖")} All technologies researched.</span>`;
     status.append(l);
   }
@@ -4259,6 +4269,8 @@ function renderTechTree(
     ),
   );
   container.append(panel);
+  // Keep the pre-rebuild scroll on a live re-render so the tree stays put.
+  if (!animate) panel.scrollTop = prevScroll;
 }
 
 // --- helpers ----------------------------------------------------------------

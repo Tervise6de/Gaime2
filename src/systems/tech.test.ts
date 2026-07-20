@@ -92,6 +92,15 @@ describe("advanceResearch", () => {
     expect(step.research.current).toBeNull();
   });
 
+  it("rolls surplus knowledge over as banked progress on completion", () => {
+    const cost = TECHS.writing.cost;
+    const step = advanceResearch({ current: "writing", progress: cost, done: [] }, 30);
+    expect(step.completed).toBe("writing");
+    expect(step.research.current).toBeNull();
+    // The 30 knowledge past the cost is kept as head-start, not discarded.
+    expect(step.research.progress).toBe(30);
+  });
+
   it("accumulates progress otherwise", () => {
     const step = advanceResearch({ current: "writing", progress: 0, done: [] }, 4);
     expect(step.completed).toBeNull();

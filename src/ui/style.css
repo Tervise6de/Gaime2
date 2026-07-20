@@ -4216,6 +4216,11 @@ body {
 .confirm-panel {
   animation: hud-panel-rise 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
+/* A live re-render of an already-open panel (e.g. picking a research node)
+   must not replay the rise — only a fresh open animates. */
+.hud-techtree-panel.hud-noanim {
+  animation: none;
+}
 
 /* Gentle hover feel on the common controls (reduce-motion squashes these). */
 .hud-legend-toggle,
