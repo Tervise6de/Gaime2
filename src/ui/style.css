@@ -231,12 +231,21 @@ body {
   padding: 0 4px;
 }
 
+/* Elastic middle. Crisis chips dock just after the resources (left of the
+   centred turn panel) and stack above it if the two ever meet — a famine
+   warning outranks the date. */
 .hud-topbar-center {
   flex: 1 1 0;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  padding-left: 10px;
   min-width: 0;
+}
+
+.hud-topbar-center .hud-crisis {
+  position: relative;
+  z-index: 2;
 }
 
 /* The right cluster never shrinks or clips: the elastic centre and the
@@ -321,7 +330,14 @@ body {
 }
 
 /* The turn block: turn·year / age·difficulty·trait / active modifiers. */
+/* The turn panel sits at the exact centre of the bar (absolute, so the realm/
+   resource cluster's width never nudges it off the screen's midline). */
 .hud-turnblock {
+  position: absolute;
+  left: 50%;
+  top: 9px;
+  bottom: 9px;
+  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -4513,12 +4529,17 @@ a:focus-visible,
 }
 
 /* Small laptops / tablets: the strip scrolls sideways rather than clipping —
-   every control stays reachable. */
+   every control stays reachable. The turn panel rejoins the flow (an
+   absolutely-centred panel cannot ride a scrolling strip). */
 @media (max-width: 1024px) {
   .hud-topbar {
     justify-content: flex-start;
     overflow-x: auto;
     scrollbar-width: none;
+  }
+  .hud-turnblock {
+    position: static;
+    transform: none;
   }
   .hud-topbar::-webkit-scrollbar {
     display: none;

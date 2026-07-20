@@ -40,7 +40,8 @@ import {
   type GameState,
   type Region,
 } from "@/systems/state";
-import { atWar } from "@/systems/diplomacy";
+import { atWar, getTreaty } from "@/systems/diplomacy";
+import { inLeague } from "@/systems/state";
 import { nextHopToward } from "@/systems/military";
 import { regionCapacity } from "@/systems/population";
 import { popCompact, popDisplay, soldiersCompact, soldiersDisplay } from "@/systems/format";
@@ -2089,7 +2090,10 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
   /** CK3-style planted banner: a swallowtail flag on a staff bearing the role glyph,
    *  with a strength chip at the foot. The player's is gold-trimmed and softly lit. */
-  function drawArmyBanner(cx: number, cy: number, color: string, mine: boolean, label: string, role: string): void {
+  /** Zoom fade for army strength chips — set once per drawArmies pass. */
+  let chipFade = 1;
+
+  function drawArmyBanner(cx: number, cy: number, color: string, mine: boolean, label: string | null, role: string): void {
     const fw = 20;
     const fh = 14;
     const lx = cx - fw / 2;         // hoist (staff) edge
@@ -2138,13 +2142,19 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     // Role emblem, centred on the flag toward the hoist.
     drawUnitGlyph(cx - 1, cy, 4, role, "rgba(248, 250, 252, 0.94)");
 
-    // Strength chip at the foot of the staff.
-    drawStrengthChip(lx, staffBase + 6, label, color);
+    // Strength chip at the foot of the staff — own/allied armies only, and it
+    // rides the zoom reveal (null label = hidden: rivals, or zoomed out).
+    if (label) {
+      context.save();
+      context.globalAlpha *= chipFade;
+      drawStrengthChip(lx, staffBase + 6, label, color);
+      context.restore();
+    }
   }
 
   /** A Hansa cog for a force crossing open water: a wooden hull with an owner-coloured
    *  sail and a strength chip. The player's is gold-trimmed and softly lit. */
-  function drawCog(cx: number, cy: number, color: string, mine: boolean, label: string): void {
+  function drawCog(cx: number, cy: number, color: string, mine: boolean, label: string | null): void {
     const hw = 14;
     const hull = "#6b533a";
     const hullDark = "#3a2c1c";
@@ -2214,11 +2224,22 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     context.fillStyle = mine ? "#f4d27a" : "#c8463c";
     context.fill();
 
-    // Strength chip at the waterline.
-    drawStrengthChip(cx, cy + 13, label, color);
+    // Strength chip at the waterline — same own/allied + zoom gate as banners.
+    if (label) {
+      context.save();
+      context.globalAlpha *= chipFade;
+      drawStrengthChip(cx, cy + 13, label, color);
+      context.restore();
+    }
   }
 
   function drawArmies(s: GameState): void {
+    // Strength numbers are privileged intel: only the player's own armies and
+    // their allies' (alliance treaty, or fellow League members) carry a chip —
+    // and even then only once zoomed in, riding the same reveal as the province
+    // labels. Rival banners stay visible (presence is public), just unnumbered.
+    chipFade = regionLabelAlpha();
+    const playerInLeague = inLeague(s, PLAYER_ID);
     for (const army of s.armies) {
       const size = armySize(army.units);
       if (size <= 0) continue;
@@ -2226,13 +2247,19 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       if (!region) continue;
       const ownerNation = s.nations.find((n) => n.id === army.ownerId);
       const mine = !!ownerNation?.isPlayer;
+      const allied =
+        !mine &&
+        !!ownerNation &&
+        !ownerNation.isBarbarian &&
+        (getTreaty(s, PLAYER_ID, army.ownerId) === "alliance" ||
+          (playerInLeague && inLeague(s, army.ownerId)));
       const p = project(region);
       // Token centre, lower-right of the region node so it clears the capital
       // star and the centred region name.
       const cx = p.x + NODE_RADIUS - 5;
       const cy = p.y + NODE_RADIUS - 3;
       const color = ownerColor(army.ownerId);
-      const label = soldiersCompact(size);
+      const label = (mine || allied) && chipFade > 0 ? soldiersCompact(size) : null;
       const atSea = armyAtSea(s, army);
 
       if (atSea) drawCog(cx, cy, color, mine, label);

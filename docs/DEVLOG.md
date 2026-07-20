@@ -6,6 +6,26 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-20 — Centred turn panel; army numbers become privileged intel (v0.94.0)
+
+**Turn panel at true centre.** The gilt turn panel is now absolutely centred in
+the top bar (`left: 50%`), so the realm/resource cluster's width never nudges it
+off the screen's midline. Crisis chips dock left of it in the elastic middle and
+stack above it if the two ever meet (a famine warning outranks the date). In the
+≤1024px scroll mode the panel rejoins the flow.
+
+**Army strength chips: own + allies, zoomed in only** (`systems/renderer.ts`).
+The number chip under an army banner/cog now draws only for the player's own
+armies and their allies' (alliance treaty, or fellow League members), and it
+rides the same zoom reveal as the province labels (`regionLabelAlpha`, fading in
+across cam 1.22→1.6) — so the fit view is clean of numbers entirely. Rival
+banners and cogs stay visible (presence is public; the count is not), and the
+hover tooltip still reports strength on deliberate inspection. Read-only
+renderer change — no sim behaviour touched.
+
+Captures: fit zoom (no chips anywhere), zoomed into the home realm (own chip
+visible). 691 tests green, typecheck + build clean.
+
 ## 2026-07-20 — Icon-only nav + realm-name floor (v0.93.0)
 
 Nav buttons (Ledger · Diplomacy · Research · Production · Armies · Politics)
