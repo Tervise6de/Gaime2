@@ -289,28 +289,33 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   // Standing / Game) and the ☰ menu close the right end.
   const topBar = el("div", "hud-topbar");
   const barLeft = el("div", "hud-topbar-left");
-  const realmBlock = el("div", "hud-realm-block");
+  // Each top-bar section sits in its own gilt-framed panel (`hud-frame` draws
+  // the ornate gold border): realm crest+name · resources · turn.
+  const realmBlock = el("div", "hud-realm-block hud-frame");
   const realmCrest = el("div", "hud-realm-crest");
   const realmText = el("div", "hud-realm-text");
   const realmName = el("div", "hud-realm-name");
   const realmSub = el("div", "hud-realm-sub");
   realmText.append(realmName, realmSub);
   realmBlock.append(realmCrest, realmText);
-  barLeft.append(realmBlock);
+  const resWrap = el("div", "hud-reswrap hud-frame");
+  barLeft.append(realmBlock, resWrap);
   const resourceEls: Record<TopbarResourceKey, { stock: HTMLElement; flow: HTMLElement }> =
     {} as never;
   for (const key of TOPBAR_RESOURCE_KEYS) {
     const meta = RESOURCE_META[key];
+    // Mockup layout: caps label on top, icon + stock as the middle row, the
+    // per-turn flow underneath — one centred column per resource.
     const cell = el("div", "hud-resource");
-    const icon = resourceIconEl(key, meta.icon, "hud-resource-icon");
-    const body = el("div", "hud-resource-body");
     const label = el("span", "hud-resource-label");
     label.textContent = meta.label;
+    const valueRow = el("div", "hud-resource-valuerow");
+    const icon = resourceIconEl(key, meta.icon, "hud-resource-icon");
     const stock = el("span", "hud-resource-stock");
+    valueRow.append(icon, stock);
     const flow = el("span", "hud-resource-flow");
-    body.append(label, stock, flow);
-    cell.append(icon, body);
-    barLeft.append(cell);
+    cell.append(label, valueRow, flow);
+    resWrap.append(cell);
     resourceEls[key] = { stock, flow };
     // Hovering a resource chip floats a per-region income breakdown (CK3-style),
     // so "where does my materials come from?" is answered without opening a panel.
@@ -404,7 +409,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
   // The turn block: turn·year on top, then age · difficulty · trait, then any
   // active timed modifiers ("War-weariness ×2 (3)") — one bordered segment.
-  const turnBlock = el("div", "hud-turnblock");
+  const turnBlock = el("div", "hud-turnblock hud-frame");
   const turnMain = el("div", "hud-turn-main");
   const turnSub = el("div", "hud-turn-sub");
   const turnMods = el("div", "hud-turn-mods");

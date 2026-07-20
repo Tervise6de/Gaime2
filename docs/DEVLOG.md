@@ -6,6 +6,37 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-20 — Top bar rebuilt as gilt-framed panels (mockup pass 2) (v0.91.0)
+
+The first gilded pass kept the bar as one continuous strip; the target mockup
+frames every section as its own panel, and at real-world window widths the strip
+overflowed (clipped End turn, truncated captions). Rebuilt (`ui/hud.ts` DOM +
+`ui/style.css`):
+
+**Framed panels.** A shared `.hud-frame` class draws the mockup's ornamental
+gold frame — double line, corner ticks, diamond finials — via an SVG
+`border-image`, so realm, resources and turn each sit in an identical gilt frame
+at any size. The right cluster's group frame is gone; nav buttons, the End-turn
+slab and the gear stand as individual bordered boxes, as in the mockup.
+
+**Resource columns.** Cells restructured label-top / icon+value / flow-below
+(centred columns, engraved hairlines between), matching the mockup instead of
+the old icon-left rows. Crest moved from a round medallion to the mockup's
+square gold-bordered plaque; realm/turn subtitles switched to quiet cream
+regular case.
+
+**Fit — nothing truncates, nothing clips.** Nav buttons now size to their
+caption (no fixed widths), so Production/Diplomacy read in full at any width
+that shows captions. A progressive ladder sheds padding (≤1560), tightens
+panels (≤1366), drops captions to icons+tooltips (≤1200), and finally lets the
+strip scroll sideways (≤1024) — End turn is whole at every width; the elastic
+centre and the ellipsising realm/turn text cede space first. Bar height 78→88px;
+the panels pinned beneath (ledger drawer, alerts, move banner, region inspector,
+outcome banner) moved down to match.
+
+Verified with captures at 1120/1280/1440/1920 plus the ledger open. 686 tests
+green, typecheck + production build clean.
+
 ## 2026-07-20 — R4: Production chains, salted-fish premium & luxury prestige (v0.90.0)
 
 The trade layer gains manufacturing depth and a reason to chase luxuries.
