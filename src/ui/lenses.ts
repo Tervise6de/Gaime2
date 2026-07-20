@@ -39,22 +39,32 @@ export const LENSES: LensDef[] = [
   { id: "unrest", label: "Unrest", glyph: "warning", fallback: "🔥", hint: "How restless each region is (red = revolt risk)." },
   { id: "relations", label: "Relations", glyph: "diplomacy", fallback: "🤝", hint: "How each realm stands with you — allies green, enemies red." },
   { id: "military", label: "Military", glyph: "attack", fallback: "⚔", hint: "Where the armies are — your forces green, hostiles red, exposed land amber." },
-  { id: "trade", label: "Trade", glyph: "gold", fallback: "⚓", hint: "The merchant world — what each land exports (grain, timber, furs, iron, salt, herring, amber, beer) and the Kontore that buy it." },
+  { id: "trade", label: "Trade", glyph: "gold", fallback: "⚓", hint: "The merchant world — the signature ware each land exports and the Kontore that buy it." },
 ];
 
 /** Trade lens: the good each land exports, and the Kontor markets (amber). */
 const TRADE_KONTOR = "#e8913a"; // the great Kontore — the markets goods flow to
-const TRADE_MUTED = "#3d434b"; // land with nothing to export (ports, transit, tundra)
-/** Colour a region takes from the good it exports; first match wins (a forest
-    sources timber and furs — it reads as timber, the bulk export). */
+const TRADE_MUTED = "#3d434b"; // land with nothing to export (bare mountains, transit)
+/** Colour a region takes from the ware it exports; first match wins, so the list
+    is ordered signature-first — a region reads as its most distinctive export (the
+    rare strategics and metals before a terrain's bulk staple). Covers every ware in
+    data/goods.ts so no exporting land falls through to muted. */
 const TRADE_GOODS: { good: GoodId; color: string }[] = [
   { good: "amber", color: "#e0a021" }, // the amber shore — warm amber
   { good: "salt", color: "#e6ddc4" }, // salt — pale white-gold
   { good: "iron", color: "#8b97a6" }, // ore country — steel grey
+  { good: "copper", color: "#c67a3e" }, // mined copper — burnished orange
+  { good: "cloth", color: "#9a5a86" }, // the cloth towns — dyed purple
   { good: "herring", color: "#5a8fb0" }, // the fisheries — sea blue
-  { good: "grain", color: "#d9b23f" }, // the grain plains — wheat gold (beat by beer below only if no grain)
+  { good: "stockfish", color: "#7fa8b8" }, // dried cod — pale sea grey
+  { good: "naval_stores", color: "#4f5a4a" }, // pitch, tar & hemp — dark pine
+  { good: "brick", color: "#b5532f" }, // the clay hills — terracotta
+  { good: "grain", color: "#d9b23f" }, // the grain plains — wheat gold
   { good: "beer", color: "#c8862f" }, // plains also brew — amber ale
-  { good: "timber", color: "#6f8a4c" }, // the forests — timber/furs green
+  { good: "timber", color: "#6f8a4c" }, // the forests — timber green
+  { good: "furs", color: "#7a5230" }, // fur country — sable brown
+  { good: "wax", color: "#d8c26a" }, // hive wax — pale honey-gold
+  { good: "honey", color: "#caa63a" }, // forest honey — deep gold
 ];
 
 /** Low → high colour ramp for each heat lens (dark, receding low; bright high). */

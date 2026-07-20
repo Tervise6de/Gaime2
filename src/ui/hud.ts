@@ -15,7 +15,7 @@
 import { BUILDINGS, BUILDING_IDS, BUILD_RATE, buildingFocusOk, buildingResourceOk, type BuildingId } from "@/data/buildings";
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
 import { TERRAIN, TERRAIN_IDS, STRATEGIC_RESOURCES } from "@/data/terrain";
-import { regionProduction, nationalProduction, nationYieldMult, yieldFactors, singleModifierMult, unrestPenalty } from "@/systems/economy";
+import { regionProduction, nationalProduction, nationYieldMult, yieldFactors, singleModifierMult, unrestPenalty, regionWareMult } from "@/systems/economy";
 import { garrisonCalm, nextUnrest, overexpansionUnrest } from "@/systems/stability";
 import { techUnrestReduction } from "@/systems/tech";
 import { runTutorial } from "@/ui/tutorial";
@@ -946,9 +946,12 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   function renderGoodsLedger(state: GameState): void {
     const rows = new Map<GoodId, { output: number; routes: number; income: number }>();
     for (const id of GOOD_IDS) rows.set(id, { output: 0, routes: 0, income: 0 });
+    const player = playerNation(state);
     for (const region of state.regions) {
       if (region.ownerId !== PLAYER_ID) continue;
-      for (const out of regionGoodOutput(region)) {
+      // Scale by the owner's ware multiplier so the ledger matches what actually
+      // accrues each turn (national trait/tech × region focus).
+      for (const out of regionGoodOutput(region, regionWareMult(player, region))) {
         const row = rows.get(out.good)!;
         row.output += out.amount;
       }
