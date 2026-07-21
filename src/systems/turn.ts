@@ -32,6 +32,7 @@ import { GOOD_IDS, type GoodId } from "@/data/goods";
 import { nationalProduction, round1 } from "@/systems/economy";
 import { advanceConstruction } from "@/systems/construction";
 import { stepTrade, seedKontore, nationalWareOutput, nationFoodOutput, hasSaltAccess } from "@/systems/trade";
+import { stepPiracy } from "@/systems/piracy";
 import { resolveContentment, contentmentUnrest, luxuryAppetite, drawFoodReserve } from "@/systems/prosperity";
 import { stepLeague } from "@/systems/league";
 import { scheduleEpochs, stepEpochs } from "@/systems/epochs";
@@ -776,6 +777,13 @@ export function resolveTurn(state: GameState): GameState {
   // a territorial brake on overexpansion. Runs before the AI so rivals can react
   // (e.g. move to reconquer a region that just seceded).
   s = applySecession(s);
+
+  // 1.55. Piracy (the Victual Brothers): before trade pays out, pirates raid the
+  // sea-lanes — an unguarded convoy is taken (pays nothing), a lane guarded by a
+  // war-fleet fights a sea battle instead. Dormant until the epoch event begins
+  // the age of piracy (systems/piracy.ts). Runs before stepTrade so a raided route
+  // earns nothing this turn.
+  s = stepPiracy(s);
 
   // 1.6. Hansa goods trade: standing routes carry goods to the Kontore, turning
   // goods into gold without touching the four-resource economy.

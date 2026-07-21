@@ -23,6 +23,8 @@ import {
 import { EPOCH_EVENTS, type EpochEventDef } from "@/data/epochEvents";
 import { BASE_YEAR, YEARS_PER_TURN, yearForTurn } from "@/data/eras";
 import { round1 } from "@/systems/economy";
+import { recordChronicle } from "@/systems/chronicle";
+import { PIRACY } from "@/data/piracy";
 
 /** Inverse of yearForTurn: the (≥1) game turn a calendar year falls on. */
 export function turnForYear(year: number): number {
@@ -122,7 +124,14 @@ function applyEpoch(state: GameState, def: EpochEventDef, rng: Rng): GameState {
       const regions = coast
         ? state.regions.map((r) => (r.id === coast.id ? { ...r, unrest: bumpUnrest(r.unrest, eff.unrest) } : r))
         : state.regions;
-      return announce({ ...state, nations, regions }, def, def.headline.replace("{place}", place));
+      // Begin the ongoing age of piracy: the sea-lanes turn raidable and war-fleets
+      // gain a peacetime guard job until the pressure eases (systems/piracy.ts).
+      const piracy = {
+        pressure: Math.max(state.piracy?.pressure ?? 0, PIRACY.epochPressure),
+        defeatedCaptains: state.piracy?.defeatedCaptains ?? [],
+      };
+      const announced = announce({ ...state, nations, regions, piracy }, def, def.headline.replace("{place}", place));
+      return recordChronicle(announced, "piracy", "The Victual Brothers descend on the sea-lanes.");
     }
     case "great_fire": {
       // Fire guts the busiest wharf-town: people lost, its owner's stockpiled
