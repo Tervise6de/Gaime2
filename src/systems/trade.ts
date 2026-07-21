@@ -559,6 +559,7 @@ export function setSoundEmbargo(state: GameState, ownerId: number, targetId: num
  * *blocked* strait does. Pure.
  */
 export function routeFlows(state: GameState, route: TradeRoute): boolean {
+  if (route.pirated) return false; // pirates took the convoy this turn (systems/piracy.ts)
   if (routeDisrupted(state, route)) return false;
   if (leagueSeversRoute(state, route)) return false;
   if (!kontorOpen(state, route.toKontorId)) return false;
@@ -598,7 +599,8 @@ export function stepTrade(state: GameState): GameState {
     const leagueBlocked = leagueSeversRoute(state, route);
     const disrupted = routeDisrupted(state, route);
     const kontorClosed = !kontorOpen(state, route.toKontorId); // a shuttered Kontor takes no trade (A3)
-    let income = disrupted || leagueBlocked || kontorClosed ? 0 : routeIncome(state, route);
+    const pirated = route.pirated ?? false; // pirates took this convoy this turn (systems/piracy.ts)
+    let income = disrupted || leagueBlocked || kontorClosed || pirated ? 0 : routeIncome(state, route);
 
     // The Øresund toll: the strait-holder skims a crossing route, or closes it.
     const eff = income > 0 ? soundEffect(state, route, income) : { toll: 0, blocked: false, holderId: null };
@@ -615,7 +617,7 @@ export function stepTrade(state: GameState): GameState {
     }
 
     if (income > 0) gain.set(route.ownerId, round1((gain.get(route.ownerId) ?? 0) + income));
-    nextRoutes.push({ ...route, lastIncome: income, disrupted: disrupted || soundBlocked || leagueBlocked || kontorClosed, tollPaid, soundBlocked, leagueBlocked });
+    nextRoutes.push({ ...route, lastIncome: income, disrupted: disrupted || soundBlocked || leagueBlocked || kontorClosed || pirated, tollPaid, soundBlocked, leagueBlocked });
   }
 
   const nations =

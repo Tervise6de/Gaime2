@@ -6,6 +6,37 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-21 — Pirates & guard-ships: the Victual Brothers era (v0.102.0)
+
+Connected the two sea-facing layers that had lived apart — trade was safe gold,
+war-fleets only mattered in a war. Now **trade routes are raidable and fleets earn
+a peacetime job guarding them.** Every rich route becomes a *guard-or-gamble* call.
+
+**The era model.** Piracy is an *age*, gated on `state.piracy.pressure` (0..1),
+which is **0 by default so the system is a no-op** — the existing `victual_brothers`
+epoch event (c. 1395) now *raises* it (and records a chronicle beat), and it eases
+each turn. Faithful to the real Victual Brothers (hired 1392 → suppressed at Hamburg
+1400/01) and keeps every prior test green.
+
+**Each turn (`stepPiracy`, before `stepTrade`):** per route, a raid chance from
+lane exposure × pressure × cargo value (capped; the Naval Power doctrine deters).
+A raided route unguarded → convoy taken, `pirated` flag → `stepTrade` pays it 0. A
+route **guarded** — the owner has a war-fleet parked on its lane (reuses fleet
+movement, *no new UI*) — fights a **sea battle** (`resolveCombat`): win → cargo safe
++ a named-captain **bounty**; lose → convoy taken *and* fleet losses.
+
+**Named captains** (`data/piracy.ts`, stat-cards, legend-flagged per `hansa
+times.md` §7): Wichmann, Magister Wigbold, Gödeke Michels, and the marquee **Klaus
+Störtebeker** (hulk flagship, big bounty, a chronicle beat on capture) — the hotter
+the era, the more infamous the captain, each recurring until a guard-fleet takes him.
+
+Determinism kept via a salted side-stream off `state.rngState` (never perturbs the
+main AI/event stream). New: `systems/piracy.ts`, `data/piracy.ts`, `PiracyState` +
+`TradeRoute.pirated` + a `"piracy"` chronicle kind; `routeFlows`/`stepTrade` honour
+the flag; turn pipeline calls `stepPiracy`. **746 tests pass** (+15). Design:
+`docs/pirates-and-guard-ships.md`. Next: pirate havens + the Hunt, letters of marque,
+and surfacing raid/guard status in the trade UI.
+
 ## 2026-07-20 — Parchment grain + hand-inked frames (v0.95.0)
 
 Two hand-craft passes against the "too clean, too generated" feel of the top

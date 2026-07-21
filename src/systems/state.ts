@@ -372,6 +372,22 @@ export interface TradeRoute {
   soundBlocked?: boolean;
   /** Set when the Hanseatic League shut this route's owner out of the Kontor (no access / boycott) — paid 0. */
   leagueBlocked?: boolean;
+  /** Set when pirates took this route's convoy this turn (systems/piracy.ts) — paid 0. Re-evaluated each turn. */
+  pirated?: boolean;
+}
+
+/**
+ * The piracy era (systems/piracy.ts). Dormant while `pressure` is 0; the Victual
+ * Brothers epoch event raises it, after which trade routes are raidable each turn
+ * and war-fleets parked on a route's lane can intercept the raiders. Pressure eases
+ * each turn (and drops when raids are repelled or a named captain is taken), so the
+ * age of piracy rises and passes. Serialisable data only.
+ */
+export interface PiracyState {
+  /** How lawless the sea-lanes are, 0..1. Drives per-route raid chance. */
+  pressure: number;
+  /** Ids (data/piracy.ts) of named captains already taken — each recurs only until defeated. */
+  defeatedCaptains: string[];
 }
 
 /**
@@ -624,6 +640,12 @@ export interface GameState {
    * Absent until a realm founds it (Hansa board only).
    */
   league?: LeagueState;
+  /**
+   * The piracy era (systems/piracy.ts) — the Victual Brothers preying on the
+   * sea-lanes. Absent/dormant until the epoch event raises `pressure`; while it
+   * runs, trade routes are raidable and war-fleets earn a peacetime guard job.
+   */
+  piracy?: PiracyState;
   /**
    * The rolled timeline of historical epoch events still to fire (systems/epochs.ts).
    * Set once at game start; entries are removed as they fire. Optional so legacy

@@ -20,8 +20,10 @@
 
 - **Hansa-control meter:** Kontor coverage, route value, league leadership and
   sea-lane control as a visible race.
-- **Route conflict:** piracy, escorting, blockade, toll avoidance and contested
-  ports.
+- **Route conflict:** ~~piracy, escorting~~ (shipped — the Victual Brothers era:
+  raidable routes + guard-fleets, `docs/pirates-and-guard-ships.md`), blockade,
+  toll avoidance and contested ports. Next: pirate havens + the Hunt, letters of
+  marque, and surfacing raid/guard status in the trade UI.
 - **League offices:** a small election/leadership layer with concrete trade
   powers.
 - **Character-light politics:** rulers, commanders and one civic office-holder
