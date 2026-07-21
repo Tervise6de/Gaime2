@@ -429,7 +429,7 @@ export const TECHS: Record<TechId, TechDef> = {
   heavy_horse: {
     id: "heavy_horse", name: "Siege Trains", category: "military", path: "chivalric_orders", tier: 2, era: 3, cost: 88,
     wareMult: 0.1, unrestReduction: 2, unlockUnit: "siege",
-    blurb: "+10% ware output; unlocks Siege engines that strip a fortress bare.",
+    blurb: "+10% ware output; unlocks Bombards — cannon that batter a fortress to rubble.",
   },
   town_watch: {
     id: "town_watch", name: "Town Watch", category: "military", path: "town_levies", tier: 0, era: 0, cost: 28,

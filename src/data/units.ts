@@ -1,21 +1,31 @@
 /**
  * Unit types and the rock-paper-scissors counter loop (docs/game-design.md §3.4).
  *
- * A 4-cycle counter loop plus siege as the fortification answer:
+ * The roster is drawn from the Hanseatic era's own land warfare (c. 1250–1550;
+ * see `hansa times.md` §10) — the transition from **mail-and-levy** through the
+ * **crossbow**, the **pike revolution**, and finally **gunpowder shot**:
+ *
  *   Militia → Cavalry → Ranged → Infantry → Militia   (X → Y means "X counters Y")
- *   Siege: weak in the field, but strips enemy fortification.
- * Each of the four roles has a cheap, early **basic** and a tech-gated **premium**
- * that counters the same type, so the loop stays a clean 4-cycle while the roster
- * deepens over the ages:
- *   counters Cavalry :  Militia   → Pikemen     (Town Watch doctrine)
- *   counters Militia :  Infantry  → Swordsmen   (Drilled Infantry + iron)
- *   counters Infantry:  Ranged    → Handgunners (Gunpowder Shot + iron)
- *   counters Ranged  :  Cavalry   → Knights     (Knightly Orders + horses)
- * Premiums cost more and gate behind tech (and often a strategic resource), so the
- * early game is the tidy four-unit loop and the late game adds heavy specialists.
+ *
+ * Read in era terms:
+ *   Town Militia (spear levy) → Mounted Sergeants (light horse) →
+ *   Crossbowmen (windlass crossbow) → Men-at-Arms (mail/plate foot) → Town Militia
+ *   Bombards: weak in the field, but batter down a fortress's walls.
+ *
+ * Each of the four roles has a cheap, always-available **basic** and a
+ * doctrine-gated **premium** that counters the same type, so the loop stays a
+ * clean 4-cycle while the roster deepens toward the age of pike-and-shot:
+ *   counters Cavalry :  Town Militia → Pikemen      (Town Watch doctrine)
+ *   counters Militia :  Men-at-Arms  → Swordsmen     (Drilled Infantry + iron)
+ *   counters Infantry:  Crossbowmen  → Handgunners   (Gunpowder Shot + iron)
+ *   counters Ranged  :  Mounted Sgt  → Knights       (Knightly Orders + horses)
+ * The core four are ungated (a realm always has an army); the premiums gate behind
+ * a Military doctrine and often a strategic resource, so the late field belongs to
+ * the realm that committed to Chivalric Orders (Knights, Bombards) or Town Levies
+ * (Pikemen, Swordsmen, Handgunners).
  *
  * Composition matters, so "just spam the strongest unit" is never optimal.
- * Costs are gold + arms wares (timber for the levy; iron/copper for the heavy and
+ * Costs are gold + arms wares (timber for the levy; iron/copper for plate and
  * gunpowder troops) to raise; every unit also draws gold upkeep each turn, so
  * armies are an ongoing economic drag, not a one-time buy. Some units require
  * access to a strategic resource (iron / horses), which makes specific territory
@@ -59,14 +69,16 @@ export interface UnitDef {
   siegePower: number;
   /** Strategic resource access required to raise this unit. */
   requires: StrategicResource | null;
-  /** Tech that must be researched to raise this unit (null = available from start). */
+  /** Research doctrine node that must be completed to raise this unit (null = ungated core). */
   requiresTech: TechId | null;
 }
 
 export const UNITS: Record<UnitType, UnitDef> = {
+  // The burgher levy — townsmen with spear and billhook, called out to the walls.
+  // Cheap, always available, and a spear hedge that unhorses a charge (counters cavalry).
   militia: {
     id: "militia",
-    name: "Militia",
+    name: "Town Militia",
     short: "Mil",
     cost: { gold: 10, wares: { timber: 4 } },
     upkeep: 1,
@@ -79,10 +91,12 @@ export const UNITS: Record<UnitType, UnitDef> = {
     requires: null,
     requiresTech: null,
   },
+  // Men-at-arms — professional foot in mail (and, in time, plate); the line that
+  // grinds a raw levy down (counters Militia).
   infantry: {
     id: "infantry",
-    name: "Infantry",
-    short: "Inf",
+    name: "Men-at-Arms",
+    short: "MaA",
     cost: { gold: 20, wares: { timber: 8 } },
     upkeep: 2,
     attack: 5,
@@ -94,10 +108,12 @@ export const UNITS: Record<UnitType, UnitDef> = {
     requires: null,
     requiresTech: null,
   },
+  // Crossbowmen — the town crossbow guilds' windlass-spanned bows, strong enough
+  // to punch armour; a killing opening volley that undoes heavy foot (counters Infantry).
   ranged: {
     id: "ranged",
-    name: "Ranged",
-    short: "Rng",
+    name: "Crossbowmen",
+    short: "Xbow",
     cost: { gold: 20, wares: { timber: 6 } },
     upkeep: 2,
     attack: 6,
@@ -109,10 +125,12 @@ export const UNITS: Record<UnitType, UnitDef> = {
     requires: null,
     requiresTech: null,
   },
+  // Mounted sergeants — light and medium horse that ride down loose shot before it
+  // can span again (counters Ranged). The everyday cavalry beneath the Knights.
   cavalry: {
     id: "cavalry",
-    name: "Cavalry",
-    short: "Cav",
+    name: "Mounted Sergeants",
+    short: "Srg",
     cost: { gold: 30, wares: { timber: 8 } },
     upkeep: 3,
     attack: 7,
@@ -124,10 +142,12 @@ export const UNITS: Record<UnitType, UnitDef> = {
     requires: "horses",
     requiresTech: null,
   },
+  // Bombards — trebuchets giving way to great gunpowder cannon; feeble in the open
+  // field, but they batter a fortress's walls to rubble (Siege Trains doctrine + iron).
   siege: {
     id: "siege",
-    name: "Siege",
-    short: "Sge",
+    name: "Bombards",
+    short: "Bmb",
     cost: { gold: 30, wares: { timber: 10, iron: 4 } },
     upkeep: 3,
     attack: 4,
@@ -139,8 +159,8 @@ export const UNITS: Record<UnitType, UnitDef> = {
     requires: "iron",
     requiresTech: "heavy_horse",
   },
-  // Mid-game anti-cavalry wall: a drilled pike block. Cheap, tanky, low bite —
-  // a dedicated answer to horse beyond the humble Militia (Town Watch, no resource).
+  // Pikemen — the infantry revolution: a drilled pike block, nearly invincible
+  // against cavalry in formation (Town Watch doctrine, no resource) — the premium Militia.
   pikeman: {
     id: "pikeman",
     name: "Pikemen",
@@ -156,8 +176,8 @@ export const UNITS: Record<UnitType, UnitDef> = {
     requires: null,
     requiresTech: "town_watch",
   },
-  // Late-game firepower: early handguns. A hard-hitting volley unit that punches
-  // through foot, but fragile in the melee (Gunpowder Shot + iron) — the endgame Ranged.
+  // Handgunners — matchlock arquebus and hand-gonne; a hard-hitting volley that
+  // punches through foot, but fragile in the melee (Gunpowder Shot + iron) — the endgame Ranged.
   handgunner: {
     id: "handgunner",
     name: "Handgunners",
@@ -173,8 +193,8 @@ export const UNITS: Record<UnitType, UnitDef> = {
     requires: "iron",
     requiresTech: "gunpowder_shot",
   },
-  // Elite men-at-arms: a hard, well-armoured melee line that outclasses the levy
-  // it hunts (Drilled Infantry + iron) — the premium Infantry: more bite, more armour.
+  // Swordsmen — Doppelsöldner in full plate with two-handed blade; elite men-at-arms
+  // who outclass the levy they hunt (Drilled Infantry + iron) — the premium Infantry.
   swordsman: {
     id: "swordsman",
     name: "Swordsmen",
@@ -190,8 +210,9 @@ export const UNITS: Record<UnitType, UnitDef> = {
     requires: "iron",
     requiresTech: "drilled_infantry",
   },
-  // Heavy shock cavalry — the crusading orders' mailed fist. Fast, hard-hitting and
-  // dear to field (Knightly Orders + horses) — the premium Cavalry, death to loose shot.
+  // Knights — the crusading orders' mailed-and-plated fist (the Teutonic Order in
+  // the Baltic). Fast, hard-hitting and dear to field (Knightly Orders + horses) —
+  // the premium Cavalry, death to loose shot.
   knight: {
     id: "knight",
     name: "Knights",
