@@ -224,8 +224,19 @@ walls), so a fleet can defend your coast, break an enemy fleet, or bombard-and-
 assault a coastal province. A mixed stack (troops + ships) is an amphibious force
 the fleet carries along the shore.
 
-*Deferred (V2):* open-water crossings to distant/island coasts (the map is one
-land-adjacency graph today), naval blockade of trade, and rival AI fleet-building.
+### Sea areas (v0.101)
+
+The open water is now drawn as named **sea areas** — the Norwegian Sea, the North
+Sea, the Kattegat, the Baltic, Bothnia and the Gulf of Finland — as faded,
+wide-tracked serif labels baked under the land (so a name tucks beneath the coast).
+The sea reads as structured *regions* rather than empty blue (`renderer.ts`
+`drawSeaLabels`; positions in `HANSA_SEA_AREAS`).
+
+*Deferred to a functional sea-layer milestone:* making the sea areas **navigable
+zones** where land armies cannot cross open water (only fleets and amphibious
+stacks can), which needs rival **AI fleets** in the same pass (else islands like
+Gotland would strand, uncontested) plus **naval transport and blockade**. That is
+a larger, interconnected change than V1 and is best done as its own milestone.
 
 ## Build plan — resource overhaul (R-series)
 

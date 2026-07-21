@@ -140,4 +140,7 @@ export const OCEAN = {
   contextLand: "rgba(212, 197, 165, 0.62)",
   contextCoast: "rgba(120, 104, 74, 0.42)",
   contextLabel: "rgba(101, 88, 64, 0.45)",
+  /** Named open-water area labels (the Baltic, the North Sea, the gulfs) — a
+      faded steel-blue, wide-tracked serif, so the sea reads as regions. */
+  seaLabel: "rgba(74, 108, 138, 0.42)",
 } as const;

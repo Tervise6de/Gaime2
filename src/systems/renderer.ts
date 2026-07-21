@@ -63,6 +63,17 @@ export const WAR_EDGE_COLOR = "rgba(232, 119, 107, 0.6)";
 const CELL_EDGE_COLOR = "rgba(13, 15, 20, 0.38)";
 /** Marker layout radius: the footprint each region's marker stack occupies. */
 const NODE_RADIUS = 26;
+
+/** Named open-water areas of the Hanseatic world, in map space (0..1) — drawn as
+    faded serif labels so the sea reads as regions. Tuned to sit clear of land. */
+const HANSA_SEA_AREAS: { text: string; x: number; y: number; size?: number; track?: number }[] = [
+  { text: "North Sea", x: 0.315, y: 0.60, size: 18, track: 6 },
+  { text: "Norwegian Sea", x: 0.235, y: 0.15, size: 15 },
+  { text: "Kattegat", x: 0.452, y: 0.485, size: 11, track: 2 },
+  { text: "Baltic Sea", x: 0.585, y: 0.63, size: 19, track: 7 },
+  { text: "Bothnia", x: 0.66, y: 0.27, size: 12, track: 2 },
+  { text: "Gulf of Finland", x: 0.815, y: 0.40, size: 11, track: 1 },
+];
 /** Fill opacity for map-lens heat (strong enough to read over terrain). */
 const LENS_ALPHA = 0.82;
 const SELECT_COLOR = "#f4d27a";
@@ -569,6 +580,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     }
     g.setLineDash([]);
 
+    // Named sea areas — baked under the land so a name tucks beneath the coast.
+    drawSeaLabels(g, s);
+
     // Landmass shadow + base: the island reads as a body sitting on the water.
     g.save();
     g.shadowColor = OCEAN.shadow;
@@ -672,6 +686,29 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       g.fillText(lb.text.toUpperCase(), p.x, p.y);
       if ("letterSpacing" in plate) plate.letterSpacing = "0px";
     }
+  }
+
+  /**
+   * Named open-water areas — faded, wide-tracked serif labels so the sea reads as
+   * structured *regions* (the Baltic, the North Sea, the gulfs), not empty blue.
+   * Baked into the ocean layer under the active land, so a name tucks beneath the
+   * coast where it runs onto shore. Hansa board only. Positions are map space.
+   */
+  function drawSeaLabels(g: CanvasRenderingContext2D, s: GameState): void {
+    if ((s.mapId ?? "hansa") !== "hansa") return;
+    const plate = g as CanvasRenderingContext2D & { letterSpacing?: string };
+    g.save();
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    for (const a of HANSA_SEA_AREAS) {
+      const p = projectXY(a.x, a.y);
+      if ("letterSpacing" in plate) plate.letterSpacing = `${a.track ?? 4}px`;
+      g.font = `italic 600 ${a.size ?? 15}px Georgia, "Times New Roman", serif`;
+      g.fillStyle = OCEAN.seaLabel;
+      g.fillText(a.text.toUpperCase(), p.x, p.y);
+      if ("letterSpacing" in plate) plate.letterSpacing = "0px";
+    }
+    g.restore();
   }
 
   function drawSeaCreature(g: CanvasRenderingContext2D, k: number, x: number, y: number): void {
