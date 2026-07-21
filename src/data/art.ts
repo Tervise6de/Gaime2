@@ -228,6 +228,18 @@ export const UNIT_ART: Record<UnitType, string | null> = {
   knight: ico(
     '<path d="M7.5 8.5a4.5 4.5 0 019 0v8a1.6 1.6 0 01-1.6 1.6H9.1A1.6 1.6 0 017.5 16.5z"/><path d="M7.6 12.1h8.8"/><path d="M12 13.7v3.4"/>',
   ),
+  // A single-masted cog with a square sail — the Hansa warship.
+  war_cog: ico(
+    '<path d="M4 15.4h16l-2.2 3.6H6.2z"/><path d="M12 4v11.4"/><path d="M12.6 5.2h5.6v6h-5.6z" fill="currentColor" stroke="none"/>',
+  ),
+  // A bigger castled hull — the hulk that succeeded the cog.
+  hulk: ico(
+    '<path d="M3 15.4h18l-2.2 3.6H5.2z"/><path d="M12 4v11.4"/><path d="M12.6 5.2h5.6v6.2h-5.6z" fill="currentColor" stroke="none"/><path d="M4.4 12.2h2.8v3.2H4.4z"/>',
+  ),
+  // Three masts + a gun deck — the carvel carrack, birth of the sailing warship.
+  carrack: ico(
+    '<path d="M3 15.4h18l-2.2 3.6H5.2z"/><path d="M7 6.4v9M12 4v11.4M17 6.4v9"/><path d="M7 7h3.2v3.1H7zM13.6 6h3.4v3.4h-3.4z" fill="currentColor" stroke="none"/>',
+  ),
 };
 
 export const BUILDING_ART: Record<BuildingId, string | null> = {

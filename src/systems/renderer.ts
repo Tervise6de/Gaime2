@@ -42,7 +42,7 @@ import {
 } from "@/systems/state";
 import { atWar, getTreaty } from "@/systems/diplomacy";
 import { inLeague } from "@/systems/state";
-import { nextHopToward } from "@/systems/military";
+import { nextHopToward, armyIsFleet } from "@/systems/military";
 import { regionCapacity } from "@/systems/population";
 import { popCompact, popDisplay, soldiersCompact, soldiersDisplay } from "@/systems/format";
 import { computeVoronoiCells, pointInPolygon, type Point, type VoronoiCell } from "@/systems/voronoi";
@@ -2023,6 +2023,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   /** An army is "at sea" this turn if it is marching and its next step crosses water —
    *  when it's drawn as a ship (a Hansa cog) rather than a planted banner. */
   function armyAtSea(s: GameState, army: Army): boolean {
+    if (armyIsFleet(army.units)) return true; // a fleet always rides the sea — draw it as a cog
     const dest = army.dest;
     if (dest == null) return false;
     const next = nextHopToward(s, army.regionId, dest);

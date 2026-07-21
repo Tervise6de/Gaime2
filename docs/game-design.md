@@ -188,6 +188,45 @@ with a free doctrine (e.g. Novgorod's Monastic Orders) are pre-committed to it.
 paths as commitment columns, and a detail panel with the path's KEY EFFECTS and a
 Start/Continue button — matching the mockup in `docs/`.
 
+## Military — time-true land & sea (v0.98–v0.100)
+
+The army roster is drawn from the era's own land warfare (`hansa times.md` §10) —
+the mail→plate, crossbow, pike and gunpowder-shot ladder — and now aligns with
+the two Military doctrines:
+
+- **Core (ungated):** Town Militia (spear levy) → Men-at-Arms (armoured foot) →
+  Crossbowmen (windlass crossbow) → Mounted Sergeants (light horse). A realm
+  always has a working four-unit counter loop.
+- **Chivalric Orders doctrine:** Knights (the crusading orders' plated horse) and
+  Bombards (cannon that batter walls).
+- **Town Levies doctrine:** the burgher pike-and-shot — Pikemen → Swordsmen →
+  Handgunners.
+
+Every unit id, stat and the counter loop are unchanged from the abstract roster;
+only the names, flavour and doctrine gates are era-true.
+
+### Navy (v0.100)
+
+The Hansa fought at sea with **armed cogs** and, later, **gun-armed carracks**
+(§8, §10). Three warships build **only at a coastal port**:
+
+- **War-Cog** — ungated coastal workhorse (any port).
+- **Hulk** — the bigger castled carrier; **Maritime → Naval Power → War Cogs**.
+- **Carrack** — the carvel gun platform (heavy bombard); **Naval Power → Ship
+  Bombards** (needs iron for its guns).
+
+So committing Maritime to **Naval Power** (over Merchant Marine) is what turns a
+realm into a sea power — navy is wired straight into the doctrine tree. Any army
+holding a warship is a **fleet**: it is **coast-locked** (it may only sail to
+coastal regions, never march inland) and fights with the shared combat resolver —
+ships bring a killing volley (naval gunnery) and siege power (bombarding a port's
+walls), so a fleet can defend your coast, break an enemy fleet, or bombard-and-
+assault a coastal province. A mixed stack (troops + ships) is an amphibious force
+the fleet carries along the shore.
+
+*Deferred (V2):* open-water crossings to distant/island coasts (the map is one
+land-adjacency graph today), naval blockade of trade, and rival AI fleet-building.
+
 ## Build plan — resource overhaul (R-series)
 
 Each R-milestone leaves the game runnable, tested and playable end-to-end.

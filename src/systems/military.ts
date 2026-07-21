@@ -12,7 +12,7 @@
  * advancing `rngState`, so resolution stays deterministic and reproducible.
  */
 
-import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
+import { UNITS, UNIT_TYPES, NAVAL_UNIT_TYPES, type UnitType } from "@/data/units";
 import { GOODS, type GoodId } from "@/data/goods";
 import {
   COMMANDER_DISLOYAL,
@@ -91,6 +91,13 @@ export function strategicAccess(
   return set;
 }
 
+/** Whether an army is a fleet — it holds at least one warship. A fleet is
+    coast-locked: raised at a coastal port, and only able to enter coastal
+    regions (it sails the shore rather than marching inland). Pure. */
+export function armyIsFleet(units: UnitCounts): boolean {
+  return NAVAL_UNIT_TYPES.some((t) => units[t] > 0);
+}
+
 /** An army moves at the pace of its slowest unit. */
 export function armyMoves(units: UnitCounts): number {
   let min = Infinity;
@@ -121,6 +128,9 @@ export function canRaiseUnit(
   const def = UNITS[unit];
   if (def.requiresTech && !nation.research.done.includes(def.requiresTech)) {
     return { ok: false, reason: `Requires ${def.requiresTech.replace(/_/g, " ")}.` };
+  }
+  if (def.naval && region.terrain !== "coast") {
+    return { ok: false, reason: "Ships must be built at a coastal port." };
   }
   const cost = unitCost(nation, unit, region.focus);
   if (nation.stocks.gold < cost.gold) return { ok: false, reason: "Not enough gold." };
@@ -181,11 +191,16 @@ export function raiseUnit(
   return { ...state, nations, armies, nextArmyId };
 }
 
-/** Which adjacent regions an army could move into this turn (has moves left). */
+/** Which adjacent regions an army could move into this turn (has moves left).
+    A fleet is confined to coastal regions — it sails the shore, never inland. */
 export function reachableRegions(state: GameState, army: Army): number[] {
   if (army.movesLeft <= 0) return [];
   const region = state.regions[army.regionId];
-  return region ? region.adjacency.slice() : [];
+  if (!region) return [];
+  if (armyIsFleet(army.units)) {
+    return region.adjacency.filter((id) => state.regions[id]?.terrain === "coast");
+  }
+  return region.adjacency.slice();
 }
 
 /**
@@ -361,6 +376,8 @@ export function moveArmy(
   const from = state.regions[army.regionId];
   const target = state.regions[targetRegionId];
   if (!from || !target || !from.adjacency.includes(targetRegionId)) return state;
+  // A fleet may only sail to another coastal region; it cannot march inland.
+  if (armyIsFleet(army.units) && target.terrain !== "coast") return state;
 
   const owner = army.ownerId;
   const friendlyAtTarget = armyAt(state, targetRegionId, owner);

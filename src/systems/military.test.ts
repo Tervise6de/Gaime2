@@ -3,6 +3,8 @@ import {
   armyAt,
   strategicAccess,
   armyMoves,
+  armyIsFleet,
+  reachableRegions,
   canRaiseUnit,
   raiseUnit,
   moveArmy,
@@ -712,5 +714,57 @@ describe("marching (travel over turns)", () => {
     expect(marchEta(slow, slow.armies[0]!)).toBe(2);
     const fast = orderMarch(realm({ cavalry: 2 }), 0, 2); // moves 2 → 1 turn
     expect(marchEta(fast, fast.armies[0]!)).toBe(1);
+  });
+});
+
+describe("naval fleets", () => {
+  it("armyIsFleet detects a warship in the stack", () => {
+    expect(armyIsFleet({ ...emptyUnits(), militia: 3 })).toBe(false);
+    expect(armyIsFleet({ ...emptyUnits(), war_cog: 1 })).toBe(true);
+    // A mixed amphibious stack (troops + ships) is still a fleet.
+    expect(armyIsFleet({ ...emptyUnits(), knight: 2, war_cog: 1 })).toBe(true);
+  });
+
+  it("ships can only be built at a coastal port", () => {
+    const coast = region(0, { terrain: "coast", adjacency: [1] });
+    const inland = region(1, { terrain: "plains", adjacency: [0] });
+    const s: GameState = { ...battlefield({}, {}), regions: [coast, inland] };
+    expect(canRaiseUnit(s, 0, "war_cog", PLAYER_ID).ok).toBe(true); // coastal port
+    expect(canRaiseUnit(s, 1, "war_cog", PLAYER_ID).ok).toBe(false); // inland — no port
+    // The Hulk additionally needs the Maritime Naval Power doctrine (War Cogs node).
+    expect(canRaiseUnit(s, 0, "hulk", PLAYER_ID).ok).toBe(false);
+    const withDoctrine: GameState = {
+      ...s,
+      nations: s.nations.map((n) =>
+        n.id === PLAYER_ID ? { ...n, research: { current: null, progress: 0, done: ["war_cogs"] } } : n,
+      ),
+    };
+    expect(canRaiseUnit(withDoctrine, 0, "hulk", PLAYER_ID).ok).toBe(true);
+  });
+
+  it("a fleet is coast-locked: it may sail to coastal regions only", () => {
+    const r0 = region(0, { terrain: "coast", adjacency: [1, 2] });
+    const r1 = region(1, { terrain: "coast", ownerId: PLAYER_ID, adjacency: [0] });
+    const r2 = region(2, { terrain: "plains", ownerId: PLAYER_ID, adjacency: [0] });
+    const s: GameState = {
+      ...battlefield({}, {}),
+      regions: [r0, r1, r2],
+      armies: [{ id: 0, ownerId: PLAYER_ID, regionId: 0, units: { ...emptyUnits(), war_cog: 2 }, movesLeft: 1 }],
+    };
+    expect(reachableRegions(s, s.armies[0]!)).toEqual([1]); // coast only, not inland r2
+    expect(moveArmy(s, 0, 2).armies[0]!.regionId).toBe(0); // inland move blocked
+    expect(moveArmy(s, 0, 1).armies[0]!.regionId).toBe(1); // sailed to the coast
+  });
+
+  it("a land army is unaffected — it still marches inland", () => {
+    const r0 = region(0, { terrain: "coast", adjacency: [1] });
+    const r1 = region(1, { terrain: "plains", ownerId: PLAYER_ID, adjacency: [0] });
+    const s: GameState = {
+      ...battlefield({}, {}),
+      regions: [r0, r1],
+      armies: [{ id: 0, ownerId: PLAYER_ID, regionId: 0, units: { ...emptyUnits(), knight: 1 }, movesLeft: 1 }],
+    };
+    expect(reachableRegions(s, s.armies[0]!)).toEqual([1]);
+    expect(moveArmy(s, 0, 1).armies[0]!.regionId).toBe(1);
   });
 });

@@ -47,7 +47,12 @@ export type UnitType =
   | "pikeman"
   | "handgunner"
   | "swordsman"
-  | "knight";
+  | "knight"
+  // Naval — warships built only at a coastal port; they form coast-locked fleets
+  // (the Hansa fought at sea with armed cogs and, later, gun-armed carracks).
+  | "war_cog"
+  | "hulk"
+  | "carrack";
 
 export interface UnitDef {
   id: UnitType;
@@ -71,6 +76,9 @@ export interface UnitDef {
   requires: StrategicResource | null;
   /** Research doctrine node that must be completed to raise this unit (null = ungated core). */
   requiresTech: TechId | null;
+  /** A warship: raised only at a coastal port; any army holding one is a fleet,
+      locked to the coast (it sails the shore rather than marching inland). */
+  naval?: boolean;
 }
 
 export const UNITS: Record<UnitType, UnitDef> = {
@@ -228,9 +236,71 @@ export const UNITS: Record<UnitType, UnitDef> = {
     requires: "horses",
     requiresTech: "knightly_orders",
   },
+
+  // --- Naval — fleets built at coastal ports ---------------------------------
+  // The Hansa's sea war was armed merchant cogs and, later, gun-armed carracks
+  // (hansa times.md §8, §10). A War-Cog is the ungated coastal workhorse; the
+  // Hulk and Carrack are the payoff of the Maritime **Naval Power** doctrine.
+  // Ships fight other ships and batter coastal forts (siege power); they never
+  // counter a land type — the sea is its own domain.
+  war_cog: {
+    id: "war_cog",
+    name: "War-Cog",
+    short: "Cog",
+    cost: { gold: 24, wares: { timber: 6, naval_stores: 6 } },
+    upkeep: 2,
+    attack: 5,
+    defense: 6,
+    moves: 2,
+    counters: null,
+    volley: true,
+    siegePower: 1,
+    requires: null,
+    requiresTech: null,
+    naval: true,
+  },
+  // The larger 15th-century carrier, castled fore and aft — a stronger warship
+  // (Maritime → Naval Power: War Cogs).
+  hulk: {
+    id: "hulk",
+    name: "Hulk",
+    short: "Hlk",
+    cost: { gold: 34, wares: { naval_stores: 10, iron: 4 } },
+    upkeep: 3,
+    attack: 7,
+    defense: 8,
+    moves: 2,
+    counters: null,
+    volley: true,
+    siegePower: 1,
+    requires: null,
+    requiresTech: "war_cogs",
+    naval: true,
+  },
+  // The carvel-built, high-sided gun platform whose stern "bristled with cannon"
+  // — the age of naval artillery (Naval Power: Ship Bombards; needs iron for guns).
+  carrack: {
+    id: "carrack",
+    name: "Carrack",
+    short: "Crk",
+    cost: { gold: 44, wares: { naval_stores: 10, iron: 8 } },
+    upkeep: 4,
+    attack: 9,
+    defense: 7,
+    moves: 2,
+    counters: null,
+    volley: true,
+    siegePower: 3,
+    requires: "iron",
+    requiresTech: "ship_bombards",
+    naval: true,
+  },
 };
 
 export const UNIT_TYPES = Object.keys(UNITS) as UnitType[];
+
+/** The naval unit types (warships) — a fleet is any army holding one of these. */
+export const NAVAL_UNIT_TYPES = UNIT_TYPES.filter((t) => UNITS[t].naval);
 
 /** Counter bonus: a unit deals this much extra vs the type it counters. */
 export const COUNTER_BONUS = 0.5;

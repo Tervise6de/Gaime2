@@ -327,13 +327,13 @@ export const TECHS: Record<TechId, TechDef> = {
   },
   war_cogs: {
     id: "war_cogs", name: "War Cogs", category: "maritime", path: "naval_power", tier: 1, era: 2, cost: 55,
-    tradeMult: 0.06, wareMult: 0.08,
-    blurb: "+6% trade, +8% ware output — castled war-cogs cow the pirates.",
+    tradeMult: 0.06, wareMult: 0.08, unlockUnit: "hulk",
+    blurb: "+6% trade, +8% ware output; unlocks the Hulk — a big castled warship that cows the pirates.",
   },
   ship_bombards: {
     id: "ship_bombards", name: "Ship Bombards", category: "maritime", path: "naval_power", tier: 2, era: 3, cost: 90,
-    tradeMult: 0.06, unrestReduction: 4,
-    blurb: "+6% trade, much safer lanes — bombard-armed ships rule the narrows.",
+    tradeMult: 0.06, unrestReduction: 4, unlockUnit: "carrack",
+    blurb: "+6% trade, much safer lanes; unlocks the gun-armed Carrack that rules the narrows.",
   },
 
   // === Production ==========================================================
