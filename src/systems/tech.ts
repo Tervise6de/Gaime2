@@ -53,6 +53,13 @@ export function techTradeMult(done: TechId[]): number {
   return Math.max(0, mult);
 }
 
+/** Combined extra trade-route capacity from completed nodes (systems/trade.ts). */
+export function techTradeCapacity(done: TechId[]): number {
+  let cap = 0;
+  for (const id of done) cap += TECHS[id]?.tradeCapacity ?? 0;
+  return cap;
+}
+
 /** Total flat unrest reduction from completed nodes (negative nodes raise unrest). */
 export function techUnrestReduction(done: TechId[]): number {
   let r = 0;

@@ -367,6 +367,10 @@ export const BUILDING_ART: Record<BuildingId, string | null> = {
   weaving_works: ico(
     '<path d="M4.5 4.5h15v15h-15z"/><path d="M8 4.5v15M12 4.5v15M16 4.5v15"/><path d="M4.5 9.5h15M4.5 14.5h15"/>',
   ),
+  // Ropewalk — a long low shed where cordage is laid; a twisted strand runs its length.
+  ropewalk: ico(
+    '<path d="M4.5 19.5v-6h15v6M4.5 13.5L12 10.5l7.5 3M3.4 19.5h17.2"/><path d="M6 16.5c1.5-1.1 3-1.1 4.5 0s3 1.1 4.5 0 3-1.1 4.5 0"/>',
+  ),
   // Stecknitz canal — an arched waterway (reuses the aqueduct read).
   canal: ico(
     '<path d="M3.4 5.4h17.2M4.6 5.4v2.4M19.4 5.4v2.4M3.4 7.8h17.2"/><path d="M5.2 19.5v-8.1a3.2 3.2 0 016.4 0v8.1M12.4 19.5v-8.1a3.2 3.2 0 016.4 0v8.1"/><path d="M3 19.5h18"/>',

@@ -28,10 +28,11 @@ import type { ScriptedMap } from "@/data/maps/types";
 import { KONTORE } from "@/data/kontore";
 import { SOUND } from "@/data/sound";
 import type { StrategicResource } from "@/data/terrain";
-import { GOOD_IDS, type GoodId } from "@/data/goods";
+import { GOODS, GOOD_IDS, type GoodId } from "@/data/goods";
 import { nationalProduction, round1 } from "@/systems/economy";
 import { advanceConstruction } from "@/systems/construction";
 import { stepTrade, seedKontore, nationalWareOutput, nationFoodOutput, hasSaltAccess } from "@/systems/trade";
+import { manufactureWares } from "@/systems/manufacture";
 import { resolveContentment, contentmentUnrest, luxuryAppetite, drawFoodReserve } from "@/systems/prosperity";
 import { stepLeague } from "@/systems/league";
 import { scheduleEpochs, stepEpochs } from "@/systems/epochs";
@@ -650,6 +651,13 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
   // A completed build pulls the next still-valid entry off the region's queue.
   let regions = startQueuedBuildings(built.regions, nationId, research.done);
 
+  // Production chains: refine the *surplus* raw wares into dearer finished ones
+  // (wool→cloth, grain→beer, timber→naval stores) through the realm's converter
+  // buildings — run after construction takes its raw wares, so refining never
+  // starves a build; before food/contentment, so the finished ware feeds them (R7).
+  const manu = manufactureWares(wares, regions, nationId);
+  wares = manu.wares;
+
   // Food balance → famine. Food now comes chiefly from the realm's food wares
   // (grain, salted fish, beer, honey — R3), on top of any building/subsistence food
   // in flow.food, minus the population's consumption already netted into flow.food.
@@ -735,6 +743,7 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
     const notes: string[] = [];
     for (const c of built.completed) notes.push(`${BUILDINGS[c.building].name} built in ${c.regionName}`);
     if (step.completed) notes.push(`researched ${TECHS[step.completed].name}`);
+    for (const f of manu.flows) notes.push(`refined ${f.amount} ${GOODS[f.from].name.toLowerCase()} → ${GOODS[f.to].name.toLowerCase()}`);
     if (reserveFood > 0) notes.push(`larder reserve fed +${reserveFood} food`);
     if (content.consumed > 0) notes.push(`burghers ${Math.round(content.ratio * 100)}% content (−${contentCalm} unrest)`);
     if (renownGain > 0) notes.push(`+${renownGain} renown from civic works`);

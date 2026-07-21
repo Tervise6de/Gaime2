@@ -50,7 +50,7 @@ import {
   wouldJoinWar,
 } from "@/systems/diplomacy";
 import { researchFrontier, selectTech, isBuildingUnlockedFor, nextNodeInPath, isPathRejected } from "@/systems/tech";
-import { createRoute, laneFor, regionSources, distanceFactor } from "@/systems/trade";
+import { createRoute, laneFor, regionSources, distanceFactor, tradeCapacity } from "@/systems/trade";
 import { buyWare, sellWare, marketBuyPrice } from "@/systems/market";
 import { luxuryAppetite, resolveContentment } from "@/systems/prosperity";
 import { foundLeague, joinLeague, canFoundLeague, canJoinLeague, kontoreHeldBy, hasHanseHall } from "@/systems/league";
@@ -64,7 +64,6 @@ import {
   DIFFICULTY,
   FORT_PER_LEVEL,
   FRIENDLY_THRESHOLD,
-  MAX_ROUTES_PER_NATION,
   PLAYER_ID,
   UNREST_REVOLT,
   SECESSION_REVOLT_TURNS,
@@ -145,7 +144,7 @@ function manageTrade(state: GameState, nationId: number): GameState {
   if (nationId === BARBARIAN_ID) return state;
   let s = state;
   const mine = () => (s.routes ?? []).filter((r) => r.ownerId === nationId);
-  if (mine().length >= MAX_ROUTES_PER_NATION) return s;
+  if (mine().length >= tradeCapacity(s, nationId)) return s;
 
   interface Cand { regionId: number; good: (typeof GOOD_IDS)[number]; kontorId: keyof typeof KONTORE; income: number }
   const cands: Cand[] = [];
@@ -169,7 +168,7 @@ function manageTrade(state: GameState, nationId: number): GameState {
   const already = (c: Cand): boolean =>
     mine().some((r) => r.fromRegionId === c.regionId && r.good === c.good && r.toKontorId === c.kontorId);
   for (const c of cands) {
-    if (mine().length >= MAX_ROUTES_PER_NATION) break;
+    if (mine().length >= tradeCapacity(s, nationId)) break;
     if (already(c)) continue;
     s = createRoute(s, nationId, c.regionId, c.good, c.kontorId);
   }
@@ -238,12 +237,21 @@ function manageEconomy(state: GameState, nationId: number): GameState {
   const done = s.nations.find((n) => n.id === nationId)!.research.done;
   const cur = s.nations.find((n) => n.id === nationId)!;
   const buildWareStock = cur.wares.timber + cur.wares.brick + cur.wares.iron + cur.wares.naval_stores;
+  const sourcesWare = (good: GoodId): boolean =>
+    s.regions.some((r) => r.ownerId === nationId && regionSources(r, good));
+  const routeCount = (s.routes ?? []).filter((r) => r.ownerId === nationId).length;
   const hints: BuildHints = {
     needFood: cur.famine || cur.stocks.food < AI_FOOD_LOW,
     needBuildWares: buildWareStock < AI_BUILD_WARE_LOW,
     // Develop luxury industry when the burghers are well short of contentment (R5.1),
     // so a realm's own land keeps its towns comfortable rather than only imports.
     needLuxury: contentRatio(cur, nationPop(s, nationId)) < 0.6,
+    // A trader pressed against its route cap builds warehouse capacity to carry more.
+    needTradeCapacity: routeCount >= 2 && routeCount >= tradeCapacity(s, nationId) - 1,
+    // Converters only earn out where the realm actually sources their raw input.
+    sourcesWool: sourcesWare("wool"),
+    sourcesGrain: sourcesWare("grain"),
+    sourcesTimber: sourcesWare("timber"),
   };
   for (const region of s.regions) {
     if (region.ownerId !== nationId || region.construction) continue;
@@ -454,6 +462,9 @@ function pickTech(done: TechId[], nation: Nation, era: number): TechId | null {
     front and get raised wherever they apply. */
 const BASE_BUILD_ORDER: BuildingId[] = [
   "bloomery", "stable", "market", "harbor", "bank", "guildhall", "workshop", "mine", "university", "forum", "farm", "aqueduct", "library", "temple", "monastery", "cathedral", "fortress",
+  // Production chains sit last: they only pass `fits` where the realm sources their
+  // raw input (wool/grain/timber), so they fill in once the core economy is up.
+  "weaving_works", "brewery", "ropewalk",
 ];
 
 /** Buildings a trait rushes first, so rivals open along their strength. A
@@ -462,7 +473,7 @@ const BASE_BUILD_ORDER: BuildingId[] = [
 const TRAIT_BUILD_PRIORITY: Record<TraitId, BuildingId[]> = {
   fertile: ["farm", "aqueduct"],
   industrious: ["workshop", "mine", "guildhall"],
-  mercantile: ["market", "harbor", "bank", "guildhall"],
+  mercantile: ["market", "harbor", "salzspeicher", "bank", "guildhall", "weaving_works"],
   scholarly: ["library", "monastery", "university", "cathedral", "forum"],
   martial: ["fortress", "workshop"],
 };
@@ -487,6 +498,14 @@ export interface BuildHints {
   needBuildWares?: boolean;
   /** Burghers are short of contentment — develop luxury industry (a Weaving Works). */
   needLuxury?: boolean;
+  /** The realm trades and is at/near its route cap — build warehouse capacity. */
+  needTradeCapacity?: boolean;
+  /** The realm sources raw wool — a Weaving Works has feedstock to weave into cloth. */
+  sourcesWool?: boolean;
+  /** The realm sources grain — an Export Brewery has feedstock to brew into beer. */
+  sourcesGrain?: boolean;
+  /** The realm sources timber — a Ropewalk has feedstock to work into naval stores. */
+  sourcesTimber?: boolean;
 }
 
 export function chooseBuilding(
@@ -501,6 +520,15 @@ export function chooseBuilding(
     const t = BUILDINGS[b].requiresTerrain;
     if (t && region.terrain !== t) return false;
     if (!buildingResourceOk(region.resource, b)) return false;
+    // A production-chain building only earns out where the realm sources its raw
+    // input — no point weaving with no wool, brewing with no grain, or working
+    // rope with no timber (systems/manufacture.ts draws from the national pool).
+    const conv = BUILDINGS[b].convert;
+    if (conv) {
+      if (conv.from === "wool" && !hints?.sourcesWool) return false;
+      if (conv.from === "grain" && !hints?.sourcesGrain) return false;
+      if (conv.from === "timber" && !hints?.sourcesTimber) return false;
+    }
     return buildingFocusOk(region.focus, b);
   };
   const firstOf = (list: BuildingId[]) => list.find((b) => unlocked(b) && !has(b) && fits(b)) ?? null;
@@ -522,11 +550,15 @@ export function chooseBuilding(
     const ware = firstOf(WARE_BUILDINGS);
     if (ware) return ware;
   }
-  // Burghers short of luxuries: raise a Weaving Works to spin cloth for contentment.
+  // Burghers short of luxuries: raise a Weaving Works to spin cloth for contentment
+  // (fits() gates it out where the realm sources no wool to weave).
   if (hints?.needLuxury) {
     const lux = firstOf(LUXURY_BUILDINGS);
     if (lux) return lux;
   }
+  // A trader pressed against its route cap builds warehouse capacity to carry more
+  // trade — the Salzspeicher's new role (systems/trade.ts `tradeCapacity`).
+  if (hints?.needTradeCapacity && !has("salzspeicher") && fits("salzspeicher")) return "salzspeicher";
   // Trait-preferred buildings first, then the generalist order.
   const order = [...new Set([...(trait ? TRAIT_BUILD_PRIORITY[trait] : []), ...BASE_BUILD_ORDER])];
   for (const b of order) if (unlocked(b) && !has(b) && fits(b)) return b;

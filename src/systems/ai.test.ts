@@ -126,11 +126,16 @@ describe("manageMarket (R5 town market)", () => {
 });
 
 describe("chooseBuilding — luxury industry (R5.1)", () => {
-  it("develops a Weaving Works when burghers want contentment", () => {
-    expect(chooseBuilding({ unrest: 0, buildings: [], terrain: "plains" }, [], undefined, { needLuxury: true })).toBe("weaving_works");
+  it("develops a Weaving Works when burghers want contentment and the realm has wool", () => {
+    // The Weaving Works weaves wool → cloth, so it only earns out where the realm
+    // sources wool (systems/manufacture.ts) — the sourcesWool feedstock hint.
+    expect(chooseBuilding({ unrest: 0, buildings: [], terrain: "plains" }, [], undefined, { needLuxury: true, sourcesWool: true })).toBe("weaving_works");
+  });
+  it("does not weave without wool to spin, even when burghers want luxuries", () => {
+    expect(chooseBuilding({ unrest: 0, buildings: [], terrain: "plains" }, [], undefined, { needLuxury: true })).not.toBe("weaving_works");
   });
   it("does not force luxury industry without the hint", () => {
-    expect(chooseBuilding({ unrest: 0, buildings: [], terrain: "plains" }, [], undefined, {})).not.toBe("weaving_works");
+    expect(chooseBuilding({ unrest: 0, buildings: [], terrain: "plains" }, [], undefined, { sourcesWool: true })).not.toBe("weaving_works");
   });
 });
 

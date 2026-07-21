@@ -23,11 +23,10 @@ import { KONTORE, KONTOR_IDS, type KontorId } from "@/data/kontore";
 import { SOUND } from "@/data/sound";
 import { round1, unrestPenalty, regionWareMult } from "@/systems/economy";
 import { atWar } from "@/systems/diplomacy";
-import { techTradeMult } from "@/systems/tech";
+import { techTradeMult, techTradeCapacity } from "@/systems/tech";
 import { kontorBlockedFor, leagueSeversRoute, isLeagueMonopoly } from "@/systems/league";
 import {
   BARBARIAN_ID,
-  MAX_ROUTES_PER_NATION,
   PLAYER_ID,
   TRADE_DIST_CAP,
   TRADE_DIST_COEF,
@@ -196,6 +195,37 @@ export function kontorOpen(state: GameState, kontor: KontorId): boolean {
   return state.kontore?.find((k) => k.id === kontor)?.open ?? true;
 }
 
+// --- trade capacity ---------------------------------------------------------
+
+/** Routes a realm can run before it has built any trade infrastructure. */
+export const BASE_TRADE_CAPACITY = 4;
+/** Ceiling on a realm's trade capacity, however much it develops. */
+export const MAX_TRADE_CAPACITY = 14;
+/** Extra routes League membership grants — the Kontore's shared reach. */
+export const LEAGUE_TRADE_CAPACITY = 1;
+
+/**
+ * How many trade routes `ownerId` may run at once — no longer a flat cap but the
+ * merchant infrastructure the realm has actually built (docs/game-design.md §Trade):
+ * a base, plus every warehouse/harbour/fair's `tradeCapacity` (Salzspeicher +2,
+ * Harbor/Lighthouse/Canal/Charter Fair/Hanse Hall +1), plus the Merchant-Marine and
+ * Kontor-Network doctrines' bulk-shipping bonus, plus League membership — capped at
+ * `MAX_TRADE_CAPACITY`. So developing a trade empire lets you carry more trade, and
+ * the Maritime path means *more* trade, not merely richer trade. Pure.
+ */
+export function tradeCapacity(state: GameState, ownerId: number): number {
+  const nation = nationById(state, ownerId);
+  if (!nation || ownerId === BARBARIAN_ID) return 0;
+  let cap = BASE_TRADE_CAPACITY;
+  for (const r of state.regions) {
+    if (r.ownerId !== ownerId) continue;
+    for (const b of r.buildings) cap += BUILDINGS[b]?.tradeCapacity ?? 0;
+  }
+  cap += techTradeCapacity(nation.research?.done ?? []);
+  if (inLeague(state, ownerId)) cap += LEAGUE_TRADE_CAPACITY;
+  return Math.min(MAX_TRADE_CAPACITY, cap);
+}
+
 // --- route creation ---------------------------------------------------------
 
 /**
@@ -207,7 +237,7 @@ export function kontorOpen(state: GameState, kontor: KontorId): boolean {
  *  - the Kontor demands the good, and is open (not shuttered by an epoch);
  *  - a lane exists to the Kontor host;
  *  - `ownerId` is not at war with the Kontor's host owner (no trading into a foe);
- *  - the nation is under its MAX_ROUTES_PER_NATION cap.
+ *  - the nation is under its `tradeCapacity` (the routes its warehouses/fleets carry).
  * On success appends the route and bumps nextRouteId (armies/nextArmyId pattern). Pure.
  */
 export function createRoute(
@@ -237,7 +267,7 @@ export function createRoute(
   if (kontorBlockedFor(state, ownerId, toKontorId)) return state;
 
   const existing = state.routes ?? [];
-  if (existing.filter((r) => r.ownerId === ownerId).length >= MAX_ROUTES_PER_NATION) return state;
+  if (existing.filter((r) => r.ownerId === ownerId).length >= tradeCapacity(state, ownerId)) return state;
 
   const id = state.nextRouteId ?? 0;
   const route: TradeRoute = { id, ownerId, good, fromRegionId, toKontorId, lane };

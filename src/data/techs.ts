@@ -124,6 +124,14 @@ export interface TechDef {
   wareMult?: number;
   /** Additive bonus to trade-route income, e.g. 0.12 = +12% (systems/trade.ts). */
   tradeMult?: number;
+  /**
+   * Extra trade routes the realm may run (systems/trade.ts `tradeCapacity`). The
+   * Merchant Marine doctrine is bulk shipping made literal — more hulls carry more
+   * trade, not merely richer trade — and the League's Kontor Network opens the reach
+   * to run more routes at once. This is the doctrine lever on *how much* you trade,
+   * beside `tradeMult`'s lever on *how richly*.
+   */
+  tradeCapacity?: number;
   /** Flat change to every owned region's unrest target (positive = calmer). */
   unrestReduction?: number;
   unlockBuilding?: BuildingId;
@@ -307,18 +315,18 @@ export const TECHS: Record<TechId, TechDef> = {
   // === Maritime ============================================================
   cog_fleets: {
     id: "cog_fleets", name: "Cog Fleets", category: "maritime", path: "merchant_marine", tier: 0, era: 0, cost: 28,
-    tradeMult: 0.08, yieldMult: { gold: 0.04 }, unlockBuilding: "lighthouse",
-    blurb: "+8% trade, +4% gold; unlocks the Lighthouse — fleets of sturdy cogs.",
+    tradeMult: 0.08, tradeCapacity: 1, yieldMult: { gold: 0.04 }, unlockBuilding: "lighthouse",
+    blurb: "+8% trade, +1 trade route, +4% gold; unlocks the Lighthouse — fleets of sturdy cogs.",
   },
   bulk_shipping: {
     id: "bulk_shipping", name: "Bulk Shipping", category: "maritime", path: "merchant_marine", tier: 1, era: 2, cost: 52,
-    tradeMult: 0.12, wareMult: 0.06, unlockBuilding: "canal",
-    blurb: "+12% trade, +6% ware output; unlocks the Canal — cheap carriage of bulk goods.",
+    tradeMult: 0.12, tradeCapacity: 1, wareMult: 0.06, unlockBuilding: "canal",
+    blurb: "+12% trade, +1 trade route, +6% ware output; unlocks the Canal — cheap carriage of bulk goods.",
   },
   carrack_trade: {
     id: "carrack_trade", name: "Carrack Trade", category: "maritime", path: "merchant_marine", tier: 2, era: 3, cost: 88,
-    tradeMult: 0.15, yieldMult: { gold: 0.08 },
-    blurb: "+15% trade, +8% gold — great carracks reach further, richer markets.",
+    tradeMult: 0.15, tradeCapacity: 2, yieldMult: { gold: 0.08 },
+    blurb: "+15% trade, +2 trade routes, +8% gold — great carracks reach further, richer markets.",
   },
   sea_escorts: {
     id: "sea_escorts", name: "Sea Escorts", category: "maritime", path: "naval_power", tier: 0, era: 0, cost: 30,
@@ -391,8 +399,8 @@ export const TECHS: Record<TechId, TechDef> = {
   },
   kontor_network: {
     id: "kontor_network", name: "Kontor Network", category: "governance", path: "league_federation", tier: 1, era: 2, cost: 55,
-    tradeMult: 0.12, yieldMult: { gold: 0.04 },
-    blurb: "+12% trade, +4% gold — Kontore at Bergen, Bruges, London and Novgorod.",
+    tradeMult: 0.12, tradeCapacity: 2, yieldMult: { gold: 0.04 },
+    blurb: "+12% trade, +2 trade routes, +4% gold — Kontore at Bergen, Bruges, London and Novgorod.",
   },
   hanseatic_diet: {
     id: "hanseatic_diet", name: "Hanseatic Diet", category: "governance", path: "league_federation", tier: 2, era: 3, cost: 90,

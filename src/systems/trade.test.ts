@@ -17,6 +17,8 @@ import {
   setSoundToll,
   setSoundEmbargo,
   activeEmbargoes,
+  tradeCapacity,
+  BASE_TRADE_CAPACITY,
 } from "@/systems/trade";
 import { declareWar } from "@/systems/diplomacy";
 import { SOUND } from "@/data/sound";
@@ -27,7 +29,6 @@ import {
   BARBARIAN_ID,
   UNREST_REVOLT,
   UNREST_PENALTY_START,
-  MAX_ROUTES_PER_NATION,
   TRADE_DIST_CAP,
   type GameState,
   type KontorState,
@@ -206,13 +207,17 @@ describe("createRoute", () => {
     expect(createRoute(atWarState, PLAYER_ID, 4, "grain", "bruges").routes).toEqual([]);
   });
 
-  it("enforces the per-nation route cap", () => {
+  it("enforces the trade-capacity cap, which warehouses raise", () => {
     let s = base();
-    for (let i = 0; i < MAX_ROUTES_PER_NATION; i++) s = createRoute(s, PLAYER_ID, 4, "grain", "bruges");
-    expect(s.routes).toHaveLength(MAX_ROUTES_PER_NATION);
-    // One more is refused.
+    const cap0 = tradeCapacity(s, PLAYER_ID);
+    expect(cap0).toBe(BASE_TRADE_CAPACITY); // no trade buildings yet → the base capacity
+    for (let i = 0; i < cap0 + 2; i++) s = createRoute(s, PLAYER_ID, 4, "grain", "bruges");
+    expect(s.routes).toHaveLength(cap0); // capped at capacity, extras refused
+    // A Salzspeicher (a warehouse, +2 capacity) lets the realm carry more trade.
+    s = { ...s, regions: s.regions.map((r) => (r.id === 4 ? { ...r, buildings: [...r.buildings, "salzspeicher"] } : r)) };
+    expect(tradeCapacity(s, PLAYER_ID)).toBe(cap0 + 2);
     s = createRoute(s, PLAYER_ID, 4, "grain", "bruges");
-    expect(s.routes).toHaveLength(MAX_ROUTES_PER_NATION);
+    expect(s.routes).toHaveLength(cap0 + 1); // one more route now fits
   });
 
   it("is a no-op that does not mutate its input on an invalid request", () => {

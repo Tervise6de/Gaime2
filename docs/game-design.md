@@ -347,6 +347,36 @@ Each R-milestone leaves the game runnable, tested and playable end-to-end.
   — a real trade-victory path, not a dominant one — with no bankruptcies and rivals as
   diverse as before. Serialisable (`Nation.renown`, no back-fill needed); the HUD's "This
   world" card shows it once earned.
+- **R7 — The merchant's chain: production chains & trade capacity (landed).** Trade was
+  the game's headline pillar but its ware layer was shallow: buildings *conjured* finished
+  wares from nothing (a Weaving Works simply emitted cloth), and the route cap was a flat
+  constant — so "trade" was watch-a-few-routes-tick. Grounded in `hansa times.md` §5/§13,
+  two changes turn it into a develop-and-export game:
+  - **Production chains** (`systems/manufacture.ts`): a `convert` building now *consumes* a
+    raw ware from the realm's pooled stockpile and refines it 1:1 into a dearer finished
+    one — **Weaving Works** wool→cloth, **Export Brewery** grain→beer, the new **Ropewalk**
+    timber→naval stores (pitch, tar, cordage). The profit is the finished ware's higher
+    Kontor `value`, so the decision is real: export raw wool cheap, or hold the wool land
+    *and* build the refinery to export dear cloth (vertical integration). Runs in the turn
+    pipeline *after* construction takes its raw wares (refining never starves a build) and
+    before food/contentment (the finished ware feeds them). Cloth still also comes raw from
+    the Flemish cloth-coasts, so weaving *amplifies* rather than being the only source. A
+    converter with no feedstock simply idles — pure, deterministic, order-free.
+  - **Trade capacity** (`systems/trade.ts` `tradeCapacity`): the flat 6-route cap becomes
+    **built infrastructure** — a base of 4 plus every warehouse/harbour/fair's
+    `tradeCapacity` (**Salzspeicher** +2 — the warehouse finally earns a distinct role —
+    Harbor/Lighthouse/Canal/Charter Fair/Hanse Hall +1), plus the **Merchant Marine**
+    doctrine (bulk shipping made literal: +1/+1/+2 across its nodes) and **Kontor Network**
+    (+2) and League membership (+1), capped at 14. Developing a trade empire lets you carry
+    more trade, and the Maritime path now means *more* trade, not merely *richer* trade.
+  - *Research adjusted (with reasons in `data/techs.ts`):* added a `tradeCapacity` lever to
+    the Merchant Marine and Kontor Network nodes — the doctrines about *how much* you trade,
+    beside `tradeMult`'s *how richly*. The AI plays all of it (`systems/ai.ts`): it builds
+    converters only where it sources the feedstock, and raises warehouses when pressed
+    against its route cap. Balance sims (140-turn runs): trade income healthy (~100g/nation/
+    turn), rivals run ~10 routes each (capacity working), converters and Salzspeichers built
+    widely — **no famines, no bankruptcies** (grain→beer never starves the larder, since food
+    is production-derived), rivals as diverse as before. New tests: `manufacture.test.ts`.
 
 Guardrails unchanged: deterministic seeded RNG only, pure `GameState → GameState`
 turn pipeline, `systems/` never touch the DOM, `data/` stays serialisable, tests

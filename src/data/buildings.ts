@@ -59,6 +59,7 @@ export type BuildingId =
   | "salzspeicher"
   | "brewery"
   | "weaving_works"
+  | "ropewalk"
   | "canal"
   | "roland"
   | "hanse_hall";
@@ -74,6 +75,20 @@ export interface BuildingDef {
   yield: Partial<ResourceYield>;
   /** Additive per-turn ware output once built — the wares an industry building produces. */
   wareYield?: Partial<Record<GoodId, number>>;
+  /**
+   * A production chain (docs/hansa times.md §5): each turn this building consumes up
+   * to `per` units of the raw ware `from` from the realm's stockpile and refines them
+   * 1:1 into the dearer finished ware `to` (systems/manufacture.ts). The value uplift
+   * is the finished ware's higher `value` — wool→cloth, grain→beer, timber→naval
+   * stores. A converter with no input to draw on simply idles (no output).
+   */
+  convert?: { from: GoodId; to: GoodId; per: number };
+  /**
+   * Trade capacity this building adds to its realm — how many merchant routes the
+   * realm can run at once (systems/trade.ts `tradeCapacity`). Warehouses (Speicher),
+   * harbours and fairs are the merchant infrastructure that carries more trade.
+   */
+  tradeCapacity?: number;
   /** Added to the region's population capacity. */
   popCapacity: number;
   /** Subtracted from the region's unrest target (an order-keeping effect). */
@@ -138,8 +153,9 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     yield: { gold: 3, food: 2 },
     popCapacity: 2,
     unrest: 0,
+    tradeCapacity: 1,
     requiresTerrain: "coast",
-    blurb: "+3 gold, +2 food, +2 population capacity. Coast regions only.",
+    blurb: "+3 gold, +2 food, +2 population, +1 trade route. Coast regions only.",
   },
   mine: {
     id: "mine",
@@ -217,8 +233,9 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     yield: { gold: 2 },
     popCapacity: 0,
     unrest: 5,
+    tradeCapacity: 1,
     requiresTech: "lubeck_law",
-    blurb: "+2 gold, -5 unrest — the merchant guild's seat. Build it to found the Hanseatic League. (Lübeck Law)",
+    blurb: "+2 gold, -5 unrest, +1 trade route — the merchant guild's seat. Build it to found the Hanseatic League. (Lübeck Law)",
   },
   forum: {
     id: "forum",
@@ -268,9 +285,10 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     yield: { gold: 3, food: 1 },
     popCapacity: 2,
     unrest: 0,
+    tradeCapacity: 1,
     requiresTech: "cog_fleets",
     requiresTerrain: "coast",
-    blurb: "+3 gold, +1 food, +2 population. Coast only. (Cog Fleets)",
+    blurb: "+3 gold, +1 food, +2 population, +1 trade route. Coast only. (Cog Fleets)",
   },
   monastery: {
     id: "monastery",
@@ -375,8 +393,9 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     yield: { gold: 7 },
     popCapacity: 0,
     unrest: 0,
+    tradeCapacity: 1,
     requiresFocus: "market",
-    blurb: "+7 gold — a chartered fair that draws merchants for leagues. Market focus.",
+    blurb: "+7 gold, +1 trade route — a chartered fair that draws merchants for leagues. Market focus.",
   },
   foundry: {
     id: "foundry",
@@ -421,30 +440,41 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     id: "salzspeicher",
     name: "Salzspeicher",
     cost: 20,
-    yield: { gold: 3 },
+    yield: { gold: 2 },
     popCapacity: 2,
     unrest: 0,
-    blurb: "+3 gold, +2 population — a salt warehouse; the ‘white gold’ underwrites the town's trade.",
+    tradeCapacity: 2,
+    blurb: "+2 gold, +2 population, +2 trade routes — a great salt warehouse; storage is the sinew of trade.",
   },
   brewery: {
     id: "brewery",
     name: "Export Brewery",
     cost: 22,
     yield: { gold: 2 },
-    wareYield: { beer: 3 },
+    convert: { from: "grain", to: "beer", per: 3 },
     popCapacity: 1,
     unrest: 0,
-    blurb: "+3 beer, +2 gold — Wendish hopped beer, prized across the north, brewed for export.",
+    blurb: "+2 gold; brews 3 grain → 3 beer — Wendish hopped beer, prized across the north, brewed for export.",
   },
   weaving_works: {
     id: "weaving_works",
     name: "Weaving Works",
     cost: 24,
     yield: { gold: 1 },
-    wareYield: { cloth: 3 },
+    convert: { from: "wool", to: "cloth", per: 3 },
     popCapacity: 1,
     unrest: 0,
-    blurb: "+3 cloth, +1 gold — a weaving hall spins upland wool into the great western cloth.",
+    blurb: "+1 gold; weaves 3 wool → 3 cloth — upland fleece spun into the dear western cloth.",
+  },
+  ropewalk: {
+    id: "ropewalk",
+    name: "Ropewalk",
+    cost: 18,
+    yield: { gold: 1 },
+    convert: { from: "timber", to: "naval_stores", per: 2 },
+    popCapacity: 1,
+    unrest: 0,
+    blurb: "+1 gold; works 2 timber → 2 naval stores — pitch, tar and cordage, the sinews of shipbuilding.",
   },
   canal: {
     id: "canal",
@@ -454,8 +484,9 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     yield: { gold: 3, food: 1 },
     popCapacity: 2,
     unrest: 0,
+    tradeCapacity: 1,
     requiresTech: "bulk_shipping",
-    blurb: "+3 gold, +1 food, +2 population — a Stecknitz-style canal carries salt and goods inland. (Bulk Shipping)",
+    blurb: "+3 gold, +1 food, +2 population, +1 trade route — a Stecknitz-style canal carries bulk goods inland. (Bulk Shipping)",
   },
   roland: {
     id: "roland",

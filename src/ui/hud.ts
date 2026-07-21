@@ -77,7 +77,7 @@ import { EPOCH_EVENTS } from "@/data/epochEvents";
 import { choiceEventImage } from "@/data/eventArt";
 import { KONTORE, type KontorId } from "@/data/kontore";
 import { SOUND } from "@/data/sound";
-import { routeOptions, regionGoodOutput, routeIncome, soundHolderId, activeEmbargoes, soundPreview, marketOutlook } from "@/systems/trade";
+import { routeOptions, regionGoodOutput, routeIncome, soundHolderId, activeEmbargoes, soundPreview, marketOutlook, tradeCapacity } from "@/systems/trade";
 import { canFoundLeague, canJoinLeague, leagueLeader, leagueDividendPool, isBoycotted } from "@/systems/league";
 import { inLeague } from "@/systems/state";
 import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
@@ -98,7 +98,6 @@ import {
 import { rulerTitle } from "@/data/rulers";
 import {
   BARBARIAN_ID,
-  MAX_ROUTES_PER_NATION,
   PLAYER_ID,
   RESOURCE_KEYS,
   TAX_MAX,
@@ -985,7 +984,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     const title = el("div", "hud-ledger-title");
     title.textContent = "Goods Ledger";
     const meta = el("div", "hud-ledger-meta");
-    meta.textContent = `${fmt(totalOutput)} output · ${activeRoutes.length}/${MAX_ROUTES_PER_NATION} routes · +${fmt(totalIncome)}g`;
+    meta.textContent = `${fmt(totalOutput)} output · ${activeRoutes.length}/${tradeCapacity(state, PLAYER_ID)} routes · +${fmt(totalIncome)}g`;
     const titleWrap = el("div", "hud-ledger-titlewrap");
     titleWrap.append(title, meta);
     head.append(titleWrap, closeButton(closeLedger));
@@ -2870,9 +2869,10 @@ function tradeSection(state: GameState, region: Region, callbacks: HudCallbacks)
   // Routes you could open (your land only).
   if (region.ownerId === PLAYER_ID) {
     const total = (state.routes ?? []).filter((r) => r.ownerId === PLAYER_ID).length;
-    if (total >= MAX_ROUTES_PER_NATION) {
+    const cap = tradeCapacity(state, PLAYER_ID);
+    if (total >= cap) {
       const full = el("p", "hud-hint muted");
-      full.textContent = `Your trade book is full (${total}/${MAX_ROUTES_PER_NATION}) — close a route to open another.`;
+      full.textContent = `Your trade book is full (${total}/${cap}) — build warehouses/harbours (or take Merchant Marine) to carry more, or close a route.`;
       wrap.append(full);
     } else {
       const opts = routeOptions(state, region.id, PLAYER_ID);
