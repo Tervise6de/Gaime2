@@ -147,6 +147,52 @@ export const TRADE_DIST_CAP = 2.5;
 export const MAX_ROUTES_PER_NATION = 6;
 
 /**
+ * Domestic ware demand & the treasury's job (R5, docs/game-design.md R5). Until R5
+ * the luxuries were export-only and gold had almost nothing to buy. Three levers
+ * close both gaps:
+ *  - **Luxury contentment**: a realm's towns crave the pure luxuries (furs, wax,
+ *    amber, cloth, wool) in proportion to the population they govern; supplying
+ *    them from the stockpile eases unrest realm-wide. A carrot, never a
+ *    punishment (the anti-snowball brake stays unrest, by design).
+ *  - **The town market**: gold buys or sells wares at a spread deliberately worse
+ *    than a Kontor route, so the great Hansa trade stays the profit engine and the
+ *    market is the liquidity/emergency valve (import grain, buy brick, muster arms).
+ *  - **The food reserve**: a food shortfall taps the food-ware stockpile before it
+ *    bites as famine (see systems/turn.ts) — so a stocked or market-supplied larder
+ *    rides out a bad turn.
+ */
+/**
+ * Luxury units a realm's towns crave per head of population, per turn. Pitched so
+ * a small realm is easily kept content, but a large/populous one must invest in
+ * luxury industry (a Weaving Works) or import on the market to stay fully content —
+ * a demand that scales with the empire, not a flat always-on bonus.
+ */
+export const LUXURY_DEMAND_PER_POP = 0.12;
+/** Realm-wide unrest eased when luxury demand is fully met (scaled by how much is). */
+export const LUXURY_CONTENT_UNREST = 10;
+/** Gold a unit of a ware fetches when sold on the local market (× the good's value). */
+export const MARKET_SELL_MULT = 0.5;
+/** Gold a unit of a ware costs to buy on the local market (× the good's value). */
+export const MARKET_BUY_MULT = 2;
+
+/**
+ * Renown — the treasury's endgame job (R6). A dominant realm's tax income outruns
+ * every other sink, so gold would otherwise pile up inert (the "nothing to do with
+ * the treasury" problem). Instead, coin held beyond a working reserve is reinvested
+ * each turn into **lasting renown** — civic works, patronage, endowments — which
+ * counts toward the prestige score (systems/victory.ts). Bounded per turn, so a
+ * fortune deploys over the ages rather than at once, and the reserve stays liquid
+ * for the market, musters and gifts. The Hansa's "win by commerce" made concrete:
+ * a merchant republic's wealth becomes its renown.
+ */
+/** Gold kept liquid (for the market, musters, gifts) before surplus turns to renown. */
+export const TREASURY_RESERVE = 2500;
+/** Most gold a realm converts to renown in one turn (a fortune deploys over time). */
+export const RENOWN_INVEST_MAX = 800;
+/** Gold that buys one point of lasting renown through civic works and patronage. */
+export const RENOWN_GOLD_COST = 60;
+
+/**
  * Tech / victory / events tuning (M5, docs/game-design.md §3.6, §6).
  */
 /** Fraction of all regions a nation must hold for a domination victory. */
@@ -469,6 +515,11 @@ export interface Nation {
   /** Last turn's flags, for the HUD. */
   famine: boolean;
   bankrupt: boolean;
+  /**
+   * Lasting renown accrued by reinvesting surplus treasury into civic works (R6).
+   * Counts toward the prestige score; never decays. Absent/0 on legacy saves.
+   */
+  renown?: number;
   /** Temporary effects with a per-turn countdown (undefined = none / legacy saves). */
   modifiers?: NationModifier[];
 }

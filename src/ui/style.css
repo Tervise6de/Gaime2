@@ -1191,6 +1191,74 @@ body {
   white-space: nowrap;
 }
 
+/* Burgher-contentment readout + town market (R5) in the Goods Ledger. */
+.hud-ledger-content {
+  margin: 2px 0 6px;
+  padding: 7px 9px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--muted);
+  background: rgba(214, 158, 62, 0.08);
+  border: 1px solid rgba(214, 158, 62, 0.22);
+  border-radius: 5px;
+}
+
+.hud-ledger-content-title {
+  color: var(--fg);
+  font-weight: 700;
+}
+
+.hud-ledger-content-val {
+  color: #e0b74a;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-ledger-marketnote {
+  margin: 0 0 6px;
+  font-size: 10px;
+  color: var(--muted);
+  opacity: 0.85;
+}
+
+.hud-good-market {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.hud-market-btn {
+  flex: 1;
+  padding: 4px 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(214, 158, 62, 0.28);
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-market-btn:hover:not(:disabled) {
+  background: rgba(214, 158, 62, 0.18);
+}
+
+.hud-market-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.hud-market-btn.buy {
+  color: #e0b74a;
+}
+
+.hud-market-btn.sell {
+  color: #82c99a;
+}
+
 @media (max-width: 820px) {
   .hud-minimap {
     height: 104px;

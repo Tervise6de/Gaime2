@@ -265,3 +265,17 @@ export const GOOD_IDS = Object.keys(GOODS) as GoodId[];
 export function waresWithRole(role: WareRole): GoodId[] {
   return GOOD_IDS.filter((id) => GOODS[id].roles.includes(role));
 }
+
+/**
+ * The pure consumer luxuries a town's burghers crave — a `luxury` ware that is NOT
+ * also a food or arms ware, i.e. furs, wax, amber, cloth, wool. These were
+ * export-only (a route's cargo and nothing else) until R5 gave them a domestic
+ * use: luxury contentment (systems/prosperity.ts). Beer/copper/honey are excluded
+ * because they already have a home use (food / arms). In GOOD_IDS order. Pure.
+ */
+export function contentmentWares(): GoodId[] {
+  return GOOD_IDS.filter((id) => {
+    const roles = GOODS[id].roles;
+    return roles.includes("luxury") && !roles.includes("food") && !roles.includes("arms");
+  });
+}

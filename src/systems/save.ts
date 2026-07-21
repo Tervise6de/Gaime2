@@ -104,6 +104,9 @@ export function deserializeGame(json: string): GameState | null {
     for (const n of s.nations) {
       if (n) n.wares = { ...emptyWares(), ...(n.wares ?? {}) };
     }
+    // Renown (R6) needs no back-fill: nationScore and the HUD read it as `?? 0`, and
+    // the turn pipeline stamps it on each living realm — so a pre-R6 save simply
+    // starts renown at zero on its next turn (and stays round-trip-identical here).
     return s;
   } catch {
     return null;

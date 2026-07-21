@@ -31,7 +31,8 @@ import type { StrategicResource } from "@/data/terrain";
 import { GOOD_IDS, type GoodId } from "@/data/goods";
 import { nationalProduction, round1 } from "@/systems/economy";
 import { advanceConstruction } from "@/systems/construction";
-import { stepTrade, seedKontore, nationalWareOutput, nationFoodOutput } from "@/systems/trade";
+import { stepTrade, seedKontore, nationalWareOutput, nationFoodOutput, hasSaltAccess } from "@/systems/trade";
+import { resolveContentment, contentmentUnrest, luxuryAppetite, drawFoodReserve } from "@/systems/prosperity";
 import { stepLeague } from "@/systems/league";
 import { scheduleEpochs, stepEpochs } from "@/systems/epochs";
 import { nextPopulation } from "@/systems/population";
@@ -62,6 +63,9 @@ import {
   GAME_LENGTH_TURNS,
   GRANARY_CAP,
   PLAYER_ID,
+  RENOWN_GOLD_COST,
+  RENOWN_INVEST_MAX,
+  TREASURY_RESERVE,
   UNREST_MAX,
   clampTax,
   emptyResearch,
@@ -650,12 +654,32 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
   // (grain, salted fish, beer, honey — R3), on top of any building/subsistence food
   // in flow.food, minus the population's consumption already netted into flow.food.
   const foodFromWares = round1(nationFoodOutput(state, nationId) * econMult);
-  const rawFood = round1(nation.stocks.food + flow.food + foodFromWares);
+  let rawFood = round1(nation.stocks.food + flow.food + foodFromWares);
+  // R5: a shortfall taps the food-ware granary reserve (grain, salted fish, beer,
+  // honey held in the stockpile) before it bites as famine — so a stocked or
+  // market-supplied larder rides out a lean turn. Only ever reduces famine.
+  let reserveFood = 0;
+  if (rawFood < 0) {
+    const drawn = drawFoodReserve(wares, -rawFood, hasSaltAccess(state, nationId));
+    wares = drawn.wares;
+    reserveFood = drawn.food;
+    rawFood = round1(rawFood + reserveFood);
+  }
   const famine = rawFood < 0;
   stocks.food = round1(Math.max(0, Math.min(GRANARY_CAP, rawFood)));
 
+  // Luxury contentment (R5): the burgher class's appetite for the pure luxuries
+  // (furs, cloth, wax, amber, wool) is met from the stockpile; a well-supplied
+  // realm is calmer across every province. A carrot, never a punishment (unmet
+  // demand simply forgoes the easing) — so it never adds to famine's bite.
+  const ownedPop = regions.filter((r) => r.ownerId === nationId).reduce((sum, r) => sum + r.population, 0);
+  const content = resolveContentment(wares, luxuryAppetite(ownedPop));
+  wares = spendWares(wares, content.spent);
+  const contentCalm = contentmentUnrest(content.ratio);
+
   // Population & unrest for this nation's regions (tech eases unrest; a stationed
-  // garrison polices its region and calms it — design §3.3).
+  // garrison polices its region and calms it — design §3.3; luxury contentment
+  // eases every province at once — R5).
   const ownedCount = regions.filter((r) => r.ownerId === nationId).length;
   const techCalm = techUnrestReduction(research.done);
   const garrisonIn = (regionId: number): number =>
@@ -667,7 +691,7 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
       ? {
           ...r,
           population: nextPopulation(r, famine),
-          unrest: nextUnrest(r, nation.taxRate, famine, ownedCount, techCalm, garrisonIn(r.id)),
+          unrest: nextUnrest(r, nation.taxRate, famine, ownedCount, techCalm, garrisonIn(r.id), contentCalm),
         }
       : r,
   );
@@ -685,9 +709,24 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
     stocks.gold = 0;
   }
 
+  // R6: surplus treasury → lasting renown. Coin held beyond the working reserve is
+  // reinvested into civic works and patronage — turning an idle hoard into prestige
+  // (nationScore) instead of piling up unused. Bounded per turn, so a fortune deploys
+  // over the ages; the reserve stays liquid for the market, musters and gifts. Skipped
+  // when bankrupt (no surplus to invest).
+  let renown = nation.renown ?? 0;
+  let renownGain = 0;
+  const surplus = round1(stocks.gold - TREASURY_RESERVE);
+  if (!bankrupt && surplus > 0) {
+    const invest = Math.min(surplus, RENOWN_INVEST_MAX);
+    renownGain = round1(invest / RENOWN_GOLD_COST);
+    stocks.gold = round1(stocks.gold - invest);
+    renown = round1(renown + renownGain);
+  }
+
   const nations = state.nations.map((n) =>
     n.id === nationId
-      ? { ...n, stocks, wares, research, famine, bankrupt, modifiers: tickModifiers(n.modifiers) }
+      ? { ...n, stocks, wares, research, famine, bankrupt, renown, modifiers: tickModifiers(n.modifiers) }
       : n,
   );
 
@@ -696,6 +735,9 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
     const notes: string[] = [];
     for (const c of built.completed) notes.push(`${BUILDINGS[c.building].name} built in ${c.regionName}`);
     if (step.completed) notes.push(`researched ${TECHS[step.completed].name}`);
+    if (reserveFood > 0) notes.push(`larder reserve fed +${reserveFood} food`);
+    if (content.consumed > 0) notes.push(`burghers ${Math.round(content.ratio * 100)}% content (−${contentCalm} unrest)`);
+    if (renownGain > 0) notes.push(`+${renownGain} renown from civic works`);
     if (famine) notes.push("Famine — population starving");
     if (bankrupt) notes.push("Bankruptcy — troops disbanded, unrest spikes");
     const entry =
