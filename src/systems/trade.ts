@@ -17,6 +17,7 @@
  */
 
 import { GOODS, GOOD_IDS, type GoodId } from "@/data/goods";
+import { NAVAL_UNIT_TYPES } from "@/data/units";
 import { BUILDINGS } from "@/data/buildings";
 import { KONTORE, KONTOR_IDS, type KontorId } from "@/data/kontore";
 import { SOUND } from "@/data/sound";
@@ -429,9 +430,11 @@ export function routeIncome(state: GameState, route: TradeRoute): number {
 
 /**
  * Whether a route is severed this turn: `ownerId` is at war with the Kontor host's
- * owner, or any node on the lane is held by a realm at war with `ownerId` (an enemy
- * astride the road chokes it). Barbarian holders are not treaty parties, so they do
- * not disrupt trade in this slice. Pure.
+ * owner; any node on the lane is held by a realm at war with `ownerId` (an enemy
+ * astride the road chokes it); or an at-war enemy **fleet is blockading** a node of
+ * the lane (sea power projected onto the road without holding the land — the Hansa's
+ * blockades of Bruges and the Novgorod Peterhof). Barbarian holders/fleets are not
+ * treaty parties, so they do not disrupt trade in this slice. Pure.
  */
 export function routeDisrupted(state: GameState, route: TradeRoute): boolean {
   const hostOwner = state.regions[KONTORE[route.toKontorId].regionId]?.ownerId ?? null;
@@ -441,6 +444,24 @@ export function routeDisrupted(state: GameState, route: TradeRoute): boolean {
   for (const nodeId of route.lane) {
     const owner = state.regions[nodeId]?.ownerId ?? null;
     if (owner !== null && owner !== route.ownerId && atWar(state, route.ownerId, owner)) return true;
+    if (blockadedBy(state, nodeId, route.ownerId)) return true;
+  }
+  return false;
+}
+
+/**
+ * Whether an at-war enemy fleet stands on `regionId`, blockading it against
+ * `ownerId`'s trade. A blockade needs only a warship on the node — the enemy chokes
+ * the route without owning the land under it. Barbarian fleets don't blockade (not
+ * treaty parties). Pure.
+ */
+export function blockadedBy(state: GameState, regionId: number, ownerId: number): boolean {
+  for (const a of state.armies) {
+    if (a.regionId !== regionId) continue;
+    const foe = a.ownerId;
+    if (foe === ownerId || foe === null || foe === BARBARIAN_ID) continue;
+    if (!atWar(state, ownerId, foe)) continue;
+    if (NAVAL_UNIT_TYPES.some((t) => a.units[t] > 0)) return true;
   }
   return false;
 }

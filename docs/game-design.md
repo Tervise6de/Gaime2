@@ -232,11 +232,37 @@ wide-tracked serif labels baked under the land (so a name tucks beneath the coas
 The sea reads as structured *regions* rather than empty blue (`renderer.ts`
 `drawSeaLabels`; positions in `HANSA_SEA_AREAS`).
 
-*Deferred to a functional sea-layer milestone:* making the sea areas **navigable
-zones** where land armies cannot cross open water (only fleets and amphibious
-stacks can), which needs rival **AI fleets** in the same pass (else islands like
-Gotland would strand, uncontested) plus **naval transport and blockade**. That is
-a larger, interconnected change than V1 and is best done as its own milestone.
+### The functional sea layer (v0.102)
+
+The sea areas are now a **real barrier**, not just a drawing. An adjacency is a
+**sea crossing** when the two provinces don't share a land border and the water
+between their sites is open (`systems/seaways.ts`, memoised per map from the
+province polygons; maps without polygons — procedural boards, fixtures — have no
+sea crossings, so land movement there is unchanged). From that one predicate:
+
+- **Land armies cannot cross open water.** `moveArmy`, `reachableRegions` and the
+  march pathfinder (`nextHopToward` now takes a passability predicate) all bar a
+  land stack from a sea crossing — it needs a fleet to carry it.
+- **Fleets sail the crossings** (coast-to-coast) and put troops ashore at a
+  coastal target. A **mixed stack (troops + ships) is amphibious for free**: the
+  whole stack crosses and the embarked soldiers fight in the assault, so taking an
+  island is "load a war-cog with men-at-arms, sail, storm the port."
+- **Rival AI fleets** ship in the same pass, so overseas targets are contested
+  rather than stranded (`ai.ts` `recruitNavy`/`sailFleet`): a coastal realm that
+  faces an attackable target across water lays down the best ship it can at a
+  target-facing port and sails it to assault — and `bestTarget` is now
+  passability-aware, so land armies never plan a march they can't walk and fleets
+  only assault coasts. **Gotland (Visby) — the map's one true island — is now
+  fought over by sea** rather than reached on foot.
+- **Naval blockade:** an at-war enemy fleet standing on a lane node **severs the
+  trade route** running through it (`trade.ts` `blockadedBy` → `routeDisrupted`) —
+  sea power projected onto the road without holding the land, the Hansa's blockades
+  of Bruges and the Novgorod Peterhof.
+
+*Future polish (not blocking):* the AI does not yet actively hunt blockade
+stations (its fleets blockade only incidentally, en route to a target), and naval
+force is built reactively (during a naval war) rather than as a standing peacetime
+fleet — both are balance-tuning, not new mechanics.
 
 ## Build plan — resource overhaul (R-series)
 

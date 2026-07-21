@@ -31,6 +31,7 @@ import { createRng } from "@/systems/rng";
 import { resolveCombat, type UnitCounts } from "@/systems/combat";
 import { soldiersDisplay } from "@/systems/format";
 import { atWar, declareWar, getTreaty } from "@/systems/diplomacy";
+import { isSeaCrossing } from "@/systems/seaways";
 import {
   BARBARIAN_ID,
   CONQUEST_UNREST,
@@ -96,6 +97,26 @@ export function strategicAccess(
     regions (it sails the shore rather than marching inland). Pure. */
 export function armyIsFleet(units: UnitCounts): boolean {
   return NAVAL_UNIT_TYPES.some((t) => units[t] > 0);
+}
+
+/**
+ * Whether `army` may move from region `from` into adjacent region `to`:
+ *  - a FLEET sails only to coastal regions (it crosses open water and hugs the
+ *    shore, but never puts in inland);
+ *  - a LAND army may not cross a **sea crossing** (open water) — it needs a
+ *    fleet to carry it. On maps without polygon data there are no sea crossings,
+ *    so land movement is unrestricted (procedural boards, test fixtures). Pure.
+ */
+export function armyCanEnter(state: GameState, army: Army, from: number, to: number): boolean {
+  return unitsCanEnter(state, army.units, from, to);
+}
+
+/** As `armyCanEnter`, but over a raw unit stack — for callers (the AI) that hold
+    a loosely-typed army. A fleet sails only coast→coast; a land stack may not
+    cross a sea crossing. Pure. */
+export function unitsCanEnter(state: GameState, units: UnitCounts, from: number, to: number): boolean {
+  if (armyIsFleet(units)) return state.regions[to]?.terrain === "coast";
+  return !isSeaCrossing(state, from, to);
 }
 
 /** An army moves at the pace of its slowest unit. */
@@ -192,15 +213,13 @@ export function raiseUnit(
 }
 
 /** Which adjacent regions an army could move into this turn (has moves left).
-    A fleet is confined to coastal regions — it sails the shore, never inland. */
+    A fleet is confined to coastal regions (it sails the shore, incl. across open
+    water); a land army may not step across a sea crossing — it needs a fleet. */
 export function reachableRegions(state: GameState, army: Army): number[] {
   if (army.movesLeft <= 0) return [];
   const region = state.regions[army.regionId];
   if (!region) return [];
-  if (armyIsFleet(army.units)) {
-    return region.adjacency.filter((id) => state.regions[id]?.terrain === "coast");
-  }
-  return region.adjacency.slice();
+  return region.adjacency.filter((id) => armyCanEnter(state, army, army.regionId, id));
 }
 
 /**
@@ -376,8 +395,10 @@ export function moveArmy(
   const from = state.regions[army.regionId];
   const target = state.regions[targetRegionId];
   if (!from || !target || !from.adjacency.includes(targetRegionId)) return state;
-  // A fleet may only sail to another coastal region; it cannot march inland.
-  if (armyIsFleet(army.units) && target.terrain !== "coast") return state;
+  // Movement legality (docs/game-design.md §Military): a fleet may only sail to
+  // another coastal region (it hugs the shore, never puts in inland); a land army
+  // may not cross a sea crossing — open water needs a fleet to carry it across.
+  if (!armyCanEnter(state, army, army.regionId, targetRegionId)) return state;
 
   const owner = army.ownerId;
   const friendlyAtTarget = armyAt(state, targetRegionId, owner);
@@ -532,9 +553,17 @@ export function moveArmy(
 /**
  * The first region on the shortest path from `fromId` to `destId` over region
  * adjacency (breadth-first, lowest-id tie-break for a reproducible route), or
- * null if the destination is unreachable / already reached. Pure.
+ * null if the destination is unreachable / already reached. An optional `canStep`
+ * predicate prunes edges the moving army may not take — so a land army routes
+ * *around* open water and a fleet routes *along* the coast, rather than plotting a
+ * path it cannot walk. Pure.
  */
-export function nextHopToward(state: GameState, fromId: number, destId: number): number | null {
+export function nextHopToward(
+  state: GameState,
+  fromId: number,
+  destId: number,
+  canStep?: (from: number, to: number) => boolean,
+): number | null {
   if (fromId === destId) return null;
   const regions = state.regions;
   const prev = new Map<number, number>();
@@ -544,7 +573,7 @@ export function nextHopToward(state: GameState, fromId: number, destId: number):
     const n = queue.shift()!;
     if (n === destId) break;
     for (const m of [...(regions[n]?.adjacency ?? [])].sort((a, b) => a - b)) {
-      if (!seen.has(m)) {
+      if (!seen.has(m) && (!canStep || canStep(n, m))) {
         seen.add(m);
         prev.set(m, n);
         queue.push(m);
@@ -555,6 +584,12 @@ export function nextHopToward(state: GameState, fromId: number, destId: number):
   let cur = destId;
   while (prev.get(cur) !== undefined && prev.get(cur) !== fromId) cur = prev.get(cur)!;
   return prev.get(cur) === fromId ? cur : null;
+}
+
+/** The passability predicate for `army` — which adjacency steps it may take
+    (fleet: coast-to-coast; land army: never across a sea crossing). Pure. */
+export function armyPassability(state: GameState, army: Army): (from: number, to: number) => boolean {
+  return (from, to) => armyCanEnter(state, army, from, to);
 }
 
 /**
@@ -569,7 +604,7 @@ export function orderMarch(state: GameState, armyId: number, destId: number): Ga
   if (!army) return state;
   if (destId === army.regionId) return cancelMarch(state, armyId);
   if (!state.regions[destId]) return state;
-  if (nextHopToward(state, army.regionId, destId) === null) return state;
+  if (nextHopToward(state, army.regionId, destId, armyPassability(state, army)) === null) return state;
   return {
     ...state,
     armies: state.armies.map((a) => (a.id === armyId ? { ...a, dest: destId, fortifying: false } : a)),
@@ -586,12 +621,13 @@ export function cancelMarch(state: GameState, armyId: number): GameState {
 /** Turns an army with orders needs to reach its destination at its move rate. */
 export function marchEta(state: GameState, army: Army): number | null {
   if (army.dest == null) return null;
+  const pass = armyPassability(state, army);
   let hops = 0;
   let at = army.regionId;
   const guard = new Set<number>();
   while (at !== army.dest && !guard.has(at)) {
     guard.add(at);
-    const next = nextHopToward(state, at, army.dest);
+    const next = nextHopToward(state, at, army.dest, pass);
     if (next === null) return null;
     hops += 1;
     at = next;
@@ -625,8 +661,8 @@ export function advanceMarches(state: GameState): GameState {
       if (!army) { died = true; break; }
       if (army.regionId === dest) { clear = true; break; } // arrived
       if (army.movesLeft <= 0) break; // out of moves — resume next turn (keep the order)
-      const next = nextHopToward(s, army.regionId, dest);
-      if (next === null) { clear = true; break; } // path cut
+      const next = nextHopToward(s, army.regionId, dest, armyPassability(s, army));
+      if (next === null) { clear = true; break; } // path cut (or no passable route for this army)
       const before = army.regionId;
       s = moveArmy(s, id, next);
       const after = s.armies.find((a) => a.id === id);

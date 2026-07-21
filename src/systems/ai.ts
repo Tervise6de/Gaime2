@@ -15,7 +15,7 @@
  * Pure over `GameState`; all randomness comes from the passed-in Rng.
  */
 
-import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
+import { UNITS, UNIT_TYPES, NAVAL_UNIT_TYPES, type UnitType } from "@/data/units";
 import { BUILDINGS, buildingFocusOk, buildingResourceOk, focusCapstone, type BuildingId } from "@/data/buildings";
 import type { TraitId } from "@/data/traits";
 import { TERRAIN, type StrategicResource, type TerrainId } from "@/data/terrain";
@@ -23,12 +23,16 @@ import type { FocusId } from "@/data/focuses";
 import { sideStrength, type UnitCounts } from "@/systems/combat";
 import {
   appointCommander,
+  armyIsFleet,
   canRaiseUnit,
   fortifyArmy,
   moveArmy,
+  nextHopToward,
   raiseUnit,
   strategicAccess,
+  unitsCanEnter,
 } from "@/systems/military";
+import { isSeaCrossing } from "@/systems/seaways";
 import {
   addOffer,
   atWar,
@@ -771,6 +775,11 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
   // Recruit: keep an army if aggressive/at war and it's affordable.
   s = recruit(s, nationId, rng);
 
+  // Lay down warships when there is something worth sailing against — an island
+  // like Gotland, or an enemy port across a strait — so the sea layer is contested
+  // rather than leaving overseas targets stranded (docs/game-design.md §Military).
+  s = recruitNavy(s, nationId);
+
   // Phase 0 — appoint commanders to lead any sizeable unled stack (M4), so the
   // rival armies benefit from the same martial bonus the player's can.
   for (const a of s.armies) {
@@ -798,6 +807,13 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
     const live = s.armies.find((a) => a.id === army.id);
     if (!live || live.movesLeft <= 0) continue;
     if (bestTarget(s, live, nationId) !== null) continue;
+
+    // A fleet with no assault to make this turn closes on the nearest coastal
+    // target across the water; the land-reposition logic below is for armies.
+    if (armyIsFleet(live.units)) {
+      s = sailFleet(s, live, nationId);
+      continue;
+    }
 
     if (isBadlyOutmatched(s, live, nationId)) {
       const refuge = retreatStep(s, live, nationId);
@@ -864,12 +880,92 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
   // then deepens each turn it keeps the ground.
   for (const a of s.armies) {
     if (a.ownerId !== nationId || a.fortifying || a.movesLeft <= 0) continue;
+    if (armyIsFleet(a.units)) continue; // fleets patrol the shore; entrenchment is a land stance
     const r = s.regions[a.regionId];
     if (r && r.ownerId === nationId && regionIsThreatened(s, a.regionId, nationId)) {
       s = fortifyArmy(s, a.id);
     }
   }
   return s;
+}
+
+// --- navy -------------------------------------------------------------------
+
+/** A coastal enemy/barbarian region a fleet could actually assault (put troops
+    ashore) — attackable, and coastal so a fleet may enter it. Pure. */
+function navalAttackable(state: GameState, regionId: number, nationId: number): boolean {
+  return state.regions[regionId]?.terrain === "coast" && isAttackable(state, regionId, nationId);
+}
+
+/**
+ * Build warships when the realm has a reason to put to sea (M-Navy): a coastal
+ * port that faces an attackable target across open water — an island such as
+ * Gotland, or an enemy port over a strait. Desired naval weight scales with
+ * aggression and is capped so a navy never crowds out the land host; the strongest
+ * ship the realm can lay down (carrack › hulk › war-cog, tech-gated) is built at a
+ * target-facing port, massing where a squadron already gathers. Landlocked realms,
+ * and those with nothing to sail against, build nothing. Pure.
+ */
+function recruitNavy(state: GameState, nationId: number): GameState {
+  const nation = state.nations.find((n) => n.id === nationId);
+  if (!nation) return state;
+  const ports = state.regions.filter((r) => r.ownerId === nationId && r.terrain === "coast");
+  if (!ports.length) return state; // landlocked realms field no navy
+
+  const buildPorts = ports
+    .filter((port) =>
+      port.adjacency.some((nb) => isSeaCrossing(state, port.id, nb) && navalAttackable(state, nb, nationId)),
+    )
+    .map((r) => r.id)
+    .sort((a, b) => a - b);
+  if (!buildPorts.length) return state; // nothing across the water to sail against
+
+  const aggression = nation.personality?.aggression ?? 0.4;
+  const wanted = 2 + Math.round(aggression * 3);
+  const navalNow = state.armies
+    .filter((a) => a.ownerId === nationId && armyIsFleet(a.units))
+    .reduce((sum, a) => sum + armySize(a.units), 0);
+  if (navalNow >= wanted || nation.stocks.gold < 30) return state;
+
+  // Prefer a port already berthing a fleet (concentrate the squadron), else lowest id.
+  const portId =
+    buildPorts.find((id) =>
+      state.armies.some((a) => a.ownerId === nationId && a.regionId === id && armyIsFleet(a.units)),
+    ) ?? buildPorts[0]!;
+  const ship = NAVAL_UNIT_TYPES.slice()
+    .sort((a, b) => UNITS[b].attack + UNITS[b].defense - (UNITS[a].attack + UNITS[a].defense))
+    .find((t) => canRaiseUnit(state, portId, t, nationId).ok);
+  return ship ? raiseUnit(state, portId, ship, nationId) : state;
+}
+
+/** Sail an idle fleet one step toward the nearest coastal target it can assault,
+    hugging navigable water. No-op if none is reachable. Pure (advances RNG only if
+    a hop resolves combat). */
+function sailFleet(state: GameState, fleet: Army, nationId: number): GameState {
+  const dest = nearestNavalTarget(state, fleet, nationId);
+  if (dest === null) return state;
+  const step = nextHopToward(state, fleet.regionId, dest, (from, to) =>
+    unitsCanEnter(state, fleet.units, from, to),
+  );
+  return step !== null ? moveArmy(state, fleet.id, step) : state;
+}
+
+/** The nearest coastal region a fleet can assault, by breadth-first search over
+    navigable (coast-to-coast) steps from where it sits. Null if none. Pure. */
+function nearestNavalTarget(state: GameState, fleet: Army, nationId: number): number | null {
+  const visited = new Set<number>([fleet.regionId]);
+  const queue: number[] = [fleet.regionId];
+  while (queue.length) {
+    const n = queue.shift()!;
+    for (const nb of [...(state.regions[n]?.adjacency ?? [])].sort((a, b) => a - b)) {
+      if (visited.has(nb)) continue;
+      if (!unitsCanEnter(state, fleet.units, n, nb)) continue; // stay on navigable water/coast
+      visited.add(nb);
+      if (navalAttackable(state, nb, nationId)) return nb;
+      queue.push(nb);
+    }
+  }
+  return null;
 }
 
 /** Enemy (rival, at-war) armies standing in regions adjacent to `regionId`. */
@@ -1020,6 +1116,7 @@ function firstStepTowards(
       if (visited.has(nb)) continue;
       const nbR = state.regions[nb];
       if (!nbR || nbR.ownerId !== nationId) continue; // march only through own land
+      if (isSeaCrossing(state, node, nb)) continue; // a land march never crosses open water
       visited.add(nb);
       const step = first ?? nb;
       if (isGoal(nb)) return step;
@@ -1308,6 +1405,10 @@ export function bestTarget(state: GameState, army: { id: number; regionId: numbe
   for (const nid of region.adjacency) {
     const target = state.regions[nid];
     if (!target || target.ownerId === nationId) continue;
+    // Respect the sea: a land army cannot assault across open water, and a fleet
+    // only puts troops ashore at a coastal target. Keeps the AI from ordering the
+    // illegal moves the new sea layer forbids.
+    if (!unitsCanEnter(state, army.units, army.regionId, nid)) continue;
 
     const isBarb = target.ownerId === BARBARIAN_ID;
     const isEnemy = target.ownerId !== null && !isBarb && atWar(state, nationId, target.ownerId);
