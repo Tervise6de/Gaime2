@@ -110,26 +110,33 @@ app.stage.addChild(hoverLayer);
 const selectLayer = new Graphics();
 app.stage.addChild(selectLayer);
 
-type Realm = { g: Graphics; rings: number[][]; realm: string; color: number };
-const realms: Realm[] = [];
-let selected: Realm | null = null;
+// group provinces by realm; each province is its own graphic (faint internal
+// borders + hit-testing), but hover/select act on the whole realm.
+const groups = new Map<string, { rings: number[][]; color: number }>();
+let selected: string | null = null;
 
 for (const f of data.features) {
   const rings = toRings(f.geometry);
+  const realm = (f.properties as any).realm as string;
   const color = (f.properties as any).color as number;
+  let grp = groups.get(realm);
+  if (!grp) {
+    grp = { rings: [], color };
+    groups.set(realm, grp);
+  }
+  grp.rings.push(...rings);
+
   const g = new Graphics();
   for (const ring of rings) {
     g.poly(ring).fill({ color });
-    g.poly(ring).stroke({ width: 1.1, color: BORDER, alpha: 0.9, join: "round" });
+    g.poly(ring).stroke({ width: 0.7, color: BORDER, alpha: 0.32, join: "round" });
   }
   g.eventMode = "static";
   g.cursor = "pointer";
   land.addChild(g);
-  const r: Realm = { g, rings, realm: (f.properties as any).realm, color };
-  realms.push(r);
-  g.on("pointerover", () => hover(r));
+  g.on("pointerover", () => hover(realm));
   g.on("pointerout", () => hover(null));
-  g.on("pointertap", () => select(r));
+  g.on("pointertap", () => select(realm));
 }
 
 // ---- labels ----------------------------------------------------------------
@@ -168,7 +175,7 @@ for (const f of data.features) {
   const p = f.properties as any;
   if (labelled.has(p.realm)) continue; // one label per realm
   labelled.add(p.realm);
-  placeLabel(p.realm, p.label[0], p.label[1], { size: 16, color: LABEL, halo: LABEL_HALO });
+  placeLabel(p.realm, p.label[0], p.label[1], { size: 13, color: LABEL, halo: LABEL_HALO });
 }
 for (const s of (data as any).seas as { text: string; at: [number, number] }[])
   placeLabel(s.text, s.at[0], s.at[1], { size: 15, color: SEA_LABEL, italic: true });
@@ -183,25 +190,27 @@ readout.x = W / 2;
 readout.y = H - 22;
 app.stage.addChild(readout);
 
-function hover(r: Realm | null) {
+function hover(realm: string | null) {
   hoverLayer.clear();
-  if (!r) {
-    readout.text = selected ? `Selected: ${selected.realm}` : "Hover a realm";
+  if (!realm) {
+    readout.text = selected ? `Selected: ${selected}` : "Hover a realm";
     return;
   }
-  for (const ring of r.rings) {
-    hoverLayer.poly(ring).fill({ color: HOVER, alpha: 0.16 });
-    hoverLayer.poly(ring).stroke({ width: 2, color: HOVER, alpha: 0.6, join: "round" });
+  const grp = groups.get(realm)!;
+  for (const ring of grp.rings) {
+    hoverLayer.poly(ring).fill({ color: HOVER, alpha: 0.15 });
+    hoverLayer.poly(ring).stroke({ width: 1.6, color: HOVER, alpha: 0.5, join: "round" });
   }
-  readout.text = r.realm;
+  readout.text = realm;
 }
 
-function select(r: Realm) {
-  selected = r;
+function select(realm: string) {
+  selected = realm;
   selectLayer.clear();
-  for (const ring of r.rings)
-    selectLayer.poly(ring).stroke({ width: 3.4, color: SELECT, alpha: 0.95, join: "round" });
-  readout.text = `Selected: ${r.realm}`;
+  const grp = groups.get(realm)!;
+  for (const ring of grp.rings)
+    selectLayer.poly(ring).stroke({ width: 2.6, color: SELECT, alpha: 0.95, join: "round" });
+  readout.text = `Selected: ${realm}`;
 }
 
 // ---- minimal compass + title ----------------------------------------------
@@ -233,10 +242,9 @@ app.stage.addChild(title);
 
 // demo hook: drive hover/select without a real pointer (for screenshots)
 (window as any).__demo = (name: string) => {
-  const r = realms.find((x) => x.realm === name);
-  if (r) {
-    select(r);
-    hover(r);
+  if (groups.has(name)) {
+    select(name);
+    hover(name);
   }
 };
 (window as any).__mapReady = true;
