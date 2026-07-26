@@ -6,6 +6,22 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-26 - Public intelligence boundary for rival AI
+
+Rival planning now goes through `systems/intel.ts` instead of treating the full
+enemy `GameState` as private knowledge. Landed enemy garrisons remain exact
+because the current region panel exposes their composition when inspected;
+fleets at sea are reduced to a visible fleet presence with a one-cog estimate.
+The same observer-relative estimate feeds military threat/target scoring and AI
+diplomatic power comparisons, while each realm retains exact knowledge of its
+own forces.
+
+Added fairness coverage for own-versus-enemy observations, hidden fleet strength,
+and four deterministic 24-turn full-board play-outs (warlord, merchant, builder,
+opportunist), including state conservation and finite-stock checks. The full
+serialized suite is 745/745 green across 49 files; typecheck, production build,
+and generated-bundle smoke check are clean.
+
 ## 2026-07-26 - AI concentration of force, capital defense and coordinated offensives
 
 The rival military planner now produces one deterministic nation-level offensive

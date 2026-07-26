@@ -22,6 +22,7 @@ import type { TraitId } from "@/data/traits";
 import { TERRAIN, type StrategicResource, type TerrainId } from "@/data/terrain";
 import type { FocusId } from "@/data/focuses";
 import { previewCombat, sideStrength, type UnitCounts } from "@/systems/combat";
+import { publicIntelUnits, publicNationPower } from "@/systems/intel";
 import {
   appointCommander,
   canRaiseUnit,
@@ -562,11 +563,11 @@ const COALITION_MARGIN = 0.85;
  * nation by `LEADER_POWER_RATIO` and holds `LEADER_REGION_SHARE` of the map.
  * Needs at least three living nations, so there's a coalition to form.
  */
-export function runawayLeader(state: GameState): number | null {
+export function runawayLeader(state: GameState, observerId?: number): number | null {
   const nations = state.nations.filter((n) => !n.isBarbarian && n.alive);
   if (nations.length < 3) return null;
   const powers = nations
-    .map((n) => ({ id: n.id, p: nationPower(state, n.id) }))
+    .map((n) => ({ id: n.id, p: observerId === undefined ? nationPower(state, n.id) : publicNationPower(state, observerId, n.id) }))
     .sort((a, b) => b.p - a.p);
   const first = powers[0]!;
   const second = powers[1]!;
@@ -584,11 +585,13 @@ export function coalitionPowerAgainst(
   state: GameState,
   leaderId: number,
   joinerId: number,
+  observerId?: number,
 ): number {
-  let power = nationPower(state, joinerId);
+  const powerOf = (id: number) => observerId === undefined ? nationPower(state, id) : publicNationPower(state, observerId, id);
+  let power = powerOf(joinerId);
   for (const n of state.nations) {
     if (n.isBarbarian || !n.alive || n.id === leaderId || n.id === joinerId) continue;
-    if (atWar(state, n.id, leaderId)) power += nationPower(state, n.id);
+    if (atWar(state, n.id, leaderId)) power += powerOf(n.id);
   }
   return power;
 }
@@ -603,8 +606,8 @@ function doDiplomacy(state: GameState, nationId: number, rng: Rng): GameState {
   const others = state.nations.filter(
     (n) => !n.isBarbarian && n.alive && n.id !== nationId,
   );
-  const myPower = nationPower(state, nationId);
-  const leaderId = runawayLeader(state);
+  const myPower = publicNationPower(state, nationId, nationId);
+  const leaderId = runawayLeader(state, nationId);
   // A realm already struggling to hold itself together (a province in open
   // revolt) puts new wars of *conquest* on hold until it restores order — quell
   // unrest before grabbing more land. Defensive wars, suing for peace, and
@@ -619,7 +622,7 @@ function doDiplomacy(state: GameState, nationId: number, rng: Rng): GameState {
     if (actions >= 1) break; // at most one diplomatic move per turn
     const rel = getRelation(s, nationId, o.id);
     const treaty = getTreaty(s, nationId, o.id);
-    const theirPower = nationPower(s, o.id) || 1;
+    const theirPower = publicNationPower(s, nationId, o.id) || 1;
     const ratio = myPower / theirPower;
     const border = sharedBorders(s, nationId, o.id) > 0;
     const earlyGraceForPlayer = o.isPlayer && s.turn < earlyPeaceTurns(s);
@@ -644,7 +647,7 @@ function doDiplomacy(state: GameState, nationId: number, rng: Rng): GameState {
       treaty === "peace" &&
       rel < FRIENDLY_THRESHOLD &&
       !earlyGraceForPlayer &&
-      coalitionPowerAgainst(s, leaderId, nationId) >= nationPower(s, leaderId) * COALITION_MARGIN
+      coalitionPowerAgainst(s, leaderId, nationId, nationId) >= publicNationPower(s, nationId, leaderId) * COALITION_MARGIN
     ) {
       s = openWar(s, nationId, o);
       actions++;
@@ -718,7 +721,7 @@ function doDiplomacy(state: GameState, nationId: number, rng: Rng): GameState {
       if (enemy.id === ally.id) continue;
       if (
         atWar(s, nationId, enemy.id) &&
-        nationPower(s, enemy.id) > nationPower(s, nationId) * 1.1 &&
+        publicNationPower(s, nationId, enemy.id) > publicNationPower(s, nationId, nationId) * 1.1 &&
         wouldJoinWar(s, ally.id, nationId, enemy.id)
       ) {
         s = callToArms(s, nationId, ally.id, enemy.id);
@@ -1002,7 +1005,7 @@ function defenseAt(
 function incomingPressure(state: GameState, army: Army, nationId: number): number {
   let worst = 0;
   for (const threat of adjacentThreats(state, army.regionId, nationId)) {
-    const atk = sideStrength(threat.units, army.units, "attack");
+    const atk = sideStrength(publicIntelUnits(state, nationId, threat), army.units, "attack");
     if (atk > worst) worst = atk;
   }
   return worst;
@@ -1013,20 +1016,21 @@ export function isBadlyOutmatched(state: GameState, army: Army, nationId: number
   const pressure = incomingPressure(state, army, nationId);
   if (pressure <= 0) return false;
   const threats = adjacentThreats(state, army.regionId, nationId);
-  const enemyUnits = strongestOf(threats);
+  const enemyUnits = strongestOf(state, threats, nationId);
   const def = defenseAt(state, army.units, army.regionId, enemyUnits);
   return pressure > def * RETREAT_RATIO;
 }
 
 /** The units of the strongest (by size) army in a list, for counter maths. */
-function strongestOf(armies: Army[]): UnitCounts {
+function strongestOf(state: GameState, armies: Army[], observerId: number): UnitCounts {
   let best: UnitCounts = emptyUnits();
   let bestSize = -1;
   for (const a of armies) {
-    const size = armySize(a.units);
+    const visible = publicIntelUnits(state, observerId, a);
+    const size = armySize(visible);
     if (size > bestSize) {
       bestSize = size;
-      best = a.units;
+      best = visible;
     }
   }
   return best;
@@ -1041,7 +1045,7 @@ export function retreatStep(state: GameState, army: Army, nationId: number): num
   const here = state.regions[army.regionId];
   if (!here) return null;
   const hereThreat = adjacentThreats(state, army.regionId, nationId).reduce(
-    (m, a) => Math.max(m, sideStrength(a.units, army.units, "attack")),
+    (m, a) => Math.max(m, sideStrength(publicIntelUnits(state, nationId, a), army.units, "attack")),
     0,
   );
   let best: number | null = null;
@@ -1055,7 +1059,9 @@ export function retreatStep(state: GameState, army: Army, nationId: number): num
       const ar = state.regions[a.regionId];
       if (!ar || a.ownerId === nationId || a.ownerId === null || a.ownerId === BARBARIAN_ID) continue;
       if (!atWar(state, nationId, a.ownerId)) continue;
-      if (ar.adjacency.includes(nb)) threat = Math.max(threat, sideStrength(a.units, army.units, "attack"));
+      if (ar.adjacency.includes(nb)) {
+        threat = Math.max(threat, sideStrength(publicIntelUnits(state, nationId, a), army.units, "attack"));
+      }
     }
     if (threat < bestThreat) {
       bestThreat = threat;
@@ -1153,7 +1159,7 @@ function soloWinnable(state: GameState, targetId: number, nationId: number): boo
     if (!ar || !ar.adjacency.includes(targetId)) continue;
     const atk = sideStrength(a.units, zeroUnits(), "attack");
     const def = defender
-      ? sideStrength(defender.units, a.units, "defense") * 1.2 + target.fortification * 3
+      ? sideStrength(publicIntelUnits(state, nationId, defender), a.units, "defense") * 1.2 + target.fortification * 3
       : 0;
     if (atk > def * 1.1) return true;
   }
@@ -1274,7 +1280,8 @@ function targetDefenders(state: GameState, targetId: number, nationId: number): 
   const defenders = emptyUnits();
   for (const army of state.armies) {
     if (armyIsAtSea(army) || army.ownerId === nationId || army.regionId !== targetId) continue;
-    for (const type of UNIT_TYPES) defenders[type] += army.units[type];
+    const visible = publicIntelUnits(state, nationId, army);
+    for (const type of UNIT_TYPES) defenders[type] += visible[type];
   }
   return defenders;
 }
@@ -1459,7 +1466,8 @@ function assessThreat(state: GameState, nationId: number): ThreatProfile {
     const onTarget = targetIds.has(a.regionId);
     const nearOurLand = state.regions[a.regionId]?.adjacency.some((n) => ownedIds.has(n));
     if (onTarget || nearOurLand) {
-      for (const t of UNIT_TYPES) composition[t] += a.units[t];
+      const visible = publicIntelUnits(state, nationId, a);
+      for (const t of UNIT_TYPES) composition[t] += visible[t];
     }
   }
 
@@ -1552,7 +1560,7 @@ export function bestTarget(state: GameState, army: { id: number; regionId: numbe
 
     const defender = state.armies.find((a) => !armyIsAtSea(a) && a.regionId === nid && a.ownerId !== nationId);
     const def = defender
-      ? sideStrength(defender.units, army.units, "defense") * 1.2 + target.fortification * 3
+      ? sideStrength(publicIntelUnits(state, nationId, defender), army.units, "defense") * 1.2 + target.fortification * 3
       : 0;
 
     // Winnable if our attack clearly exceeds their defence.

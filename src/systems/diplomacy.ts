@@ -15,6 +15,7 @@
 
 import { UNITS, type UnitType } from "@/data/units";
 import { recordChronicle, chronicleName } from "@/systems/chronicle";
+import { publicNationPower } from "@/systems/intel";
 import {
   BARBARIAN_ID,
   GIFT_RELATION,
@@ -286,7 +287,7 @@ export function wouldBreakTreaty(state: GameState, aggressor: number, target: nu
   // an alliance is far more sacred than a NAP.
   const trustCeil = treaty === "alliance" ? 0.18 : 0.3;
   if (trust >= trustCeil) return false; // keeps its word
-  const ratio = nationPower(state, aggressor) / (nationPower(state, target) || 1);
+  const ratio = publicNationPower(state, aggressor, aggressor) / (publicNationPower(state, aggressor, target) || 1);
   // A *tempting* strike, not a routine one: either a foe caught reeling (famine,
   // revolt, bankruptcy — a real vulnerability window) with a solid edge, or an
   // overwhelming edge outright. Both bars sit high enough that treachery is an
@@ -424,7 +425,7 @@ export function wouldAccept(
   if (targetNation.isPlayer || targetNation.isBarbarian) return false;
 
   const rel = getRelation(state, proposer, target);
-  const powerRatio = nationPower(state, proposer) / (nationPower(state, target) || 1);
+  const powerRatio = publicNationPower(state, target, proposer) / (publicNationPower(state, target, target) || 1);
   const p = targetNation.personality;
   const trust = p?.trustworthiness ?? 0.5;
   const aggression = p?.aggression ?? 0.5;
@@ -451,7 +452,7 @@ export function wouldAccept(
 export function peaceReparations(state: GameState, from: number, to: number): number {
   const me = state.nations.find((n) => n.id === from);
   if (!me) return 0;
-  const ratio = nationPower(state, from) / (nationPower(state, to) || 1);
+  const ratio = publicNationPower(state, from, from) / (publicNationPower(state, from, to) || 1);
   if (ratio >= 0.75) return 0; // even footing: no need to pay for peace
   const amount = Math.min(40, Math.floor(me.stocks.gold * 0.25));
   return amount >= 10 ? amount : 0; // too small to bother offering
@@ -622,7 +623,7 @@ export function wouldJoinWar(
   // (`ai.ts` `doDiplomacy`), which likewise lowers its bar against a reeling
   // target — an ally is most useful exactly when finishing off a crumbling foe.
   const powerFloor = nationInstability(state, enemy).reeling ? 0.25 : 0.4;
-  if (nationPower(state, ally) < powerFloor * nationPower(state, enemy)) return false;
+  if (publicNationPower(state, ally, ally) < powerFloor * publicNationPower(state, ally, enemy)) return false;
   return true;
 }
 
