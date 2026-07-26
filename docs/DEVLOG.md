@@ -17,9 +17,11 @@ war-front edges stay shared between both views, and hit-testing follows the acti
 presentation without changing simulation adjacency.
 
 Added pure graph-projection coverage for reciprocal-link deduplication, stable
-ordering, unknown-node filtering and no mutation of simulation data. The next
-map pass should focus on a larger strategic overlay (convoys, supply and naval
-visibility) rather than another map topology.
+ordering, unknown-node filtering and no mutation of simulation data. The
+minimap follows the active mode as well, so Strategy does not fall back to a
+misleading province thumbnail. The next map pass should focus on a larger
+strategic overlay (convoys, supply and naval visibility) rather than another
+map topology.
 
 ## 2026-07-26 - Public intelligence boundary for rival AI
 
