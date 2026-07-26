@@ -1494,7 +1494,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     if (!mm) return;
     const mctx = mm.getContext("2d");
     if (!mctx) return;
-    const st = ensureStatic(s);
+    const st = mapMode === "province" ? ensureStatic(s) : null;
     const dpr = window.devicePixelRatio || 1;
     const cw = mm.clientWidth || 168;
     const ch = mm.clientHeight || 116;
@@ -1516,7 +1516,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     const fh = ah * scale;
     const ox = (cw - fw) / 2;
     const oy = (ch - fh) / 2;
-    mctx.drawImage(st, 0, 0, st.width, st.height, ox, oy, fw, fh);
+    if (st) mctx.drawImage(st, 0, 0, st.width, st.height, ox, oy, fw, fh);
+    else drawStrategyMinimap(mctx, s, ox, oy, fw, fh);
     minimapFit = { ox, oy, fw, fh };
     // Current-view rectangle: the base-normalised slice the camera shows (clamped
     // to the fitted map so it never spills into the letterbox).
@@ -1528,6 +1529,61 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     mctx.strokeStyle = "rgba(255, 242, 207, 0.92)";
     mctx.lineWidth = 1.5;
     mctx.strokeRect(vx, vy, vw, vh);
+  }
+
+  /** Keep the minimap faithful to the active node-and-edge presentation. */
+  function drawStrategyMinimap(
+    g: CanvasRenderingContext2D,
+    s: GameState,
+    ox: number,
+    oy: number,
+    fw: number,
+    fh: number,
+  ): void {
+    const mini = (x: number, y: number): Point => ({ x: ox + x * fw, y: oy + y * fh });
+    const trace = (ring: Point[]): void => {
+      if (ring.length < 3) return;
+      const first = mini(ring[0]!.x, ring[0]!.y);
+      g.moveTo(first.x, first.y);
+      for (let i = 1; i < ring.length; i++) {
+        const p = mini(ring[i]!.x, ring[i]!.y);
+        g.lineTo(p.x, p.y);
+      }
+      g.closePath();
+    };
+
+    g.save();
+    g.fillStyle = "rgba(75, 91, 82, 0.96)";
+    g.beginPath();
+    for (const blob of shape?.blobs ?? []) trace(blob);
+    g.fill();
+    g.strokeStyle = "rgba(230, 218, 177, 0.5)";
+    g.lineWidth = 1;
+    g.stroke();
+
+    for (const [a, b] of graphEdges(s.regions)) {
+      const from = s.regions[a]!;
+      const to = s.regions[b]!;
+      const p = mini(from.x, from.y);
+      const q = mini(to.x, to.y);
+      const water = shape ? !pointInIsland(shape, (from.x + to.x) / 2, (from.y + to.y) / 2) : false;
+      g.beginPath();
+      g.moveTo(p.x, p.y);
+      g.lineTo(q.x, q.y);
+      g.setLineDash(water ? [2, 2] : []);
+      g.strokeStyle = water ? "rgba(174, 210, 218, 0.55)" : "rgba(17, 25, 27, 0.56)";
+      g.lineWidth = 0.8;
+      g.stroke();
+    }
+    g.setLineDash([]);
+    for (const region of s.regions) {
+      const p = mini(region.x, region.y);
+      g.beginPath();
+      g.arc(p.x, p.y, 2.2, 0, Math.PI * 2);
+      g.fillStyle = region.ownerId === null ? "rgba(230, 218, 177, 0.72)" : ownerColor(region.ownerId);
+      g.fill();
+    }
+    g.restore();
   }
 
   /**
