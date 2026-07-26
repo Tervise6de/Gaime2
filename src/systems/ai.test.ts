@@ -8,6 +8,8 @@ import {
   defendStep,
   focusTarget,
   musterRegion,
+  concentrationPlan,
+  capitalDefensePlan,
   chooseBuilding,
   runawayLeader,
   coalitionPowerAgainst,
@@ -657,6 +659,64 @@ describe("concentration of force", () => {
       ],
     );
     expect(musterRegion(s, RIVAL, 1)).toBe(2); // region 2 holds the bigger stack — the anvil
+  });
+
+  it("keeps the concentration plan closed when the assembled force still loses", () => {
+    const s = warState(
+      [
+        region({ id: 0, ownerId: RIVAL, adjacency: [1, 2] }),
+        region({ id: 1, ownerId: ENEMY, adjacency: [0, 2], population: 6 }),
+        region({ id: 2, ownerId: RIVAL, adjacency: [0, 1] }),
+      ],
+      [
+        army({ id: 1, ownerId: RIVAL, regionId: 0, units: units({ infantry: 5 }) }),
+        army({ id: 2, ownerId: RIVAL, regionId: 2, units: units({ infantry: 5 }) }),
+        army({ id: 5, ownerId: ENEMY, regionId: 1, units: units({ infantry: 20 }) }),
+      ],
+    );
+    const plan = concentrationPlan(s, RIVAL);
+    expect(plan?.targetId).toBe(1);
+    expect(plan?.musterId).toBe(0);
+    expect(plan?.ready).toBe(false);
+    expect(plan?.stagingArmyIds).toEqual([2]);
+  });
+
+  it("routes a reserve to an empty threatened capital", () => {
+    const s = {
+      ...warState(
+        [
+          region({ id: 0, ownerId: RIVAL, adjacency: [1, 2] }),
+          region({ id: 1, ownerId: ENEMY, adjacency: [0] }),
+          region({ id: 2, ownerId: RIVAL, adjacency: [0] }),
+        ],
+        [
+          army({ id: 2, ownerId: RIVAL, regionId: 2, units: units({ infantry: 4 }), movesLeft: 1 }),
+          army({ id: 5, ownerId: ENEMY, regionId: 1, units: units({ infantry: 4 }) }),
+        ],
+      ),
+      nations: [{ id: RIVAL, capitalRegionId: 0 }],
+    } as unknown as GameState;
+    expect(capitalDefensePlan(s, RIVAL)).toEqual({ capitalId: 0, armyId: 2, step: 0 });
+  });
+
+  it("does not strip a sole garrison from a threatened home region", () => {
+    const s = warState(
+      [
+        region({ id: 0, ownerId: RIVAL, adjacency: [1, 2] }),
+        region({ id: 1, ownerId: ENEMY, adjacency: [0], population: 6 }),
+        region({ id: 2, ownerId: RIVAL, adjacency: [0, 3] }),
+        region({ id: 3, ownerId: ENEMY, adjacency: [2] }),
+      ],
+      [
+        army({ id: 1, ownerId: RIVAL, regionId: 0, units: units({ infantry: 1 }) }),
+        army({ id: 2, ownerId: RIVAL, regionId: 2, units: units({ infantry: 5 }) }),
+        army({ id: 5, ownerId: ENEMY, regionId: 1, units: units({ infantry: 5 }) }),
+        army({ id: 6, ownerId: ENEMY, regionId: 3, units: units({ infantry: 5 }) }),
+      ],
+    );
+    const plan = concentrationPlan(s, RIVAL);
+    expect(plan?.targetId).toBe(1);
+    expect(plan?.stagingArmyIds).toEqual([]);
   });
 
   it("two split armies mass and merge, then take a region neither beat alone", () => {

@@ -21,7 +21,7 @@ import { BUILDINGS, buildingFocusOk, buildingResourceOk, focusCapstone, type Bui
 import type { TraitId } from "@/data/traits";
 import { TERRAIN, type StrategicResource, type TerrainId } from "@/data/terrain";
 import type { FocusId } from "@/data/focuses";
-import { sideStrength, type UnitCounts } from "@/systems/combat";
+import { previewCombat, sideStrength, type UnitCounts } from "@/systems/combat";
 import {
   appointCommander,
   canRaiseUnit,
@@ -774,6 +774,21 @@ function demandTribute(state: GameState, from: number, playerId: number, gold: n
 /** An army retreats when a bordering enemy's attack exceeds its defence by this. */
 const RETREAT_RATIO = 1.35;
 
+/** Avoid the heavier target scoring pass for realms without a multi-stack war front. */
+function shouldConcentrate(state: GameState, nationId: number): boolean {
+  let landArmies = 0;
+  for (const army of state.armies) {
+    if (!armyIsAtSea(army) && !armyIsFleet(army.units) && army.ownerId === nationId && armySize(army.units) > 0) {
+      landArmies++;
+      if (landArmies >= 2) break;
+    }
+  }
+  if (landArmies < 2) return false;
+  return state.regions.some(
+    (region) => region.ownerId === nationId && region.adjacency.some((id) => isAttackable(state, id, nationId)),
+  );
+}
+
 function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
   let s = state;
   const nation = s.nations.find((n) => n.id === nationId);
@@ -792,10 +807,28 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
   }
 
   // Phase 1 — attack: strongest armies first take their best winnable target.
+  // Restore an empty capital garrison before committing to an offensive.
+  const capitalPlan = capitalDefensePlan(s, nationId);
+  if (capitalPlan) {
+    const defender = s.armies.find((a) => a.id === capitalPlan.armyId);
+    if (defender && defender.movesLeft > 0) s = moveArmy(s, defender.id, capitalPlan.step);
+  }
+
+  // One shared offensive plan gates the attack loop: stage first, then attack
+  // only from the assembled stack once the shared combat forecast is positive.
+  const concentration = shouldConcentrate(s, nationId) ? concentrationPlan(s, nationId) : null;
+  const actedOffensively = new Set<number>();
   const myArmies = () => s.armies.filter((a) => a.ownerId === nationId && !armyIsFleet(a.units));
   for (const army of [...myArmies()].sort((a, b) => armySize(b.units) - armySize(a.units))) {
     const live = s.armies.find((a) => a.id === army.id);
     if (!live || live.movesLeft <= 0) continue;
+    if (concentration && !concentration.ready) continue;
+    if (concentration?.ready) {
+      if (live.id !== concentration.assaultArmyId) continue;
+      s = moveArmy(s, live.id, concentration.targetId);
+      actedOffensively.add(live.id);
+      continue;
+    }
     const target = bestTarget(s, live, nationId);
     if (target !== null) s = moveArmy(s, live.id, target);
   }
@@ -806,9 +839,11 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
   //   • holding a defensible threatened region → stay put and garrison it;
   //   • otherwise march to reinforce the nearest threatened region, or, failing
   //     that, concentrate toward the offensive frontier (previous behaviour).
+  let currentConcentration = concentration && !concentration.ready ? concentration : null;
   for (const army of myArmies()) {
     const live = s.armies.find((a) => a.id === army.id);
     if (!live || live.movesLeft <= 0) continue;
+    if (actedOffensively.has(live.id)) continue;
     if (bestTarget(s, live, nationId) !== null) continue;
 
     if (isBadlyOutmatched(s, live, nationId)) {
@@ -823,10 +858,30 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
     // This takes priority over a *passive* garrison (the anvil is itself on the
     // front), but never overrides the retreat above, and never strips the
     // capital's own garrison — a realm keeps its seat of power defended.
+    if (currentConcentration && !currentConcentration.ready) {
+      const plan = currentConcentration;
+      if (
+        live.regionId === plan.musterId ||
+        !canStageEssentialDefender(
+          s,
+          live,
+          nationId,
+          plan.musterId,
+          plan.targetId,
+        )
+      ) continue;
+      const toMuster = firstStepTowards(s, live.regionId, nationId, (rid) => rid === plan.musterId);
+      if (toMuster !== null) {
+        s = moveArmy(s, live.id, toMuster);
+        currentConcentration = concentrationPlan(s, nationId);
+        continue;
+      }
+    }
+
     const capitalId = s.nations.find((n) => n.id === nationId)?.capitalRegionId;
     const holdingCapital = live.regionId === capitalId && regionIsThreatened(s, live.regionId, nationId);
     if (!holdingCapital) {
-      const focus = focusTarget(s, nationId);
+      const focus = null;
       if (focus !== null) {
         const muster = musterRegion(s, nationId, focus);
         if (muster !== null) {
@@ -1161,6 +1216,126 @@ export function musterRegion(state: GameState, nationId: number, focusId: number
     }
   }
   return best;
+}
+
+export interface ConcentrationPlan {
+  targetId: number;
+  musterId: number;
+  assaultArmyId: number | null;
+  stagingArmyIds: number[];
+  ready: boolean;
+}
+
+/** Armies physically standing in a region, excluding fleets at sea. */
+function stationedArmies(state: GameState, regionId: number, nationId: number): Army[] {
+  return state.armies.filter(
+    (a) => !armyIsAtSea(a) && !armyIsFleet(a.units) && a.ownerId === nationId && a.regionId === regionId && armySize(a.units) > 0,
+  );
+}
+
+/** Keep at least one stack in a capital and in any currently threatened home region. */
+export function isEssentialDefender(state: GameState, army: Army, nationId: number): boolean {
+  const region = state.regions[army.regionId];
+  if (!region || region.ownerId !== nationId) return false;
+  const capitalId = state.nations.find((n) => n.id === nationId)?.capitalRegionId;
+  const stationed = stationedArmies(state, region.id, nationId);
+  if (region.id === capitalId && stationed.length <= 1) return true;
+  return regionIsThreatened(state, region.id, nationId) && stationed.length <= 1;
+}
+
+/**
+ * A sole garrison may still redeploy across the same threatened front: moving
+ * from one owned border region to another that also borders the chosen target
+ * does not abandon the threat, it creates a better-held anvil.
+ */
+function canStageEssentialDefender(
+  state: GameState,
+  army: Army,
+  nationId: number,
+  musterId: number,
+  targetId: number,
+): boolean {
+  if (!isEssentialDefender(state, army, nationId)) return true;
+  const capitalId = state.nations.find((n) => n.id === nationId)?.capitalRegionId;
+  if (army.regionId === capitalId) return false;
+  const current = state.regions[army.regionId];
+  const muster = state.regions[musterId];
+  return !!current?.adjacency.includes(targetId) && !!muster?.adjacency.includes(targetId);
+}
+
+function offensiveMargin(state: GameState, nationId: number): number {
+  const aggression = state.nations.find((n) => n.id === nationId)?.personality?.aggression ?? 0.4;
+  // Aggressive archetypes accept a narrower edge, but never plan an attack below
+  // parity: concentration makes the attack decisive, not suicidal.
+  return 1.08 - aggression * 0.06;
+}
+
+function targetDefenders(state: GameState, targetId: number, nationId: number): UnitCounts {
+  const defenders = emptyUnits();
+  for (const army of state.armies) {
+    if (armyIsAtSea(army) || army.ownerId === nationId || army.regionId !== targetId) continue;
+    for (const type of UNIT_TYPES) defenders[type] += army.units[type];
+  }
+  return defenders;
+}
+
+/**
+ * Build one nation-level offensive plan. The plan is recomputed every turn, so
+ * it cannot go stale when a target falls or its garrison changes. It reserves
+ * essential defenders, stages through one owned anvil, and opens the attack
+ * only when the actual assembled stack clears the shared combat forecast.
+ */
+export function concentrationPlan(state: GameState, nationId: number): ConcentrationPlan | null {
+  const landArmies = state.armies.filter(
+    (army) => !armyIsAtSea(army) && !armyIsFleet(army.units) && army.ownerId === nationId && armySize(army.units) > 0,
+  );
+  if (landArmies.length < 2) return null;
+  const targetId = focusTarget(state, nationId);
+  if (targetId === null) return null;
+  const musterId = musterRegion(state, nationId, targetId);
+  if (musterId === null) return null;
+
+  const atMuster = stationedArmies(state, musterId, nationId).sort((a, b) => armySize(b.units) - armySize(a.units) || a.id - b.id);
+  const assault = atMuster.length === 1 ? atMuster[0]! : null;
+  const defenders = targetDefenders(state, targetId, nationId);
+  const target = state.regions[targetId]!;
+  const force = assault?.units ?? emptyUnits();
+  const forecast = previewCombat(force, defenders, {
+    terrainDefense: TERRAIN[target.terrain].defense,
+    fortification: target.fortification,
+  });
+  const ready = !!assault && forecast.attack > forecast.defense * offensiveMargin(state, nationId);
+  const stagingArmyIds = state.armies
+    .filter((army) => {
+      if (armyIsAtSea(army) || armyIsFleet(army.units) || army.ownerId !== nationId || army.regionId === musterId) return false;
+      if (!canStageEssentialDefender(state, army, nationId, musterId, targetId)) return false;
+      return firstStepTowards(state, army.regionId, nationId, (rid) => rid === musterId) !== null;
+    })
+    .sort((a, b) => armySize(b.units) - armySize(a.units) || a.id - b.id)
+    .map((army) => army.id);
+
+  return { targetId, musterId, assaultArmyId: assault?.id ?? null, stagingArmyIds, ready };
+}
+
+export interface CapitalDefensePlan {
+  capitalId: number;
+  armyId: number;
+  step: number;
+}
+
+/** Find the nearest releasable army that can restore a missing capital garrison. */
+export function capitalDefensePlan(state: GameState, nationId: number): CapitalDefensePlan | null {
+  const capitalId = state.nations.find((n) => n.id === nationId)?.capitalRegionId;
+  const capital = capitalId === undefined ? undefined : state.regions[capitalId];
+  if (!capital || capital.ownerId !== nationId || stationedArmies(state, capital.id, nationId).length > 0) return null;
+  const candidates = state.armies
+    .filter((army) => !armyIsAtSea(army) && !armyIsFleet(army.units) && army.ownerId === nationId && army.movesLeft > 0)
+    .filter((army) => !isEssentialDefender(state, army, nationId))
+    .map((army) => ({ army, step: firstStepTowards(state, army.regionId, nationId, (rid) => rid === capital.id) }))
+    .filter((entry): entry is { army: Army; step: number } => entry.step !== null)
+    .sort((a, b) => armySize(b.army.units) - armySize(a.army.units) || a.army.id - b.army.id);
+  const best = candidates[0];
+  return best ? { capitalId: capital.id, armyId: best.army.id, step: best.step } : null;
 }
 
 /** Raise and move a small navy: rivals patrol their trade approaches and seek

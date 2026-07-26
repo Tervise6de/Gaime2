@@ -6,6 +6,28 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-26 - AI concentration of force, capital defense and coordinated offensives
+
+The rival military planner now produces one deterministic nation-level offensive
+plan: it selects a valuable frontier target, chooses the owned anvil with the
+strongest local force, stages releasable armies through own land, and only
+commits the assembled stack after the shared `previewCombat` forecast clears an
+aggression-weighted margin. A sole garrison can redeploy across the same
+threatened front, but isolated threatened homes and capitals remain reserved.
+
+An empty capital is restored from the nearest available reserve before offensive
+orders are considered. Fleet stacks and armies at sea are excluded from land
+concentration. The plan is recomputed only when a staging move changes the board,
+and skips the heavier scoring pass for nations without a multi-stack war front.
+
+Focused coverage now includes a two-army merge-and-capture, refusal to stage into
+a losing assault, capital reinforcement, and threatened-home preservation. The
+AI suite is 90/90 green; the serialized repository suite is 739/739 green;
+typecheck, production build, and generated-bundle smoke check are clean. The
+isolated five-game performance guard measured 30.13s against its 40s ceiling.
+The default parallel suite can exceed that wall-clock guard on this loaded
+machine, while the serialized suite passes all tests.
+
 ## 2026-07-26 — Functional sea zones, naval transport and blockades
 
 The six labelled sea areas are now navigable zones rather than scenery. Fleets
