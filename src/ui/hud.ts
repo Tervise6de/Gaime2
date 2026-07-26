@@ -57,6 +57,7 @@ import { fullscreenAvailable, isFullscreen, toggleFullscreen } from "@/ui/fullsc
 import { loadProfile, type ProfileStats } from "@/ui/profile";
 import { ACHIEVEMENTS } from "@/data/achievements";
 import { WAR_EDGE_COLOR } from "@/systems/renderer";
+import type { MapRenderMode } from "@/systems/mapview";
 import { regionCapacity } from "@/systems/population";
 import { popDisplay, soldiersCompact, soldiersDisplay } from "@/systems/format";
 import { buildOptions, deriveAdvice, regionCanStartBuild } from "@/ui/advisor";
@@ -206,6 +207,9 @@ export interface HudCallbacks {
   onSetColourblind(on: boolean): void;
   /** Reduce-motion toggled — the parent tells the renderer to suppress motion. */
   onSetReduceMotion(on: boolean): void;
+  /** Map presentation only; the simulation graph and province geometry stay unchanged. */
+  onSetMapMode(mode: MapRenderMode): void;
+  getMapMode(): MapRenderMode;
   /** Map lens changed — the parent recolours the board by the chosen metric. */
   onLensChange(lens: LensId): void;
 }
@@ -1504,6 +1508,33 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
         "A card when a dated event fires — the Black Death, the herring monopoly, a lost Kontor. The events still happen when off.",
       ),
     );
+
+    // Map --------------------------------------------------------------------
+    panel.append(sectionHeading("Map"));
+    const mapModeRow = el("div", "hud-map-mode-row");
+    const mapModeLabel = el("span", "hud-opt-label");
+    mapModeLabel.textContent = "Map reading";
+    const mapModeSeg = el("div", "hud-seg hud-map-mode");
+    const mapModes: { id: MapRenderMode; label: string; title: string }[] = [
+      { id: "province", label: "Province", title: "Authored province polygons with terrain and political borders." },
+      { id: "strategy", label: "Strategy", title: "A clean node-and-edge overview using the same regions and adjacency." },
+    ];
+    for (const mode of mapModes) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "hud-seg-btn";
+      button.textContent = mode.label;
+      button.title = mode.title;
+      button.classList.toggle("active", callbacks.getMapMode() === mode.id);
+      button.addEventListener("click", () => {
+        callbacks.onSetMapMode(mode.id);
+        renderOptions();
+      });
+      mapModeSeg.append(button);
+    }
+    mapModeRow.append(mapModeLabel, mapModeSeg);
+    panel.append(mapModeRow);
+    panel.append(line("Province shows land ownership and fronts; Strategy shows the playable graph for quick planning." , "hud-hint"));
 
     // Accessibility ----------------------------------------------------------
     panel.append(sectionHeading("Accessibility"));

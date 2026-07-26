@@ -6,6 +6,21 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-26 - Toggleable province chart and strategy graph fallback
+
+The authored polygon/Voronoi renderer is now a user-facing map mode rather than
+an implicit implementation detail. Options exposes a persisted Province /
+Strategy switch: Strategy is the safe node-and-edge fallback shown by default,
+while Province reveals the detailed political cells, terrain, borders, fronts
+and markers. Selection, move targets, armies, capitals, owner colors and
+war-front edges stay shared between both views, and hit-testing follows the active
+presentation without changing simulation adjacency.
+
+Added pure graph-projection coverage for reciprocal-link deduplication, stable
+ordering, unknown-node filtering and no mutation of simulation data. The next
+map pass should focus on a larger strategic overlay (convoys, supply and naval
+visibility) rather than another map topology.
+
 ## 2026-07-26 - Public intelligence boundary for rival AI
 
 Rival planning now goes through `systems/intel.ts` instead of treating the full

@@ -4451,6 +4451,21 @@ a:focus-visible,
   cursor: pointer;
 }
 
+.hud-map-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 2px 2px;
+}
+
+.hud-map-mode {
+  flex: 0 0 190px;
+}
+
+.hud-map-mode-note {
+  margin-top: 2px;
+}
+
 .hud-opt-label {
   flex: 1;
 }

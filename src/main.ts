@@ -38,7 +38,10 @@ import { applyLocale } from "@/ui/i18n";
 import { lensColorsFor, type LensId } from "@/ui/lenses";
 import { recordGameEnd } from "@/ui/profile";
 import { ACHIEVEMENTS } from "@/data/achievements";
+import type { MapRenderMode } from "@/systems/mapview";
 import "@/ui/style.css";
+
+const MAP_MODE_KEY = "gaime2:mapMode";
 
 /**
  * Application entry point.
@@ -78,6 +81,8 @@ function main(): void {
   }
 
   const renderer = createRenderer(canvas);
+  let mapMode: MapRenderMode = loadMapMode();
+  renderer.setMapMode(mapMode);
   renderer.setColourblind(isColourblind()); // honour the saved palette preference at boot
   renderer.setReduceMotion(isReduceMotion()); // honour the saved motion preference at boot
   const hud = createHud(hudRoot, {
@@ -320,6 +325,14 @@ function main(): void {
     onSetReduceMotion(on) {
       renderer.setReduceMotion(on);
     },
+    onSetMapMode(mode) {
+      mapMode = mode;
+      saveMapMode(mode);
+      renderer.setMapMode(mode);
+    },
+    getMapMode() {
+      return mapMode;
+    },
     onLensChange(lens) {
       activeLens = lens;
       refreshLens();
@@ -543,6 +556,23 @@ function main(): void {
 /** A wall-clock stamp for saves. Kept out of the sim (which forbids Date). */
 function nowStamp(): number {
   return Date.now();
+}
+
+function loadMapMode(): MapRenderMode {
+  try {
+    const value = localStorage.getItem(MAP_MODE_KEY);
+    return value === "province" ? "province" : "strategy";
+  } catch {
+    return "strategy";
+  }
+}
+
+function saveMapMode(mode: MapRenderMode): void {
+  try {
+    localStorage.setItem(MAP_MODE_KEY, mode);
+  } catch {
+    /* visual preference is optional */
+  }
 }
 
 /** "slot2" → "Slot 2" for user-facing save/load toasts. */

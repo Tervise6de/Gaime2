@@ -47,6 +47,7 @@ import { nextHopToward, armyIsAtSea, armyIsFleet } from "@/systems/military";
 import { regionCapacity } from "@/systems/population";
 import { popCompact, popDisplay, soldiersCompact, soldiersDisplay } from "@/systems/format";
 import { computeVoronoiCells, pointInPolygon, type Point, type VoronoiCell } from "@/systems/voronoi";
+import { graphEdges, type MapRenderMode } from "@/systems/mapview";
 import { scriptedMap } from "@/data/maps/types";
 import {
   hashFloat,
@@ -109,6 +110,8 @@ export interface Renderer {
   setColourblind(on: boolean): void;
   /** Suppress cosmetic motion (capture ripples) when true. */
   setReduceMotion(on: boolean): void;
+  /** Switch between the authored province chart and the safe graph fallback. */
+  setMapMode(mode: MapRenderMode): void;
   /** Flash a capture ripple at a region that just changed hands. */
   pulseCapture(regionId: number): void;
   onRegionClick(handler: (regionId: number | null) => void): void;
@@ -303,6 +306,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     isletsPx: Point[][];
     /** Cross-water adjacency lanes (both endpoints at region sites). */
     lanes: [Point, Point][];
+    /** All simulation adjacency links, projected for the strategy fallback. */
+    graphLinks: { fromId: number; toId: number; a: Point; b: Point; water: boolean }[];
   }
   let projection: Projection | null = null;
   let projSig = "";
@@ -326,6 +331,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   // Active trade overlay: routes whose lanes draw as merchant lines (trade lens
   // only). Not baked — drawn live each frame over the political layer.
   let tradeLanes: TradeRoute[] | null = null;
+  let mapMode: MapRenderMode = "strategy";
   // Composite of ocean+terrain+political: the per-frame cost is ONE blit, not
   // three. Recomposited (three offscreen blits, no re-drawing) when any part
   // rebuilds.
@@ -421,7 +427,14 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       }
     }
 
-    return { px, paths, edgesPx, sites, reach, land, blobsPx, blobPaths, isletsPx, lanes };
+    const graphLinks = graphEdges(s.regions).map(([a, b]) => {
+      const from = s.regions[a]!;
+      const to = s.regions[b]!;
+      const water = shape ? !pointInIsland(shape, (from.x + to.x) / 2, (from.y + to.y) / 2) : false;
+      return { fromId: a, toId: b, a: sites[a]!, b: sites[b]!, water };
+    });
+
+    return { px, paths, edgesPx, sites, reach, land, blobsPx, blobPaths, isletsPx, lanes, graphLinks };
   }
 
   function ensureCells(s: GameState): void {
@@ -1456,7 +1469,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     context.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
     if (state) {
       const proj = ensureProjection(state);
-      paintVoronoi(state, proj, busy);
+      if (mapMode === "strategy") paintStrategyGraph(state, proj, busy);
+      else paintVoronoi(state, proj, busy);
       drawSeaShimmer(proj);
       drawTradeLanes(proj);
       drawMarchOrders(state, proj);
@@ -1680,6 +1694,84 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   }
 
   /**
+   * Lightweight node-and-edge fallback. It deliberately reads the same sites,
+   * owners and adjacency as the province chart, so it is useful for orientation
+   * and never becomes a second simulation map.
+   */
+  function paintStrategyGraph(s: GameState, proj: Projection, busy = false): void {
+    markerHits = [];
+    context.save();
+    // A quiet land silhouette keeps the fallback legible without implying that
+    // the polygon boundaries are part of this presentation mode.
+    context.fillStyle = "rgba(75, 91, 82, 0.96)";
+    context.fill(proj.land);
+    context.strokeStyle = "rgba(230, 218, 177, 0.5)";
+    context.lineWidth = 2;
+    context.stroke(proj.land);
+
+    // Links sit below nodes. War links are the same front colour used by the
+    // province chart; sea links remain dashed and cool so transport routes read.
+    for (const link of proj.graphLinks) {
+      const from = s.regions[link.fromId];
+      const to = s.regions[link.toId];
+      const hostile = !!from && !!to && from.ownerId !== null && to.ownerId !== null &&
+        from.ownerId !== BARBARIAN_ID && to.ownerId !== BARBARIAN_ID && atWar(s, from.ownerId, to.ownerId);
+      context.beginPath();
+      context.moveTo(link.a.x, link.a.y);
+      context.lineTo(link.b.x, link.b.y);
+      context.setLineDash(link.water ? [7, 5] : []);
+      context.strokeStyle = hostile ? WAR_EDGE_COLOR : link.water ? "rgba(174, 210, 218, 0.55)" : "rgba(17, 25, 27, 0.54)";
+      context.lineWidth = hostile ? 4 : link.water ? 2 : 2.5;
+      context.stroke();
+      context.setLineDash([]);
+    }
+
+    const capitals = capitalSet(s);
+    for (const region of s.regions) {
+      const p = proj.sites[region.id]!;
+      const radius = 15;
+      context.beginPath();
+      context.arc(p.x, p.y, radius + 5, 0, Math.PI * 2);
+      context.fillStyle = region.ownerId === null ? "rgba(14, 21, 25, 0.5)" : ownerColor(region.ownerId);
+      context.globalAlpha = region.ownerId === null ? 0.55 : 0.7;
+      context.fill();
+      context.globalAlpha = 1;
+      context.beginPath();
+      context.arc(p.x, p.y, radius, 0, Math.PI * 2);
+      context.fillStyle = terrainFill(context, region.terrain, p.x, p.y, radius);
+      context.fill();
+      context.strokeStyle = region.ownerId === null ? "rgba(230, 218, 177, 0.7)" : ownerColor(region.ownerId);
+      context.lineWidth = region.ownerId === PLAYER_ID ? 4 : 3;
+      context.stroke();
+
+      if (highlights.has(region.id)) {
+        context.beginPath();
+        context.arc(p.x, p.y, radius + 10, 0, Math.PI * 2);
+        context.strokeStyle = HIGHLIGHT_COLOR;
+        context.lineWidth = 3;
+        context.setLineDash([6, 4]);
+        context.stroke();
+        context.setLineDash([]);
+      }
+      if (selected === region.id) {
+        context.beginPath();
+        context.arc(p.x, p.y, radius + 10, 0, Math.PI * 2);
+        context.strokeStyle = SELECT_COLOR;
+        context.lineWidth = 3;
+        context.stroke();
+      }
+    }
+    context.restore();
+
+    if (!busy) {
+      for (const region of s.regions) drawMarkers(region, proj.sites[region.id]!, capitals);
+      drawNameplates(s, proj);
+    } else {
+      markerHits = [];
+    }
+  }
+
+  /**
    * Shared region markers (both layouts), stacked as one tidy column so
    * neighbouring regions stop colliding: (crest +) population chip at the
    * site, the name beneath, then a compact status row — resource, fort,
@@ -1690,8 +1782,10 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     // The population chip, name and status ride the same zoom reveal on the dense
     // province map, so a zoomed-out view stays clean (realm colours + names +
     // capital crests + armies) and the detail appears as you zoom in.
-    const denseMap = (state?.regions.length ?? 0) > 30;
-    const detailA = !denseMap || region.id === selected ? 1 : regionLabelAlpha();
+    const denseMap = (state?.regions.length ?? 0) > 30 && mapMode === "province";
+    const detailA = mapMode === "strategy"
+      ? (region.id === selected ? 1 : 0.58)
+      : (!denseMap || region.id === selected ? 1 : regionLabelAlpha());
     const showChip = detailA > 0.02;
 
     // Population count in a soft dark chip (same family as the icon chips), so
@@ -2366,6 +2460,18 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
   function hitTest(px: number, py: number): number | null {
     if (!state) return null;
+    if (mapMode === "strategy") {
+      const proj = ensureProjection(state);
+      let best: { id: number; d2: number } | null = null;
+      for (const region of state.regions) {
+        const p = proj.sites[region.id]!;
+        const dx = p.x - px;
+        const dy = p.y - py;
+        const d2 = dx * dx + dy * dy;
+        if (d2 <= 30 * 30 && (!best || d2 < best.d2)) best = { id: region.id, d2 };
+      }
+      return best?.id ?? null;
+    }
     ensureCells(state);
     // Hit-test against the *organic* polygons — exactly what is drawn — testing
     // EVERY ring of a multipart province, so a small offshore part (Hiiumaa,
@@ -2547,6 +2653,11 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     setReduceMotion(on: boolean): void {
       reduceMotion = on;
       if (on) ripples = []; // drop any in-flight motion
+      needsPaint = true;
+    },
+    setMapMode(mode: MapRenderMode): void {
+      mapMode = mode;
+      markerHits = [];
       needsPaint = true;
     },
     pulseCapture(regionId: number): void {
