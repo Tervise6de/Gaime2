@@ -9,6 +9,7 @@
 
 import { emptyUnits, emptyWares, TURN_LIMIT, type GameState } from "@/systems/state";
 import { SOUND } from "@/data/sound";
+import { SEA_ZONE_IDS } from "@/data/sea";
 
 const SAVE_VERSION = 1;
 /**
@@ -94,6 +95,7 @@ export function deserializeGame(json: string): GameState | null {
     if (Array.isArray(s.armies)) {
       for (const a of s.armies) {
         if (a && a.units) a.units = { ...emptyUnits(), ...a.units };
+        if (a && a.seaZoneId !== undefined && !SEA_ZONE_IDS.includes(a.seaZoneId)) delete a.seaZoneId;
       }
     }
     // The wares economy replaced the abstract "materials" resource: a pre-wares

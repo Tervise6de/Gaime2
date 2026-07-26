@@ -6,6 +6,44 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-26 — Functional sea zones, naval transport and blockades
+
+The six labelled sea areas are now navigable zones rather than scenery. Fleets
+retain their last coastal port as an anchor, spend movement to sail between
+touching zones, resolve hostile fleet interceptions through the shared combat
+math, and land mixed stacks at any coastal region on the current zone. Fleet
+presence is excluded from land garrisons, unrest policing and zone-of-control
+checks while at sea.
+
+Rivals now raise war cogs when war, trade or aggression calls for a navy, sail
+patrols toward enemy ports and trade lanes, and can contest the same zones as the
+player. Trade routes derive their sea exposure and become `blockaded` (and pay
+zero) when a hostile fleet occupies a touched zone; the HUD surfaces that reason.
+Save loading sanitises unknown sea-zone ids so older saves remain safe.
+
+Naval unit, landing, interception, blockade, AI-navy and regression coverage added.
+736 tests green, typecheck + production build clean. The next useful pass is
+escort/convoy protection and more expressive sea-zone map interaction; both should
+build on this explicit zone model.
+
+## 2026-07-26 — Cache AI trade-distance searches and align the performance guard
+
+The Hansa-only migration had left the max-config benchmark describing the old
+30-region / 6-nation random map, even though `createGame` now always starts the
+full authored board. The test was therefore exercising a much larger game than
+its name suggested, and the normal 100-turn log test could time out under the
+same load.
+
+`ai.ts` now builds one deterministic reverse BFS distance map per Kontor when an
+AI realm evaluates trade routes, instead of reconstructing a full `laneFor`
+path for every region × ware × Kontor candidate. Exact lanes are still rebuilt
+only for the few routes that are actually opened, so route choice and saved
+route data remain unchanged. The benchmark now explicitly runs the full Hansa
+board and allows 40 seconds under Vitest worker contention; isolated runs are
+about 24 seconds for five games, versus about 41 seconds before the cache.
+
+732 tests green, typecheck + production build clean.
+
 ## 2026-07-20 — Parchment grain + hand-inked frames (v0.95.0)
 
 Two hand-craft passes against the "too clean, too generated" feel of the top

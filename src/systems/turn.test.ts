@@ -363,7 +363,7 @@ describe("resolveTurn", () => {
     let s = createGame({ seed: 1 });
     for (let i = 0; i < 100; i++) s = resolveTurn(s);
     expect(s.log.length).toBeLessThanOrEqual(50);
-  });
+  }, 15_000); // Naval AI and blockade checks make the full Hansa turn heavier.
 
   it("grows player population over a calm game", () => {
     let s = setTaxRate(createGame({ seed: 3, rivals: 0 }), 0);

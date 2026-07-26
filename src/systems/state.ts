@@ -23,6 +23,7 @@ import type { BattleReport } from "@/systems/combat";
 import type { ChronicleEntry } from "@/systems/chronicle";
 import type { TechId } from "@/data/techs";
 import type { TraitId } from "@/data/traits";
+import type { SeaZoneId } from "@/data/sea";
 
 /** Owner id 0 is always the human player. */
 export const PLAYER_ID = 0;
@@ -320,6 +321,8 @@ export interface Army {
   units: Record<UnitType, number>;
   /** Region moves remaining this turn. */
   movesLeft: number;
+  /** The sea zone occupied by this fleet; regionId remains its last port anchor. */
+  seaZoneId?: SeaZoneId;
   /**
    * Dug in (M3): the army holds position to entrench. Set by the fortify action,
    * cleared the moment it moves or attacks. Undefined on legacy saves = not dug in.
@@ -372,6 +375,7 @@ export interface TradeRoute {
   soundBlocked?: boolean;
   /** Set when the Hanseatic League shut this route's owner out of the Kontor (no access / boycott) — paid 0. */
   leagueBlocked?: boolean;
+  blockaded?: boolean;
 }
 
 /**

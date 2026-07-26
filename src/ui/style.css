@@ -664,6 +664,42 @@ body {
   cursor: default;
 }
 
+.hud-army-naval-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  flex: 1 1 100%;
+  margin: 4px 0 0 0;
+}
+
+.hud-army-sail,
+.hud-army-land {
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--fg);
+  background: rgba(111, 168, 190, 0.16);
+  border: 1px solid rgba(137, 194, 214, 0.42);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.hud-army-sail:hover,
+.hud-army-land:hover {
+  background: rgba(111, 168, 190, 0.28);
+}
+
+.hud-army-land-select {
+  min-width: 130px;
+  max-width: 190px;
+  padding: 4px 6px;
+  font-size: 11px;
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+}
+
 /* Attack chooser: pick which army leads the assault. */
 .hud-attack-panel {
   width: min(520px, 94vw);

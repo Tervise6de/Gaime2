@@ -23,7 +23,7 @@ city power.
 2. **League control:** a visible meter based on route value, Kontor coverage,
    league leadership and member support.
 3. **Kontore as objects:** contest, close, seize, protect or privilege them.
-4. **Naval layer:** sea zones, fleets, escorts, blockades and amphibious pressure.
+4. **Naval layer:** sea zones, fleets, AI patrols, blockades and amphibious pressure — landed in v0.102; escorts and contested Kontor actions remain follow-up work.
 5. **Hansa identity pass:** rename remaining off-theme buildings/units and make
    city/merchant language stronger.
 6. **Light characters:** rulers, commanders and a small office-holder layer.

@@ -20,8 +20,10 @@ import { GOODS, GOOD_IDS, type GoodId } from "@/data/goods";
 import { BUILDINGS } from "@/data/buildings";
 import { KONTORE, KONTOR_IDS, type KontorId } from "@/data/kontore";
 import { SOUND } from "@/data/sound";
+import { SEA_ZONE_IDS, SEA_ZONES, type SeaZoneId } from "@/data/sea";
 import { round1, unrestPenalty, regionWareMult } from "@/systems/economy";
 import { atWar } from "@/systems/diplomacy";
+import { armyIsAtSea, armyIsFleet } from "@/systems/military";
 import { techTradeMult } from "@/systems/tech";
 import { kontorBlockedFor, leagueSeversRoute, isLeagueMonopoly } from "@/systems/league";
 import {
@@ -180,6 +182,43 @@ export function laneFor(state: GameState, fromRegionId: number, kontor: KontorId
     cur = p;
   }
   return path.reverse();
+}
+
+/**
+ * Shortest lane lengths to a Kontor host, keyed by source region. The AI only
+ * needs the length while ranking route candidates; building this reverse BFS
+ * once is substantially cheaper than reconstructing a full lane for every
+ * region × good × Kontor candidate. Values use the same node-count convention
+ * as `laneFor` (the host itself is length 1). Pure and deterministic.
+ */
+export function distanceMapToKontor(state: GameState, kontor: KontorId): Map<number, number> {
+  const target = KONTORE[kontor].regionId;
+  if (!state.regions[target]) return new Map();
+
+  // Build the reverse graph so this remains equivalent to laneFor even if a
+  // legacy save contains an asymmetric adjacency entry.
+  const reverse = new Map<number, number[]>();
+  for (const region of state.regions) {
+    for (const neighbour of region.adjacency) {
+      const sources = reverse.get(neighbour);
+      if (sources) sources.push(region.id);
+      else reverse.set(neighbour, [region.id]);
+    }
+  }
+
+  const distances = new Map<number, number>([[target, 1]]);
+  const queue: number[] = [target];
+  let head = 0;
+  while (head < queue.length) {
+    const n = queue[head++]!;
+    const nextDistance = distances.get(n)! + 1;
+    for (const source of reverse.get(n) ?? []) {
+      if (distances.has(source)) continue;
+      distances.set(source, nextDistance);
+      queue.push(source);
+    }
+  }
+  return distances;
 }
 
 // --- Kontor state -----------------------------------------------------------
@@ -442,7 +481,29 @@ export function routeDisrupted(state: GameState, route: TradeRoute): boolean {
     const owner = state.regions[nodeId]?.ownerId ?? null;
     if (owner !== null && owner !== route.ownerId && atWar(state, route.ownerId, owner)) return true;
   }
-  return false;
+  return routeBlockaded(state, route);
+}
+
+/** Sea zones a route plausibly crosses, derived from its ports and lane. */
+export function routeSeaZones(state: GameState, route: TradeRoute): SeaZoneId[] {
+  void state;
+  const kontorRegionId = KONTORE[route.toKontorId]?.regionId;
+  const coastalNodes = [route.fromRegionId, kontorRegionId, ...route.lane];
+  return SEA_ZONE_IDS.filter((zoneId) =>
+    coastalNodes.some((regionId) => SEA_ZONES[zoneId].coastalRegions.includes(regionId)),
+  );
+}
+
+/** True when a hostile fleet occupies one of the sea lanes this route needs. */
+export function routeBlockaded(state: GameState, route: TradeRoute): boolean {
+  return routeSeaZones(state, route).some((zoneId) =>
+    state.armies.some(
+      (army) =>
+        armyIsAtSea(army) && army.seaZoneId === zoneId && armyIsFleet(army.units) &&
+        army.ownerId !== route.ownerId &&
+        (army.ownerId === BARBARIAN_ID || atWar(state, route.ownerId, army.ownerId)),
+    ),
+  );
 }
 
 // --- the Øresund Sound toll (trade as power) --------------------------------
@@ -596,6 +657,7 @@ export function stepTrade(state: GameState): GameState {
 
     // The League shuts a non-member (or a boycotted realm) out of its Kontore entirely.
     const leagueBlocked = leagueSeversRoute(state, route);
+    const blockaded = routeBlockaded(state, route);
     const disrupted = routeDisrupted(state, route);
     const kontorClosed = !kontorOpen(state, route.toKontorId); // a shuttered Kontor takes no trade (A3)
     let income = disrupted || leagueBlocked || kontorClosed ? 0 : routeIncome(state, route);
@@ -615,7 +677,7 @@ export function stepTrade(state: GameState): GameState {
     }
 
     if (income > 0) gain.set(route.ownerId, round1((gain.get(route.ownerId) ?? 0) + income));
-    nextRoutes.push({ ...route, lastIncome: income, disrupted: disrupted || soundBlocked || leagueBlocked || kontorClosed, tollPaid, soundBlocked, leagueBlocked });
+    nextRoutes.push({ ...route, lastIncome: income, disrupted: disrupted || soundBlocked || leagueBlocked || kontorClosed, blockaded, tollPaid, soundBlocked, leagueBlocked });
   }
 
   const nations =

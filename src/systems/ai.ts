@@ -16,6 +16,7 @@
  */
 
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
+import { SEA_ZONE_IDS, SEA_ZONES } from "@/data/sea";
 import { BUILDINGS, buildingFocusOk, buildingResourceOk, focusCapstone, type BuildingId } from "@/data/buildings";
 import type { TraitId } from "@/data/traits";
 import { TERRAIN, type StrategicResource, type TerrainId } from "@/data/terrain";
@@ -26,6 +27,10 @@ import {
   canRaiseUnit,
   fortifyArmy,
   moveArmy,
+  armyIsAtSea,
+  armyIsFleet,
+  reachableSeaZones,
+  sailToSeaZone,
   raiseUnit,
   strategicAccess,
 } from "@/systems/military";
@@ -46,12 +51,12 @@ import {
   wouldJoinWar,
 } from "@/systems/diplomacy";
 import { researchFrontier, selectTech, isBuildingUnlockedFor, nextNodeInPath, isPathRejected } from "@/systems/tech";
-import { createRoute, laneFor, regionSources, distanceFactor } from "@/systems/trade";
+import { createRoute, distanceFactor, distanceMapToKontor, regionSources } from "@/systems/trade";
 import { buyWare, sellWare, marketBuyPrice } from "@/systems/market";
 import { luxuryAppetite, resolveContentment } from "@/systems/prosperity";
 import { foundLeague, joinLeague, canFoundLeague, canJoinLeague, kontoreHeldBy, hasHanseHall } from "@/systems/league";
 import { GOODS, GOOD_IDS, contentmentWares, type GoodId } from "@/data/goods";
-import { KONTORE } from "@/data/kontore";
+import { KONTOR_IDS, KONTORE, type KontorId } from "@/data/kontore";
 import { eraIndexForTurn } from "@/data/eras";
 import { TECHS, type TechId, type ResearchCategory } from "@/data/techs";
 import type { Rng } from "@/systems/rng";
@@ -143,6 +148,12 @@ function manageTrade(state: GameState, nationId: number): GameState {
   const mine = () => (s.routes ?? []).filter((r) => r.ownerId === nationId);
   if (mine().length >= MAX_ROUTES_PER_NATION) return s;
 
+  // Route ranking only needs hop counts. Build one reverse BFS per Kontor rather
+  // than running laneFor for every region × good × Kontor candidate. The exact
+  // lane is still reconstructed by createRoute for the few routes that win.
+  const distances = new Map<KontorId, Map<number, number>>();
+  for (const kontorId of KONTOR_IDS) distances.set(kontorId, distanceMapToKontor(s, kontorId));
+
   interface Cand { regionId: number; good: (typeof GOOD_IDS)[number]; kontorId: keyof typeof KONTORE; income: number }
   const cands: Cand[] = [];
   for (const region of s.regions) {
@@ -150,11 +161,11 @@ function manageTrade(state: GameState, nationId: number): GameState {
     for (const good of GOOD_IDS) {
       if (!regionSources(region, good)) continue;
       for (const kontorId of GOODS[good].demandedAt) {
-        const lane = laneFor(s, region.id, kontorId);
-        if (lane.length === 0) continue; // Kontor unreachable / off this map
+        const hops = distances.get(kontorId)?.get(region.id);
+        if (hops === undefined) continue; // Kontor unreachable / off this map
         const hostOwner = s.regions[KONTORE[kontorId].regionId]?.ownerId ?? null;
         if (hostOwner !== null && hostOwner !== nationId && atWar(s, nationId, hostOwner)) continue;
-        cands.push({ regionId: region.id, good, kontorId, income: GOODS[good].value * distanceFactor(lane.length) });
+        cands.push({ regionId: region.id, good, kontorId, income: GOODS[good].value * distanceFactor(hops) });
       }
     }
   }
@@ -770,6 +781,7 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
 
   // Recruit: keep an army if aggressive/at war and it's affordable.
   s = recruit(s, nationId, rng);
+  s = manageNavy(s, nationId);
 
   // Phase 0 — appoint commanders to lead any sizeable unled stack (M4), so the
   // rival armies benefit from the same martial bonus the player's can.
@@ -780,7 +792,7 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
   }
 
   // Phase 1 — attack: strongest armies first take their best winnable target.
-  const myArmies = () => s.armies.filter((a) => a.ownerId === nationId);
+  const myArmies = () => s.armies.filter((a) => a.ownerId === nationId && !armyIsFleet(a.units));
   for (const army of [...myArmies()].sort((a, b) => armySize(b.units) - armySize(a.units))) {
     const live = s.armies.find((a) => a.id === army.id);
     if (!live || live.movesLeft <= 0) continue;
@@ -863,7 +875,7 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
   // threatened owned region holds the line, so entrench it (M3). Entrenchment
   // then deepens each turn it keeps the ground.
   for (const a of s.armies) {
-    if (a.ownerId !== nationId || a.fortifying || a.movesLeft <= 0) continue;
+    if (a.ownerId !== nationId || armyIsFleet(a.units) || a.fortifying || a.movesLeft <= 0) continue;
     const r = s.regions[a.regionId];
     if (r && r.ownerId === nationId && regionIsThreatened(s, a.regionId, nationId)) {
       s = fortifyArmy(s, a.id);
@@ -879,7 +891,7 @@ function adjacentThreats(state: GameState, regionId: number, nationId: number): 
   const out: Army[] = [];
   for (const nb of region.adjacency) {
     for (const a of state.armies) {
-      if (a.regionId !== nb) continue;
+      if (armyIsAtSea(a) || a.regionId !== nb) continue;
       if (a.ownerId === nationId || a.ownerId === null || a.ownerId === BARBARIAN_ID) continue;
       if (atWar(state, nationId, a.ownerId)) out.push(a);
     }
@@ -907,7 +919,7 @@ export function secessionRiskRegion(state: GameState, nationId: number): number 
     if (r.ownerId !== nationId || r.unrest < UNREST_REVOLT) continue;
     if ((r.revoltTurns ?? 0) < imminent) continue;
     const garrisoned = state.armies.some(
-      (a) => a.regionId === r.id && a.ownerId === nationId && armySize(a.units) > 0,
+      (a) => !armyIsAtSea(a) && a.regionId === r.id && a.ownerId === nationId && armySize(a.units) > 0,
     );
     if (garrisoned) continue;
     const turns = r.revoltTurns ?? 0;
@@ -1079,7 +1091,7 @@ function advanceStep(
 function soloWinnable(state: GameState, targetId: number, nationId: number): boolean {
   const target = state.regions[targetId];
   if (!target) return false;
-  const defender = state.armies.find((a) => a.regionId === targetId && a.ownerId !== nationId);
+  const defender = state.armies.find((a) => !armyIsAtSea(a) && a.regionId === targetId && a.ownerId !== nationId);
   for (const a of state.armies) {
     if (a.ownerId !== nationId) continue;
     const ar = state.regions[a.regionId];
@@ -1141,7 +1153,7 @@ export function musterRegion(state: GameState, nationId: number, focusId: number
     const r = state.regions[nb];
     if (!r || r.ownerId !== nationId) continue;
     const force = state.armies
-      .filter((a) => a.ownerId === nationId && a.regionId === nb)
+      .filter((a) => !armyIsAtSea(a) && a.ownerId === nationId && a.regionId === nb)
       .reduce((s, a) => s + armySize(a.units), 0);
     if (force > bestForce) {
       bestForce = force;
@@ -1149,6 +1161,53 @@ export function musterRegion(state: GameState, nationId: number, focusId: number
     }
   }
   return best;
+}
+
+/** Raise and move a small navy: rivals patrol their trade approaches and seek
+ * enemy ports at sea, while peaceful merchants keep a single escort afloat. */
+function manageNavy(state: GameState, nationId: number): GameState {
+  const nation = state.nations.find((n) => n.id === nationId);
+  if (!nation) return state;
+  const aggression = nation.personality?.aggression ?? 0.4;
+  const atWarNow = state.nations.some(
+    (other) => !other.isBarbarian && other.id !== nationId && atWar(state, nationId, other.id),
+  );
+  const hasTrade = (state.routes ?? []).some((route) => route.ownerId === nationId);
+  const desired = atWarNow || hasTrade || aggression >= 0.6 ? (atWarNow && aggression >= 0.7 ? 2 : 1) : 0;
+  let s = state;
+  let fleets = () => s.armies.filter((a) => a.ownerId === nationId && armyIsFleet(a.units));
+
+  if (fleets().length < desired) {
+    const port = s.regions
+      .filter((r) => r.ownerId === nationId && r.terrain === "coast")
+      .sort((a, b) => a.id - b.id)[0];
+    if (port && canRaiseUnit(s, port.id, "war_cog", nationId).ok) s = raiseUnit(s, port.id, "war_cog", nationId);
+  }
+
+  for (const fleet of [...fleets()].sort((a, b) => a.id - b.id)) {
+    const live = s.armies.find((a) => a.id === fleet.id);
+    if (!live || live.movesLeft <= 0) continue;
+    const choices = reachableSeaZones(s, live);
+    if (choices.length === 0) continue;
+    const scored = choices.map((zoneId) => {
+      const zone = SEA_ZONES[zoneId];
+      const enemyShips = s.armies.filter(
+        (a) => armyIsAtSea(a) && a.seaZoneId === zoneId && a.ownerId !== nationId && armyIsFleet(a.units),
+      ).length;
+      const enemyPorts = zone.coastalRegions.filter((regionId) => {
+        const owner = s.regions[regionId]?.ownerId;
+        return owner !== undefined && owner !== null && owner !== nationId && owner !== BARBARIAN_ID && atWar(s, nationId, owner);
+      }).length;
+      const ownRoutes = (s.routes ?? []).filter((route) => route.ownerId === nationId &&
+        [route.fromRegionId, ...route.lane].some((regionId) => zone.coastalRegions.includes(regionId))).length;
+      return { zoneId, score: enemyShips * 100 + enemyPorts * 10 + ownRoutes };
+    }).sort((a, b) => b.score - a.score || SEA_ZONE_IDS.indexOf(a.zoneId) - SEA_ZONE_IDS.indexOf(b.zoneId));
+    const target = scored[0];
+    if (target && (atWarNow || target.score > 0 || live.seaZoneId === undefined)) {
+      s = sailToSeaZone(s, live.id, target.zoneId);
+    }
+  }
+  return s;
 }
 
 function recruit(state: GameState, nationId: number, rng: Rng): GameState {
@@ -1221,6 +1280,7 @@ function assessThreat(state: GameState, nationId: number): ThreatProfile {
     if (a.ownerId === nationId || a.ownerId === null) continue;
     const hostile = a.ownerId === BARBARIAN_ID || atWar(state, nationId, a.ownerId);
     if (!hostile) continue;
+    if (armyIsAtSea(a)) continue;
     const onTarget = targetIds.has(a.regionId);
     const nearOurLand = state.regions[a.regionId]?.adjacency.some((n) => ownedIds.has(n));
     if (onTarget || nearOurLand) {
@@ -1315,7 +1375,7 @@ export function bestTarget(state: GameState, army: { id: number; regionId: numbe
     // Honour the player's early-game grace: don't invade them before it lapses.
     if (target.ownerId === PLAYER_ID && state.turn < earlyPeaceTurns(state)) continue;
 
-    const defender = state.armies.find((a) => a.regionId === nid && a.ownerId !== nationId);
+    const defender = state.armies.find((a) => !armyIsAtSea(a) && a.regionId === nid && a.ownerId !== nationId);
     const def = defender
       ? sideStrength(defender.units, army.units, "defense") * 1.2 + target.fortification * 3
       : 0;

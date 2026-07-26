@@ -37,7 +37,7 @@ import { stepLeague } from "@/systems/league";
 import { scheduleEpochs, stepEpochs } from "@/systems/epochs";
 import { nextPopulation } from "@/systems/population";
 import { nextUnrest } from "@/systems/stability";
-import { advanceMarches, applyCommanderEffects, applyDefection, armyMoves, tickEntrenchment, totalUpkeep } from "@/systems/military";
+import { advanceMarches, applyCommanderEffects, applyDefection, armyIsAtSea, armyMoves, tickEntrenchment, totalUpkeep } from "@/systems/military";
 import { commanderTitle, generateCommander } from "@/data/commanders";
 import { generateRuler } from "@/data/rulers";
 import { recordChronicle, chronicleName } from "@/systems/chronicle";
@@ -374,7 +374,7 @@ export function applySecession(state: GameState): GameState {
     const inRevolt = r.unrest >= UNREST_REVOLT;
     const garrisoned =
       inRevolt &&
-      state.armies.some((a) => a.regionId === r.id && a.ownerId === owner && armySize(a.units) > 0);
+      state.armies.some((a) => !armyIsAtSea(a) && a.regionId === r.id && a.ownerId === owner && armySize(a.units) > 0);
     if (!inRevolt || garrisoned) {
       return r.revoltTurns ? { ...r, revoltTurns: 0 } : r;
     }
@@ -684,7 +684,7 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
   const techCalm = techUnrestReduction(research.done);
   const garrisonIn = (regionId: number): number =>
     state.armies
-      .filter((a) => a.regionId === regionId && a.ownerId === nationId)
+      .filter((a) => !armyIsAtSea(a) && a.regionId === regionId && a.ownerId === nationId)
       .reduce((sum, a) => sum + armySize(a.units), 0);
   regions = regions.map((r) =>
     r.ownerId === nationId

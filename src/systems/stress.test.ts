@@ -106,7 +106,9 @@ const CONFIGS: Array<{ name: string; opts: (seed: number) => NewGameOptions }> =
 
 // Each of these plays many full games; give them plenty of headroom so a slow
 // CI box never trips the default 5s per-test timeout.
-const STRESS_TIMEOUT_MS = 120_000;
+// The functional naval layer adds fleet recruitment, sea movement and blockade
+// scans to every self-play turn; allow the matrix to finish under worker contention.
+const STRESS_TIMEOUT_MS = 180_000;
 
 describe("stress: self-play across configs holds every invariant and terminates", () => {
   it("plays a matrix of full games with no invariant violation", () => {

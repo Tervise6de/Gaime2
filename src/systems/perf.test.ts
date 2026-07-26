@@ -2,7 +2,7 @@
  * Max-config integration + performance guard (roadmap D4).
  *
  * Exercises the whole turn pipeline at the largest configuration the game
- * offers — 30 regions × 6 nations × up to 150 turns — driven by the AI. It is
+ * offers — 74 authored regions × 16 historical realms × up to 220 turns — driven by the AI. It is
  * both an end-to-end correctness check at scale (the game always terminates with
  * conserved region ownership and finite stocks) and a catastrophic-performance
  * regression guard: the wall-clock ceiling is deliberately generous (~50× the
@@ -14,14 +14,13 @@ import { createGame, resolveTurn } from "@/systems/turn";
 import { runNationTurn } from "@/systems/ai";
 import { resolveChoice } from "@/systems/events";
 import { createRng } from "@/systems/rng";
-import { DEFAULT_MAP_OPTIONS } from "@/systems/mapgen";
 import { PLAYER_ID, TURN_LIMIT, type GameState } from "@/systems/state";
-
-const MAX_MAP = { ...DEFAULT_MAP_OPTIONS, regionCount: 30 };
 
 /** Play one AI-driven game to its conclusion (or the turn cap). */
 function playToEnd(seed: number): GameState {
-  let s = createGame({ seed, rivals: 5, map: MAX_MAP });
+  // The live game is Hansa-only: compatibility map/rival options are ignored,
+  // so this intentionally exercises the full authored board and roster.
+  let s = createGame({ seed });
   for (let t = 0; t < TURN_LIMIT + 5 && s.outcome === "playing"; t++) {
     s = runNationTurn(s, PLAYER_ID, createRng(seed * 1000 + t));
     if (s.pendingChoice) s = resolveChoice(s, s.pendingChoice.options[0]!.id);
@@ -32,7 +31,7 @@ function playToEnd(seed: number): GameState {
 
 describe("max-config integration & performance", () => {
   it(
-    "runs full 30-region / 6-nation games to completion with conserved state, within budget",
+    "runs full Hansa-board games to completion with conserved state, within budget",
     () => {
       const start = performance.now();
       for (let seed = 1; seed <= 5; seed++) {
@@ -51,9 +50,10 @@ describe("max-config integration & performance", () => {
         }
       }
       const elapsed = performance.now() - start;
-      // Generous catastrophic-regression ceiling (baseline ≈ 0.6 ms/turn → ~0.5 s
-      // for five full games; 8 s is ~15× headroom, safe on slow CI).
-      expect(elapsed).toBeLessThan(30000);
+      // Five games take about 24s in isolation. Allow worker contention when the
+      // full Vitest suite runs in parallel, while still catching a return to the
+      // pre-cache ~41s baseline.
+      expect(elapsed).toBeLessThan(40000);
     },
     45000,
   );

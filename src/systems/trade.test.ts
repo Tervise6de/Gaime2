@@ -3,6 +3,7 @@ import {
   regionSources,
   regionGoodOutput,
   laneFor,
+  distanceMapToKontor,
   createRoute,
   closeRoute,
   routeOptions,
@@ -154,6 +155,19 @@ describe("laneFor", () => {
     const regions = regionsOf(2, { 0: { adjacency: [] }, 1: { adjacency: [] } });
     expect(laneFor(state(regions), 1, "london")).toEqual([]); // no path to 0
     expect(laneFor(state(regions), 1, "bergen")).toEqual([]); // Bergen host absent from this map
+  });
+
+  it("builds the same node-count distances as laneFor, without reconstructing paths", () => {
+    const regions = regionsOf(4, {
+      0: { adjacency: [1] },
+      1: { adjacency: [0, 3] },
+      3: { adjacency: [1] },
+    });
+    const distances = distanceMapToKontor(state(regions), "london");
+    expect(distances.get(0)).toBe(1);
+    expect(distances.get(1)).toBe(2);
+    expect(distances.get(3)).toBe(3);
+    expect(distances.has(2)).toBe(false);
   });
 });
 

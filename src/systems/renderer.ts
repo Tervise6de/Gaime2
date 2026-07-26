@@ -33,6 +33,7 @@ import {
   TERRAIN_TEXTURE_DENSITY,
 } from "@/data/mapstyle";
 import { armySize, BARBARIAN_ID, PLAYER_ID, type TradeRoute } from "@/systems/state";
+import { SEA_ZONES } from "@/data/sea";
 import {
   UNREST_PENALTY_START,
   UNREST_REVOLT,
@@ -42,7 +43,7 @@ import {
 } from "@/systems/state";
 import { atWar, getTreaty } from "@/systems/diplomacy";
 import { inLeague } from "@/systems/state";
-import { nextHopToward, armyIsFleet } from "@/systems/military";
+import { nextHopToward, armyIsAtSea, armyIsFleet } from "@/systems/military";
 import { regionCapacity } from "@/systems/population";
 import { popCompact, popDisplay, soldiersCompact, soldiersDisplay } from "@/systems/format";
 import { computeVoronoiCells, pointInPolygon, type Point, type VoronoiCell } from "@/systems/voronoi";
@@ -2060,7 +2061,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   /** An army is "at sea" this turn if it is marching and its next step crosses water —
    *  when it's drawn as a ship (a Hansa cog) rather than a planted banner. */
   function armyAtSea(s: GameState, army: Army): boolean {
-    if (armyIsFleet(army.units)) return true; // a fleet always rides the sea — draw it as a cog
+    if (armyIsAtSea(army)) return true;
     const dest = army.dest;
     if (dest == null) return false;
     const next = nextHopToward(s, army.regionId, dest);
@@ -2291,7 +2292,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         !ownerNation.isBarbarian &&
         (getTreaty(s, PLAYER_ID, army.ownerId) === "alliance" ||
           (playerInLeague && inLeague(s, army.ownerId)));
-      const p = project(region);
+      const sea = army.seaZoneId ? SEA_ZONES[army.seaZoneId] : undefined;
+      const p = sea ? projectXY(sea.x, sea.y) : project(region);
       // Token centre, lower-right of the region node so it clears the capital
       // star and the centred region name.
       const cx = p.x + NODE_RADIUS - 5;
@@ -2300,15 +2302,16 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       const label = (mine || allied) && chipFade > 0 ? soldiersCompact(size) : null;
       const atSea = armyAtSea(s, army);
 
-      if (atSea) drawCog(cx, cy, color, mine, label);
+      const fleet = armyIsFleet(army.units);
+      if (fleet) drawCog(cx, cy, color, mine, label);
       else drawArmyBanner(cx, cy, color, mine, label, armyRole(army.units));
 
       const who = ownerNation?.isPlayer ? "Your" : ownerNation?.isBarbarian ? "Tribal" : `${ownerNation?.name ?? "Rival"}'s`;
       const where = atSea
-        ? `at sea off ${region.name}, under sail`
+        ? `in ${sea?.name ?? "the open sea"}, anchored from ${region.name}`
         : `stationed in ${region.name}`;
-      const kind = atSea ? "fleet" : "army";
-      const hint = mine && !atSea ? " Click the region, then Move / Attack to send it somewhere." : "";
+      const kind = fleet ? "fleet" : "army";
+      const hint = mine && !fleet ? " Click the region, then Move / Attack to send it somewhere." : "";
       markerHits.push({
         x: cx,
         y: cy,

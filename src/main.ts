@@ -10,7 +10,7 @@ import {
   setRegionFocus,
   chooseResearch,
 } from "@/systems/turn";
-import { raiseUnit, orderMarch, cancelMarch, moveDetachment, disbandUnits, fortifyArmy, appointCommander, reachableRegions } from "@/systems/military";
+import { raiseUnit, orderMarch, cancelMarch, moveDetachment, disbandUnits, fortifyArmy, appointCommander, reachableRegions, moveArmy, sailToSeaZone } from "@/systems/military";
 import {
   declareWar,
   atWar,
@@ -207,6 +207,21 @@ function main(): void {
       moveArmyId = armyId;
       sync();
     },
+    onSailToSeaZone(armyId, seaZoneId) {
+      state = sailToSeaZone(state, armyId, seaZoneId);
+      moveArmyId = null;
+      play("build");
+      commit();
+    },
+    onLandFleet(armyId, targetRegionId) {
+      const army = state.armies.find((a) => a.id === armyId && a.ownerId === PLAYER_ID);
+      if (!army) return;
+      withWarConfirm(targetRegionId, () => {
+        state = moveArmy(state, armyId, targetRegionId);
+        moveArmyId = null;
+        commit();
+      });
+    },
     onCancelMove() {
       moveArmyId = null;
       sync();
@@ -328,7 +343,9 @@ function main(): void {
         const armyId = moveArmyId;
         const order = (): void => {
           const before = state;
-          state = orderMarch(state, armyId, regionId);
+          state = army.seaZoneId !== undefined
+            ? moveArmy(state, armyId, regionId)
+            : orderMarch(state, armyId, regionId);
           selectedRegion = regionId;
           moveArmyId = null;
           if (state === before) hud.toast("No route there — the army can't reach that region.");

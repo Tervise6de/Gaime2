@@ -224,19 +224,21 @@ walls), so a fleet can defend your coast, break an enemy fleet, or bombard-and-
 assault a coastal province. A mixed stack (troops + ships) is an amphibious force
 the fleet carries along the shore.
 
-### Sea areas (v0.101)
+### Navigable sea areas (v0.102)
 
 The open water is now drawn as named **sea areas** — the Norwegian Sea, the North
-Sea, the Kattegat, the Baltic, Bothnia and the Gulf of Finland — as faded,
-wide-tracked serif labels baked under the land (so a name tucks beneath the coast).
-The sea reads as structured *regions* rather than empty blue (`renderer.ts`
-`drawSeaLabels`; positions in `HANSA_SEA_AREAS`).
+Sea, the Kattegat, the Baltic, Bothnia and the Gulf of Finland — and those labels
+are backed by functional zones in `data/sea.ts`. Fleets keep their last port as
+an anchor while sailing between adjacent zones. A mixed stack carries its land
+units aboard, can fight an interception with the shared combat resolver, and can
+land at any coastal region touched by its current zone. Rival AI realms recruit
+war cogs, patrol their trade approaches and seek hostile sea lanes.
 
-*Deferred to a functional sea-layer milestone:* making the sea areas **navigable
-zones** where land armies cannot cross open water (only fleets and amphibious
-stacks can), which needs rival **AI fleets** in the same pass (else islands like
-Gotland would strand, uncontested) plus **naval transport and blockade**. That is
-a larger, interconnected change than V1 and is best done as its own milestone.
+Trade routes derive the zones touched by their port/lane and stop paying when a
+hostile fleet occupies one of them. The route HUD calls this out as a blockade;
+the existing Sound and League disruptions remain separate reasons. Land armies
+still cannot enter open water, and a fleet at sea is not counted as a regional
+garrison or zone of control.
 
 ## Build plan — resource overhaul (R-series)
 

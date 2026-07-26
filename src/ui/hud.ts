@@ -14,6 +14,7 @@
 
 import { BUILDINGS, BUILDING_IDS, BUILD_RATE, buildingFocusOk, buildingResourceOk, type BuildingId } from "@/data/buildings";
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
+import { SEA_ZONES, type SeaZoneId } from "@/data/sea";
 import { TERRAIN, TERRAIN_IDS, STRATEGIC_RESOURCES } from "@/data/terrain";
 import { regionProduction, nationalProduction, nationYieldMult, yieldFactors, singleModifierMult, unrestPenalty, regionWareMult } from "@/systems/economy";
 import { garrisonCalm, nextUnrest, overexpansionUnrest } from "@/systems/stability";
@@ -63,7 +64,10 @@ import { previewCombat, forecastCombat } from "@/systems/combat";
 import {
   armyAt,
   anyArmyAt,
+  armyIsAtSea,
+  armyIsFleet,
   canRaiseUnit,
+  reachableSeaZones,
   strategicAccess,
   totalUpkeep,
   unitCost,
@@ -164,6 +168,10 @@ export interface HudCallbacks {
   onSetBoycott(targetId: number, on: boolean): void;
   onRaiseUnit(regionId: number, unit: UnitType): void;
   onBeginMove(armyId: number): void;
+  /** Sail a fleet into a touching sea zone. */
+  onSailToSeaZone(armyId: number, seaZoneId: SeaZoneId): void;
+  /** Land a fleet at a coastal region in its current sea zone. */
+  onLandFleet(armyId: number, targetRegionId: number): void;
   onCancelMove(): void;
   /** Order an army to march on a region (travels over turns, fights on arrival). */
   onAttackWith(armyId: number, regionId: number): void;
@@ -974,7 +982,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       const row = rows.get(route.good);
       if (!row) continue;
       row.routes += 1;
-      row.income += route.lastIncome ?? (route.disrupted || route.soundBlocked || route.leagueBlocked ? 0 : routeIncome(state, route));
+      row.income += route.lastIncome ?? (route.disrupted || route.blockaded || route.soundBlocked || route.leagueBlocked ? 0 : routeIncome(state, route));
     }
 
     const activeRoutes = (state.routes ?? []).filter((r) => r.ownerId === PLAYER_ID);
@@ -1928,14 +1936,16 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     for (const army of mine) {
       const region = state.regions[army.regionId];
       if (!region) continue;
+      const atSea = armyIsAtSea(army);
+      const sea = army.seaZoneId ? SEA_ZONES[army.seaZoneId] : undefined;
       const item = el("div", "hud-prod-item");
       const rowEl = el("div", "hud-prod-row");
-      const name = btn(region.name, "hud-prod-name", () => {
+      const name = btn(atSea ? `${sea?.name ?? "Open sea"} fleet` : region.name, "hud-prod-name", () => {
         callbacks.onSelectRegion(region.id);
         closeArmies();
         openRegionScreen(region.id);
       });
-      name.title = `Open ${region.name} full-screen.`;
+      name.title = atSea ? `Open the fleet's anchor port, ${region.name}.` : `Open ${region.name} full-screen.`;
       rowEl.append(name);
 
       const status = el("div", "hud-prod-status");
@@ -1947,6 +1957,34 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
         ? "This army can still act this turn."
         : "Out of moves — it acts again after End turn.";
       status.append(pill);
+      if (armyIsFleet(army.units) && ready) {
+        const seaActions = el("div", "hud-army-naval-actions");
+        for (const zoneId of reachableSeaZones(state, army)) {
+          const sail = btn(`Sail ${SEA_ZONES[zoneId].name}`, "hud-army-sail", () => {
+            callbacks.onSailToSeaZone(army.id, zoneId);
+          });
+          sail.title = `Spend one move sailing into ${SEA_ZONES[zoneId].name}. Hostile fleets can intercept you.`;
+          seaActions.append(sail);
+        }
+        if (atSea && sea) {
+          const landSelect = document.createElement("select");
+          landSelect.className = "hud-army-land-select";
+          for (const regionId of sea.coastalRegions) {
+            const landing = state.regions[regionId];
+            if (!landing) continue;
+            const option = document.createElement("option");
+            option.value = String(regionId);
+            option.textContent = `Land at ${landing.name}`;
+            landSelect.append(option);
+          }
+          const land = btn("Land", "hud-army-land", () => {
+            callbacks.onLandFleet(army.id, Number(landSelect.value));
+          });
+          land.title = "Land the fleet and any carried troops at the selected coastal region.";
+          seaActions.append(landSelect, land);
+        }
+        if (seaActions.childElementCount > 0) status.append(seaActions);
+      }
       const moveBtn = btn("Move ▸", "hud-army-move", () => {
         closeArmies();
         callbacks.onSelectRegion(region.id);
@@ -1954,7 +1992,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       });
       moveBtn.disabled = !ready;
       moveBtn.title = ready
-        ? "Pick a destination on the map (highlighted regions)."
+        ? atSea ? "Pick a coastal landing on the map (highlighted regions), or use Land above." : "Pick a destination on the map (highlighted regions)."
         : "No moves left this turn.";
       status.append(moveBtn);
       rowEl.append(status);
@@ -2852,7 +2890,9 @@ function tradeSection(state: GameState, region: Region, callbacks: HudCallbacks)
     const toll = rt.tollPaid
       ? ` <span class="hud-trade-toll" title="The Øresund Sound toll skims this Baltic→western route.">−${fmt(rt.tollPaid)}g Sound</span>`
       : "";
-    const worth = rt.soundBlocked
+    const worth = rt.blockaded
+      ? `<span class="hud-trade-severed" title="A hostile fleet is blockading one of this route's sea lanes.">blockaded</span>`
+      : rt.soundBlocked
       ? `<span class="hud-trade-severed" title="The Sound holder has closed the strait to you (war or embargo).">closed at the Sound</span>`
       : rt.leagueBlocked
         ? `<span class="hud-trade-severed" title="The Hanseatic League has shut you out of this Kontor — join the League, or it is boycotting you.">shut out (League)</span>`

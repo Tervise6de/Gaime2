@@ -20,8 +20,9 @@
 
 - **Hansa-control meter:** Kontor coverage, route value, league leadership and
   sea-lane control as a visible race.
-- **Route conflict:** piracy, escorting, blockade, toll avoidance and contested
-  ports.
+- **Route conflict:** piracy, escorting, toll avoidance and contested ports. The
+  first blockade layer is now live: hostile AI fleets can occupy sea zones and
+  stop routes.
 - **League offices:** a small election/leadership layer with concrete trade
   powers.
 - **Character-light politics:** rulers, commanders and one civic office-holder

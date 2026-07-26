@@ -13,6 +13,7 @@
  */
 
 import { UNITS, UNIT_TYPES, NAVAL_UNIT_TYPES, type UnitType } from "@/data/units";
+import { SEA_ZONE_IDS, SEA_ZONES, type SeaZoneId } from "@/data/sea";
 import { GOODS, type GoodId } from "@/data/goods";
 import {
   COMMANDER_DISLOYAL,
@@ -71,12 +72,12 @@ export function armyAt(
   regionId: number,
   ownerId: number,
 ): Army | undefined {
-  return state.armies.find((a) => a.regionId === regionId && a.ownerId === ownerId);
+  return state.armies.find((a) => a.seaZoneId === undefined && a.regionId === regionId && a.ownerId === ownerId);
 }
 
 /** Any army (of any owner) in a region. */
 export function anyArmyAt(state: GameState, regionId: number): Army | undefined {
-  return state.armies.find((a) => a.regionId === regionId);
+  return state.armies.find((a) => a.seaZoneId === undefined && a.regionId === regionId);
 }
 
 /** Strategic resources a nation can draw on (via the regions it owns). */
@@ -96,6 +97,11 @@ export function strategicAccess(
     regions (it sails the shore rather than marching inland). Pure. */
 export function armyIsFleet(units: UnitCounts): boolean {
   return NAVAL_UNIT_TYPES.some((t) => units[t] > 0);
+}
+
+/** Whether a fleet is currently occupying a navigable sea zone. Pure. */
+export function armyIsAtSea(army: Army): boolean {
+  return army.seaZoneId !== undefined;
 }
 
 /** An army moves at the pace of its slowest unit. */
@@ -193,10 +199,18 @@ export function raiseUnit(
 
 /** Which adjacent regions an army could move into this turn (has moves left).
     A fleet is confined to coastal regions — it sails the shore, never inland. */
+export function reachableSeaZones(state: GameState, army: Army): SeaZoneId[] {
+  void state;
+  if (army.movesLeft <= 0 || !armyIsFleet(army.units)) return [];
+  if (army.seaZoneId !== undefined) return SEA_ZONES[army.seaZoneId].neighbors.slice();
+  return SEA_ZONE_IDS.filter((id) => SEA_ZONES[id].coastalRegions.includes(army.regionId));
+}
+
 export function reachableRegions(state: GameState, army: Army): number[] {
   if (army.movesLeft <= 0) return [];
   const region = state.regions[army.regionId];
   if (!region) return [];
+  if (army.seaZoneId !== undefined) return SEA_ZONES[army.seaZoneId].coastalRegions.slice();
   if (armyIsFleet(army.units)) {
     return region.adjacency.filter((id) => state.regions[id]?.terrain === "coast");
   }
@@ -254,7 +268,7 @@ export function applyCommanderEffects(state: GameState): GameState {
   const bump = new Map<number, number>();
   const armies = state.armies.map((a) => {
     const c = a.commander;
-    if (!c) return a;
+    if (!c || armyIsAtSea(a)) return a;
     const r = state.regions[a.regionId];
     if (!r || r.ownerId !== a.ownerId) return a; // effects only apply at home
     const loyalty =
@@ -287,6 +301,7 @@ export function applyCommanderEffects(state: GameState): GameState {
 export function applyDefection(state: GameState): GameState {
   const defectors = state.armies.filter((a) => {
     const c = a.commander;
+    if (armyIsAtSea(a)) return false;
     if (!c || c.loyalty > COMMANDER_DISLOYAL || a.ownerId === BARBARIAN_ID) return false;
     const r = state.regions[a.regionId];
     return !!r && r.ownerId === a.ownerId && r.unrest >= UNREST_REVOLT;
@@ -351,7 +366,7 @@ export function inEnemyZoc(state: GameState, regionId: number, ownerId: number):
   if (!region) return false;
   return region.adjacency.some((nb) =>
     state.armies.some(
-      (a) => a.regionId === nb && armySize(a.units) > 0 && isHostileOwner(state, ownerId, a.ownerId),
+      (a) => !armyIsAtSea(a) && a.regionId === nb && armySize(a.units) > 0 && isHostileOwner(state, ownerId, a.ownerId),
     ),
   );
 }
@@ -375,14 +390,16 @@ export function moveArmy(
   if (!army || army.movesLeft <= 0) return state;
   const from = state.regions[army.regionId];
   const target = state.regions[targetRegionId];
-  if (!from || !target || !from.adjacency.includes(targetRegionId)) return state;
+  const canLandFromSea =
+    army.seaZoneId !== undefined && SEA_ZONES[army.seaZoneId].coastalRegions.includes(targetRegionId);
+  if (!from || !target || (!canLandFromSea && !from.adjacency.includes(targetRegionId))) return state;
   // A fleet may only sail to another coastal region; it cannot march inland.
   if (armyIsFleet(army.units) && target.terrain !== "coast") return state;
 
   const owner = army.ownerId;
   const friendlyAtTarget = armyAt(state, targetRegionId, owner);
   const enemyAtTarget = state.armies.find(
-    (a) => a.regionId === targetRegionId && a.ownerId !== owner,
+    (a) => !armyIsAtSea(a) && a.regionId === targetRegionId && a.ownerId !== owner,
   );
 
   // Friendly destination: merge stacks (or just relocate) and spend a move.
@@ -525,6 +542,110 @@ export function moveArmy(
     next = spendMove(next, army.id);
   }
   return next;
+}
+
+/** Extract the warships that actually fight in a sea battle; transported land
+ * units remain aboard and are carried through as passengers. */
+function navalUnits(units: UnitCounts): UnitCounts {
+  const out = emptyUnits();
+  for (const t of NAVAL_UNIT_TYPES) out[t] = units[t];
+  return out;
+}
+
+/** Sail one fleet into a touching sea zone, resolving any hostile fleet there. */
+export function sailToSeaZone(state: GameState, armyId: number, seaZoneId: SeaZoneId): GameState {
+  const army = state.armies.find((a) => a.id === armyId);
+  if (!army || army.movesLeft <= 0 || !armyIsFleet(army.units)) return state;
+  if (!reachableSeaZones(state, army).includes(seaZoneId)) return state;
+
+  const enemy = state.armies.find(
+    (a) => armyIsAtSea(a) && a.seaZoneId === seaZoneId && a.ownerId !== army.ownerId && armyIsFleet(a.units),
+  );
+  if (!enemy) {
+    const armies = state.armies.map((a) =>
+      a.id === armyId
+        ? { ...a, seaZoneId, dest: null, fortifying: false, entrenchment: 0, movesLeft: Math.max(0, a.movesLeft - 1) }
+        : a,
+    );
+    const owner = state.nations.find((n) => n.id === army.ownerId);
+    return {
+      ...state,
+      armies,
+      log: appendLog(state, [`${owner?.isPlayer ? "Your" : owner?.name ?? "A rival"} fleet sailed into ${SEA_ZONES[seaZoneId].name}.`]),
+    };
+  }
+
+  let working = state;
+  if (enemy.ownerId !== BARBARIAN_ID && !atWar(working, army.ownerId, enemy.ownerId)) {
+    working = declareWar(working, army.ownerId, enemy.ownerId);
+  }
+  const rng = createRng(working.rngState);
+  const result = resolveCombat(
+    navalUnits(army.units),
+    navalUnits(enemy.units),
+    {
+      terrainDefense: 1,
+      fortification: 0,
+      attackerCommand: commanderAttack(army.commander),
+      defenderCommand: commanderDefense(enemy.commander),
+    },
+    rng,
+  );
+  const attackerRemaining = subtractUnits(army.units, result.attackerLosses);
+  const defenderRemaining = subtractUnits(enemy.units, result.defenderLosses);
+  const attackerNation = working.nations.find((n) => n.id === army.ownerId);
+  const defenderNation = working.nations.find((n) => n.id === enemy.ownerId);
+  const zoneName = SEA_ZONES[seaZoneId].name;
+  const attackerName = attackerNation?.name ?? "Fleet";
+  const attackerSunk = !armyIsFleet(attackerRemaining);
+  const defenderSunk = !armyIsFleet(defenderRemaining);
+  const armies = working.armies
+    .map((a) => {
+      if (a.id === army.id) {
+        return {
+          ...a,
+          units: attackerRemaining,
+          seaZoneId: attackerSunk ? undefined : result.attackerWins ? seaZoneId : undefined,
+          movesLeft: 0,
+          fortifying: false,
+          entrenchment: 0,
+        };
+      }
+      if (a.id === enemy.id) {
+        return {
+          ...a,
+          units: defenderRemaining,
+          seaZoneId: defenderSunk ? undefined : result.attackerWins ? undefined : seaZoneId,
+          movesLeft: result.attackerWins ? a.movesLeft : 0,
+          fortifying: false,
+          entrenchment: 0,
+        };
+      }
+      return a;
+    })
+    .filter((a) => armySize(a.units) > 0);
+  const report = {
+    ...result.report,
+    regionName: zoneName,
+    terrainName: "Open sea",
+    attackerName: attackerNation?.isPlayer ? "Your realm" : attackerName,
+    defenderName: defenderNation?.isBarbarian
+      ? "Free Towns"
+      : defenderNation?.isPlayer
+        ? "Your realm"
+        : defenderNation?.name ?? "the enemy fleet",
+    attackerIsPlayer: !!attackerNation?.isPlayer,
+    defenderIsPlayer: !!defenderNation?.isPlayer,
+    defenderReinforcements: 0,
+  };
+  const log = `${attackerName} ${result.attackerWins ? "won" : "lost"} the fleet action in ${zoneName} (losses ${soldiersDisplay(armySize(result.attackerLosses))} vs ${soldiersDisplay(armySize(result.defenderLosses))} warships).`;
+  return {
+    ...working,
+    armies,
+    rngState: rng.seed,
+    battles: [...(working.battles ?? []), report],
+    log: appendLog(working, [log]),
+  };
 }
 
 // --- Marching: movement that takes time (in-transit orders) -----------------
@@ -742,6 +863,7 @@ function ralliedDefenders(state: GameState, target: Region, garrison: Army): Arm
   const realm = garrison.ownerId;
   const reinforcements = state.armies.filter((a) => {
     if (a.id === garrison.id || a.movesLeft <= 0) return false;
+    if (armyIsAtSea(a)) return false;
     if (a.ownerId === BARBARIAN_ID) return false;
     if (!target.adjacency.includes(a.regionId)) return false;
     // Same realm always rallies; a formal ally answers the defensive call.
@@ -831,6 +953,7 @@ function relocateOrMerge(
           ? {
               ...a,
               units: mergedUnits,
+              seaZoneId: undefined,
               movesLeft: zocClampedMoves(
                 state,
                 targetRegionId,
@@ -856,6 +979,7 @@ function relocateOrMerge(
       ? {
           ...a,
           regionId: targetRegionId,
+          seaZoneId: undefined,
           movesLeft: zocClampedMoves(state, targetRegionId, a.ownerId, a.movesLeft - 1),
           fortifying: false,
           entrenchment: 0,
@@ -879,6 +1003,7 @@ function advanceInto(state: GameState, armyId: number, regionId: number): GameSt
       ? {
           ...a,
           regionId,
+          seaZoneId: undefined,
           movesLeft: zocClampedMoves(state, regionId, a.ownerId, a.movesLeft - 1),
           fortifying: false,
           entrenchment: 0,
