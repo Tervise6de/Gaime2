@@ -814,6 +814,9 @@ export function resolveTurn(state: GameState): GameState {
   // monopoly, pirates, a great fire, the Novgorod Peterhof's fall) fire when
   // their rolled turn arrives — dated history, not a per-turn coin-flip.
   s = stepEpochs(s, rng);
+  // Events and epoch effects share the turn's RNG stream. Persist every draw
+  // they consumed so saves and the next turn resume from the true stream head.
+  s = { ...s, rngState: rng.seed };
 
   // 5. Refresh army moves for the coming turn, and deepen entrenchment for
   //    every army still dug in (M3).

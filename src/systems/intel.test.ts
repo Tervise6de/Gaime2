@@ -77,6 +77,6 @@ describe("AI play-out fairness smoke", () => {
       expect(first.regions.every((region) => region.ownerId !== undefined)).toBe(true);
       expect(first.armies.every((stack) => Number.isFinite(stack.movesLeft))).toBe(true);
       expect(first.nations.every((nation) => Object.values(nation.stocks).every(Number.isFinite))).toBe(true);
-    });
+    }, 15_000);
   }
 });

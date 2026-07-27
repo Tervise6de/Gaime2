@@ -6,6 +6,29 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-27 - Naval-state and deterministic-RNG bug bash
+
+A deep deterministic bug bash fixed nine interacting simulation defects. Fleets
+now share sea zones with neutral powers without declaring an unrequested war,
+may only land through their occupied sea zone, cannot detach warships inland,
+and retreat only to a friendly port. Retreating passengers merge into the port
+garrison instead of leaving a second stack that conquest or defection could
+orphan on hostile land. Regional reinforcement events no longer add soldiers to
+an at-sea fleet, while rival recruitment ignores a fleet's lost anchor and uses
+held land.
+
+AI land and naval combat now consume the turn's shared RNG stream, and event plus
+epoch draws persist the true stream head in `rngState`; save/replay determinism
+therefore no longer forks or repeats random outcomes. The permanent stress net
+now checks sea-zone validity, fleet terrain, and army ownership every turn, with
+the long configuration matrix split into independently diagnosed cases. Added
+targeted regressions for every reproduced defect. Version 0.103.0 also advances
+the offline cache so deployed clients receive the fixes.
+
+The serialized repository suite is 762/762 green across 50 files. Typecheck,
+production build, generated-bundle offline scan, service-worker cache check and
+local production HTTP smoke test are clean.
+
 ## 2026-07-26 - Toggleable province chart and strategy graph fallback
 
 The authored polygon/Voronoi renderer is now a user-facing map mode rather than

@@ -3,7 +3,7 @@ import { fireEvent, resolveChoice } from "@/systems/events";
 import { createGame } from "@/systems/turn";
 import { createRng } from "@/systems/rng";
 import { getRelation, getTreaty } from "@/systems/diplomacy";
-import { PLAYER_ID, BARBARIAN_ID, RESEARCH_SURGE_TURNS, pairKey, type GameState } from "@/systems/state";
+import { PLAYER_ID, BARBARIAN_ID, RESEARCH_SURGE_TURNS, emptyUnits, pairKey, type GameState } from "@/systems/state";
 
 const relationBetween = (s: GameState, a: number, b: number): number => getRelation(s, a, b);
 
@@ -177,6 +177,32 @@ describe("choice events", () => {
     expect(hired.pendingChoice).toBeUndefined();
     expect(hired.nations[PLAYER_ID]!.stocks.gold).toBe(gold0 - 40);
     expect(infantryOf(hired, PLAYER_ID)).toBe(inf0 + 2);
+  });
+
+  it("musters reinforcements in port instead of adding them to an anchored fleet at sea", () => {
+    const base = createGame({ seed: 12345, playerFaction: "England" });
+    const capitalId = base.nations[PLAYER_ID]!.capitalRegionId!;
+    const fleetId = 900;
+    const state: GameState = {
+      ...base,
+      armies: [{
+        id: fleetId,
+        ownerId: PLAYER_ID,
+        regionId: capitalId,
+        seaZoneId: "north_sea",
+        units: { ...emptyUnits(), war_cog: 1 },
+        movesLeft: 0,
+      }],
+      nextArmyId: fleetId + 1,
+      pendingChoice: { eventId: "call_the_banners", prompt: "", options: [] },
+    };
+
+    const next = resolveChoice(state, "muster");
+    const fleet = next.armies.find((a) => a.id === fleetId)!;
+    const garrison = next.armies.find((a) => a.seaZoneId === undefined && a.regionId === capitalId);
+
+    expect(fleet.units.militia).toBe(0);
+    expect(garrison?.units.militia).toBe(3);
   });
 
   it("decline clears the prompt at no cost", () => {

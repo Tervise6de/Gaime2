@@ -28,7 +28,7 @@ import { TERRAIN, type StrategicResource } from "@/data/terrain";
 import { recordChronicle, chronicleName } from "@/systems/chronicle";
 import { traitUnitCostMult } from "@/data/traits";
 import { focusUnitCostMult, type FocusId } from "@/data/focuses";
-import { createRng } from "@/systems/rng";
+import { createRng, type Rng } from "@/systems/rng";
 import { resolveCombat, type UnitCounts } from "@/systems/combat";
 import { soldiersDisplay } from "@/systems/format";
 import { atWar, declareWar, getTreaty } from "@/systems/diplomacy";
@@ -385,6 +385,7 @@ export function moveArmy(
   state: GameState,
   armyId: number,
   targetRegionId: number,
+  sharedRng?: Rng,
 ): GameState {
   const army = state.armies.find((a) => a.id === armyId);
   if (!army || army.movesLeft <= 0) return state;
@@ -392,7 +393,10 @@ export function moveArmy(
   const target = state.regions[targetRegionId];
   const canLandFromSea =
     army.seaZoneId !== undefined && SEA_ZONES[army.seaZoneId].coastalRegions.includes(targetRegionId);
-  if (!from || !target || (!canLandFromSea && !from.adjacency.includes(targetRegionId))) return state;
+  if (!from || !target) return state;
+  // While at sea, the old anchor port is only a map/rendering reference. Its
+  // land adjacency must not become a back door to a coast outside this zone.
+  if (armyIsAtSea(army) ? !canLandFromSea : !from.adjacency.includes(targetRegionId)) return state;
   // A fleet may only sail to another coastal region; it cannot march inland.
   if (armyIsFleet(army.units) && target.terrain !== "coast") return state;
 
@@ -450,7 +454,7 @@ export function moveArmy(
   // A dug-in garrison fights as if the region held extra fortification (M3); the
   // attacker's siege still strips it inside resolveCombat.
   const entrenchFort = target.fortification + (enemyAtTarget.entrenchment ?? 0);
-  const rng = createRng(state.rngState);
+  const rng = sharedRng ?? createRng(state.rngState);
   const result = resolveCombat(
     army.units,
     combinedDefender,
@@ -552,14 +556,83 @@ function navalUnits(units: UnitCounts): UnitCounts {
   return out;
 }
 
+/** A defeated fleet may only leave the sea at a friendly port in the battle
+ * zone. Its old anchor can have fallen while it was away and must never become
+ * a teleport onto hostile land. */
+function fleetRetreatPort(
+  state: GameState,
+  army: Army,
+  seaZoneId: SeaZoneId,
+): number | null {
+  const ports = SEA_ZONES[seaZoneId].coastalRegions;
+  const anchor = state.regions[army.regionId];
+  if (
+    ports.includes(army.regionId) &&
+    anchor?.terrain === "coast" &&
+    anchor.ownerId === army.ownerId
+  ) {
+    return army.regionId;
+  }
+  return [...ports]
+    .sort((a, b) => a - b)
+    .find((regionId) => {
+      const region = state.regions[regionId];
+      return region?.terrain === "coast" && region.ownerId === army.ownerId;
+    }) ?? null;
+}
+
+/** Retreating passengers join the friendly garrison already in port. The land
+ * model assumes one stack per owner/region; leaving a second stack behind lets
+ * later conquest or defection fight only one and orphan the other on hostile
+ * land. */
+function mergeRetreatingGroundArmies(
+  armies: Army[],
+  retreatingIds: ReadonlySet<number>,
+): Army[] {
+  let out = armies;
+  for (const retreatingId of retreatingIds) {
+    const retreating = out.find((a) => a.id === retreatingId);
+    if (!retreating || armyIsAtSea(retreating)) continue;
+    const garrison = out.find(
+      (a) =>
+        a.id !== retreating.id &&
+        !armyIsAtSea(a) &&
+        a.ownerId === retreating.ownerId &&
+        a.regionId === retreating.regionId,
+    );
+    if (!garrison) continue;
+    const merged: Army = {
+      ...garrison,
+      units: addUnits(garrison.units, retreating.units),
+      movesLeft: Math.min(garrison.movesLeft, retreating.movesLeft),
+      fortifying: false,
+      entrenchment: 0,
+      commander: garrison.commander ?? retreating.commander,
+    };
+    out = out
+      .filter((a) => a.id !== retreating.id)
+      .map((a) => a.id === garrison.id ? merged : a);
+  }
+  return out;
+}
+
 /** Sail one fleet into a touching sea zone, resolving any hostile fleet there. */
-export function sailToSeaZone(state: GameState, armyId: number, seaZoneId: SeaZoneId): GameState {
+export function sailToSeaZone(
+  state: GameState,
+  armyId: number,
+  seaZoneId: SeaZoneId,
+  sharedRng?: Rng,
+): GameState {
   const army = state.armies.find((a) => a.id === armyId);
   if (!army || army.movesLeft <= 0 || !armyIsFleet(army.units)) return state;
   if (!reachableSeaZones(state, army).includes(seaZoneId)) return state;
 
   const enemy = state.armies.find(
-    (a) => armyIsAtSea(a) && a.seaZoneId === seaZoneId && a.ownerId !== army.ownerId && armyIsFleet(a.units),
+    (a) =>
+      armyIsAtSea(a) &&
+      a.seaZoneId === seaZoneId &&
+      armyIsFleet(a.units) &&
+      isHostileOwner(state, army.ownerId, a.ownerId),
   );
   if (!enemy) {
     const armies = state.armies.map((a) =>
@@ -575,11 +648,10 @@ export function sailToSeaZone(state: GameState, armyId: number, seaZoneId: SeaZo
     };
   }
 
-  let working = state;
-  if (enemy.ownerId !== BARBARIAN_ID && !atWar(working, army.ownerId, enemy.ownerId)) {
-    working = declareWar(working, army.ownerId, enemy.ownerId);
-  }
-  const rng = createRng(working.rngState);
+  // Peaceful and allied fleets may share a zone. War must be declared through
+  // diplomacy first; sailing never starts one without a target/confirmation.
+  const working = state;
+  const rng = sharedRng ?? createRng(working.rngState);
   const result = resolveCombat(
     navalUnits(army.units),
     navalUnits(enemy.units),
@@ -599,23 +671,34 @@ export function sailToSeaZone(state: GameState, armyId: number, seaZoneId: SeaZo
   const attackerName = attackerNation?.name ?? "Fleet";
   const attackerSunk = !armyIsFleet(attackerRemaining);
   const defenderSunk = !armyIsFleet(defenderRemaining);
-  const armies = working.armies
+  const attackerRetreats = attackerSunk || !result.attackerWins;
+  const defenderRetreats = defenderSunk || result.attackerWins;
+  const attackerPort = attackerRetreats ? fleetRetreatPort(working, army, seaZoneId) : null;
+  const defenderPort = defenderRetreats ? fleetRetreatPort(working, enemy, seaZoneId) : null;
+  const retreatingIds = new Set<number>();
+  if (attackerRetreats && attackerPort !== null) retreatingIds.add(army.id);
+  if (defenderRetreats && defenderPort !== null) retreatingIds.add(enemy.id);
+  const battleArmies = working.armies
     .map((a) => {
       if (a.id === army.id) {
+        if (attackerRetreats && attackerPort === null) return null;
         return {
           ...a,
           units: attackerRemaining,
-          seaZoneId: attackerSunk ? undefined : result.attackerWins ? seaZoneId : undefined,
+          regionId: attackerRetreats ? attackerPort! : a.regionId,
+          seaZoneId: attackerRetreats ? undefined : seaZoneId,
           movesLeft: 0,
           fortifying: false,
           entrenchment: 0,
         };
       }
       if (a.id === enemy.id) {
+        if (defenderRetreats && defenderPort === null) return null;
         return {
           ...a,
           units: defenderRemaining,
-          seaZoneId: defenderSunk ? undefined : result.attackerWins ? undefined : seaZoneId,
+          regionId: defenderRetreats ? defenderPort! : a.regionId,
+          seaZoneId: defenderRetreats ? undefined : seaZoneId,
           movesLeft: result.attackerWins ? a.movesLeft : 0,
           fortifying: false,
           entrenchment: 0,
@@ -623,7 +706,8 @@ export function sailToSeaZone(state: GameState, armyId: number, seaZoneId: SeaZo
       }
       return a;
     })
-    .filter((a) => armySize(a.units) > 0);
+    .filter((a): a is Army => a !== null && armySize(a.units) > 0);
+  const armies = mergeRetreatingGroundArmies(battleArmies, retreatingIds);
   const report = {
     ...result.report,
     regionName: zoneName,
@@ -778,7 +862,7 @@ export function moveDetachment(
   subset: Partial<Record<UnitType, number>>,
 ): GameState {
   const army = state.armies.find((a) => a.id === armyId);
-  if (!army || army.movesLeft <= 0) return state;
+  if (!army || army.movesLeft <= 0 || armyIsAtSea(army)) return state;
   const from = state.regions[army.regionId];
   const target = state.regions[targetRegionId];
   if (!from || !target || !from.adjacency.includes(targetRegionId)) return state;
@@ -787,6 +871,9 @@ export function moveDetachment(
 
   const take = clampSubset(army, subset);
   if (!take) return state; // nothing selected
+  // A partial stack containing ships remains a fleet and is coast-locked just
+  // like a whole-stack move. Land-only troops may still detach inland from port.
+  if (armyIsFleet(take) && target.terrain !== "coast") return state;
   const remaining = subtractUnits(army.units, take);
   // Selecting everything is just a whole-stack move — keep its id and merge logic.
   if (armySize(remaining) === 0) return moveArmy(state, armyId, targetRegionId);

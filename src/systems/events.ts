@@ -24,6 +24,7 @@ import {
 } from "@/systems/state";
 import { atWar, adjustRelation, getRelation, getTreaty, setPact } from "@/systems/diplomacy";
 import { round1 } from "@/systems/economy";
+import { armyAt } from "@/systems/military";
 import type { TraitId } from "@/data/traits";
 import type { GoodId } from "@/data/goods";
 
@@ -114,7 +115,7 @@ function reinforce(state: GameState, nationId: number, unit: UnitType, count: nu
   const capHeld =
     nation?.capitalRegionId !== undefined && state.regions[nation.capitalRegionId]?.ownerId === nationId;
   const region = capHeld ? state.regions[nation!.capitalRegionId!]! : owned[0]!;
-  const existing = state.armies.find((a) => a.regionId === region.id && a.ownerId === nationId);
+  const existing = armyAt(state, region.id, nationId);
   if (existing) {
     const armies = state.armies.map((a) =>
       a.id === existing.id ? { ...a, units: { ...a.units, [unit]: a.units[unit] + count } } : a,
@@ -276,7 +277,7 @@ const EVENTS: EventDef[] = [
       const owned = state.regions.filter((r) => r.ownerId === nationId);
       if (!owned.length) return null;
       const region = owned[rng.int(0, owned.length - 1)]!;
-      const existing = state.armies.find((a) => a.regionId === region.id && a.ownerId === nationId);
+      const existing = armyAt(state, region.id, nationId);
       let armies = state.armies;
       let nextArmyId = state.nextArmyId;
       if (existing) {
@@ -1030,7 +1031,7 @@ const EVENTS: EventDef[] = [
       const owned = state.regions.filter((r) => r.ownerId === nationId);
       if (!owned.length) return null;
       const region = owned[rng.int(0, owned.length - 1)]!;
-      const existing = state.armies.find((a) => a.regionId === region.id && a.ownerId === nationId);
+      const existing = armyAt(state, region.id, nationId);
       let armies = state.armies;
       let nextArmyId = state.nextArmyId;
       if (existing) {

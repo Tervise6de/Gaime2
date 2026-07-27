@@ -24,6 +24,7 @@ import {
 } from "@/systems/military";
 import type { Commander } from "@/data/commanders";
 import { createGame } from "@/systems/turn";
+import { createRng } from "@/systems/rng";
 import { UNITS } from "@/data/units";
 import {
   BARBARIAN_ID,
@@ -311,6 +312,15 @@ describe("moveArmy", () => {
     const g = battlefield({ infantry: 3 }, { militia: 2 });
     const next = moveArmy(g, 0, 1);
     expect(next.rngState).not.toBe(g.rngState);
+  });
+
+  it("consumes a caller-provided turn rng instead of forking a second combat stream", () => {
+    const g = battlefield({ infantry: 3 }, { militia: 2 });
+    const rng = createRng(g.rngState);
+    const next = moveArmy(g, 0, 1, rng);
+
+    expect(rng.seed).not.toBe(g.rngState);
+    expect(next.rngState).toBe(rng.seed);
   });
 
   it("logs both sides' casualties after a defended battle (in soldiers)", () => {
@@ -766,5 +776,23 @@ describe("naval fleets", () => {
     };
     expect(reachableRegions(s, s.armies[0]!)).toEqual([1]);
     expect(moveArmy(s, 0, 1).armies[0]!.regionId).toBe(1);
+  });
+
+  it("cannot detach warships into an inland province", () => {
+    const r0 = region(0, { terrain: "coast", adjacency: [1] });
+    const r1 = region(1, { terrain: "plains", ownerId: PLAYER_ID, adjacency: [0] });
+    const s: GameState = {
+      ...battlefield({}, {}),
+      regions: [r0, r1],
+      armies: [{
+        id: 0,
+        ownerId: PLAYER_ID,
+        regionId: 0,
+        units: { ...emptyUnits(), war_cog: 2, infantry: 1 },
+        movesLeft: 1,
+      }],
+    };
+
+    expect(moveDetachment(s, 0, 1, { war_cog: 1 })).toBe(s);
   });
 });

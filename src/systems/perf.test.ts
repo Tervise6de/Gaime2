@@ -33,9 +33,11 @@ describe("max-config integration & performance", () => {
   it(
     "runs full Hansa-board games to completion with conserved state, within budget",
     () => {
-      const start = performance.now();
+      const cpuStart = process.cpuUsage();
+      let simulatedTurns = 0;
       for (let seed = 1; seed <= 5; seed++) {
         const end = playToEnd(seed);
+        simulatedTurns += end.turn - 1;
         // Always terminates: a verdict, or hard-stopped at the turn limit.
         expect(["victory", "defeat", "playing"]).toContain(end.outcome);
         expect(end.turn).toBeLessThanOrEqual(TURN_LIMIT + 1);
@@ -49,12 +51,15 @@ describe("max-config integration & performance", () => {
           }
         }
       }
-      const elapsed = performance.now() - start;
-      // Five games take about 24s in isolation. Allow worker contention when the
-      // full Vitest suite runs in parallel, while still catching a return to the
-      // pre-cache ~41s baseline.
-      expect(elapsed).toBeLessThan(40000);
+      const cpu = process.cpuUsage(cpuStart);
+      const cpuMillisecondsPerTurn = (cpu.user + cpu.system) / 1000 / simulatedTurns;
+      // Measure the simulation rather than scheduler/host pauses: wall time made
+      // this guard fail under Vitest contention and even count machine sleep.
+      // The per-turn ceiling remains generous enough for CI while still catching
+      // an accidental hot-path complexity blowup.
+      expect(simulatedTurns).toBeGreaterThan(0);
+      expect(cpuMillisecondsPerTurn).toBeLessThan(75);
     },
-    45000,
+    120_000,
   );
 });

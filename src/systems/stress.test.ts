@@ -20,6 +20,8 @@ import { resolveChoice } from "@/systems/events";
 import { createRng } from "@/systems/rng";
 import { DEFAULT_MAP_OPTIONS } from "@/systems/mapgen";
 import { UNIT_TYPES } from "@/data/units";
+import { SEA_ZONE_IDS } from "@/data/sea";
+import { armyIsFleet } from "@/systems/military";
 import {
   PLAYER_ID,
   RESOURCE_KEYS,
@@ -65,6 +67,24 @@ function checkInvariants(s: GameState, ctx: string): void {
     if (armySize(a.units) <= 0) throw new Error(`${ctx}: empty army ${a.id} left in play`);
     if (!s.regions[a.regionId]) throw new Error(`${ctx}: army ${a.id} in nonexistent region ${a.regionId}`);
     if (!validOwners.has(a.ownerId)) throw new Error(`${ctx}: army ${a.id} has unknown owner ${a.ownerId}`);
+    if (a.seaZoneId !== undefined) {
+      if (!SEA_ZONE_IDS.includes(a.seaZoneId)) throw new Error(`${ctx}: army ${a.id} in unknown sea zone ${a.seaZoneId}`);
+      if (!armyIsFleet(a.units)) throw new Error(`${ctx}: land army ${a.id} stranded at sea`);
+    } else {
+      const region = s.regions[a.regionId]!;
+      if (armyIsFleet(a.units) && region.terrain !== "coast") {
+        throw new Error(`${ctx}: fleet ${a.id} stranded inland in region ${region.id}`);
+      }
+      if (region.ownerId !== a.ownerId) {
+        const armyOwner = s.nations.find((n) => n.id === a.ownerId)?.name ?? a.ownerId;
+        const regionOwner = s.nations.find((n) => n.id === region.ownerId)?.name ?? region.ownerId;
+        const composition = UNIT_TYPES.filter((t) => a.units[t] > 0).map((t) => `${t}:${a.units[t]}`).join(",");
+        throw new Error(
+          `${ctx}: ${armyOwner} army ${a.id} (${composition}) occupies ${region.name} (${region.id}) held by ${regionOwner}; ` +
+          `recent log: ${s.log.slice(-4).join(" | ")}`,
+        );
+      }
+    }
     if (a.commander && !(a.commander.loyalty >= 0 && a.commander.loyalty <= 100)) {
       throw new Error(`${ctx}: army ${a.id} commander loyalty out of range (${a.commander.loyalty})`);
     }
@@ -111,18 +131,16 @@ const CONFIGS: Array<{ name: string; opts: (seed: number) => NewGameOptions }> =
 const STRESS_TIMEOUT_MS = 180_000;
 
 describe("stress: self-play across configs holds every invariant and terminates", () => {
-  it("plays a matrix of full games with no invariant violation", () => {
+  it.each(CONFIGS)("plays $name games with no invariant violation", (cfg) => {
     let played = 0;
-    for (const cfg of CONFIGS) {
-      for (let seed = 1; seed <= 4; seed++) {
-        const end = playChecked(cfg.opts(seed), `${cfg.name}#${seed}`);
-        // Terminates: a verdict, or hard-stopped exactly at the cap.
-        expect(end.outcome === "playing" ? end.turn : "ended").not.toBe(TURN_LIMIT + 5);
-        expect(["playing", "victory", "defeat"]).toContain(end.outcome);
-        played++;
-      }
+    for (let seed = 1; seed <= 4; seed++) {
+      const end = playChecked(cfg.opts(seed), `${cfg.name}#${seed}`);
+      // Terminates: a verdict, or hard-stopped exactly at the cap.
+      expect(end.outcome === "playing" ? end.turn : "ended").not.toBe(TURN_LIMIT + 5);
+      expect(["playing", "victory", "defeat"]).toContain(end.outcome);
+      played++;
     }
-    expect(played).toBe(CONFIGS.length * 4);
+    expect(played).toBe(4);
   }, STRESS_TIMEOUT_MS);
 
   it("actually exercises conflict across the matrix (coverage guard)", () => {

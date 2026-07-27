@@ -799,7 +799,7 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
 
   // Recruit: keep an army if aggressive/at war and it's affordable.
   s = recruit(s, nationId, rng);
-  s = manageNavy(s, nationId);
+  s = manageNavy(s, nationId, rng);
 
   // Phase 0 — appoint commanders to lead any sizeable unled stack (M4), so the
   // rival armies benefit from the same martial bonus the player's can.
@@ -814,7 +814,7 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
   const capitalPlan = capitalDefensePlan(s, nationId);
   if (capitalPlan) {
     const defender = s.armies.find((a) => a.id === capitalPlan.armyId);
-    if (defender && defender.movesLeft > 0) s = moveArmy(s, defender.id, capitalPlan.step);
+    if (defender && defender.movesLeft > 0) s = moveArmy(s, defender.id, capitalPlan.step, rng);
   }
 
   // One shared offensive plan gates the attack loop: stage first, then attack
@@ -828,12 +828,12 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
     if (concentration && !concentration.ready) continue;
     if (concentration?.ready) {
       if (live.id !== concentration.assaultArmyId) continue;
-      s = moveArmy(s, live.id, concentration.targetId);
+      s = moveArmy(s, live.id, concentration.targetId, rng);
       actedOffensively.add(live.id);
       continue;
     }
     const target = bestTarget(s, live, nationId);
-    if (target !== null) s = moveArmy(s, live.id, target);
+    if (target !== null) s = moveArmy(s, live.id, target, rng);
   }
 
   // Phase 2 — reposition idle armies (no winnable attack this turn):
@@ -851,7 +851,7 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
 
     if (isBadlyOutmatched(s, live, nationId)) {
       const refuge = retreatStep(s, live, nationId);
-      if (refuge !== null) s = moveArmy(s, live.id, refuge);
+      if (refuge !== null) s = moveArmy(s, live.id, refuge, rng);
       continue; // if nowhere safer, hold and sell it dearly rather than advance
     }
 
@@ -875,7 +875,7 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
       ) continue;
       const toMuster = firstStepTowards(s, live.regionId, nationId, (rid) => rid === plan.musterId);
       if (toMuster !== null) {
-        s = moveArmy(s, live.id, toMuster);
+        s = moveArmy(s, live.id, toMuster, rng);
         currentConcentration = concentrationPlan(s, nationId);
         continue;
       }
@@ -891,7 +891,7 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
           if (live.regionId === muster) continue; // already massing here — hold and build up
           const toMuster = firstStepTowards(s, live.regionId, nationId, (rid) => rid === muster);
           if (toMuster !== null) {
-            s = moveArmy(s, live.id, toMuster);
+            s = moveArmy(s, live.id, toMuster, rng);
             continue;
           }
         }
@@ -913,7 +913,7 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
     if (atRisk !== null) {
       const toRisk = firstStepTowards(s, live.regionId, nationId, (rid) => rid === atRisk);
       if (toRisk !== null) {
-        s = moveArmy(s, live.id, toRisk);
+        s = moveArmy(s, live.id, toRisk, rng);
         continue;
       }
     }
@@ -921,12 +921,12 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
     // Otherwise reinforce the nearest threatened region, then stage at the front.
     const defend = defendStep(s, live, nationId);
     if (defend !== null) {
-      s = moveArmy(s, live.id, defend);
+      s = moveArmy(s, live.id, defend, rng);
       continue;
     }
 
     const step = advanceStep(s, live, nationId);
-    if (step !== null) s = moveArmy(s, live.id, step);
+    if (step !== null) s = moveArmy(s, live.id, step, rng);
   }
 
   // Phase 3 — dig in: an army that ended the phase idle (still had a move) on a
@@ -1347,7 +1347,7 @@ export function capitalDefensePlan(state: GameState, nationId: number): CapitalD
 
 /** Raise and move a small navy: rivals patrol their trade approaches and seek
  * enemy ports at sea, while peaceful merchants keep a single escort afloat. */
-function manageNavy(state: GameState, nationId: number): GameState {
+function manageNavy(state: GameState, nationId: number, rng: Rng): GameState {
   const nation = state.nations.find((n) => n.id === nationId);
   if (!nation) return state;
   const aggression = nation.personality?.aggression ?? 0.4;
@@ -1374,7 +1374,12 @@ function manageNavy(state: GameState, nationId: number): GameState {
     const scored = choices.map((zoneId) => {
       const zone = SEA_ZONES[zoneId];
       const enemyShips = s.armies.filter(
-        (a) => armyIsAtSea(a) && a.seaZoneId === zoneId && a.ownerId !== nationId && armyIsFleet(a.units),
+        (a) =>
+          armyIsAtSea(a) &&
+          a.seaZoneId === zoneId &&
+          armyIsFleet(a.units) &&
+          a.ownerId !== nationId &&
+          (a.ownerId === BARBARIAN_ID || atWar(s, nationId, a.ownerId)),
       ).length;
       const enemyPorts = zone.coastalRegions.filter((regionId) => {
         const owner = s.regions[regionId]?.ownerId;
@@ -1386,7 +1391,7 @@ function manageNavy(state: GameState, nationId: number): GameState {
     }).sort((a, b) => b.score - a.score || SEA_ZONE_IDS.indexOf(a.zoneId) - SEA_ZONE_IDS.indexOf(b.zoneId));
     const target = scored[0];
     if (target && (atWarNow || target.score > 0 || live.seaZoneId === undefined)) {
-      s = sailToSeaZone(s, live.id, target.zoneId);
+      s = sailToSeaZone(s, live.id, target.zoneId, rng);
     }
   }
   return s;
@@ -1418,7 +1423,12 @@ function recruit(state: GameState, nationId: number, rng: Rng): GameState {
 
   // Recruit in the capital-ish region (first owned with an army, else first owned).
   const home =
-    state.armies.find((a) => a.ownerId === nationId)?.regionId ??
+    state.armies.find(
+      (a) =>
+        a.ownerId === nationId &&
+        !armyIsAtSea(a) &&
+        state.regions[a.regionId]?.ownerId === nationId,
+    )?.regionId ??
     state.regions.find((r) => r.ownerId === nationId)?.id;
   if (home === undefined) return state;
 

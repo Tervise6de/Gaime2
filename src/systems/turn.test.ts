@@ -21,6 +21,7 @@ import { totalUpkeep } from "@/systems/military";
 import { regionCapacity } from "@/systems/population";
 import { DEFAULT_MAP_OPTIONS } from "@/systems/mapgen";
 import { BUILDINGS } from "@/data/buildings";
+import { createRng } from "@/systems/rng";
 import {
   PLAYER_ID,
   BARBARIAN_ID,
@@ -220,6 +221,29 @@ describe("secession (revolt → break away)", () => {
 });
 
 describe("resolveTurn", () => {
+  it("persists every random draw consumed by events and due epoch effects", () => {
+    const created = createGame({ seed: 41, playerFaction: "England" });
+    const stripped: GameState = {
+      ...created,
+      rngState: 1,
+      nations: created.nations.filter((n) => n.isPlayer || n.isBarbarian),
+      routes: [],
+      league: undefined,
+      epochs: [],
+    };
+    const gateOnly = createRng(stripped.rngState);
+    gateOnly.next(); // player event-chance check; seed 1 does not fire an event
+
+    const ordinary = resolveTurn(stripped);
+    const withEpoch = resolveTurn({
+      ...stripped,
+      epochs: [{ id: "great_fire", fireTurn: stripped.turn + 1 }],
+    });
+
+    expect(ordinary.rngState).toBe(gateOnly.seed);
+    expect(withEpoch.rngState).not.toBe(ordinary.rngState);
+  });
+
   it("advances the turn counter", () => {
     const g = createGame({ seed: 1 });
     expect(resolveTurn(g).turn).toBe(g.turn + 1);
@@ -348,7 +372,7 @@ describe("resolveTurn", () => {
       return playerNation(s).stocks.gold;
     };
     expect(run()).toBe(run());
-  });
+  }, 15_000);
 
   it("higher taxes yield more treasury over time", () => {
     const play = (tax: number): number => {
