@@ -806,6 +806,28 @@ describe("bestTarget prizes valuable regions", () => {
     expect(bestTarget(s, attacker, RIVAL)).toBe(null);
   });
 
+  it("does not attack a weak garrison when a strong neighbouring reserve can rally", () => {
+    const enemy = 3;
+    const attacker = army({ id: 1, ownerId: RIVAL, regionId: 0, units: units({ infantry: 6 }) });
+    const s = {
+      ...targetState(
+        [
+          region({ id: 0, ownerId: RIVAL, adjacency: [1] }),
+          region({ id: 1, ownerId: enemy, population: 6, adjacency: [0, 2] }),
+          region({ id: 2, ownerId: enemy, adjacency: [1] }),
+        ],
+        [
+          attacker,
+          army({ id: 5, ownerId: enemy, regionId: 1, units: units({ militia: 1 }), movesLeft: 0 }),
+          army({ id: 6, ownerId: enemy, regionId: 2, units: units({ infantry: 10 }), movesLeft: 1 }),
+        ],
+      ),
+      treaties: { "2-3": "war" },
+    } as GameState;
+
+    expect(bestTarget(s, attacker, RIVAL)).toBe(null);
+  });
+
   it("prioritises reclaiming its own breakaway land (E5 loop)", () => {
     // Two equal barbarian-held prizes; region 1 broke away from RIVAL and still
     // remembers it, so the reclaim bonus should win it over the richer region 2.

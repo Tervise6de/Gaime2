@@ -277,7 +277,9 @@ describe("resolveTurn", () => {
   });
 
   it("adds national production to stocks, net of army upkeep", () => {
-    const g = createGame({ seed: 1, rivals: 0 });
+    // Isolate the economy assertion from the independent random-event layer.
+    const created = createGame({ seed: 1, rivals: 0 });
+    const g: GameState = { ...created, rngState: 1, epochs: [] };
     const flow = nationalProduction(g, PLAYER_ID);
     const wareOut = nationalWareOutput(g, PLAYER_ID);
     const upkeep = totalUpkeep(g, PLAYER_ID);
@@ -298,6 +300,30 @@ describe("resolveTurn", () => {
         expect(p1.wares[id]).toBeCloseTo(full, 5);
       }
     }
+  });
+
+  it("bankruptcy never removes the final ship from troops that are still at sea", () => {
+    const g = createGame({ seed: 19, rivals: 0 });
+    const port = g.regions.find((r) => r.ownerId === PLAYER_ID && r.terrain === "coast")!;
+    const indebted: GameState = {
+      ...g,
+      nations: g.nations.map((n) =>
+        n.id === PLAYER_ID ? { ...n, stocks: { ...n.stocks, gold: -10000 } } : n
+      ),
+      armies: [{
+        id: 990,
+        ownerId: PLAYER_ID,
+        regionId: port.id,
+        seaZoneId: "north_sea",
+        units: { ...emptyUnits(), war_cog: 1, infantry: 2 },
+        movesLeft: 0,
+      }],
+    };
+
+    const after = resolveTurn(indebted);
+    const fleet = after.armies.find((a) => a.id === 990)!;
+    expect(fleet.units.war_cog).toBe(1);
+    expect(armySize(fleet.units)).toBe(2);
   });
 
   it("luxury contentment eases unrest realm-wide (R5)", () => {

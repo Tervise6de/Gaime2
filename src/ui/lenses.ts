@@ -14,6 +14,7 @@ import { getRelation, getTreaty } from "@/systems/diplomacy";
 import { regionSources, regionGoodOutput } from "@/systems/trade";
 import { KONTORE, KONTOR_IDS } from "@/data/kontore";
 import type { GoodId } from "@/data/goods";
+import { armyIsAtSea } from "@/systems/military";
 
 /** Heat lenses colour by a normalised scalar; relations/military/trade are categorical. */
 type HeatLens = "population" | "gold" | "wares" | "food" | "unrest";
@@ -190,6 +191,7 @@ export function lensColorsFor(state: GameState, id: LensId): (string | null)[] |
     const hostile: number[] = [];
     let maxStr = 1;
     for (const a of state.armies) {
+      if (armyIsAtSea(a)) continue;
       const str = armySize(a.units);
       if (str <= 0) continue;
       if (friendlyTo(a.ownerId)) friendly[a.regionId] = (friendly[a.regionId] ?? 0) + str;

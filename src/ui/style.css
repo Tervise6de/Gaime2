@@ -635,6 +635,85 @@ body {
   min-width: 0;
 }
 
+.hud-army-meta {
+  margin: -2px 10px 7px;
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.hud-army-orders {
+  margin: 0 8px 8px;
+  border-top: 1px solid rgba(226, 197, 126, 0.16);
+}
+
+.hud-army-orders-summary {
+  padding: 7px 2px 3px;
+  color: #d7be7e;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.025em;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.hud-army-orders-summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform 120ms ease;
+}
+
+.hud-army-orders[open] > .hud-army-orders-summary::before {
+  transform: rotate(90deg);
+}
+
+.hud-army-orders-summary::-webkit-details-marker {
+  display: none;
+}
+
+.hud-army-commandbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 5px 0 2px;
+}
+
+.hud-army-command {
+  padding: 5px 8px;
+  color: var(--fg);
+  font-size: 10.5px;
+  font-weight: 700;
+  background: rgba(226, 197, 126, 0.08);
+  border: 1px solid rgba(226, 197, 126, 0.28);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.hud-army-command:hover:not(:disabled) {
+  background: rgba(226, 197, 126, 0.16);
+}
+
+.hud-army-command:disabled,
+.hud-detach button:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.hud-army-orders .hud-odds {
+  margin: 7px 0 3px;
+  padding: 7px 8px;
+  background: rgba(8, 14, 20, 0.34);
+  border: 1px solid rgba(117, 151, 163, 0.18);
+  border-radius: 7px;
+}
+
+.hud-army-orders .hud-odds h3 {
+  margin: 0 0 4px;
+  font-size: 11px;
+}
+
 .hud-army-ready {
   flex: 0 0 auto;
   padding: 2px 8px;

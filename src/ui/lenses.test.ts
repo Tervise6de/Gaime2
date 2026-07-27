@@ -116,4 +116,31 @@ describe("military lens", () => {
     };
     expect(lensColorsFor(g, "military")![pr.id]).toBe("#d99a4f");
   });
+
+  it("does not count an at-sea fleet at its obsolete anchor as a land garrison", () => {
+    const g = createGame({ seed: 7, rivals: 2 });
+    const port = g.regions.find((r) => r.ownerId === PLAYER_ID && r.terrain === "coast")!;
+    const withoutAnchorArmy = {
+      ...g,
+      armies: g.armies.filter((a) => a.regionId !== port.id || a.ownerId !== PLAYER_ID),
+    };
+    const withFleet = {
+      ...withoutAnchorArmy,
+      armies: [
+        ...withoutAnchorArmy.armies,
+        {
+          id: 99998,
+          ownerId: PLAYER_ID,
+          regionId: port.id,
+          seaZoneId: "north_sea" as const,
+          units: { ...emptyUnits(), war_cog: 2 },
+          movesLeft: 0,
+        },
+      ],
+    };
+
+    expect(lensColorsFor(withFleet, "military")![port.id]).toBe(
+      lensColorsFor(withoutAnchorArmy, "military")![port.id],
+    );
+  });
 });

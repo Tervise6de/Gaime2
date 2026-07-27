@@ -59,7 +59,16 @@ import { ACHIEVEMENTS } from "@/data/achievements";
 import { WAR_EDGE_COLOR } from "@/systems/renderer";
 import type { MapRenderMode } from "@/systems/mapview";
 import { regionCapacity } from "@/systems/population";
-import { popDisplay, soldiersCompact, soldiersDisplay } from "@/systems/format";
+import { popDisplay, soldiersDisplay } from "@/systems/format";
+import {
+  battleVerdict,
+  eligiblePlayerAttackers,
+  forceCompactLabel,
+  forceLabel,
+  landUnitCount,
+  shipCount,
+  unitDisplay,
+} from "@/ui/military";
 import { buildOptions, deriveAdvice, regionCanStartBuild } from "@/ui/advisor";
 import { previewCombat, forecastCombat } from "@/systems/combat";
 import {
@@ -68,7 +77,11 @@ import {
   armyIsAtSea,
   armyIsFleet,
   canRaiseUnit,
+  inEnemyZoc,
+  marchEta,
+  reachableRegions,
   reachableSeaZones,
+  regionDefense,
   strategicAccess,
   totalUpkeep,
   unitCost,
@@ -1909,11 +1922,16 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     panel.append(head);
 
     const mine = state.armies.filter((a) => a.ownerId === PLAYER_ID && armySize(a.units) > 0);
-    const totalSoldiers = mine.reduce((s, a) => s + armySize(a.units), 0);
+    const totalLand = mine.reduce((sum, army) => sum + landUnitCount(army.units), 0);
+    const totalShips = mine.reduce((sum, army) => sum + shipCount(army.units), 0);
+    const forceSummary = [
+      totalLand > 0 ? `${soldiersDisplay(totalLand)} soldiers` : "",
+      totalShips > 0 ? `${totalShips} warship${totalShips === 1 ? "" : "s"}` : "",
+    ].filter(Boolean).join(" · ") || "no forces";
     const upkeep = totalUpkeep(state, PLAYER_ID);
     const summaryLine = el("p", "hud-hint hud-prod-summary");
     summaryLine.textContent =
-      `${mine.length} arm${mine.length === 1 ? "y" : "ies"} · ${soldiersDisplay(totalSoldiers)} soldiers · ` +
+      `${mine.length} field force${mine.length === 1 ? "" : "s"} · ${forceSummary} · ` +
       `upkeep ${fmt(upkeep)}g/turn. Moving onto your own army merges the stacks.`;
     panel.append(summaryLine);
 
@@ -2027,7 +2045,11 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
         : "No moves left this turn.";
       status.append(moveBtn);
       rowEl.append(status);
-      item.append(rowEl);
+      item.append(
+        rowEl,
+        renderArmyMeta(state, region, army),
+        renderArmyOrders(state, region, army, callbacks),
+      );
       list.append(item);
     }
     panel.append(list);
@@ -2050,23 +2072,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   });
   root.append(attackOverlay);
 
-  /** The player's adjacent, ready armies that could strike `regionId`. */
-  function eligibleAttackers(state: GameState, regionId: number): Army[] {
-    return state.armies
-      .filter(
-        (a) =>
-          a.ownerId === PLAYER_ID &&
-          a.movesLeft > 0 &&
-          armySize(a.units) > 0 &&
-          state.regions[a.regionId]?.adjacency.includes(regionId),
-      )
-      .sort((a, b) => armySize(b.units) - armySize(a.units));
-  }
-
   /** Open the attack flow for a region: 0 → nothing, 1 → strike, 2+ → chooser. */
   function openAttack(regionId: number): void {
     if (!lastState) return;
-    const attackers = eligibleAttackers(lastState, regionId);
+    const attackers = eligiblePlayerAttackers(lastState, regionId);
     if (attackers.length === 0) return;
     if (attackers.length === 1) {
       callbacks.onAttackWith(attackers[0]!.id, regionId);
@@ -2080,7 +2089,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     const state = lastState;
     const target = state.regions[regionId];
     if (!target) return closeAttack();
-    const attackers = eligibleAttackers(state, regionId);
+    const attackers = eligiblePlayerAttackers(state, regionId);
     if (attackers.length <= 1) return closeAttack(); // a resolved fight emptied the list
 
     attackOverlay.innerHTML = "";
@@ -2091,10 +2100,14 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     head.append(title, closeButton(closeAttack));
     panel.append(head);
 
-    const garrison = anyArmyAt(state, regionId);
+    const defense = regionDefense(state, regionId, PLAYER_ID);
+    const garrison = defense?.garrison;
     const defLine = el("p", "hud-hint hud-prod-summary");
     defLine.innerHTML = garrison
-      ? `Defender: ${soldiersDisplay(armySize(garrison.units))} soldiers (${composition(garrison)}) · ` +
+      ? `Defender: ${escapeHtml(forceLabel(defense!.units))} (${compositionUnits(defense!.units)})` +
+        (defense!.reinforcements > 0
+          ? ` · ${escapeHtml(forceLabel(defense!.reinforcementUnits))} rallying`
+          : "") + ` · ` +
         `${glyphHtml("shield", "🛡")} ×${TERRAIN[target.terrain].defense}${target.fortification ? ` +fort ${target.fortification}` : ""}. ` +
         `Choose which army leads the assault.`
       : "Undefended — any army that walks in captures it. Choose which one.";
@@ -2102,16 +2115,17 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
     const list = el("div", "hud-prod-list");
     attackers.forEach((army, i) => {
-      const from = state.regions[army.regionId];
-      const preview = previewCombat(army.units, garrison?.units ?? emptyUnits(), {
+      const preview = previewCombat(army.units, defense?.units ?? emptyUnits(), {
         terrainDefense: TERRAIN[target.terrain].defense,
-        fortification: target.fortification,
+        fortification: target.fortification + (garrison?.entrenchment ?? 0),
+        attackerCommand: commanderAttack(army.commander),
+        defenderCommand: commanderDefense(garrison?.commander),
       });
       const row = el("div", "hud-prod-row");
       const name = el("div", "hud-attack-from");
       name.innerHTML =
-        `<span class="hud-attack-fromname">${escapeHtml(from?.name ?? "Army")}</span>` +
-        `<span class="hud-attack-comp">${soldiersDisplay(armySize(army.units))} — ${composition(army)}</span>`;
+        `<span class="hud-attack-fromname">${escapeHtml(armyLocationLabel(state, army))}</span>` +
+        `<span class="hud-attack-comp">${escapeHtml(forceLabel(army.units))} — ${composition(army)}</span>`;
       row.append(name);
       const chipWrap = el("div", "hud-prod-status");
       const chip = el("span", "hud-odds-chip " + (preview.undefended ? "win" : oddsClass(preview.winChance)));
@@ -2332,7 +2346,11 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
   function forceLine(units: Record<UnitType, number>): string {
     const parts: string[] = [];
-    for (const t of UNIT_TYPES) if (units[t] > 0) parts.push(`${unitIconHtml(t, UNITS[t].short + " ")}${soldiersCompact(units[t])}`);
+    for (const t of UNIT_TYPES) {
+      if (units[t] > 0) {
+        parts.push(`${unitIconHtml(t, UNITS[t].short + " ")}${unitDisplay(t, units[t], true)}`);
+      }
+    }
     return parts.join(" ") || "—";
   }
 
@@ -2341,20 +2359,27 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     const panel = el("div", "hud-techtree-panel hud-battle-panel");
     const head = el("div", "hud-techtree-head");
     const title = el("h2", "hud-techtree-title");
-    title.textContent = `Battle of ${report.regionName}`;
+    title.textContent = report.battleKind === "naval"
+      ? `Fleet action in ${report.regionName}`
+      : `Battle of ${report.regionName}`;
     head.append(title, closeButton(closeBattle));
     panel.append(head);
 
     // Setting line: terrain, fort (and how far siege battered it down).
     const setting = el("p", "hud-hint hud-prod-summary");
-    setting.innerHTML =
-      `${escapeHtml(report.terrainName)} · ${glyphHtml("shield", "🛡")} defence ×${report.terrainDefense}` +
-      (report.fortification > 0
-        ? ` · fort ${report.fortification}${report.effectiveFort < report.fortification ? ` → ${report.effectiveFort} (siege)` : ""}`
-        : "") +
-      (report.defenderReinforcements
-        ? ` · ${glyphHtml("shield", "🛡")} neighbours rallied +${soldiersDisplay(report.defenderReinforcements)}`
-        : "");
+    setting.innerHTML = report.battleKind === "naval"
+      ? `${escapeHtml(report.terrainName)} · ships committed to close action`
+      : `${escapeHtml(report.terrainName)} · ${glyphHtml("shield", "🛡")} defence ×${report.terrainDefense}` +
+        (report.fortification > 0
+          ? ` · fort ${report.fortification}${report.effectiveFort < report.fortification ? ` → ${report.effectiveFort} (siege)` : ""}`
+          : "") +
+        (report.defenderReinforcements
+          ? ` · ${glyphHtml("shield", "🛡")} neighbours rallied +${
+              report.defenderReinforcementUnits
+                ? escapeHtml(forceLabel(report.defenderReinforcementUnits))
+                : `${soldiersDisplay(report.defenderReinforcements)} soldiers`
+            }`
+          : "");
     panel.append(setting);
 
     // The two forces, side by side.
@@ -2364,7 +2389,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       const nm = el("div", "hud-battle-name");
       nm.textContent = `${role}: ${name}`;
       const comp = el("div", "hud-battle-comp");
-      comp.innerHTML = `${forceLine(units)} <span class="muted">(${soldiersDisplay(sumUnits(units))})</span>`;
+      comp.innerHTML = `${forceLine(units)} <span class="muted">(${escapeHtml(forceLabel(units))})</span>`;
       col.append(nm, comp);
       return col;
     };
@@ -2383,10 +2408,9 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       const note = el("div", "hud-battle-phase-note");
       note.textContent = ph.note;
       const cas = el("div", "hud-battle-phase-cas");
-      const a = sumUnits(ph.attackerLosses);
-      const d = sumUnits(ph.defenderLosses);
       cas.innerHTML =
-        `<span class="atk">−${soldiersCompact(a)}</span> / <span class="def">−${soldiersCompact(d)}</span>`;
+        `<span class="atk">−${escapeHtml(forceCompactLabel(ph.attackerLosses))}</span> / ` +
+        `<span class="def">−${escapeHtml(forceCompactLabel(ph.defenderLosses))}</span>`;
       cas.title = "Attacker losses / defender losses this phase.";
       row.append(label, note, cas);
       phases.append(row);
@@ -2402,8 +2426,8 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
     const totals = el("p", "hud-hint hud-battle-totals");
     totals.innerHTML =
-      `Losses — ${escapeHtml(report.attackerName)}: <b>${soldiersDisplay(sumUnits(report.attackerLosses))}</b>` +
-      ` · ${escapeHtml(report.defenderName)}: <b>${soldiersDisplay(sumUnits(report.defenderLosses))}</b> soldiers.`;
+      `Losses — ${escapeHtml(report.attackerName)}: <b>${escapeHtml(forceLabel(report.attackerLosses))}</b>` +
+      ` · ${escapeHtml(report.defenderName)}: <b>${escapeHtml(forceLabel(report.defenderLosses))}</b>.`;
     panel.append(totals);
 
     const btns = el("div", "hud-end-btns");
@@ -2537,10 +2561,9 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     // Move-mode banner (what's moving, what to click, how to cancel).
     if (moveArmyId !== null) {
       const movingArmy = state.armies.find((a) => a.id === moveArmyId);
-      const unitCount = movingArmy ? armySize(movingArmy.units) : 0;
       moveBanner.innerHTML = "";
       const txt = el("span", "hud-move-banner-text");
-      txt.textContent = `Moving ${soldiersDisplay(unitCount)} soldiers — click a highlighted region to move or attack`;
+      txt.textContent = `Moving ${movingArmy ? forceLabel(movingArmy.units) : "force"} — click a highlighted region to move or attack`;
       moveBanner.append(txt, btn("✕ Cancel", "hud-move-banner-cancel", () => callbacks.onCancelMove()));
       moveBanner.style.display = "flex";
     } else {
@@ -2851,10 +2874,10 @@ function renderRegion(
   const garrison = anyArmyAt(state, region.id);
   const garrisonStat = el("span", "hud-region-stat");
   garrisonStat.innerHTML = garrison
-    ? `${glyphHtml("attack", "⚔")} ${soldiersCompact(armySize(garrison.units))}`
+    ? `${glyphHtml("attack", "⚔")} ${escapeHtml(forceCompactLabel(garrison.units))}`
     : `${glyphHtml("attack", "⚔")} —`;
   garrisonStat.title = garrison
-    ? `${soldiersDisplay(armySize(garrison.units))} soldiers garrison this region.`
+    ? `${forceLabel(garrison.units)} garrison this region.`
     : "No garrison stationed here.";
   stats.append(defStat, unrestStat, garrisonStat);
   container.append(stats);
@@ -3340,16 +3363,30 @@ function renderOwnedRegion(
   container.append(cols);
 }
 
+/** A stack's physical origin: occupied sea zone for fleets, region for armies. */
+function armyLocationLabel(state: GameState, army: Army): string {
+  if (army.seaZoneId !== undefined) return SEA_ZONES[army.seaZoneId]?.name ?? "Open sea";
+  return state.regions[army.regionId]?.name ?? "the field";
+}
+
 function renderEnemyRegion(
   container: HTMLElement,
   state: GameState,
   region: Region,
   openAttack: (regionId: number) => void,
 ): void {
-  const garrison = anyArmyAt(state, region.id);
+  const defense = regionDefense(state, region.id, PLAYER_ID);
+  const garrison = defense?.garrison;
   const box = el("div", "hud-enemy");
   if (garrison && armySize(garrison.units) > 0) {
-    box.append(line(`Enemy garrison: ${soldiersDisplay(armySize(garrison.units))} soldiers (${composition(garrison)})`));
+    box.append(
+      line(
+        `Enemy defence: ${forceLabel(defense!.units)} (${compositionUnits(defense!.units)})` +
+        (defense!.reinforcements > 0
+          ? ` — ${forceLabel(defense!.reinforcementUnits)} can rally from neighbouring forces`
+          : ""),
+      ),
+    );
     if (garrison.commander) {
       const c = garrison.commander;
       const rebel = garrison.ownerId === BARBARIAN_ID;
@@ -3370,23 +3407,15 @@ function renderEnemyRegion(
   // Attack: your adjacent, ready armies that could strike here. One → the
   // button attacks with it (odds on the label); several → it opens a chooser
   // so YOU pick which army leads the assault (CK3-style).
-  const attackers = state.armies
-    .filter(
-      (a) =>
-        a.ownerId === PLAYER_ID &&
-        a.movesLeft > 0 &&
-        armySize(a.units) > 0 &&
-        state.regions[a.regionId]?.adjacency.includes(region.id),
-    )
-    .sort((a, b) => armySize(b.units) - armySize(a.units));
+  const attackers = eligiblePlayerAttackers(state, region.id);
   const attackBtn = document.createElement("button");
   attackBtn.className = "hud-attack-btn";
   if (attackers.length === 0) {
     attackBtn.innerHTML = `${glyphHtml("attack", "⚔")} Attack`;
     attackBtn.disabled = true;
-    attackBtn.title = "No army of yours with moves left borders this region — march one next door first.";
+    attackBtn.title = "No ready field force can legally reach this region.";
   } else if (attackers.length === 1) {
-    const preview = forecastCombat(attackers[0]!.units, garrison?.units ?? emptyUnits(), {
+    const preview = forecastCombat(attackers[0]!.units, defense?.units ?? emptyUnits(), {
       terrainDefense: TERRAIN[region.terrain].defense,
       fortification: region.fortification + (garrison?.entrenchment ?? 0),
       attackerCommand: commanderAttack(attackers[0]!.commander),
@@ -3394,15 +3423,15 @@ function renderEnemyRegion(
     });
     const oddsText = preview.undefended ? "capture" : `${Math.round(preview.winChance * 100)}%`;
     attackBtn.innerHTML = `${glyphHtml("attack", "⚔")} Attack (${oddsText})`;
-    const from = state.regions[attackers[0]!.regionId]?.name ?? "next door";
+    const from = armyLocationLabel(state, attackers[0]!);
     attackBtn.title = preview.undefended
-      ? `Strike with your ${soldiersDisplay(armySize(attackers[0]!.units))}-soldier army from ${from} — undefended, walking in captures it.`
-      : `Strike with your ${soldiersDisplay(armySize(attackers[0]!.units))}-soldier army from ${from} — ${oddsText} to win.\n` +
-        `Likely cost: you ~${soldiersDisplay(armySize(preview.attackerLosses))} (${lossBreakdown(preview.attackerLosses)}), them ~${soldiersDisplay(armySize(preview.defenderLosses))} (${lossBreakdown(preview.defenderLosses)}).`;
+      ? `Strike with ${forceLabel(attackers[0]!.units)} from ${from} — undefended, walking in captures it.`
+      : `Strike with ${forceLabel(attackers[0]!.units)} from ${from} — ${oddsText} to win.\n` +
+        `Likely cost: you ~${forceLabel(preview.attackerLosses)} (${lossBreakdown(preview.attackerLosses)}), them ~${forceLabel(preview.defenderLosses)} (${lossBreakdown(preview.defenderLosses)}).`;
     attackBtn.addEventListener("click", () => openAttack(region.id));
   } else {
-    attackBtn.innerHTML = `${glyphHtml("attack", "⚔")} Attack (${attackers.length} armies)`;
-    attackBtn.title = `Choose which of your ${attackers.length} bordering armies leads the assault.`;
+    attackBtn.innerHTML = `${glyphHtml("attack", "⚔")} Attack (${attackers.length} forces)`;
+    attackBtn.title = `Choose which of your ${attackers.length} ready field forces leads the assault.`;
     attackBtn.addEventListener("click", () => openAttack(region.id));
   }
   box.append(attackBtn);
@@ -3415,12 +3444,238 @@ function renderEnemyRegion(
   container.append(box);
 }
 
+/** Compact strategic status beneath one entry in the Armies ledger. */
+function renderArmyMeta(state: GameState, region: Region, army: Army): HTMLElement {
+  const meta = el("div", "hud-army-meta");
+  const parts: string[] = [];
+  if (army.commander) {
+    parts.push(`${commanderTitle(army.commander)} · martial ${army.commander.martial} · loyalty ${army.commander.loyalty}`);
+  } else {
+    parts.push("Unled");
+  }
+  if (armyIsAtSea(army)) {
+    parts.push(`at sea · anchor ${region.name}`);
+  } else if (army.dest != null) {
+    const destination = state.regions[army.dest]?.name ?? "unknown destination";
+    const eta = marchEta(state, army);
+    parts.push(`marching to ${destination}${eta == null ? "" : ` · ETA ${eta} turn${eta === 1 ? "" : "s"}`}`);
+  } else if (army.fortifying || (army.entrenchment ?? 0) > 0) {
+    parts.push(`dug in ${army.entrenchment ?? 0}/${MAX_ENTRENCH}`);
+  } else {
+    parts.push("holding");
+  }
+  if (!armyIsAtSea(army) && inEnemyZoc(state, army.regionId, army.ownerId)) {
+    parts.push("enemy zone of control");
+  }
+  meta.textContent = parts.join(" · ");
+  return meta;
+}
+
+/** Restored army-management surface: orders, commander, split/reinforce, disband. */
+function renderArmyOrders(
+  state: GameState,
+  region: Region,
+  army: Army,
+  callbacks: HudCallbacks,
+): HTMLElement {
+  const details = document.createElement("details");
+  details.className = "hud-army-orders";
+  const summary = document.createElement("summary");
+  summary.className = "hud-army-orders-summary";
+  summary.textContent = "Orders & organization";
+  details.append(summary);
+
+  const commands = el("div", "hud-army-commandbar");
+  if (army.dest != null) {
+    const cancel = btn("Cancel march", "hud-army-command", () => callbacks.onCancelMarch(army.id));
+    cancel.title = "Clear the standing destination and hold this position.";
+    commands.append(cancel);
+  }
+  if (!armyIsAtSea(army) && !armyIsFleet(army.units) && !army.fortifying) {
+    const fortify = btn("Fortify", "hud-army-command", () => callbacks.onFortifyArmy(army.id));
+    fortify.disabled = army.movesLeft <= 0;
+    fortify.title = army.movesLeft > 0
+      ? `Forfeit remaining movement and entrench here, up to ${MAX_ENTRENCH}.`
+      : "No movement remains to begin fortifying this turn.";
+    commands.append(fortify);
+  }
+  const commander = btn(
+    army.commander ? "Replace commander" : "Appoint commander",
+    "hud-army-command",
+    () => callbacks.onAppointCommander(army.id),
+  );
+  commander.title = "Assign an officer whose martial skill affects attack and defence.";
+  commands.append(commander);
+  details.append(commands);
+
+  if (army.movesLeft > 0) details.append(renderCombatOdds(state, army));
+  details.append(renderDetachPanel(state, region, army, callbacks));
+  return details;
+}
+
+function renderDetachPanel(
+  state: GameState,
+  region: Region,
+  army: Army,
+  callbacks: HudCallbacks,
+): HTMLElement {
+  const wrap = el("div", "hud-detach");
+  const headingEl = el("div", "hud-detach-summary");
+  headingEl.textContent = "Detach, reinforce, or stand down";
+  wrap.append(headingEl);
+
+  const selected = {} as Record<UnitType, number>;
+  for (const type of UNIT_TYPES) selected[type] = 0;
+  const counters: Partial<Record<UnitType, HTMLElement>> = {};
+  const actionButtons: HTMLButtonElement[] = [];
+  let disbandButton: HTMLButtonElement | null = null;
+
+  const selectedTotal = (): number =>
+    UNIT_TYPES.reduce((sum, type) => sum + selected[type], 0);
+  const selectedIsFleet = (): boolean =>
+    UNIT_TYPES.some((type) => !!UNITS[type].naval && selected[type] > 0);
+  const disbandWouldStrand = (): boolean => {
+    if (!armyIsAtSea(army)) return false;
+    const remaining = { ...army.units };
+    for (const type of UNIT_TYPES) remaining[type] -= selected[type];
+    return armySize(remaining) > 0 && !armyIsFleet(remaining);
+  };
+  const refreshActions = (): void => {
+    const any = selectedTotal() > 0;
+    for (const button of actionButtons) {
+      const destination = state.regions[Number(button.dataset.regionId)];
+      button.disabled = !any || (selectedIsFleet() && destination?.terrain !== "coast");
+    }
+    if (disbandButton) {
+      disbandButton.disabled = !any || disbandWouldStrand();
+      disbandButton.title = disbandWouldStrand()
+        ? "Keep at least one warship to carry the remaining troops at sea."
+        : "Stand the selected regiments or ships down to cut upkeep (no refund).";
+    }
+  };
+
+  for (const type of UNIT_TYPES) {
+    const have = army.units[type];
+    if (have <= 0) continue;
+    const row = el("div", "hud-detach-row");
+    const name = el("span", "hud-detach-name");
+    name.innerHTML = `${unitIconHtml(type, "")}${UNITS[type].short}`;
+    const minus = btn("−", "hud-detach-step", () => {
+      selected[type] = Math.max(0, selected[type] - 1);
+      counters[type]!.textContent = String(selected[type]);
+      refreshActions();
+    });
+    const count = el("span", "hud-detach-cnt");
+    count.textContent = "0";
+    counters[type] = count;
+    const of = el("span", "hud-detach-have");
+    of.textContent = `/ ${have}`;
+    const plus = btn("+", "hud-detach-step", () => {
+      selected[type] = Math.min(have, selected[type] + 1);
+      counters[type]!.textContent = String(selected[type]);
+      refreshActions();
+    });
+    row.append(name, minus, count, of, plus);
+    wrap.append(row);
+  }
+
+  if (!armyIsAtSea(army) && army.movesLeft > 0) {
+    const destinations = region.adjacency
+      .map((id) => state.regions[id])
+      .filter((candidate): candidate is Region => !!candidate && candidate.ownerId === PLAYER_ID);
+    if (destinations.length > 0) {
+      wrap.append(line("Send the selected force to:", "hud-hint"));
+      const destinationsRow = el("div", "hud-detach-dests");
+      for (const destination of destinations) {
+        const reinforces = !!armyAt(state, destination.id, PLAYER_ID);
+        const send = btn(
+          `${destination.name}${reinforces ? " · reinforce" : ""}`,
+          "hud-detach-dest",
+          () => callbacks.onMoveDetachment(army.id, destination.id, selected),
+        );
+        send.dataset.regionId = String(destination.id);
+        send.title = reinforces
+          ? `Merge the selected force into the army at ${destination.name}.`
+          : `Form a new detachment in ${destination.name}.`;
+        actionButtons.push(send);
+        destinationsRow.append(send);
+      }
+      wrap.append(destinationsRow);
+    }
+  } else if (!armyIsAtSea(army)) {
+    wrap.append(line("No moves remain for a detachment this turn.", "hud-hint"));
+  } else {
+    wrap.append(line("Land before splitting this fleet; safe disbanding is still available.", "hud-hint"));
+  }
+
+  disbandButton = btn(
+    "Disband selected",
+    "hud-detach-disband",
+    () => callbacks.onDisbandUnits(army.id, selected),
+  );
+  wrap.append(disbandButton);
+  refreshActions();
+  return wrap;
+}
+
+/** Honest one-step forecast including rallied defenders, entrenchment, and command. */
+function renderCombatOdds(state: GameState, army: Army): HTMLElement {
+  const box = el("div", "hud-odds");
+  box.append(heading("Targets in reach"));
+  let shown = 0;
+  for (const targetId of reachableRegions(state, army)) {
+    const target = state.regions[targetId];
+    if (!target) continue;
+    const friendly = armyAt(state, targetId, PLAYER_ID);
+    const row = el("div", "hud-odds-row");
+    const name = el("span", "hud-odds-name");
+    name.textContent = target.name;
+    row.append(name);
+    if (friendly && friendly.id !== army.id) {
+      const chip = el("span", "hud-odds-chip merge");
+      const merged = { ...army.units };
+      for (const type of UNIT_TYPES) merged[type] += friendly.units[type];
+      chip.textContent = `merge → ${forceCompactLabel(merged)}`;
+      chip.title = `Combine into ${forceLabel(merged)}.`;
+      row.append(chip);
+      box.append(row);
+      shown++;
+      continue;
+    }
+    if (target.ownerId === PLAYER_ID) continue;
+    const defense = regionDefense(state, targetId, PLAYER_ID);
+    const garrison = defense?.garrison;
+    const preview = forecastCombat(army.units, defense?.units ?? emptyUnits(), {
+      terrainDefense: TERRAIN[target.terrain].defense,
+      fortification: target.fortification + (garrison?.entrenchment ?? 0),
+      attackerCommand: commanderAttack(army.commander),
+      defenderCommand: commanderDefense(garrison?.commander),
+    });
+    const chip = el(
+      "span",
+      `hud-odds-chip ${preview.undefended ? "win" : oddsClass(preview.winChance)}`,
+    );
+    chip.textContent = preview.undefended ? "capture" : `${Math.round(preview.winChance * 100)}%`;
+    chip.title = preview.undefended
+      ? "No defending stack stands here."
+      : `${forceLabel(defense!.units)} defend` +
+        (defense!.reinforcements > 0
+          ? `, including ${forceLabel(defense!.reinforcementUnits)} rallying`
+          : "") +
+        `. Likely losses: ${forceLabel(preview.attackerLosses)} / ${forceLabel(preview.defenderLosses)}.`;
+    row.append(chip);
+    box.append(row);
+    shown++;
+  }
+  if (shown === 0) box.append(line("No attack or merge target is in immediate reach.", "hud-hint"));
+  return box;
+}
+
 /**
  * The muster menu — one button per unit type, gated by tech and strategic
  * resource, with cost on the face. Strategic-resource gates surface right on the
  * buttons: a unit whose resource you lack says "needs ⚒/🐎" — whatever else also
- * blocks it — so the map's iron/horses markers stop being trivia. Shared by the
- * region panel (legacy) and the Armies overview's "Muster troops" picker.
+ * blocks it — so the map's iron/horses markers stop being trivia.
  */
 function raiseUnitMenu(state: GameState, region: Region, callbacks: HudCallbacks): HTMLElement {
   const access = strategicAccess(state, PLAYER_ID);
@@ -3432,7 +3687,7 @@ function raiseUnitMenu(state: GameState, region: Region, callbacks: HudCallbacks
     btn.className = "hud-unit-btn";
     btn.disabled = !check.ok;
     btn.title = check.ok
-      ? `Raises a 1,000-strong ${def.name} regiment (deploys next turn). ` +
+      ? `Raises a ${soldiersDisplay(1)}-strong ${def.name} regiment (deploys next turn). ` +
         `${def.attack} atk / ${def.defense} def · ${def.upkeep}g upkeep${def.requires ? ` · needs ${def.requires}` : ""}`
       : check.reason ?? "";
     const cost = unitCost(playerNation(state), t, region.focus); // Garrison focus discounts musters
@@ -3486,7 +3741,9 @@ function attackWarning(army: Army, target: Region): string {
  *  wiped 750-soldier stack misreads as "3 lost". */
 function lossBreakdown(losses: Record<UnitType, number>): string {
   const parts: string[] = [];
-  for (const t of UNIT_TYPES) if (losses[t] > 0) parts.push(`${soldiersDisplay(losses[t])} ${UNITS[t].name}`);
+  for (const t of UNIT_TYPES) {
+    if (losses[t] > 0) parts.push(`${unitDisplay(t, losses[t])} ${UNITS[t].name}`);
+  }
   return parts.length ? parts.join(", ") : "no losses";
 }
 
@@ -4584,49 +4841,30 @@ function closeButton(onClick: () => void): HTMLButtonElement {
 }
 
 function composition(army: Army): string {
+  return compositionUnits(army.units);
+}
+
+function compositionUnits(units: Record<UnitType, number>): string {
   const parts: string[] = [];
-  for (const t of UNIT_TYPES) if (army.units[t] > 0) parts.push(`${soldiersCompact(army.units[t])} ${UNITS[t].short}`);
+  for (const t of UNIT_TYPES) {
+    if (units[t] > 0) parts.push(`${unitDisplay(t, units[t], true)} ${UNITS[t].short}`);
+  }
   return parts.join(", ") || "—";
 }
 
-/** Total regiments across all unit types in a loss/composition record. */
-function sumUnits(units: Record<UnitType, number>): number {
-  let s = 0;
-  for (const t of UNIT_TYPES) s += units[t];
-  return s;
-}
-
-/**
- * One-line battle verdict from the viewer's seat. `youAttacked` marks which
- * side the player was on, so a held region reads as a win for the defender and
- * a stalled assault for the attacker.
- */
-function battleVerdict(report: BattleReport, youAttacked: boolean): string {
-  if (youAttacked) {
-    return report.outcome === "captured"
-      ? "Victory — region taken"
-      : report.outcome === "repelled"
-        ? "Defeat — army destroyed"
-        : "Repulsed — the assault stalled";
-  }
-  return report.outcome === "captured"
-    ? "Defeat — region lost"
-    : report.outcome === "repelled"
-      ? "Victory — attackers destroyed"
-      : "Held — the line stood";
-}
-
-/** The army line with unit icons: "3,000 soldiers — [⚒]2k [🗡]1k". Text fallback intact. */
+/** Army/fleet line with scaled soldiers and raw hull counts. */
 function compositionLine(army: Army): HTMLElement {
   const p = el("p", "hud-army-comp");
-  p.append(document.createTextNode(`${soldiersDisplay(armySize(army.units))} soldiers — `));
+  p.append(document.createTextNode(`${forceLabel(army.units)} — `));
   let any = false;
   for (const t of UNIT_TYPES) {
     if (army.units[t] <= 0) continue;
     any = true;
     const chip = el("span", "hud-comp-chip");
-    chip.title = `${UNITS[t].name} — ${soldiersDisplay(army.units[t])} soldiers`;
-    chip.innerHTML = `${unitIconHtml(t, UNITS[t].short + " ")}${soldiersCompact(army.units[t])}`;
+    chip.title = UNITS[t].naval
+      ? `${UNITS[t].name} — ${army.units[t]} ${army.units[t] === 1 ? "ship" : "ships"}`
+      : `${UNITS[t].name} — ${soldiersDisplay(army.units[t])} soldiers`;
+    chip.innerHTML = `${unitIconHtml(t, UNITS[t].short + " ")}${unitDisplay(t, army.units[t], true)}`;
     p.append(chip);
   }
   if (!any) p.append(document.createTextNode("—"));

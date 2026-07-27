@@ -180,6 +180,8 @@ export interface BattlePhase {
 /** The full blow-by-blow of a fight, for the combat-report UI. Region/nation
     names are filled in by the caller (military.ts), which has the state. */
 export interface BattleReport {
+  /** Land assaults capture regions; naval actions decide control of a sea zone. */
+  battleKind: "land" | "naval";
   regionName: string;
   terrainName: string;
   attackerName: string;
@@ -201,11 +203,13 @@ export interface BattleReport {
   /** One-line summary of why it went the way it did. */
   decisive: string;
   /**
-   * Soldiers the defender's neighbouring garrisons rallied into this fight
+   * Units the defender's neighbouring garrisons rallied into this fight
    * (combined defence, M2). 0 when the region stood alone; filled by the caller,
    * which knows the map. Counted inside `defenderStart`.
    */
   defenderReinforcements?: number;
+  /** Exact rallied composition, so mixed coastal support is presented honestly. */
+  defenderReinforcementUnits?: UnitCounts;
 }
 
 export interface CombatResult {
@@ -261,6 +265,7 @@ export function resolveCombat(
   const attackerStart = { ...attacker };
   const defenderStart = { ...defender };
   const blank = (): BattleReport => ({
+    battleKind: "land",
     regionName: "",
     terrainName: "",
     attackerName: "",

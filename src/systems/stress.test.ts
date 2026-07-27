@@ -24,6 +24,7 @@ import { SEA_ZONE_IDS } from "@/data/sea";
 import { armyIsFleet } from "@/systems/military";
 import {
   PLAYER_ID,
+  MAX_ENTRENCH,
   RESOURCE_KEYS,
   TURN_LIMIT,
   UNREST_MAX,
@@ -34,6 +35,7 @@ import {
 /** Hard invariants that must hold after every turn of every game. Throws on violation. */
 function checkInvariants(s: GameState, ctx: string): void {
   const validOwners = new Set<number>(s.nations.map((n) => n.id));
+  const landedStacks = new Set<string>();
 
   for (const n of s.nations) {
     if (n.isBarbarian) continue;
@@ -70,11 +72,21 @@ function checkInvariants(s: GameState, ctx: string): void {
     if (a.seaZoneId !== undefined) {
       if (!SEA_ZONE_IDS.includes(a.seaZoneId)) throw new Error(`${ctx}: army ${a.id} in unknown sea zone ${a.seaZoneId}`);
       if (!armyIsFleet(a.units)) throw new Error(`${ctx}: land army ${a.id} stranded at sea`);
+      if (a.dest != null) throw new Error(`${ctx}: fleet ${a.id} has a land march order while at sea`);
+      if (a.fortifying || (a.entrenchment ?? 0) > 0) {
+        throw new Error(`${ctx}: fleet ${a.id} is illegally entrenched at sea`);
+      }
     } else {
       const region = s.regions[a.regionId]!;
       if (armyIsFleet(a.units) && region.terrain !== "coast") {
         throw new Error(`${ctx}: fleet ${a.id} stranded inland in region ${region.id}`);
       }
+      if (armyIsFleet(a.units) && (a.fortifying || (a.entrenchment ?? 0) > 0)) {
+        throw new Error(`${ctx}: fleet ${a.id} is illegally entrenched on land`);
+      }
+      const stackKey = `${a.ownerId}:${a.regionId}`;
+      if (landedStacks.has(stackKey)) throw new Error(`${ctx}: duplicate landed stack ${stackKey}`);
+      landedStacks.add(stackKey);
       if (region.ownerId !== a.ownerId) {
         const armyOwner = s.nations.find((n) => n.id === a.ownerId)?.name ?? a.ownerId;
         const regionOwner = s.nations.find((n) => n.id === region.ownerId)?.name ?? region.ownerId;
@@ -88,7 +100,9 @@ function checkInvariants(s: GameState, ctx: string): void {
     if (a.commander && !(a.commander.loyalty >= 0 && a.commander.loyalty <= 100)) {
       throw new Error(`${ctx}: army ${a.id} commander loyalty out of range (${a.commander.loyalty})`);
     }
-    if ((a.entrenchment ?? 0) < 0) throw new Error(`${ctx}: army ${a.id} negative entrenchment`);
+    if ((a.entrenchment ?? 0) < 0 || (a.entrenchment ?? 0) > MAX_ENTRENCH) {
+      throw new Error(`${ctx}: army ${a.id} entrenchment out of range (${a.entrenchment})`);
+    }
   }
 
   if (!(Number.isInteger(s.rngState) && s.rngState >= 0)) {

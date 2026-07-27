@@ -6,6 +6,7 @@ import { routeBlockaded, routeDisrupted, stepTrade } from "@/systems/trade";
 import { runNationTurn } from "@/systems/ai";
 import { createRng } from "@/systems/rng";
 import { getTreaty } from "@/systems/diplomacy";
+import { UNITS, UNIT_TYPES } from "@/data/units";
 
 function hansa(): GameState {
   const state = createGame({ seed: 17, playerFaction: "England" });
@@ -44,8 +45,38 @@ describe("functional naval layer", () => {
       treaties: { ...state.treaties, [`${Math.min(PLAYER_ID, enemyId)}-${Math.max(PLAYER_ID, enemyId)}`]: "war" },
     };
     const next = sailToSeaZone(withFleets, 901, "north_sea");
-    expect(next.battles?.at(-1)?.terrainName).toBe("Open sea");
+    const report = next.battles?.at(-1);
+    expect(report?.terrainName).toBe("Open sea");
+    expect(report?.battleKind).toBe("naval");
+    expect(report?.decisive).not.toMatch(/region|walls|army/i);
     expect(next.rngState).not.toBe(withFleets.rngState);
+  });
+
+  it("ends both fleets' movement after an interception and reports ships as ships", () => {
+    const state = hansa();
+    const enemyId = state.nations.find((n) => !n.isBarbarian && !n.isPlayer)!.id;
+    const withFleets: GameState = {
+      ...state,
+      regions: state.regions.map((r) => r.id === 5 ? { ...r, ownerId: enemyId } : r),
+      armies: [
+        { id: 910, ownerId: PLAYER_ID, regionId: 0, units: { ...emptyUnits(), war_cog: 6 }, movesLeft: 2 },
+        {
+          id: 911,
+          ownerId: enemyId,
+          regionId: 5,
+          seaZoneId: "north_sea",
+          units: { ...emptyUnits(), war_cog: 1, infantry: 2 },
+          movesLeft: 2,
+        },
+      ],
+      treaties: { ...state.treaties, [`${Math.min(PLAYER_ID, enemyId)}-${Math.max(PLAYER_ID, enemyId)}`]: "war" },
+    };
+
+    const next = sailToSeaZone(withFleets, 910, "north_sea");
+    const retreat = next.armies.find((a) => a.id === 911);
+    expect(retreat?.movesLeft ?? 0).toBe(0);
+    expect(next.log.at(-1)).toMatch(/losses \d+ vs \d+ warships/);
+    expect(next.log.at(-1)).not.toMatch(/250|500|750 warships/);
   });
 
   it("does not retreat survivors onto a hostile old anchor when no safe port remains", () => {
@@ -220,5 +251,39 @@ describe("functional naval layer", () => {
 
     expect(recruitedOnLand).toBeDefined();
     expect(armySize(recruitedOnLand!.units)).toBeGreaterThan(0);
+  });
+
+  it("does not count warships toward the land-army recruitment target", () => {
+    const state = hansa();
+    const rival = state.nations.find((n) => !n.isBarbarian && !n.isPlayer)!;
+    const held = state.regions.find((r) => r.ownerId === rival.id)!;
+    const fleetOnly: GameState = {
+      ...state,
+      nations: state.nations.map((n) =>
+        n.id === rival.id
+          ? {
+              ...n,
+              stocks: { ...n.stocks, gold: 1000 },
+              wares: { ...emptyWares(), timber: 100, brick: 100, iron: 100, naval_stores: 100 },
+            }
+          : n
+      ),
+      armies: [{
+        id: 912,
+        ownerId: rival.id,
+        regionId: held.id,
+        units: { ...emptyUnits(), war_cog: 20 },
+        movesLeft: 0,
+      }],
+    };
+
+    const after = runNationTurn(fleetOnly, rival.id, createRng(993));
+    const landUnits = after.armies
+      .filter((a) => a.ownerId === rival.id)
+      .reduce(
+        (sum, a) => sum + UNIT_TYPES.reduce((n, t) => n + (UNITS[t].naval ? 0 : a.units[t]), 0),
+        0,
+      );
+    expect(landUnits).toBeGreaterThan(0);
   });
 });

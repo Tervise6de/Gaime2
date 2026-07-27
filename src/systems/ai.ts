@@ -33,6 +33,7 @@ import {
   reachableSeaZones,
   sailToSeaZone,
   raiseUnit,
+  regionDefense,
   strategicAccess,
 } from "@/systems/military";
 import {
@@ -805,7 +806,7 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
   // rival armies benefit from the same martial bonus the player's can.
   for (const a of s.armies) {
     if (a.ownerId === nationId && !a.commander && armySize(a.units) >= 3) {
-      s = appointCommander(s, a.id);
+      s = appointCommander(s, a.id, rng);
     }
   }
 
@@ -1152,14 +1153,16 @@ function advanceStep(
 function soloWinnable(state: GameState, targetId: number, nationId: number): boolean {
   const target = state.regions[targetId];
   if (!target) return false;
-  const defender = state.armies.find((a) => !armyIsAtSea(a) && a.regionId === targetId && a.ownerId !== nationId);
+  const defenders = targetDefenders(state, targetId, nationId);
+  const garrison = regionDefense(state, targetId, nationId)?.garrison;
   for (const a of state.armies) {
-    if (a.ownerId !== nationId) continue;
+    if (a.ownerId !== nationId || armyIsAtSea(a) || armyIsFleet(a.units)) continue;
     const ar = state.regions[a.regionId];
     if (!ar || !ar.adjacency.includes(targetId)) continue;
     const atk = sideStrength(a.units, zeroUnits(), "attack");
-    const def = defender
-      ? sideStrength(publicIntelUnits(state, nationId, defender), a.units, "defense") * 1.2 + target.fortification * 3
+    const def = armySize(defenders) > 0
+      ? sideStrength(defenders, a.units, "defense") * 1.2 +
+        (target.fortification + (garrison?.entrenchment ?? 0)) * 3
       : 0;
     if (atk > def * 1.1) return true;
   }
@@ -1278,8 +1281,8 @@ function offensiveMargin(state: GameState, nationId: number): number {
 
 function targetDefenders(state: GameState, targetId: number, nationId: number): UnitCounts {
   const defenders = emptyUnits();
-  for (const army of state.armies) {
-    if (armyIsAtSea(army) || army.ownerId === nationId || army.regionId !== targetId) continue;
+  const defense = regionDefense(state, targetId, nationId);
+  for (const army of defense?.armies ?? []) {
     const visible = publicIntelUnits(state, nationId, army);
     for (const type of UNIT_TYPES) defenders[type] += visible[type];
   }
@@ -1309,7 +1312,8 @@ export function concentrationPlan(state: GameState, nationId: number): Concentra
   const force = assault?.units ?? emptyUnits();
   const forecast = previewCombat(force, defenders, {
     terrainDefense: TERRAIN[target.terrain].defense,
-    fortification: target.fortification,
+    fortification:
+      target.fortification + (regionDefense(state, targetId, nationId)?.garrison.entrenchment ?? 0),
   });
   const ready = !!assault && forecast.attack > forecast.defense * offensiveMargin(state, nationId);
   const stagingArmyIds = state.armies
@@ -1407,7 +1411,11 @@ function recruit(state: GameState, nationId: number, rng: Rng): GameState {
   );
   const myUnits = state.armies
     .filter((a) => a.ownerId === nationId)
-    .reduce((sum, a) => sum + armySize(a.units), 0);
+    .reduce(
+      (sum, a) =>
+        sum + UNIT_TYPES.reduce((count, type) => count + (UNITS[type].naval ? 0 : a.units[type]), 0),
+      0,
+    );
 
   // Warlords keep a bigger standing army; everyone raises more in wartime; a
   // Martial realm (cheaper units) fields a larger host and leans on it. R5.1: a rich,
@@ -1568,9 +1576,11 @@ export function bestTarget(state: GameState, army: { id: number; regionId: numbe
     // Honour the player's early-game grace: don't invade them before it lapses.
     if (target.ownerId === PLAYER_ID && state.turn < earlyPeaceTurns(state)) continue;
 
-    const defender = state.armies.find((a) => !armyIsAtSea(a) && a.regionId === nid && a.ownerId !== nationId);
-    const def = defender
-      ? sideStrength(publicIntelUnits(state, nationId, defender), army.units, "defense") * 1.2 + target.fortification * 3
+    const defenders = targetDefenders(state, nid, nationId);
+    const garrison = regionDefense(state, nid, nationId)?.garrison;
+    const def = armySize(defenders) > 0
+      ? sideStrength(defenders, army.units, "defense") * 1.2 +
+        (target.fortification + (garrison?.entrenchment ?? 0)) * 3
       : 0;
 
     // Winnable if our attack clearly exceeds their defence.

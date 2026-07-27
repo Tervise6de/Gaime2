@@ -6,6 +6,34 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-27 - Military integrity, naval semantics and army controls
+
+A full military-system audit fixed deployment-delay bypasses, stale movement
+orders, illegal fleet fortification, unsafe transport disbanding, commander loss
+during stack merges, and post-battle naval movement. Enemy zones of control now
+limit detached reinforcements, standing fleet marches follow coastal routes, and
+at-sea fleets can only initiate attacks by landing through their occupied sea
+zone. Battle previews, actual combat and rival planning now share the same
+allied-rally defense calculation.
+
+Rival recruitment no longer counts warships toward its land-army target, avoids
+suicidal attacks into nearby reserves, and consumes the shared deterministic RNG
+when appointing commanders. Save loading repairs malformed unit counts, movement,
+entrenchment, sea state, destinations, commanders, duplicate landed stacks and
+army identifiers without changing valid round trips. Stress invariants now guard
+these conditions across long campaigns.
+
+The Armies ledger regains compact controls for march cancellation, fortification,
+commander appointments, attack/merge forecasts, splitting, reinforcement and
+safe disbanding. Fleet strength is consistently shown as hulls while land forces
+use the established regiment-to-soldier conversion; naval reports and map labels
+now use sea-lane terminology.
+
+Version 0.104.0 passes the serialized repository suite (782/782 across 51 files),
+the 24-configuration campaign stress matrix, performance/profile guards,
+typecheck, production build, offline-bundle scan, service-worker check and local
+production HTTP smoke test.
+
 ## 2026-07-27 - Naval-state and deterministic-RNG bug bash
 
 A deep deterministic bug bash fixed nine interacting simulation defects. Fleets

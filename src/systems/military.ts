@@ -177,7 +177,16 @@ export function raiseUnit(
   if (existing) {
     armies = state.armies.map((a) =>
       a.id === existing.id
-        ? { ...a, units: { ...a.units, [unit]: a.units[unit] + 1 } }
+        ? {
+            ...a,
+            units: { ...a.units, [unit]: a.units[unit] + 1 },
+            // A newly mustered regiment is not combat-ready until next turn.
+            // Joining it to a veteran stack must not bypass that deployment delay.
+            movesLeft: 0,
+            dest: null,
+            fortifying: false,
+            entrenchment: 0,
+          }
         : a,
     );
   } else {
@@ -225,9 +234,18 @@ export function reachableRegions(state: GameState, army: Army): number[] {
  */
 export function fortifyArmy(state: GameState, armyId: number): GameState {
   const army = state.armies.find((a) => a.id === armyId);
-  if (!army || armySize(army.units) === 0 || army.fortifying) return state;
+  if (
+    !army ||
+    armySize(army.units) === 0 ||
+    army.movesLeft <= 0 ||
+    army.fortifying ||
+    armyIsAtSea(army) ||
+    armyIsFleet(army.units)
+  ) {
+    return state;
+  }
   const armies = state.armies.map((a) =>
-    a.id === armyId ? { ...a, fortifying: true, movesLeft: 0 } : a,
+    a.id === armyId ? { ...a, fortifying: true, movesLeft: 0, dest: null } : a,
   );
   const owner = state.nations.find((n) => n.id === army.ownerId);
   const where = state.regions[army.regionId]?.name ?? "the field";
@@ -241,10 +259,10 @@ export function fortifyArmy(state: GameState, armyId: number): GameState {
  * martial rating then feeds this army's combat, and a disloyal one foments
  * unrest where it stands. No-op for an empty stack. Pure (advances rngState).
  */
-export function appointCommander(state: GameState, armyId: number): GameState {
+export function appointCommander(state: GameState, armyId: number, sharedRng?: Rng): GameState {
   const army = state.armies.find((a) => a.id === armyId);
   if (!army || armySize(army.units) === 0) return state;
-  const rng = createRng(state.rngState);
+  const rng = sharedRng ?? createRng(state.rngState);
   const commander = generateCommander(rng);
   const armies = state.armies.map((a) => (a.id === armyId ? { ...a, commander } : a));
   const owner = state.nations.find((n) => n.id === army.ownerId);
@@ -341,11 +359,18 @@ export function applyDefection(state: GameState): GameState {
 
 /** Grow one turn's worth of entrenchment on every dug-in army (called by the turn pipeline). */
 export function tickEntrenchment(armies: Army[]): Army[] {
-  return armies.map((a) =>
-    a.fortifying
+  return armies.map((a) => {
+    // Ships cannot turn naval gunnery into a land-fortification bonus. Repair
+    // stale flags as well as rejecting new fleet fortify orders.
+    if (armyIsAtSea(a) || armyIsFleet(a.units)) {
+      return a.fortifying || (a.entrenchment ?? 0) > 0
+        ? { ...a, fortifying: false, entrenchment: 0 }
+        : a;
+    }
+    return a.fortifying
       ? { ...a, entrenchment: Math.min(MAX_ENTRENCH, (a.entrenchment ?? 0) + 1) }
-      : a,
-  );
+      : a;
+  });
 }
 
 /** Whether `other` is an army an army of `ownerId` must fight (enemy or barbarian). */
@@ -388,7 +413,7 @@ export function moveArmy(
   sharedRng?: Rng,
 ): GameState {
   const army = state.armies.find((a) => a.id === armyId);
-  if (!army || army.movesLeft <= 0) return state;
+  if (!army || army.movesLeft <= 0 || armySize(army.units) <= 0) return state;
   const from = state.regions[army.regionId];
   const target = state.regions[targetRegionId];
   const canLandFromSea =
@@ -407,7 +432,9 @@ export function moveArmy(
   );
 
   // Friendly destination: merge stacks (or just relocate) and spend a move.
-  if (target.ownerId === owner || friendlyAtTarget) {
+  // An actual hostile stack always takes precedence over a stale ownership flag
+  // or malformed duplicate friendly stack: an enemy cannot be bypassed.
+  if (!enemyAtTarget && (target.ownerId === owner || friendlyAtTarget)) {
     return relocateOrMerge(state, army, targetRegionId);
   }
 
@@ -432,7 +459,8 @@ export function moveArmy(
 
   // Defended: rally the neighbourhood into a combined defence (M2), then resolve
   // the assault once against the pooled stack.
-  const defenders = ralliedDefenders(state, target, enemyAtTarget);
+  const defense = regionDefense(state, target.id, owner);
+  const defenders = defense?.armies ?? [enemyAtTarget];
 
   // Allies who answered the call are drawn into the war against the aggressor
   // (the alliance honoured as a defensive pact). Same-realm reinforcements are
@@ -445,11 +473,9 @@ export function moveArmy(
     if (!atWar(state, owner, allyId)) state = declareWar(state, allyId, owner, "ally_call");
   }
 
-  const combinedDefender = defenders.reduce(
-    (acc, d) => addUnits(acc, d.units),
-    emptyUnits(),
-  );
-  const reinforcements = armySize(combinedDefender) - armySize(enemyAtTarget.units);
+  const combinedDefender = defense?.units ?? enemyAtTarget.units;
+  const reinforcements = defense?.reinforcements ?? 0;
+  const reinforcementUnits = subtractUnits(combinedDefender, enemyAtTarget.units);
 
   // A dug-in garrison fights as if the region held extra fortification (M3); the
   // attacker's siege still strips it inside resolveCombat.
@@ -477,18 +503,16 @@ export function moveArmy(
   const attackerNation = state.nations.find((n) => n.id === owner);
   const defenderNation = state.nations.find((n) => n.id === enemyAtTarget.ownerId);
   const atkName = attackerNation?.name ?? "Army";
-  const myLoss = armySize(result.attackerLosses);
-  const theirLoss = armySize(result.defenderLosses);
   if (reinforcements > 0) {
     const defName = defenderNation?.isPlayer ? "Your" : `${defenderNation?.name ?? "The"}'s`;
     log.push(
-      `${defName} neighbouring garrisons rallied to ${target.name} (+${soldiersDisplay(reinforcements)} soldiers).`,
+      `${defName} neighbouring garrisons rallied to ${target.name} (+${forceLog(reinforcementUnits)}).`,
     );
   }
   log.push(
     `${atkName} ${result.attackerWins ? "won" : "was repelled"} at ${target.name}` +
       (result.captured ? ` — ${target.name} captured!` : ".") +
-      ` (losses ${soldiersDisplay(myLoss)} vs ${soldiersDisplay(theirLoss)} soldiers)`,
+      ` (losses ${forceLog(result.attackerLosses)} vs ${forceLog(result.defenderLosses)})`,
   );
 
   // Enrich the battle report with the names the resolver couldn't know, and
@@ -506,6 +530,7 @@ export function moveArmy(
     attackerIsPlayer: !!attackerNation?.isPlayer,
     defenderIsPlayer: !!defenderNation?.isPlayer,
     defenderReinforcements: reinforcements,
+    defenderReinforcementUnits: reinforcementUnits,
   };
 
   // Update the armies with survivors: attacker keeps its remainder; each rallied
@@ -699,7 +724,8 @@ export function sailToSeaZone(
           units: defenderRemaining,
           regionId: defenderRetreats ? defenderPort! : a.regionId,
           seaZoneId: defenderRetreats ? undefined : seaZoneId,
-          movesLeft: result.attackerWins ? a.movesLeft : 0,
+          // Both participants have spent their action in the interception.
+          movesLeft: 0,
           fortifying: false,
           entrenchment: 0,
         };
@@ -710,6 +736,7 @@ export function sailToSeaZone(
   const armies = mergeRetreatingGroundArmies(battleArmies, retreatingIds);
   const report = {
     ...result.report,
+    battleKind: "naval" as const,
     regionName: zoneName,
     terrainName: "Open sea",
     attackerName: attackerNation?.isPlayer ? "Your realm" : attackerName,
@@ -721,8 +748,24 @@ export function sailToSeaZone(
     attackerIsPlayer: !!attackerNation?.isPlayer,
     defenderIsPlayer: !!defenderNation?.isPlayer,
     defenderReinforcements: 0,
+    phases: result.report.phases.map((phase) => ({
+      ...phase,
+      note:
+        phase.kind === "volley"
+          ? "Broadsides thunder across the water."
+          : armySize(phase.defenderLosses) > armySize(phase.attackerLosses)
+            ? "The defending line gives way under close action."
+            : "The attackers lose momentum in the close action.",
+    })),
+    decisive: result.attackerWins
+      ? "The defending fleet broke and abandoned the sea lane."
+      : armySize(result.attackerRemaining) === 0
+        ? "The attacking fleet was destroyed."
+        : "The attacking fleet broke off and withdrew.",
   };
-  const log = `${attackerName} ${result.attackerWins ? "won" : "lost"} the fleet action in ${zoneName} (losses ${soldiersDisplay(armySize(result.attackerLosses))} vs ${soldiersDisplay(armySize(result.defenderLosses))} warships).`;
+  const log =
+    `${attackerName} ${result.attackerWins ? "won" : "lost"} the fleet action in ${zoneName} ` +
+    `(losses ${armySize(result.attackerLosses)} vs ${armySize(result.defenderLosses)} warships).`;
   return {
     ...working,
     armies,
@@ -740,8 +783,19 @@ export function sailToSeaZone(
  * null if the destination is unreachable / already reached. Pure.
  */
 export function nextHopToward(state: GameState, fromId: number, destId: number): number | null {
+  return nextHopTowardWhere(state, fromId, destId, () => true);
+}
+
+/** Shortest-path helper with a terrain/passability filter. */
+function nextHopTowardWhere(
+  state: GameState,
+  fromId: number,
+  destId: number,
+  passable: (region: Region) => boolean,
+): number | null {
   if (fromId === destId) return null;
   const regions = state.regions;
+  if (!regions[fromId] || !regions[destId] || !passable(regions[destId]!)) return null;
   const prev = new Map<number, number>();
   const seen = new Set<number>([fromId]);
   const queue: number[] = [fromId];
@@ -749,7 +803,8 @@ export function nextHopToward(state: GameState, fromId: number, destId: number):
     const n = queue.shift()!;
     if (n === destId) break;
     for (const m of [...(regions[n]?.adjacency ?? [])].sort((a, b) => a - b)) {
-      if (!seen.has(m)) {
+      const candidate = regions[m];
+      if (!seen.has(m) && candidate && passable(candidate)) {
         seen.add(m);
         prev.set(m, n);
         queue.push(m);
@@ -762,6 +817,14 @@ export function nextHopToward(state: GameState, fromId: number, destId: number):
   return prev.get(cur) === fromId ? cur : null;
 }
 
+/** The next legal march step for this specific stack. */
+function nextMarchHop(state: GameState, army: Army, fromId: number, destId: number): number | null {
+  if (armyIsAtSea(army)) return null;
+  return armyIsFleet(army.units)
+    ? nextHopTowardWhere(state, fromId, destId, (region) => region.terrain === "coast")
+    : nextHopToward(state, fromId, destId);
+}
+
 /**
  * Give an army a standing march order toward `destId`: it will travel there over
  * turns (a step of its move rate each turn, fighting whatever it meets), until it
@@ -771,10 +834,10 @@ export function nextHopToward(state: GameState, fromId: number, destId: number):
  */
 export function orderMarch(state: GameState, armyId: number, destId: number): GameState {
   const army = state.armies.find((a) => a.id === armyId);
-  if (!army) return state;
+  if (!army || armyIsAtSea(army) || armySize(army.units) <= 0) return state;
   if (destId === army.regionId) return cancelMarch(state, armyId);
   if (!state.regions[destId]) return state;
-  if (nextHopToward(state, army.regionId, destId) === null) return state;
+  if (nextMarchHop(state, army, army.regionId, destId) === null) return state;
   return {
     ...state,
     armies: state.armies.map((a) => (a.id === armyId ? { ...a, dest: destId, fortifying: false } : a)),
@@ -796,7 +859,7 @@ export function marchEta(state: GameState, army: Army): number | null {
   const guard = new Set<number>();
   while (at !== army.dest && !guard.has(at)) {
     guard.add(at);
-    const next = nextHopToward(state, at, army.dest);
+    const next = nextMarchHop(state, army, at, army.dest);
     if (next === null) return null;
     hops += 1;
     at = next;
@@ -830,7 +893,7 @@ export function advanceMarches(state: GameState): GameState {
       if (!army) { died = true; break; }
       if (army.regionId === dest) { clear = true; break; } // arrived
       if (army.movesLeft <= 0) break; // out of moves — resume next turn (keep the order)
-      const next = nextHopToward(s, army.regionId, dest);
+      const next = nextMarchHop(s, army, army.regionId, dest);
       if (next === null) { clear = true; break; } // path cut
       const before = army.regionId;
       s = moveArmy(s, id, next);
@@ -878,7 +941,12 @@ export function moveDetachment(
   // Selecting everything is just a whole-stack move — keep its id and merge logic.
   if (armySize(remaining) === 0) return moveArmy(state, armyId, targetRegionId);
 
-  const arrivedMoves = Math.max(0, army.movesLeft - 1);
+  const arrivedMoves = zocClampedMoves(
+    state,
+    targetRegionId,
+    army.ownerId,
+    army.movesLeft - 1,
+  );
   // The parent stays put with the remainder; only the detachment spends a move.
   const withoutParent = state.armies.map((a) =>
     a.id === army.id ? { ...a, units: remaining } : a,
@@ -893,7 +961,14 @@ export function moveDetachment(
     reinforced = true;
     armies = withoutParent.map((a) =>
       a.id === friendly.id
-        ? { ...a, units: addUnits(a.units, take), movesLeft: Math.min(a.movesLeft, arrivedMoves) }
+        ? {
+            ...a,
+            units: addUnits(a.units, take),
+            movesLeft: Math.min(a.movesLeft, arrivedMoves),
+            dest: null,
+            fortifying: false,
+            entrenchment: 0,
+          }
         : a,
     );
   } else {
@@ -907,7 +982,7 @@ export function moveDetachment(
 
   const owner = state.nations.find((n) => n.id === army.ownerId);
   const who = owner?.isPlayer ? "Your" : `${owner?.name ?? "A rival"}'s`;
-  const line = `${who} ${soldiersDisplay(armySize(take))} soldiers ${reinforced ? "reinforced" : "detached to"} ${target.name}.`;
+  const line = `${who} ${forceLog(take)} ${reinforced ? "reinforced" : "detached to"} ${target.name}.`;
   return { ...state, armies, nextArmyId, log: appendLog(state, [line]) };
 }
 
@@ -926,14 +1001,83 @@ export function disbandUnits(
   const take = clampSubset(army, subset);
   if (!take) return state;
   const remaining = subtractUnits(army.units, take);
+  // A fleet's ships are the transport that makes its passengers' sea position
+  // valid. Standing down the final hull while troops remain would create an
+  // immobile land army in open water.
+  if (
+    armyIsAtSea(army) &&
+    armySize(remaining) > 0 &&
+    !armyIsFleet(remaining)
+  ) {
+    return state;
+  }
   const armies =
     armySize(remaining) === 0
       ? state.armies.filter((a) => a.id !== army.id)
       : state.armies.map((a) => (a.id === army.id ? { ...a, units: remaining } : a));
   const owner = state.nations.find((n) => n.id === army.ownerId);
   const who = owner?.isPlayer ? "Your realm" : (owner?.name ?? "A rival");
-  const line = `${who} disbanded ${soldiersDisplay(armySize(take))} soldiers.`;
+  const line = `${who} disbanded ${forceLog(take)}.`;
   return { ...state, armies, log: appendLog(state, [line]) };
+}
+
+export interface RegionDefense {
+  /** The army physically holding the target and supplying commander/entrenchment. */
+  garrison: Army;
+  /** Garrison first, followed by same-realm or allied stacks able to rally. */
+  armies: Army[];
+  /** Combined composition used by resolution, AI, and the player's forecast. */
+  units: UnitCounts;
+  /** Exact composition supplied by neighbouring armies. */
+  reinforcementUnits: UnitCounts;
+  /** Regiments supplied by neighbouring armies. */
+  reinforcements: number;
+}
+
+/** Presentation for simulation log lines: land regiments scale to soldiers, hulls do not. */
+function forceLog(units: UnitCounts): string {
+  let land = 0;
+  let ships = 0;
+  for (const type of UNIT_TYPES) {
+    if (UNITS[type].naval) ships += units[type];
+    else land += units[type];
+  }
+  const parts: string[] = [];
+  if (land > 0) parts.push(`${soldiersDisplay(land)} soldiers`);
+  if (ships > 0) parts.push(`${ships} warship${ships === 1 ? "" : "s"}`);
+  return parts.join(" and ") || "no forces";
+}
+
+/**
+ * The complete force that would defend a region against `attackerOwnerId`.
+ * Keeping this calculation public gives combat resolution, AI planning and the
+ * HUD one source of truth for neighbouring rallied defenders.
+ */
+export function regionDefense(
+  state: GameState,
+  targetRegionId: number,
+  attackerOwnerId: number,
+): RegionDefense | null {
+  const target = state.regions[targetRegionId];
+  if (!target) return null;
+  const garrison = state.armies.find(
+    (a) =>
+      !armyIsAtSea(a) &&
+      a.regionId === targetRegionId &&
+      a.ownerId !== attackerOwnerId &&
+      armySize(a.units) > 0,
+  );
+  if (!garrison) return null;
+  const armies = ralliedDefenders(state, target, garrison, attackerOwnerId);
+  const units = armies.reduce((acc, defender) => addUnits(acc, defender.units), emptyUnits());
+  const reinforcementUnits = subtractUnits(units, garrison.units);
+  return {
+    garrison,
+    armies,
+    units,
+    reinforcementUnits,
+    reinforcements: armySize(reinforcementUnits),
+  };
 }
 
 // --- internal helpers -------------------------------------------------------
@@ -945,14 +1089,22 @@ export function disbandUnits(
  * guns. The garrison is always first. Barbarians never coordinate, so a barbarian
  * holder stands alone and no rally is ever raised on its behalf.
  */
-function ralliedDefenders(state: GameState, target: Region, garrison: Army): Army[] {
+function ralliedDefenders(
+  state: GameState,
+  target: Region,
+  garrison: Army,
+  attackerOwnerId: number,
+): Army[] {
   if (garrison.ownerId === BARBARIAN_ID) return [garrison];
   const realm = garrison.ownerId;
   const reinforcements = state.armies.filter((a) => {
     if (a.id === garrison.id || a.movesLeft <= 0) return false;
     if (armyIsAtSea(a)) return false;
-    if (a.ownerId === BARBARIAN_ID) return false;
+    if (a.ownerId === BARBARIAN_ID || a.ownerId === attackerOwnerId) return false;
     if (!target.adjacency.includes(a.regionId)) return false;
+    // A port-bound fleet can support another coast, but cannot magically cross
+    // its coast-only movement restriction to reinforce an inland battle.
+    if (armyIsFleet(a.units) && target.terrain !== "coast") return false;
     // Same realm always rallies; a formal ally answers the defensive call.
     return a.ownerId === realm || getTreaty(state, realm, a.ownerId) === "alliance";
   });
@@ -1040,6 +1192,7 @@ function relocateOrMerge(
           ? {
               ...a,
               units: mergedUnits,
+              commander: a.commander ?? army.commander,
               seaZoneId: undefined,
               movesLeft: zocClampedMoves(
                 state,
@@ -1057,8 +1210,7 @@ function relocateOrMerge(
     const owner = state.nations.find((n) => n.id === army.ownerId);
     const line =
       `${owner?.isPlayer ? "Your armies" : `${owner?.name ?? "A rival"}'s armies`} merged at ${where} — ` +
-      `${soldiersDisplay(armySize(army.units))} + ${soldiersDisplay(armySize(target.units))} = ` +
-      `${soldiersDisplay(armySize(mergedUnits))} soldiers.`;
+      `${forceLog(army.units)} + ${forceLog(target.units)} = ${forceLog(mergedUnits)}.`;
     return { ...state, armies, log: appendLog(state, [line]) };
   }
   armies = state.armies.map((a) =>

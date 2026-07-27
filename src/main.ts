@@ -10,7 +10,19 @@ import {
   setRegionFocus,
   chooseResearch,
 } from "@/systems/turn";
-import { raiseUnit, orderMarch, cancelMarch, moveDetachment, disbandUnits, fortifyArmy, appointCommander, reachableRegions, moveArmy, sailToSeaZone } from "@/systems/military";
+import {
+  appointCommander,
+  armyIsAtSea,
+  cancelMarch,
+  disbandUnits,
+  fortifyArmy,
+  moveArmy,
+  moveDetachment,
+  orderMarch,
+  raiseUnit,
+  reachableRegions,
+  sailToSeaZone,
+} from "@/systems/military";
 import {
   declareWar,
   atWar,
@@ -238,8 +250,12 @@ function main(): void {
       const army = state.armies.find((a) => a.id === armyId && a.ownerId === PLAYER_ID);
       if (!army) return;
       withWarConfirm(regionId, () => {
-        state = orderMarch(state, armyId, regionId);
-        selectedRegion = army.regionId;
+        // Fleets already at sea land directly from their current zone. A land
+        // march order would incorrectly route them through their obsolete anchor.
+        state = armyIsAtSea(army)
+          ? moveArmy(state, armyId, regionId)
+          : orderMarch(state, armyId, regionId);
+        selectedRegion = regionId;
         moveArmyId = null;
         commit();
       });
@@ -478,7 +494,9 @@ function main(): void {
   function attackDeclaresWarOn(regionId: number): number | null {
     const target = state.regions[regionId];
     if (!target) return null;
-    const enemyArmy = state.armies.find((a) => a.regionId === regionId && a.ownerId !== PLAYER_ID);
+    const enemyArmy = state.armies.find(
+      (a) => !armyIsAtSea(a) && a.regionId === regionId && a.ownerId !== PLAYER_ID,
+    );
     const defenderOwner = enemyArmy?.ownerId ?? target.ownerId;
     if (defenderOwner === null || defenderOwner === PLAYER_ID || defenderOwner === BARBARIAN_ID) {
       return null;

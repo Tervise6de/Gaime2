@@ -20,6 +20,7 @@ import {
   appointCommander,
   applyCommanderEffects,
   applyDefection,
+  regionDefense,
   totalUpkeep,
 } from "@/systems/military";
 import type { Commander } from "@/data/commanders";
@@ -146,6 +147,41 @@ describe("moveDetachment (split / detach / reinforce)", () => {
     expect(atR1[0]!.units.cavalry).toBe(2);
   });
 
+  it("fresh reinforcements break entrenchment and stop inside an enemy zone of control", () => {
+    const g = realm({ cavalry: 2 });
+    g.regions.push(region(3, { ownerId: RIVAL, adjacency: [1] }));
+    g.regions[1]!.adjacency.push(3);
+    g.nations.push({
+      id: RIVAL, name: "Rival", color: "#000", isPlayer: false, isBarbarian: false, alive: true,
+      stocks: { gold: 0, food: 0, knowledge: 0 }, wares: emptyWares(), taxRate: 0,
+      research: { current: null, progress: 0, done: [] }, famine: false, bankrupt: false,
+    });
+    g.treaties[pairKey(PLAYER_ID, RIVAL)] = "war";
+    g.armies.push({
+      id: 5,
+      ownerId: PLAYER_ID,
+      regionId: 1,
+      units: { ...emptyUnits(), militia: 1 },
+      movesLeft: 2,
+      fortifying: true,
+      entrenchment: 2,
+    });
+    g.armies.push({
+      id: 6,
+      ownerId: RIVAL,
+      regionId: 3,
+      units: { ...emptyUnits(), militia: 1 },
+      movesLeft: 0,
+    });
+    g.nextArmyId = 7;
+
+    const next = moveDetachment(g, 0, 1, { cavalry: 1 });
+    const reinforced = armyAt(next, 1, PLAYER_ID)!;
+    expect(reinforced.fortifying).toBe(false);
+    expect(reinforced.entrenchment).toBe(0);
+    expect(reinforced.movesLeft).toBe(0);
+  });
+
   it("refuses to detach into foreign territory (attacking uses moveArmy)", () => {
     const g = realm({ infantry: 3 });
     g.regions[1]!.ownerId = 2; // a rival owns the neighbour
@@ -189,6 +225,12 @@ describe("disbandUnits", () => {
   it("removes the army when everything is disbanded (clamping an over-request)", () => {
     const g = realm({ militia: 2 });
     expect(disbandUnits(g, 0, { militia: 9 }).armies.filter((a) => a.ownerId === PLAYER_ID)).toHaveLength(0);
+  });
+
+  it("does not strand passengers by disbanding the final ship while at sea", () => {
+    const g = realm({ war_cog: 1, infantry: 2 });
+    g.armies[0]!.seaZoneId = "north_sea";
+    expect(disbandUnits(g, 0, { war_cog: 1 })).toBe(g);
   });
 });
 
@@ -263,11 +305,17 @@ describe("recruitment", () => {
 
   it("raiseUnit spends resources and adds the unit", () => {
     const g = battlefield({ militia: 1 }, {});
+    g.armies[0]!.movesLeft = 1;
+    g.armies[0]!.fortifying = true;
+    g.armies[0]!.entrenchment = 2;
     const next = raiseUnit(g, 0, "infantry", PLAYER_ID);
     expect(next.nations[PLAYER_ID]!.stocks.gold).toBe(
       g.nations[PLAYER_ID]!.stocks.gold - UNITS.infantry.cost.gold,
     );
     expect(armyAt(next, 0, PLAYER_ID)!.units.infantry).toBe(1);
+    expect(armyAt(next, 0, PLAYER_ID)!.movesLeft).toBe(0);
+    expect(armyAt(next, 0, PLAYER_ID)!.fortifying).toBe(false);
+    expect(armyAt(next, 0, PLAYER_ID)!.entrenchment).toBe(0);
     // Input not mutated.
     expect(g.nations[PLAYER_ID]!.stocks.gold).toBe(200);
   });
@@ -326,7 +374,7 @@ describe("moveArmy", () => {
   it("logs both sides' casualties after a defended battle (in soldiers)", () => {
     const g = battlefield({ infantry: 8, ranged: 4 }, { militia: 3, infantry: 1 });
     const next = moveArmy(g, 0, 1);
-    expect(next.log.some((l) => /\(losses [\d,]+ vs [\d,]+ soldiers\)/.test(l))).toBe(true);
+    expect(next.log.some((l) => /\(losses [\d,]+ soldiers vs [\d,]+ soldiers\)/.test(l))).toBe(true);
   });
 
   it("refuses to move without moves left or across a non-edge", () => {
@@ -360,8 +408,28 @@ describe("moveArmy", () => {
     expect(merged.units.militia).toBe(3);
     // Army display scale is ×250: 2 + 3 units = 500 + 750 = 1,250 soldiers.
     expect(
-      next.log.some((l) => l.includes("merged") && l.includes("500 + 750 = 1,250 soldiers")),
+      next.log.some((l) =>
+        l.includes("merged") &&
+        l.includes("500 soldiers + 750 soldiers = 1,250 soldiers"),
+      ),
     ).toBe(true);
+  });
+
+  it("keeps the moving stack's commander when merging into an unled army", () => {
+    const g = battlefield({ infantry: 2 }, {});
+    g.regions[1] = region(1, { ownerId: PLAYER_ID, adjacency: [0] });
+    const commander: Commander = {
+      name: "Otto", epithet: "the Steady", martial: 7, trait: "steadfast", loyalty: 80,
+    };
+    g.armies[0]!.commander = commander;
+    g.armies.push({
+      id: 1,
+      ownerId: PLAYER_ID,
+      regionId: 1,
+      units: { ...emptyUnits(), militia: 3 },
+      movesLeft: 1,
+    });
+    expect(moveArmy(g, 0, 1).armies[0]!.commander).toEqual(commander);
   });
 });
 
@@ -403,6 +471,20 @@ function rallyField(
 }
 
 describe("combined defence (M2)", () => {
+  it("exposes the complete rallied defence for forecasts and AI planning", () => {
+    const g = rallyField({ infantry: 6 }, { militia: 2 }, { infantry: 4 });
+    const defense = regionDefense(g, 1, PLAYER_ID);
+    expect(defense?.garrison.id).toBe(1);
+    expect(defense?.armies.map((a) => a.id)).toEqual([1, 2]);
+    expect(defense?.units.militia).toBe(2);
+    expect(defense?.units.infantry).toBe(4);
+    expect(defense?.reinforcementUnits).toEqual({
+      ...emptyUnits(),
+      infantry: 4,
+    });
+    expect(defense?.reinforcements).toBe(4);
+  });
+
   it("rallies a same-realm neighbour into the fight and reports the reinforcement", () => {
     const g = rallyField({ infantry: 6 }, { militia: 2 }, { infantry: 4 });
     const next = moveArmy(g, 0, 1);
@@ -439,6 +521,14 @@ describe("combined defence (M2)", () => {
     const g = rallyField({ infantry: 6 }, { militia: 2 }, { infantry: 4 }, 0);
     const next = moveArmy(g, 0, 1);
     expect(next.battles!.at(-1)!.defenderReinforcements).toBe(0);
+  });
+
+  it("does not let a coast-bound fleet rally into an inland battle", () => {
+    const g = rallyField({ infantry: 6 }, { militia: 2 }, { war_cog: 4 });
+    g.regions[2] = { ...g.regions[2]!, terrain: "coast" };
+    const defense = regionDefense(g, 1, PLAYER_ID);
+    expect(defense?.armies.map((army) => army.id)).toEqual([1]);
+    expect(moveArmy(g, 0, 1).battles!.at(-1)!.defenderReinforcements).toBe(0);
   });
 
   it("barbarians never coordinate — a barbarian neighbour never rallies", () => {
@@ -513,12 +603,20 @@ describe("allied rally (alliances answer the call)", () => {
 describe("fortify / entrenchment (M3)", () => {
   it("digging in forgoes movement and flags the army", () => {
     const g = realm({ infantry: 3 });
+    g.armies[0]!.dest = 2;
     const next = fortifyArmy(g, 0);
     const army = armyAt(next, 0, PLAYER_ID)!;
     expect(army.fortifying).toBe(true);
     expect(army.movesLeft).toBe(0);
+    expect(army.dest).toBeNull();
     expect(next.log.some((l) => /dug in at/.test(l))).toBe(true);
     expect(fortifyArmy(next, 0)).toBe(next); // already dug in → no-op
+  });
+
+  it("cannot fortify after the army has spent its turn", () => {
+    const g = realm({ infantry: 3 });
+    g.armies[0]!.movesLeft = 0;
+    expect(fortifyArmy(g, 0)).toBe(g);
   });
 
   it("entrenchment deepens one level per held turn, capped at MAX_ENTRENCH", () => {
@@ -527,6 +625,20 @@ describe("fortify / entrenchment (M3)", () => {
     expect(armies[0]!.entrenchment).toBe(MAX_ENTRENCH);
     // A non-fortifying army never entrenches.
     expect(tickEntrenchment([{ id: 1, ownerId: PLAYER_ID, regionId: 0, units: emptyUnits(), movesLeft: 1 }])[0]!.entrenchment).toBeUndefined();
+  });
+
+  it("fleets cannot fortify and stale fleet entrenchment is cleared", () => {
+    const g = realm({ war_cog: 1, infantry: 2 });
+    expect(fortifyArmy(g, 0)).toBe(g);
+    const stale: Army = {
+      ...g.armies[0]!,
+      fortifying: true,
+      entrenchment: 2,
+      seaZoneId: "north_sea",
+    };
+    const repaired = tickEntrenchment([stale])[0]!;
+    expect(repaired.fortifying).toBe(false);
+    expect(repaired.entrenchment).toBe(0);
   });
 
   it("an entrenched garrison holds an assault an un-dug one loses", () => {
@@ -596,6 +708,14 @@ describe("commanders (M4)", () => {
     // Empty stack cannot be given a commander.
     const empty = realm({});
     expect(appointCommander(empty, 0)).toBe(empty);
+  });
+
+  it("consumes a caller-provided turn RNG without forking the stream", () => {
+    const g = realm({ infantry: 3 });
+    const rng = createRng(g.rngState);
+    const next = appointCommander(g, 0, rng);
+    expect(next.rngState).toBe(rng.seed);
+    expect(rng.seed).not.toBe(g.rngState);
   });
 
   it("threads the commander into the moveArmy combat path (a led attacker hits harder)", () => {
@@ -696,6 +816,12 @@ describe("marching (travel over turns)", () => {
     expect(orderMarch(g, 0, 9).armies[0]!.dest ?? null).toBeNull();
   });
 
+  it("does not route an at-sea fleet through its obsolete land anchor", () => {
+    const g = realm({ war_cog: 1, infantry: 2 });
+    g.armies[0]!.seaZoneId = "north_sea";
+    expect(orderMarch(g, 0, 2)).toBe(g);
+  });
+
   it("advances a militia march one region per turn, arriving and clearing the order", () => {
     let g = orderMarch(realm({ militia: 2 }), 0, 2); // 2 hops at moves 1
     g = advanceMarches(refresh(g));
@@ -764,6 +890,31 @@ describe("naval fleets", () => {
     expect(reachableRegions(s, s.armies[0]!)).toEqual([1]); // coast only, not inland r2
     expect(moveArmy(s, 0, 2).armies[0]!.regionId).toBe(0); // inland move blocked
     expect(moveArmy(s, 0, 1).armies[0]!.regionId).toBe(1); // sailed to the coast
+  });
+
+  it("standing fleet orders choose a legal coastal route instead of an inland shortcut", () => {
+    const regions = [
+      region(0, { terrain: "coast", adjacency: [1, 3] }),
+      region(1, { terrain: "plains", adjacency: [0, 2] }),
+      region(2, { terrain: "coast", adjacency: [1, 4] }),
+      region(3, { terrain: "coast", adjacency: [0, 4] }),
+      region(4, { terrain: "coast", adjacency: [3, 2] }),
+    ];
+    const s: GameState = {
+      ...battlefield({}, {}),
+      regions,
+      armies: [{
+        id: 0,
+        ownerId: PLAYER_ID,
+        regionId: 0,
+        units: { ...emptyUnits(), war_cog: 1 },
+        movesLeft: 2,
+      }],
+    };
+    const ordered = orderMarch(s, 0, 2);
+    const advanced = advanceMarches(ordered);
+    expect(advanced.armies[0]!.regionId).not.toBe(0);
+    expect(advanced.regions[advanced.armies[0]!.regionId]!.terrain).toBe("coast");
   });
 
   it("a land army is unaffected — it still marches inland", () => {

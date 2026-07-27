@@ -47,6 +47,89 @@ describe("save / load", () => {
     }
   });
 
+  it("repairs malformed army data instead of loading impossible combat state", () => {
+    const g = createGame({ seed: 100, rivals: 1 });
+    const owned = g.regions.find((r) => r.ownerId === PLAYER_ID)!;
+    const secondOwned = g.regions.find((r) => r.ownerId === PLAYER_ID && r.id !== owned.id)!;
+    const envelope = JSON.parse(serializeGame(g, 0));
+    envelope.state.armies = [{
+      id: 9000,
+      ownerId: PLAYER_ID,
+      regionId: owned.id,
+      seaZoneId: "north_sea",
+      units: {
+        militia: "4.9",
+        infantry: -3,
+        ranged: null,
+        cavalry: Number.POSITIVE_INFINITY,
+      },
+      movesLeft: "999",
+      entrenchment: 999,
+      fortifying: true,
+      dest: 999999,
+      commander: {
+        name: "Broken",
+        epithet: "the Invalid",
+        martial: "infinite",
+        loyalty: -500,
+        trait: "not-a-trait",
+      },
+    }, {
+      id: 9000,
+      ownerId: PLAYER_ID,
+      regionId: secondOwned.id,
+      units: { militia: 1 },
+      movesLeft: 1,
+    }];
+    envelope.state.nextArmyId = 0;
+
+    const restored = deserializeGame(JSON.stringify(envelope))!;
+    const army = restored.armies[0]!;
+    expect(army.units.militia).toBe(4);
+    expect(army.units.infantry).toBe(0);
+    expect(army.units.cavalry).toBe(0);
+    expect(army.movesLeft).toBeLessThanOrEqual(1);
+    expect(army.entrenchment).toBeLessThanOrEqual(3);
+    expect(army.dest).toBeNull();
+    expect(army.seaZoneId).toBeUndefined();
+    expect(army.fortifying).toBe(false);
+    expect(army.commander).toBeUndefined();
+    expect(new Set(restored.armies.map((candidate) => candidate.id)).size).toBe(
+      restored.armies.length,
+    );
+    expect(restored.nextArmyId).toBeGreaterThan(9000);
+  });
+
+  it("rescues passengers but removes impossible hulls when no friendly port exists", () => {
+    const g = createGame({ seed: 101, rivals: 1, playerFaction: "England" });
+    const envelope = JSON.parse(serializeGame(g, 0));
+    envelope.state.regions = envelope.state.regions.map((region: { ownerId: number | null; terrain: string }) =>
+      region.ownerId === PLAYER_ID ? { ...region, terrain: "plains" } : region
+    );
+    const safeLand = envelope.state.regions.find(
+      (region: { ownerId: number | null }) => region.ownerId === PLAYER_ID,
+    );
+    envelope.state.armies = [{
+      id: 9100,
+      ownerId: PLAYER_ID,
+      regionId: safeLand.id,
+      units: { war_cog: 2, infantry: 3 },
+      movesLeft: 2,
+      fortifying: true,
+      entrenchment: 3,
+      dest: envelope.state.regions.at(-1).id,
+    }];
+
+    const restored = deserializeGame(JSON.stringify(envelope))!;
+    expect(restored.armies).toHaveLength(1);
+    expect(restored.armies[0]!.units.war_cog).toBe(0);
+    expect(restored.armies[0]!.units.infantry).toBe(3);
+    expect(restored.armies[0]!.regionId).toBe(safeLand.id);
+    expect(restored.armies[0]!.dest).toBeNull();
+    expect(restored.armies[0]!.fortifying).toBe(false);
+    expect(restored.armies[0]!.entrenchment).toBe(0);
+  });
+
   it("rejects malformed or foreign JSON", () => {
     expect(deserializeGame("not json")).toBeNull();
     expect(deserializeGame(JSON.stringify({ hello: "world" }))).toBeNull();

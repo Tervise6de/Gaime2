@@ -45,7 +45,8 @@ import { atWar, getTreaty } from "@/systems/diplomacy";
 import { inLeague } from "@/systems/state";
 import { nextHopToward, armyIsAtSea, armyIsFleet } from "@/systems/military";
 import { regionCapacity } from "@/systems/population";
-import { popCompact, popDisplay, soldiersCompact, soldiersDisplay } from "@/systems/format";
+import { popCompact, popDisplay } from "@/systems/format";
+import { forceCompactLabel, forceLabel } from "@/ui/military";
 import { computeVoronoiCells, pointInPolygon, type Point, type VoronoiCell } from "@/systems/voronoi";
 import { graphEdges, type MapRenderMode } from "@/systems/mapview";
 import { scriptedMap } from "@/data/maps/types";
@@ -2449,7 +2450,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       const cx = p.x + NODE_RADIUS - 5;
       const cy = p.y + NODE_RADIUS - 3;
       const color = ownerColor(army.ownerId);
-      const label = (mine || allied) && chipFade > 0 ? soldiersCompact(size) : null;
+      const label = (mine || allied) && chipFade > 0 ? forceCompactLabel(army.units) : null;
       const atSea = armyAtSea(s, army);
 
       const fleet = armyIsFleet(army.units);
@@ -2466,7 +2467,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         x: cx,
         y: cy,
         r: 16,
-        text: `${who} ${kind} — ${soldiersDisplay(size)} soldiers ${where}.${hint}`,
+        text: `${who} ${kind} — ${forceLabel(army.units)} ${where}.${hint}`,
       });
     }
   }

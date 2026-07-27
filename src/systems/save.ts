@@ -7,9 +7,19 @@
  * exported/imported as a JSON string for sharing or backup.
  */
 
-import { emptyUnits, emptyWares, TURN_LIMIT, type GameState } from "@/systems/state";
+import {
+  MAX_ENTRENCH,
+  armySize,
+  emptyUnits,
+  emptyWares,
+  TURN_LIMIT,
+  type Army,
+  type GameState,
+} from "@/systems/state";
 import { SOUND } from "@/data/sound";
 import { SEA_ZONE_IDS } from "@/data/sea";
+import { UNITS, UNIT_TYPES } from "@/data/units";
+import { COMMANDER_TRAIT_IDS } from "@/data/commanders";
 
 const SAVE_VERSION = 1;
 /**
@@ -93,10 +103,187 @@ export function deserializeGame(json: string): GameState | null {
     // lacks that key, which would read as `undefined` (→ NaN) in armySize/combat.
     // Backfill every unit slot to 0 so older saves load cleanly.
     if (Array.isArray(s.armies)) {
-      for (const a of s.armies) {
-        if (a && a.units) a.units = { ...emptyUnits(), ...a.units };
-        if (a && a.seaZoneId !== undefined && !SEA_ZONE_IDS.includes(a.seaZoneId)) delete a.seaZoneId;
+      const nationIds = new Set(s.nations.map((nation) => nation?.id));
+      const regionIds = new Set(s.regions.map((region) => region?.id));
+      const normalized: Army[] = [];
+      const usedArmyIds = new Set<number>();
+      let repairArmyId =
+        s.armies.reduce(
+          (max, army) => Math.max(max, Number.isFinite(Number(army?.id)) ? Math.floor(Number(army.id)) : -1),
+          -1,
+        ) + 1;
+      for (const raw of s.armies) {
+        if (
+          !raw ||
+          typeof raw !== "object" ||
+          !Number.isFinite(Number(raw.id)) ||
+          !nationIds.has(raw.ownerId) ||
+          !regionIds.has(raw.regionId)
+        ) {
+          continue;
+        }
+
+        const units = emptyUnits();
+        for (const type of UNIT_TYPES) {
+          const value = Number(raw.units?.[type]);
+          units[type] = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+        }
+        if (armySize(units) <= 0) continue;
+
+        const moveRate = UNIT_TYPES.reduce(
+          (minimum, type) =>
+            units[type] > 0 ? Math.min(minimum, UNITS[type].moves) : minimum,
+          Number.POSITIVE_INFINITY,
+        );
+        const rawMoves = Number(raw.movesLeft);
+        const movesLeft = Number.isFinite(rawMoves)
+          ? Math.max(
+              0,
+              Math.min(
+                moveRate === Number.POSITIVE_INFINITY ? 0 : moveRate,
+                Math.floor(rawMoves),
+              ),
+            )
+          : 0;
+        const requestedId = Math.max(0, Math.floor(Number(raw.id)));
+        const armyId = usedArmyIds.has(requestedId) ? repairArmyId++ : requestedId;
+        usedArmyIds.add(armyId);
+        const army: Army = {
+          ...raw,
+          id: armyId,
+          units,
+          movesLeft,
+        };
+
+        if (army.commander) {
+          const martial = Number(army.commander.martial);
+          const loyalty = Number(army.commander.loyalty);
+          if (
+            typeof army.commander.name !== "string" ||
+            typeof army.commander.epithet !== "string" ||
+            !COMMANDER_TRAIT_IDS.includes(army.commander.trait) ||
+            !Number.isFinite(martial) ||
+            !Number.isFinite(loyalty)
+          ) {
+            delete army.commander;
+          } else {
+            army.commander = {
+              ...army.commander,
+              name: army.commander.name.slice(0, 80),
+              epithet: army.commander.epithet.slice(0, 80),
+              martial: Math.max(0, Math.min(20, Math.floor(martial))),
+              loyalty: Math.max(0, Math.min(100, Math.floor(loyalty))),
+            };
+          }
+        }
+
+        const wasFleet = UNIT_TYPES.some((type) => !!UNITS[type].naval && units[type] > 0);
+        let isFleet = wasFleet;
+        const hadSeaMarker = army.seaZoneId !== undefined;
+        if (
+          army.seaZoneId !== undefined &&
+          (!SEA_ZONE_IDS.includes(army.seaZoneId) || !isFleet)
+        ) {
+          delete army.seaZoneId;
+        }
+        // `regionId` is the fleet's last physical port, not necessarily a port
+        // touching its current zone after several zone-to-zone moves. A valid
+        // sea-zone id plus a surviving ship is sufficient while it is at sea.
+
+        // Repair impossible landed positions deterministically. A fleet needs a
+        // friendly port; a ground army needs friendly ground.
+        const anchor = s.regions[army.regionId];
+        if (
+          army.seaZoneId === undefined &&
+          isFleet &&
+          (anchor?.ownerId !== army.ownerId || anchor.terrain !== "coast")
+        ) {
+          const safePort = s.regions.find(
+            (region) => region.ownerId === army.ownerId && region.terrain === "coast",
+          );
+          if (safePort) {
+            army.regionId = safePort.id;
+            army.dest = null;
+          } else {
+            // A landed fleet with no friendly port cannot exist. Preserve any
+            // carried troops at friendly ground, but discard the impossible
+            // hulls; a ships-only record has no legal recovery and is dropped.
+            for (const type of UNIT_TYPES) {
+              if (UNITS[type].naval) army.units[type] = 0;
+            }
+            isFleet = false;
+            const safeLand = s.regions.find((region) => region.ownerId === army.ownerId);
+            if (!safeLand || armySize(army.units) <= 0) continue;
+            army.regionId = safeLand.id;
+            army.dest = null;
+          }
+        } else if (
+          army.seaZoneId === undefined &&
+          !isFleet &&
+          anchor?.ownerId !== army.ownerId
+        ) {
+          const safeLand = s.regions.find((region) => region.ownerId === army.ownerId);
+          if (!safeLand) continue;
+          army.regionId = safeLand.id;
+          army.dest = null;
+        }
+
+        if (army.entrenchment !== undefined) {
+          const rawEntrenchment = Number(army.entrenchment);
+          army.entrenchment = Number.isFinite(rawEntrenchment)
+            ? Math.max(0, Math.min(MAX_ENTRENCH, Math.floor(rawEntrenchment)))
+            : 0;
+        }
+        if (wasFleet || army.seaZoneId !== undefined || hadSeaMarker) {
+          if (army.fortifying) army.fortifying = false;
+          if ((army.entrenchment ?? 0) > 0) army.entrenchment = 0;
+        } else if (army.fortifying !== undefined) {
+          army.fortifying = army.fortifying === true;
+        }
+
+        if (
+          army.dest !== undefined &&
+          army.dest !== null &&
+          (
+            !regionIds.has(army.dest) ||
+            army.seaZoneId !== undefined ||
+            (isFleet && s.regions[army.dest]?.terrain !== "coast")
+          )
+        ) {
+          army.dest = null;
+        }
+        normalized.push(army);
       }
+
+      // One owner has one landed stack per region. Merge malformed duplicates
+      // so armyAt/combat cannot silently select an arbitrary stack.
+      const merged: Army[] = [];
+      for (const army of normalized) {
+        const existing = army.seaZoneId === undefined
+          ? merged.find(
+              (candidate) =>
+                candidate.seaZoneId === undefined &&
+                candidate.ownerId === army.ownerId &&
+                candidate.regionId === army.regionId,
+            )
+          : undefined;
+        if (!existing) {
+          merged.push(army);
+          continue;
+        }
+        for (const type of UNIT_TYPES) existing.units[type] += army.units[type];
+        existing.movesLeft = Math.min(existing.movesLeft, army.movesLeft);
+        existing.commander ??= army.commander;
+        existing.dest = null;
+        existing.fortifying = false;
+        existing.entrenchment = 0;
+      }
+      s.armies = merged;
+      const maxArmyId = merged.reduce((max, army) => Math.max(max, army.id), -1);
+      s.nextArmyId = Math.max(
+        Number.isFinite(Number(s.nextArmyId)) ? Math.floor(Number(s.nextArmyId)) : 0,
+        maxArmyId + 1,
+      );
     }
     // The wares economy replaced the abstract "materials" resource: a pre-wares
     // save has nations with no `wares` (and a now-dead stocks.materials). Back-fill

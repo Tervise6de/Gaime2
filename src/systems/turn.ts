@@ -37,7 +37,16 @@ import { stepLeague } from "@/systems/league";
 import { scheduleEpochs, stepEpochs } from "@/systems/epochs";
 import { nextPopulation } from "@/systems/population";
 import { nextUnrest } from "@/systems/stability";
-import { advanceMarches, applyCommanderEffects, applyDefection, armyIsAtSea, armyMoves, tickEntrenchment, totalUpkeep } from "@/systems/military";
+import {
+  advanceMarches,
+  applyCommanderEffects,
+  applyDefection,
+  armyIsAtSea,
+  armyIsFleet,
+  armyMoves,
+  tickEntrenchment,
+  totalUpkeep,
+} from "@/systems/military";
 import { commanderTitle, generateCommander } from "@/data/commanders";
 import { generateRuler } from "@/data/rulers";
 import { recordChronicle, chronicleName } from "@/systems/chronicle";
@@ -903,7 +912,15 @@ function disbandForDebt(armies: Army[], nationId: number): Army[] {
       let worst: UnitType | null = null;
       let worstUpkeep = 0;
       for (const t of Object.keys(a.units) as UnitType[]) {
-        if (a.units[t] > 0 && UNITS[t].upkeep > worstUpkeep) {
+        if (a.units[t] <= 0) continue;
+        if (armyIsAtSea(a) && UNITS[t].naval) {
+          const after = { ...a.units, [t]: a.units[t] - 1 };
+          // Debt may stand down an expensive ship only while another transport
+          // remains, or when that ship was the fleet's final unit. Never strand
+          // passengers in a sea zone.
+          if (!armyIsFleet(after) && armySize(after) > 0) continue;
+        }
+        if (UNITS[t].upkeep > worstUpkeep) {
           worst = t;
           worstUpkeep = UNITS[t].upkeep;
         }
