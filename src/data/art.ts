@@ -38,6 +38,7 @@ export type GlyphId =
   | "star"
   | "hourglass" // ⏳ (turn deadline)
   | "crown" // 👑 (capitals)
+  | "scales" // ⚖ (the weigh-house balance — Politics)
   | "hammer" // 🔨 (construction)
   | "shield" // 🛡 (defence / fortification)
   | "attack" // ⚔ (attack / war)
@@ -159,6 +160,16 @@ export const GLYPH_ART: Record<GlyphId, string | null> = {
   crown: ico(
     '<path d="M4.2 16.9V9.4l3.9 2.8L12 6l3.9 6.2 3.9-2.8v7.5z"/><rect x="4.2" y="18.6" width="15.6" height="1.9" rx=".95"/>',
     { fill: true },
+  ),
+  // Politics: the League had no king — "no state, no standing army, no
+  // permanent navy, no common treasury" (hansa times.md §3), so the governance
+  // page is not marked by a crown. Its authority was the town's: market rights,
+  // and the weights and measures kept at the weigh-house of a Kontor compound
+  // (§6, the London Steelyard). Hence the balance — which is also the ⚖ the
+  // button has always declared as its text fallback. `crown` is left untouched;
+  // it still marks capitals on the map and in the legend.
+  scales: ico(
+    '<path d="M12 5v14.2M6.8 19.6h10.4M4.4 8.6h15.2"/><path d="M2.4 12.6 4.4 8.6l2 4a2 2 0 0 1-4 0zM17.6 12.6l2-4 2 4a2 2 0 0 1-4 0z"/><circle cx="12" cy="5" r="1.4" fill="currentColor" stroke="none"/>',
   ),
   hammer: ico(
     '<path d="M12.2 4.5l3-1.4 5.7 5.7-1.4 3z"/><path d="M13 8.4l-8.5 8.5 2.6 2.6 8.5-8.5"/>',

@@ -14,9 +14,81 @@
      Gold-clip text, plus horizontal/vertical hairline rules that fade at the
      ends so section dividers read as engraved gold rather than flat borders. */
   --gold-text: linear-gradient(180deg, #f6e3ad, #e0b45c 58%, #b98a34);
+  /* Gilt hairline divider. The top bar now cuts its dividers instead of ruling
+     them (see --groove-v below); this stays as the gilt option for any surface
+     that wants the engraved-gold reading. */
   --bar-rule-v: linear-gradient(180deg, rgba(207, 164, 86, 0), rgba(214, 174, 96, 0.55) 26%, rgba(214, 174, 96, 0.55) 74%, rgba(207, 164, 86, 0));
   --muted: #99a2b4;
   --negative: #e8776b;
+  /* --- Carved oak & iron: the top bar's material -----------------------------
+     The bar is joinery, not glass. Two period facts drive it: the Hansa's
+     workhorse was the cog, a clinker-built OAK hull whose fittings were forged
+     iron on a pintle-and-gudgeon rudder (hansa times.md §8); and a Baltic town
+     hall's council furniture — choir stalls, chests, the Rathaus screen — was
+     the same craft: chamfered boards, compass-scribed roundels, strap hinges
+     riveted through the grain. So depth here is CUT, not lit: a chisel cut is
+     dark on the face turned from the light and pale on the face turned to it.
+     Colour still belongs to the house (deep Baltic navy ground, gilt rules);
+     the timber is carried by grain, chamfer and carved shadow — never by a
+     wash of brown over the navy, which would fight the parchment map below. */
+  --oak-grain: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='240'%20height='120'%3E%3Cfilter%20id='wg'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.008%200.55'%20numOctaves='4'%20seed='19'%20stitchTiles='stitch'/%3E%3CfeColorMatrix%20values='0%200%200%200%200.84%200%200%200%200%200.7%200%200%200%200%200.44%200%200%200%200.08%200'/%3E%3C/filter%3E%3Crect%20width='240'%20height='120'%20filter='url(%23wg)'/%3E%3C/svg%3E");
+  /* Hammered-plate speckle for the strap iron (the smith's planishing marks). */
+  --iron-tooth: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='120'%20height='120'%3E%3Cfilter%20id='ir'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.9'%20numOctaves='2'%20seed='23'%20stitchTiles='stitch'/%3E%3CfeColorMatrix%20values='0%200%200%200%200.66%200%200%200%200%200.7%200%200%200%200%200.78%200%200%200%200.1%200'/%3E%3C/filter%3E%3Crect%20width='120'%20height='120'%20filter='url(%23ir)'/%3E%3C/svg%3E");
+  --oak-face: linear-gradient(177deg, #2c2619 0%, #221c13 46%, #16120c 100%);
+  --oak-face-hi: linear-gradient(177deg, #3b3221 0%, #2d2618 46%, #1e190f 100%);
+  /* Pressed in: the shadow crosses the head of the board, not its foot. */
+  --oak-face-in: linear-gradient(177deg, #14110b 0%, #1e1810 52%, #2a2312 100%);
+  --iron-plate: linear-gradient(180deg, #232a34 0%, #171c24 52%, #0f131a 100%);
+  /* Rivet heads: a domed head sitting in its own shadow, the highlight struck
+     off-centre by the hammer and a dark crescent on the far side. Drawn rather
+     than gradient-generated so the head stays round at any size (a CSS radial
+     gradient squares off in a non-square box) and so the seating ring can be
+     a real line. */
+  --rivet: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='12'%20height='12'%3E%3Ccircle%20cx='6'%20cy='6.3'%20r='5.5'%20fill='%23000'%20opacity='.45'/%3E%3Ccircle%20cx='6'%20cy='5.9'%20r='4.7'%20fill='%2339414d'/%3E%3Cpath%20d='M2.1%204.4A4.5%204.5%200%200%201%208.4%202.2'%20fill='none'%20stroke='%23b6c0cd'%20stroke-opacity='.8'%20stroke-width='1.5'%20stroke-linecap='round'/%3E%3Ccircle%20cx='4.7'%20cy='4.7'%20r='1.3'%20fill='%23b6c0cd'%20opacity='.5'/%3E%3Cpath%20d='M9.9%207.2A4.5%204.5%200%200%201%205.2%2010.3'%20fill='none'%20stroke='%23000'%20stroke-opacity='.6'%20stroke-width='1.5'%20stroke-linecap='round'/%3E%3Ccircle%20cx='6'%20cy='5.9'%20r='4.7'%20fill='none'%20stroke='%2305070a'%20stroke-opacity='.85'%20stroke-width='.9'/%3E%3C/svg%3E");
+  /* Sizes as tokens, so no state rule ever restates a `background-size`. */
+  --niche-size: 34px 36px;
+  --grain-size: 240px 120px;
+  /* Blind tracery: a two-centred lancet cut into the board face. Jambs at
+     x=4.6/29.4 (span 24.8), springing y=21, apex y=2.4 — rise/span = 0.75, so
+     it is a Gothic lancet and never a Romanesque semicircle (which would be
+     pre-Hansa). Blind arcading is how a Baltic brick mason ornaments a solid
+     wall, and a stall carver cuts the same head into a chest front. Cut, not
+     drawn: the head of a recess lies in shadow and its floor catches the
+     light, so the niche is pure value and never competes with the gilt glyph
+     standing in it — the mistake that sank the gilt-outlined version. */
+  --oak-niche: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='34'%20height='36'%20viewBox='0%200%2034%2036'%3E%3Cpath%20d='M4.6%2034.5V21A20.15%2020.15%200%200%201%2017%202.4A20.15%2020.15%200%200%201%2029.4%2021V34.5Z'%20fill='%23000'%20opacity='.26'/%3E%3Cpath%20d='M4.6%2021A20.15%2020.15%200%200%201%2017%202.4A20.15%2020.15%200%200%201%2029.4%2021'%20fill='none'%20stroke='%23000'%20stroke-opacity='.6'%20stroke-width='2.3'%20stroke-linecap='round'/%3E%3Cpath%20d='M7.2%2033.8V22A17%2017%200%200%201%2017%206.6A17%2017%200%200%201%2026.8%2022V33.8'%20fill='none'%20stroke='%23000'%20stroke-opacity='.26'%20stroke-width='.9'/%3E%3Cpath%20d='M4.2%2034.2H29.8'%20fill='none'%20stroke='%23f2dfb4'%20stroke-opacity='.18'%20stroke-width='2'%20stroke-linecap='round'/%3E%3C/svg%3E");
+  /* Open panel: the cut deepens and the inner scribe line takes a brass rim. */
+  --oak-niche-on: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='34'%20height='36'%20viewBox='0%200%2034%2036'%3E%3Cpath%20d='M4.6%2034.5V21A20.15%2020.15%200%200%201%2017%202.4A20.15%2020.15%200%200%201%2029.4%2021V34.5Z'%20fill='%23000'%20opacity='.34'/%3E%3Cpath%20d='M4.6%2021A20.15%2020.15%200%200%201%2017%202.4A20.15%2020.15%200%200%201%2029.4%2021'%20fill='none'%20stroke='%23000'%20stroke-opacity='.7'%20stroke-width='2.5'%20stroke-linecap='round'/%3E%3Cpath%20d='M7.2%2033.8V22A17%2017%200%200%201%2017%206.6A17%2017%200%200%201%2026.8%2022V33.8'%20fill='none'%20stroke='%23e8c882'%20stroke-opacity='.55'%20stroke-width='1.1'/%3E%3Cpath%20d='M4.2%2034.2H29.8'%20fill='none'%20stroke='%23f6e2b2'%20stroke-opacity='.26'%20stroke-width='2.1'%20stroke-linecap='round'/%3E%3C/svg%3E");
+  /* Fine vertical die-marks: the tooth of a struck coin. The Wendish Coinage
+     Union minted to "a common appearance, weight, and fineness across towns"
+     (hansa times.md §11), so the commit action reads as a struck mark. */
+  --brass-struck: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='48'%20height='48'%3E%3Cfilter%20id='d'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='1.7%200.03'%20numOctaves='1'%20seed='9'%20stitchTiles='stitch'/%3E%3CfeColorMatrix%20values='0%200%200%200%200.36%200%200%200%200%200.25%200%200%200%200%200.07%200%200%200%200.1%200'/%3E%3C/filter%3E%3Crect%20width='48'%20height='48'%20filter='url(%23d)'/%3E%3C/svg%3E");
+  /* Four chamfers on a board standing proud of the beam: head and left hand
+     catch the light, foot and right hand fall away. One token, four consumers
+     (rest / hover / active / the attention keyframes) — never re-typed. */
+  --board-chamfer:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.68),
+    inset 0 1px 0 rgba(255, 238, 190, 0.34),
+    inset 1.5px 0 0 rgba(246, 222, 170, 0.07),
+    inset -2px 0 4px rgba(0, 0, 0, 0.32),
+    inset 0 -3px 5px rgba(0, 0, 0, 0.5);
+  --board-chamfer-hi:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.62),
+    inset 0 1.5px 0 rgba(255, 240, 198, 0.46),
+    inset 1.5px 0 0 rgba(255, 234, 184, 0.1),
+    inset -2px 0 4px rgba(0, 0, 0, 0.3),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.45);
+  /* Pressed into the rebate: the shadow crosses the head, not the foot. */
+  --board-chamfer-in:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.8),
+    inset 0 3px 6px rgba(0, 0, 0, 0.72),
+    inset 3px 0 5px rgba(0, 0, 0, 0.4),
+    inset 0 -1.5px 0 rgba(246, 226, 180, 0.22);
+  /* Incised V-groove, the joiner's answer to the gilt hairline: one dark face,
+     one lit face, stopped short of both ends like a stopped chamfer. */
+  --groove-v:
+    linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.62) 20%, rgba(0, 0, 0, 0.62) 80%, rgba(0, 0, 0, 0) 100%) no-repeat 0 0 / 1px 100%,
+    linear-gradient(180deg, rgba(246, 226, 180, 0) 0%, rgba(246, 226, 180, 0.22) 24%, rgba(246, 226, 180, 0.22) 76%, rgba(246, 226, 180, 0) 100%) no-repeat 1px 0 / 1px 100%;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
@@ -91,18 +163,34 @@ body {
   top: 0;
   left: 0;
   right: 0;
+  /* Width of the carved cable moulding, and therefore of the right cluster's
+     gaps — one number keeps the moulding centred in its gap at every step. */
+  --cluster-gap: 9px;
+  --bay: 44px;   /* board edge = hit target */
+  --pier: 7px;   /* board-to-board gap AND the rail's own padding */
   display: flex;
   gap: 10px;
   align-items: stretch;
   justify-content: space-between;
   min-height: 88px;
   padding: 9px 12px;
+  /* The bar is read as ONE heavy oak beam, not a row of chrome: two stopped
+     chamfers are cut the length of it (dark face above, lit face below, as a
+     moulded ceiling joist), and the grain runs with the beam. Everything else
+     — crest boss, turn tablet, nav rail — is a separate board fixed to it. */
   background:
+    linear-gradient(180deg, transparent 0 6px, rgba(0, 0, 0, 0.34) 6px 7px, rgba(246, 226, 180, 0.075) 7px 8px, transparent 8px),
+    linear-gradient(0deg, transparent 0 7px, rgba(0, 0, 0, 0.34) 7px 8px, rgba(246, 226, 180, 0.06) 8px 9px, transparent 9px),
     url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='180'%20height='180'%3E%3Cfilter%20id='g'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.75'%20numOctaves='2'%20seed='7'%20stitchTiles='stitch'/%3E%3CfeColorMatrix%20values='0%200%200%200%200.93%200%200%200%200%200.85%200%200%200%200%200.66%200%200%200%200.055%200'/%3E%3C/filter%3E%3Crect%20width='180'%20height='180'%20filter='url(%23g)'/%3E%3C/svg%3E") repeat,
+    var(--oak-grain) repeat,
     url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='260'%20height='260'%3E%3Cfilter%20id='m'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.045'%20numOctaves='3'%20seed='11'%20stitchTiles='stitch'/%3E%3CfeColorMatrix%20values='0%200%200%200%200.9%200%200%200%200%200.8%200%200%200%200%200.58%200%200%200%200.05%200'/%3E%3C/filter%3E%3Crect%20width='260'%20height='260'%20filter='url(%23m)'/%3E%3C/svg%3E") repeat,
     radial-gradient(130% 210% at 50% -70%, rgba(232, 190, 108, 0.14), transparent 52%),
+    /* A thin veil of pitch over the navy: Baltic hulls and exposed civic
+       timber were tarred, and it pulls the beam a step towards its own
+       joinery without surrendering the deep navy the map needs to sit on. */
+    linear-gradient(180deg, rgba(40, 31, 18, 0.15), rgba(22, 16, 8, 0.22)),
     linear-gradient(180deg, #13273f 0%, #0f2036 52%, #0b1626 100%);
-  background-size: 180px 180px, 260px 260px, auto, auto;
+  background-size: auto, auto, 180px 180px, 240px 120px, 260px 260px, auto, auto, auto;
   /* Gold gradient frame: a hairline along the top edge, a thicker rail along
      the bottom — the "gilded banner" the title screen already uses. */
   border-width: 1px 0 3px 0;
@@ -128,10 +216,13 @@ body {
   flex: 0 1 auto;
 }
 
-/* Gilt-framed panel — an ornamental gold frame drawn by an SVG border-image.
-   Deliberately hand-inked: the main strokes bow slightly and overshoot at the
-   corners like crossed nib strokes, and each corner's tick, weight and diamond
-   differs a touch — the panels read as drawn, not generated. */
+/* Iron-bound oak tablet — the turn/date board, framed the way a cog's timbers
+   and a chest's lid were framed: forged strap running the full length of every
+   edge, a rivet head punched through at each corner, and one thin brass scribe
+   line inside the strap so the tablet still answers the bar's gilt rules.
+   Drawn deliberately by hand, like the gilt frame it replaces: the four straps
+   differ a hair in width, and no two rivets are the same size or sit on quite
+   the same centre — a smith's work, not a stamping. */
 .hud-frame {
   position: relative;
   border: 9px solid transparent;
@@ -139,9 +230,15 @@ body {
   background:
     url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='180'%20height='180'%3E%3Cfilter%20id='g'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.75'%20numOctaves='2'%20seed='7'%20stitchTiles='stitch'/%3E%3CfeColorMatrix%20values='0%200%200%200%200.93%200%200%200%200%200.85%200%200%200%200%200.66%200%200%200%200.055%200'/%3E%3C/filter%3E%3Crect%20width='180'%20height='180'%20filter='url(%23g)'/%3E%3C/svg%3E") repeat,
     url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='260'%20height='260'%3E%3Cfilter%20id='m'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.045'%20numOctaves='3'%20seed='11'%20stitchTiles='stitch'/%3E%3CfeColorMatrix%20values='0%200%200%200%200.9%200%200%200%200%200.8%200%200%200%200%200.58%200%200%200%200.05%200'/%3E%3C/filter%3E%3Crect%20width='260'%20height='260'%20filter='url(%23m)'/%3E%3C/svg%3E") repeat,
+    var(--oak-grain) repeat 0 0 / var(--grain-size),
     linear-gradient(180deg, rgba(16, 30, 50, 0.72), rgba(8, 16, 29, 0.78));
-  background-size: 180px 180px, 260px 260px, auto;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.32);
+  background-size: 180px 180px, 260px 260px, var(--grain-size), auto;
+  /* Sunk into the beam rather than floating on it: the panel is a tablet let
+     into the timber, so its head is in shadow and its foot catches a line. */
+  box-shadow:
+    inset 0 3px 7px rgba(0, 0, 0, 0.55),
+    inset 0 -2px 0 rgba(246, 226, 180, 0.07),
+    0 3px 10px rgba(0, 0, 0, 0.45);
 }
 
 /* Realm mark and resources sit directly on the bar (no frame) — an engraved
@@ -161,15 +258,17 @@ body {
 .hud-realm-block::after {
   content: "";
   position: absolute;
-  right: 0;
+  right: -1px;
   top: 16%;
   bottom: 16%;
-  width: 1px;
-  background: var(--bar-rule-v);
+  width: 2px;
+  background: var(--groove-v);
   pointer-events: none;
 }
 
-/* Crest sits on a small gold-bordered plaque, as on the mockup. */
+/* The realm arms are carved into an oak boss and nailed to the beam with four
+   iron rivets — the way a ship's or a guild hall's shield-of-arms was fixed,
+   not hung in a gilt picture frame. */
 .hud-realm-crest {
   flex: 0 0 44px;
   width: 44px;
@@ -177,18 +276,23 @@ body {
   display: grid;
   place-items: center;
   color: var(--accent);
-  border-radius: 4px;
-  background: radial-gradient(circle at 50% 32%, #1c3050, #0b1524 82%);
-  border: 1px solid rgba(228, 188, 112, 0.66);
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.45),
-    inset 0 0 0 2px rgba(9, 15, 25, 0.55),
-    inset 0 0 10px rgba(232, 190, 108, 0.18);
+  border-radius: 3px;
+  /* The arms stand in a canopied niche, the way a Roland stands in his (the
+     Bremen Roland, 1404 — hansa times.md §6). Two rivets, not four: hand-set
+     work is never symmetrical. */
+  background:
+    var(--rivet) no-repeat 3px 3px / 4.6px 4.6px,
+    var(--rivet) no-repeat calc(100% - 3px) calc(100% - 3px) / 4.4px 4.4px,
+    var(--oak-niche) no-repeat 50% calc(100% - 3px) / 30px 32px,
+    var(--oak-grain) repeat 0 0 / var(--grain-size),
+    var(--oak-face);
+  border: 1px solid rgba(146, 118, 68, 0.72);
+  box-shadow: var(--board-chamfer), 0 2px 6px rgba(0, 0, 0, 0.5);
 }
 
 .hud-realm-crest svg {
-  width: 34px;
-  height: 34px;
+  width: 29px;
+  height: 29px;
   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6));
 }
 
@@ -232,10 +336,20 @@ body {
 
 /* The resource read-outs: label-topped columns straight on the bar. */
 .hud-reswrap {
+  position: relative;
   display: flex;
   align-items: stretch;
   min-width: 0;
-  padding: 0 4px;
+  padding: 0 6px;
+  border-radius: 3px;
+  /* The read-outs sit in a shallow rebate cut in the beam — the same joinery
+     that gives the boards their edge, inverted. */
+  background:
+    var(--oak-grain) repeat 0 0 / var(--grain-size),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.05));
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.38),
+    inset 0 -1px 0 rgba(246, 226, 180, 0.07);
 }
 
 /* Elastic middle. Crisis chips dock just after the resources (left of the
@@ -256,11 +370,12 @@ body {
 }
 
 /* The right cluster never shrinks or clips: the elastic centre and the
-   ellipsising left side cede space first, so End turn is always whole. */
+   ellipsising left side cede space first, so End turn is always whole.
+   The gap carries the stopped chamfer that closes the rail. */
 .hud-topbar-right {
   display: flex;
   align-items: stretch;
-  gap: 7px;
+  gap: var(--cluster-gap);
   flex: 0 0 auto;
 }
 
@@ -277,15 +392,17 @@ body {
   padding: 3px 10px;
 }
 
-/* Engraved gold hairline between neighbouring resource columns. */
+/* Chisel-cut groove between neighbouring resource columns (see --groove-v):
+   the counting-house divides its columns by incising the board, not by ruling
+   a gold line on it. */
 .hud-resource + .hud-resource::before {
   content: "";
   position: absolute;
-  left: 0;
+  left: -1px;
   top: 14%;
   bottom: 14%;
-  width: 1px;
-  background: var(--bar-rule-v);
+  width: 2px;
+  background: var(--groove-v);
   pointer-events: none;
 }
 
@@ -367,29 +484,57 @@ body {
    corner badge for pending business. */
 /* Icon-only nav: uniform compact gilt squares — the panel name lives in the
    hover tooltip (title, led by the name) and in the aria-label. */
+/* The six panels are seated in ONE forged strap-iron rail — a hammered plate
+   with a rivet punched through each corner, the fitting a smith would band a
+   chest or a rudder with. It reads as six boards in a single piece of joinery
+   rather than six loose app icons, and it gives the tutorial's `.hud-navwrap`
+   spotlight an honest rectangle to sit on. No overflow clipping: the count
+   badges deliberately ride proud of both the panel and the rail. */
 .hud-navwrap {
+  position: relative;
   display: flex;
   align-items: center;
   align-self: center;
-  gap: 6px;
+  /* Gap, padding and board width all read --bay/--pier, so the rail can never
+     drift out of register with the hit targets at any breakpoint. */
+  gap: var(--pier);
+  padding: calc(var(--pier) - 2px) var(--pier);
+  border: 1px solid rgba(0, 0, 0, 0.72);
+  border-radius: 4px;
+  background:
+    var(--rivet) no-repeat 3px 50% / 5px 5px,
+    var(--rivet) no-repeat calc(100% - 3px) 50% / 4.8px 4.8px,
+    var(--iron-tooth) repeat 0 0 / 120px 120px,
+    var(--iron-plate);
+  box-shadow:
+    inset 0 1px 0 rgba(162, 178, 200, 0.18),
+    inset 0 -2px 5px rgba(0, 0, 0, 0.5),
+    0 2px 6px rgba(0, 0, 0, 0.45);
 }
 
+/* Each nav square is a carved oak board: chamfered on all four edges, with a
+   compass-scribed roundel sunk into the face and the glyph standing proud in
+   the hollow. Light falls from above the beam, so the top chamfer is lit and
+   the foot is in shadow — the depth is cut, never glowed. */
 .hud-navbtn {
   position: relative;
   display: grid;
   place-items: center;
-  flex: 0 0 44px;
-  width: 44px;
-  min-width: 44px;
-  height: 44px;
+  flex: 0 0 var(--bay);
+  width: var(--bay);
+  min-width: var(--bay);
+  height: var(--bay);
   padding: 0;
   color: #e7ddc7;
-  background: linear-gradient(180deg, rgba(30, 46, 70, 0.72), rgba(13, 25, 41, 0.82));
-  border: 1px solid rgba(214, 170, 92, 0.45);
-  border-radius: 4px;
-  box-shadow: inset 0 0 0 1px rgba(9, 15, 25, 0.5), inset 0 1px 0 rgba(255, 233, 170, 0.1);
+  background:
+    var(--oak-niche) no-repeat 50% calc(100% - 3px) / var(--niche-size),
+    var(--oak-grain) repeat 0 0 / var(--grain-size),
+    var(--oak-face);
+  border: 1px solid rgba(146, 118, 68, 0.72);
+  border-radius: 3px;
+  box-shadow: var(--board-chamfer), 0 2px 3px rgba(0, 0, 0, 0.5);
   cursor: pointer;
-  transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+  transition: border-color 0.12s ease, background-color 0.12s ease, box-shadow 0.12s ease, transform 0.1s ease;
 }
 
 /* railBtn passes an empty caption; hide the empty span so centring is exact. */
@@ -397,16 +542,29 @@ body {
   display: none;
 }
 
+/* Hover lifts the board a hair proud of the rail (its cast shadow deepens);
+   the brass rebate brightens. Nothing lights up. */
 .hud-navbtn:hover {
-  border-color: rgba(240, 214, 148, 0.7);
-  background: linear-gradient(180deg, rgba(48, 68, 96, 0.85), rgba(22, 37, 56, 0.9));
-  box-shadow: inset 0 1px 0 rgba(255, 233, 170, 0.14), 0 0 12px rgba(226, 180, 90, 0.16);
+  border-color: rgba(206, 170, 100, 0.9);
+  background:
+    var(--oak-niche) no-repeat 50% calc(100% - 3px) / var(--niche-size),
+    var(--oak-grain) repeat 0 0 / var(--grain-size),
+    var(--oak-face-hi);
+  box-shadow: var(--board-chamfer-hi), 0 4px 6px rgba(0, 0, 0, 0.55);
+  transform: translateY(-1px);
 }
 
+/* Open panel = the board is pressed INTO its rebate: the shadow crosses its
+   head instead of its foot and the scribed roundel picks up a brass rim. The
+   inversion is a shape cue, so the state never rests on hue alone. */
 .hud-navbtn.active {
-  border-color: #e6c874;
-  background: linear-gradient(180deg, rgba(62, 84, 112, 0.9), rgba(28, 45, 66, 0.92));
-  box-shadow: inset 0 1px 0 rgba(255, 233, 170, 0.2), 0 0 14px rgba(226, 180, 90, 0.22);
+  border-color: rgba(230, 200, 116, 0.9);
+  background:
+    var(--oak-niche-on) no-repeat 50% calc(100% - 3px) / var(--niche-size),
+    var(--oak-grain) repeat 0 0 / var(--grain-size),
+    var(--oak-face-in);
+  box-shadow: var(--board-chamfer-in), 0 1px 0 rgba(255, 236, 190, 0.1);
+  transform: translateY(1px);
 }
 
 .hud-navbtn.attention {
@@ -421,9 +579,20 @@ body {
 }
 
 .hud-navbtn .ico-svg {
-  color: #ecc978;
+  color: #eccb80;
 }
 
+/* A chiselled mark, not a scratch: the registry's 1.8px hairline is too thin
+   to read as carved at 20px, so the bar thickens the stroke and drops a hard
+   shadow under it (CSS beats the SVG's presentation attribute, so the shared
+   art registry is untouched everywhere else it is used). */
+.hud-navbtn .ico-svg svg,
+.hud-topbar .hud-menu-toggle .ico-svg svg {
+  stroke-width: 2.05;
+}
+
+/* Count badges read as brass studs driven into the board: a dark seating ring
+   under the gilt head. JS shows/hides them, so nothing here forces display. */
 .hud-navbtn .hud-railbadge {
   position: absolute;
   top: -6px;
@@ -432,7 +601,11 @@ body {
   height: 16px;
   padding: 0 4px;
   font-size: 10px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  z-index: 2;
+  box-shadow:
+    0 0 0 1px rgba(40, 27, 8, 0.85),
+    inset 0 0 0 1px rgba(255, 246, 216, 0.5),
+    0 1px 3px rgba(0, 0, 0, 0.55);
 }
 
 /* --- End-turn advisor: chips for whatever still wants orders --------------- */
@@ -911,8 +1084,13 @@ body {
   gap: 8px;
 }
 
+/* `relative` (not the panel's `absolute`) both neutralises the floating-panel
+   look and anchors the cable moulding below — it stays in the bar's flow.
+   `inset: auto` is required with it: the panel rule's own left/bottom would
+   otherwise become relative offsets and shove the plate off the beam. */
 .hud-topbar .hud-actions {
-  position: static;
+  position: relative;
+  inset: auto;
   width: auto;
   min-width: 0;
   max-width: none;
@@ -926,6 +1104,19 @@ body {
   border: 0;
   border-radius: 0;
   box-shadow: none;
+}
+
+/* Stopped chamfer closing the rail and opening the commit action. Ornamental:
+   no layout width, no pointer. */
+.hud-topbar .hud-actions::before {
+  content: "";
+  position: absolute;
+  left: calc(-0.5 * var(--cluster-gap) - 1px);
+  top: 12%;
+  bottom: 12%;
+  width: 2px;
+  background: var(--groove-v);
+  pointer-events: none;
 }
 
 .hud-topbar .hud-advisor {
@@ -1407,6 +1598,8 @@ body {
   margin: 0 0 10px;
 }
 
+/* Pending business reads as a struck disc — a small coin laid on the board,
+   domed to the light with a milled rim — rather than a flat notification dot. */
 .hud-railbadge {
   display: inline-flex;
   align-items: center;
@@ -1415,11 +1608,14 @@ body {
   height: 17px;
   padding: 0 4px;
   border-radius: 999px;
-  background: var(--accent);
-  color: #1a1408;
+  background: radial-gradient(circle at 50% 30%, #fbe8b2 0%, #eaca7e 45%, #c69a45 100%);
+  color: #241906;
   font-size: 10.5px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+  box-shadow:
+    0 0 0 1px rgba(40, 27, 8, 0.85),
+    inset 0 0 0 1px rgba(255, 246, 216, 0.5);
 }
 
 .hud-drawer-head {
@@ -1532,13 +1728,16 @@ body {
 }
 
 /* Research choice waiting: a gentle gold pulse on the top-bar entry. */
+/* "Business waiting" collar: a hard brass ring swelling around the board, not
+   a soft halo — the carved bar has no glows in it. The panel's own chamfer
+   stack is repeated in both frames so the animation never flattens it. */
 @keyframes hud-attn {
   0%,
   100% {
-    box-shadow: var(--panel-shadow), 0 0 0 0 rgba(244, 210, 122, 0);
+    box-shadow: var(--board-chamfer), inset 0 -2.5px 0 rgba(226, 180, 90, 0.5), 0 2px 3px rgba(0, 0, 0, 0.5);
   }
   50% {
-    box-shadow: var(--panel-shadow), 0 0 0 5px rgba(244, 210, 122, 0.22);
+    box-shadow: var(--board-chamfer), inset 0 -2.5px 0 rgba(255, 214, 124, 0.95), 0 2px 3px rgba(0, 0, 0, 0.5);
   }
 }
 
@@ -1656,23 +1855,45 @@ body {
 }
 
 /* The commit action: a full-height gold slab with an inner cream ring inside a
-   dark outer edge — the mockup's End-turn treatment. Never wraps, never clips. */
+   dark outer edge — the mockup's End-turn treatment. Never wraps, never clips.
+   Direction D sets that struck-metal face in a blackened-iron bezel and bolts
+   it through the beam with four brass rivet heads, the way a cog's fittings
+   were nailed through oak. The old outward gold bloom is replaced by a real
+   cast shadow plus a warm bounce off the plate's foot: depth, not glow. */
 .hud-topbar .hud-endturn {
   width: auto;
   min-width: 104px;
   height: 100%;
   padding: 0 18px;
-  border-radius: 5px;
-  border: 1px solid #6d5220;
+  border-radius: 4px;
+  border: 1px solid #4a3512;
+  /* A struck coin: die-marks in the field, a bright bead at the rim and a
+     chased fillet falling away from it. Depth is the cast shadow, not a glow. */
+  background: var(--brass-struck) repeat 0 0 / 48px 48px, var(--gold-grad);
+  color: #241a06;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.09em;
   text-transform: uppercase;
   white-space: nowrap;
+  text-shadow: 0 1px 0 rgba(255, 244, 208, 0.5);
   box-shadow:
-    inset 0 0 0 1.5px rgba(255, 240, 200, 0.55),
-    0 3px 12px rgba(214, 168, 74, 0.3);
+    inset 0 0 0 1.5px rgba(255, 243, 206, 0.62),
+    inset 0 0 0 2.9px rgba(120, 84, 26, 0.4),
+    inset 0 2px 0 rgba(255, 250, 226, 0.35),
+    inset 0 -4px 8px rgba(126, 82, 20, 0.3),
+    0 3px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* Per-surface ring audit: the global gold focus ring must never sit edge to
+   edge with a gold plate — a dark keyline guarantees the separation. */
+.hud-topbar .hud-endturn:focus-visible {
+  box-shadow:
+    inset 0 0 0 1.5px rgba(255, 243, 206, 0.62),
+    inset 0 0 0 2.9px rgba(120, 84, 26, 0.4),
+    0 0 0 2px rgba(10, 7, 3, 0.9),
+    0 3px 8px rgba(0, 0, 0, 0.5);
 }
 
 .hud-endturn:hover {
@@ -3101,25 +3322,41 @@ body {
   align-items: center;
 }
 
-.hud-menu-toggle {
+/* Same carved board as the nav squares, so the bar ends the way it begins.
+   Scoped to the bar on purpose: the button also carries `.hud-legend-toggle`,
+   a later single-class rule that would otherwise repaint it as a plain grey
+   chip — which is exactly why the ⚙ never matched the nav squares before. */
+.hud-topbar .hud-menu-toggle {
   display: grid;
   place-items: center;
-  width: 44px;
-  min-width: 44px;
-  height: 44px;
+  width: var(--bay);
+  min-width: var(--bay);
+  height: var(--bay);
   align-self: center;
   padding: 0;
-  color: #ecc978;
-  background: linear-gradient(180deg, rgba(30, 46, 70, 0.72), rgba(13, 25, 41, 0.82));
-  border: 1px solid rgba(214, 170, 92, 0.45);
-  border-radius: 4px;
-  box-shadow: inset 0 0 0 1px rgba(9, 15, 25, 0.5), inset 0 1px 0 rgba(255, 233, 170, 0.1);
-  transition: border-color 0.12s ease, background 0.12s ease;
+  color: #eccb80;
+  background:
+    var(--oak-niche) no-repeat 50% calc(100% - 3px) / var(--niche-size),
+    var(--oak-grain) repeat 0 0 / var(--grain-size),
+    var(--oak-face);
+  border: 1px solid rgba(146, 118, 68, 0.72);
+  border-radius: 3px;
+  box-shadow: var(--board-chamfer), 0 2px 3px rgba(0, 0, 0, 0.5);
+  transition: border-color 0.12s ease, background-color 0.12s ease, box-shadow 0.12s ease, transform 0.1s ease;
 }
 
-.hud-menu-toggle:hover {
-  border-color: rgba(240, 214, 148, 0.7);
-  background: linear-gradient(180deg, rgba(48, 68, 96, 0.85), rgba(22, 37, 56, 0.9));
+.hud-topbar .hud-menu-toggle .ico-svg {
+  color: #eccb80;
+}
+
+.hud-topbar .hud-menu-toggle:hover {
+  border-color: rgba(206, 170, 100, 0.9);
+  background:
+    var(--oak-niche) no-repeat 50% calc(100% - 3px) / var(--niche-size),
+    var(--oak-grain) repeat 0 0 / var(--grain-size),
+    var(--oak-face-hi);
+  box-shadow: var(--board-chamfer-hi), 0 4px 6px rgba(0, 0, 0, 0.55);
+  transform: translateY(-1px);
 }
 
 .hud-menu-toggle .ico-svg svg {
@@ -4730,12 +4967,12 @@ a:focus-visible,
 @media (max-width: 1366px) {
   .hud-topbar {
     gap: 6px;
+    /* The moulding narrows with the cluster's gaps (they are the same token). */
+    --cluster-gap: 7px;
+    --pier: 6px;
   }
   .hud-topbar-left {
     gap: 6px;
-  }
-  .hud-topbar-right {
-    gap: 5px;
   }
   .hud-frame {
     border-width: 7px;
@@ -4774,6 +5011,9 @@ a:focus-visible,
    absolutely-centred panel cannot ride a scrolling strip). */
 @media (max-width: 1024px) {
   .hud-topbar {
+    /* One step tighter than 1366: the joinery narrows with the strip. */
+    --cluster-gap: 6px;
+    --pier: 5px;
     justify-content: flex-start;
     overflow-x: auto;
     scrollbar-width: none;
@@ -4818,6 +5058,10 @@ a:focus-visible,
      ≤1024px rules; here everything just shrinks a step further.) */
   .hud-topbar {
     gap: 5px;
+    --cluster-gap: 5px;
+    --bay: 38px;
+    --pier: 4px;
+    --niche-size: 29px 31px;
     min-height: 64px;
     padding: 5px 8px;
     font-size: 12px;
@@ -4838,8 +5082,8 @@ a:focus-visible,
     height: 36px;
   }
   .hud-realm-crest svg {
-    width: 23px;
-    height: 23px;
+    width: 21px;
+    height: 21px;
   }
   .hud-realm-name {
     font-size: 13px;
@@ -4849,17 +5093,6 @@ a:focus-visible,
   }
   .hud-turn-main {
     font-size: 13px;
-  }
-  .hud-navbtn {
-    flex-basis: 38px;
-    width: 38px;
-    min-width: 38px;
-    height: 38px;
-  }
-  .hud-menu-toggle {
-    width: 38px;
-    min-width: 38px;
-    height: 38px;
   }
   .hud-topbar .hud-endturn {
     min-width: 80px;

@@ -6,6 +6,55 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-28 — The top bar becomes joinery (v0.109.0)
+
+The six nav squares were the one part of the HUD that could have belonged to any
+browser game: flat navy chips with 4px radii and thin stroke glyphs, sitting
+inside an otherwise gilt-framed, hand-inked, parchment-noise bar. Four period
+directions were built in full and judged on their pixels — a Brick-Gothic arcade,
+guild brass with wax seals, a chancery-parchment strip, and carved oak with iron.
+The arcade won on majesty; the oak won on legibility and on craft, because it was
+the only one that treated the whole beam as one object instead of redecorating a
+corner. What shipped is the oak carrying the arcade's best idea.
+
+**The bar is joinery.** Two period facts drive it: the Hansa's workhorse was the
+cog, a clinker-built *oak* hull with forged-iron fittings (`hansa times.md` §8);
+and a Baltic town hall's council furniture — choir stalls, chests, the Rathaus
+screen — was the same craft. So depth here is **cut, not lit**: a chisel cut is
+dark on the face turned from the light and pale on the face turned to it. The
+navy ground and the gilt rails are untouched, because the parchment map below
+must stay the bright field — the timber is carried by grain, chamfer and carved
+shadow, never by brown paint over the navy.
+
+**A lancet niche in every board.** Each button now has blind tracery cut into it:
+a two-centred Gothic arch, jambs at x=4.6/29.4, springing y=21, apex y=2.4 — a
+rise/span of 0.75, so it is a lancet and never a Romanesque semicircle, which
+would be pre-Hansa. Blind arcading is how a brick mason ornaments a solid wall
+(the Lübeck Rathaus's "wind-hole arcades", §6) and how a stall carver cuts a
+chest front. Critically it is drawn in **value only** — a shadowed head, a lit
+floor — so it frames the gilt glyph instead of competing with it, which is what
+sank the version that drew the arch in gold.
+
+Around it: the nav cluster sits on a riveted strap-iron rail; the crest stands in
+the same niche so both ends of the bar read as one frontage; the read-outs sit in
+a shallow rebate; a stopped chamfer closes the rail and opens the commit action;
+and End turn is struck rather than screwed — a bright bead, a chased fillet, fine
+die-marks, after the Wendish Coinage Union's standard of "a common appearance,
+weight, and fineness across towns" (§11). Badges became struck discs.
+
+Politics lost its crown. The League had "no state, no standing army, no permanent
+navy, no common treasury" (§3) — its authority was the town's: market rights, and
+the weights and measures kept at the weigh-house of a Kontor compound (§6). So
+the button carries a balance, which is also the ⚖ it had always declared as its
+text fallback. `crown` is untouched and still marks capitals. Four seal glyphs
+were drawn and rejected first — at 20px every one of them read as a padlock.
+
+Geometry is now two tokens: `--bay` (board edge = hit target) and `--pier` (the
+gap, and the rail's own padding), so the ironwork cannot drift out of register
+with the hit targets at any breakpoint. Measured in-browser at 1920/1440/1366/
+1024/900/700/380: boards 44×44 (38×38 on phone), bar 88px/64px, End turn never
+wrapped, badges still proud at 5px, nothing clipped. 791 tests green.
+
 ## 2026-07-28 — Rivers, and land that isn't bare (v0.108.0)
 
 **The great rivers.** The map had no fresh water at all, which for a Hansa board

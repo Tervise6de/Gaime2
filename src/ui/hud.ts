@@ -600,7 +600,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
   // Politics: taxes, fiscal policy and the victory race — the realm's governance
   // page (tax used to sit by End turn; victory used to ride the top bar).
   const politicsRail = railBtn(
-    "crown",
+    "scales",
     "⚖",
     t("nav.politics"),
     t("nav.politics.tip"),
@@ -2742,7 +2742,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
     taxInput.value = String(Math.round(player.taxRate * 100));
     taxLabel.textContent = `Tax ${Math.round(player.taxRate * 100)}%`;
-    taxJump.innerHTML = `${glyphHtml("crown", "⚖")} Tax ${Math.round(player.taxRate * 100)}% · Politics ▸`;
+    taxJump.innerHTML = `${glyphHtml("scales", "⚖")} Tax ${Math.round(player.taxRate * 100)}% · Politics ▸`;
     upkeepLine.textContent = `Army upkeep: ${fmt(upkeep)}g/turn.`;
     // The unrest side of the tax lever, with real numbers: the steady state
     // this policy drifts regions toward (before local calming effects).

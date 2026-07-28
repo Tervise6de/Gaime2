@@ -10,7 +10,7 @@
  * Plain JS, no dependencies — consistent with the app's zero-dep philosophy.
  */
 
-const CACHE = "sea-of-coin-v108";
+const CACHE = "sea-of-coin-v109";
 
 self.addEventListener("install", () => {
   // Activate the new worker immediately rather than waiting for old tabs to close.
