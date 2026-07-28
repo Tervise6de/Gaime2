@@ -254,6 +254,13 @@ Norwegian Sea — so the zones fleets sail between and blockades bite in are
 visible rather than implied. A compass rose and its rhumb lines sit in the
 western ocean, drawn under the landmass. All presentation: no rule reads `depth`.
 
+**Rivers (v0.108).** Ten great rivers — Thames, Rhine, Weser, Elbe, Oder,
+Vistula, Memel, Düna, Kymi, Volkhov — are drawn from `data/rivers.ts`, where each
+is a chain of region ids rather than coordinates. Every link is a real map
+adjacency (tested), so a course cannot wander into the sea, and the renderer
+trims the mouth at the coastline. They are decoration today; if river trade ever
+becomes a rule, the data already says which provinces a river connects.
+
 **Blockade and escort (v0.106).** A hostile squadron on a route's sea does not
 close the ocean, it throttles the traffic: the route pays 20% while it is hunted.
 Sail your own hulls (or a formal ally's) into every threatened sea and the convoy

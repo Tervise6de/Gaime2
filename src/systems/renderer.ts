@@ -28,6 +28,8 @@ import { cbSafe } from "@/data/palette";
 import {
   DEPTH,
   OCEAN,
+  RIVER,
+  TERRAIN_TEXTURE_MAX,
   POLITICAL,
   TERRAIN_TEXTURE_ALPHA,
   TERRAIN_TEXTURE_DENSITY,
@@ -49,6 +51,7 @@ import { popCompact, popDisplay } from "@/systems/format";
 import { forceCompactLabel, forceLabel } from "@/ui/military";
 import { computeVoronoiCells, pointInPolygon, type Point, type VoronoiCell } from "@/systems/voronoi";
 import { graphEdges, type MapRenderMode } from "@/systems/mapview";
+import { RIVERS } from "@/data/rivers";
 import { scriptedMap } from "@/data/maps/types";
 import {
   hashFloat,
@@ -935,6 +938,11 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       }
     }
 
+    // The great rivers, over the terrain texture and under the political ink and
+    // the relief wash — still inside the land clip, so a course can run right at
+    // its mouth and the coastline cuts it exactly where the water begins.
+    drawRivers(g, s);
+
     // Soft relief: interior light, coastal shade — the landmass gains volume.
     for (let b = 0; b < proj.blobsPx.length; b++) {
       const blob = proj.blobsPx[b]!;
@@ -1318,7 +1326,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       maxX = Math.max(maxX, a.x);
       maxY = Math.max(maxY, a.y);
     }
-    const count = Math.min(26, Math.round(Math.abs(area2 / 2) * density));
+    const count = Math.min(TERRAIN_TEXTURE_MAX, Math.round(Math.abs(area2 / 2) * density));
     const base = (seed ^ Math.imul(region.id + 1, 7919)) >>> 0;
     g.globalAlpha = TERRAIN_TEXTURE_ALPHA;
     let placed = 0;
@@ -1332,6 +1340,90 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       placed++;
     }
     g.globalAlpha = 1;
+  }
+
+  /**
+   * The great rivers, drawn as a smoothed course through the centres of the
+   * provinces they run through (see `data/rivers.ts`). Catmull-Rom through those
+   * points, with a small deterministic meander so the line reads as water rather
+   * than as a route, and a width that grows from headwater to mouth. The mouth
+   * is over-run past the last province's centre and left to the land clip, so a
+   * river reaches the actual coastline instead of stopping short of it.
+   */
+  function drawRivers(g: CanvasRenderingContext2D, s: GameState): void {
+    if ((s.mapId ?? "hansa") !== "hansa") return;
+    for (const river of RIVERS) {
+      const pts = river.course
+        .map((id) => s.regions[id])
+        .filter((r): r is Region => !!r)
+        .map((r) => ({ x: r.x, y: r.y }));
+      if (pts.length < 2) continue;
+      // Run the mouth out past the last centre; the coastline trims it.
+      const last = pts[pts.length - 1]!;
+      const prev = pts[pts.length - 2]!;
+      const dx = last.x - prev.x;
+      const dy = last.y - prev.y;
+      const len = Math.hypot(dx, dy) || 1;
+      pts.push({ x: last.x + (dx / len) * 0.055, y: last.y + (dy / len) * 0.055 });
+
+      const curve = smoothCourse(pts, river.name.length);
+      const px = curve.map((pt) => projectXY(pt.x, pt.y));
+      const wide = RIVER.maxWidth * river.flow;
+      const narrow = RIVER.minWidth * river.flow;
+      g.lineCap = "round";
+      g.lineJoin = "round";
+      // Two passes: a soft pale sheen, then the ink on top — the same
+      // pen-over-wash reading as the coastline.
+      for (const pass of [
+        { color: RIVER.sheen, grow: 2.1 },
+        { color: RIVER.ink, grow: 0 },
+      ]) {
+        g.strokeStyle = pass.color;
+        for (let i = 0; i + 1 < px.length; i++) {
+          const t = i / (px.length - 1);
+          g.lineWidth = narrow + (wide - narrow) * t + pass.grow;
+          g.beginPath();
+          g.moveTo(px[i]!.x, px[i]!.y);
+          g.lineTo(px[i + 1]!.x, px[i + 1]!.y);
+          g.stroke();
+        }
+      }
+    }
+  }
+
+  /**
+   * Catmull-Rom through the course points, with a deterministic sideways wobble
+   * that peaks mid-segment — a river meanders, it does not run province to
+   * province in straight lines. Map space in, map space out. Pure.
+   */
+  function smoothCourse(points: Point[], salt: number): Point[] {
+    const out: Point[] = [];
+    const at = (i: number): Point => points[Math.max(0, Math.min(points.length - 1, i))]!;
+    const STEPS = 14;
+    for (let i = 0; i + 1 < points.length; i++) {
+      const p0 = at(i - 1);
+      const p1 = at(i);
+      const p2 = at(i + 1);
+      const p3 = at(i + 2);
+      const nx = p2.y - p1.y;
+      const ny = -(p2.x - p1.x);
+      const nl = Math.hypot(nx, ny) || 1;
+      // One stable bend per segment, alternating side, scaled to its length.
+      const bend = (hashFloat(salt, 313, i, 1) - 0.5) * 0.42 * nl;
+      for (let k = 0; k < STEPS; k++) {
+        const t = k / STEPS;
+        const t2 = t * t;
+        const t3 = t2 * t;
+        const base = {
+          x: 0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
+          y: 0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3),
+        };
+        const swing = Math.sin(t * Math.PI) * bend;
+        out.push({ x: base.x + (nx / nl) * swing, y: base.y + (ny / nl) * swing });
+      }
+    }
+    out.push(points[points.length - 1]!);
+    return out;
   }
 
   /** One tiny hand-drawn stamp per terrain; `k` in [0,1) varies size/lean. */

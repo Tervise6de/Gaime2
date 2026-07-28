@@ -23,12 +23,17 @@ export const EDGE_MAX_DISP = 0.012;
  * cached terrain layer, so density costs nothing per frame. 0 disables.
  */
 export const TERRAIN_TEXTURE_DENSITY = {
-  plains: 110,
-  forest: 380,
-  hills: 190,
-  mountains: 150,
-  coast: 60,
+  plains: 2000,
+  forest: 6500,
+  hills: 3400,
+  mountains: 2600,
+  coast: 1100,
 } as const;
+
+/** Stamps one province may carry. The old cap of 26 was never reached — the
+    densities above put 3–4 stamps in a typical province, which read as empty
+    land once you zoomed in. */
+export const TERRAIN_TEXTURE_MAX = 120;
 
 /** Ink alpha for the texture stamps (kept faint — texture, not noise). */
 export const TERRAIN_TEXTURE_ALPHA = 0.75;
@@ -98,6 +103,18 @@ export const DEPTH = {
   /** Paper-grain speckles scattered over the land (count at 1600×900). */
   grainCount: 1500,
   grainAlpha: 0.07,
+} as const;
+
+/**
+ * The great rivers (data/rivers.ts): a pale sheen under a muted ink line, and a
+ * course that widens from headwater to mouth. Drawn inside the land clip, so
+ * the coastline decides where the river ends.
+ */
+export const RIVER = {
+  ink: "rgba(88, 132, 168, 0.62)",
+  sheen: "rgba(196, 226, 240, 0.34)",
+  minWidth: 1.1,
+  maxWidth: 3.4,
 } as const;
 
 /** Ocean & coastline palette (the terrain palette stays in data/terrain.ts).

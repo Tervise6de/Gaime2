@@ -6,6 +6,36 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-28 — Rivers, and land that isn't bare (v0.108.0)
+
+**The great rivers.** The map had no fresh water at all, which for a Hansa board
+is a strange omission: the grain came down the Vistula to Danzig, the wine down
+the Rhine, the Russian furs and wax down the Düna to Riga — a Kontor sits where a
+river meets the sea. Ten rivers are now drawn: Thames, Rhine, Weser, Elbe, Oder,
+Vistula, Memel, Düna, Kymi and the Volkhov.
+
+They are stored as **chains of region ids**, not coordinates (`data/rivers.ts`).
+The renderer smooths a Catmull-Rom course through those provinces' centres with a
+deterministic meander, widening from headwater to mouth. That keeps every course
+on land by construction — each link is a real map adjacency, and a test asserts
+it — and keeps the data meaningful: a river is "which provinces this water runs
+through", which is what the trade geography is about. The course is drawn inside
+the land clip and over-runs its last centre, so the coastline itself cuts the
+mouth exactly where the water starts. Presentation only; no rule reads a river.
+
+**Land texture that reaches the ground.** The terrain-stamp densities put three
+or four trees in a whole province — the land read as bare colour the moment you
+zoomed in — and a `Math.min(26, …)` cap that the maths could never reach hid how
+low they were. Densities are up roughly six-fold and the cap is a named constant.
+It is all baked into the terrain layer, so the per-frame cost is unchanged.
+
+Honest limit: the static layers bake at ~2.4× and the camera goes to 4.5×, so
+stamps still soften at full zoom. Fixing that means re-baking on zoom or a much
+larger pixel budget (~190 MB of layer canvases); neither is worth it for a
+browser game, so the texture is tuned to read at the fit view.
+
+791 tests green (+3), typecheck and production build clean.
+
 ## 2026-07-28 — The sea reads as water again (v0.107.0)
 
 Three passes on the open water, all inside the existing baked ocean layer, so
