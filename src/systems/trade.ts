@@ -494,9 +494,9 @@ export function routeSeaZones(state: GameState, route: TradeRoute): SeaZoneId[] 
   );
 }
 
-/** True when a hostile fleet occupies one of the sea lanes this route needs. */
-export function routeBlockaded(state: GameState, route: TradeRoute): boolean {
-  return routeSeaZones(state, route).some((zoneId) =>
+/** The sea zones on this route currently held by a hostile fleet. */
+export function blockadingSeaZones(state: GameState, route: TradeRoute): SeaZoneId[] {
+  return routeSeaZones(state, route).filter((zoneId) =>
     state.armies.some(
       (army) =>
         armyIsAtSea(army) && army.seaZoneId === zoneId && armyIsFleet(army.units) &&
@@ -504,6 +504,11 @@ export function routeBlockaded(state: GameState, route: TradeRoute): boolean {
         (army.ownerId === BARBARIAN_ID || atWar(state, route.ownerId, army.ownerId)),
     ),
   );
+}
+
+/** True when a hostile fleet occupies one of the sea lanes this route needs. */
+export function routeBlockaded(state: GameState, route: TradeRoute): boolean {
+  return blockadingSeaZones(state, route).length > 0;
 }
 
 // --- the Øresund Sound toll (trade as power) --------------------------------

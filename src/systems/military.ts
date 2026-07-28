@@ -104,6 +104,11 @@ export function armyIsAtSea(army: Army): boolean {
   return army.seaZoneId !== undefined;
 }
 
+/** Whether a stack carries soldiers — the only troops that can hold ground. Pure. */
+export function armyHasLandUnits(units: UnitCounts): boolean {
+  return UNIT_TYPES.some((t) => !UNITS[t].naval && units[t] > 0);
+}
+
 /** An army moves at the pace of its slowest unit. */
 export function armyMoves(units: UnitCounts): number {
   let min = Infinity;
@@ -219,11 +224,20 @@ export function reachableRegions(state: GameState, army: Army): number[] {
   if (army.movesLeft <= 0) return [];
   const region = state.regions[army.regionId];
   if (!region) return [];
-  if (army.seaZoneId !== undefined) return SEA_ZONES[army.seaZoneId].coastalRegions.slice();
-  if (armyIsFleet(army.units)) {
-    return region.adjacency.filter((id) => state.regions[id]?.terrain === "coast");
+  const candidates =
+    army.seaZoneId !== undefined
+      ? SEA_ZONES[army.seaZoneId].coastalRegions.slice()
+      : armyIsFleet(army.units)
+        ? region.adjacency.filter((id) => state.regions[id]?.terrain === "coast")
+        : region.adjacency.slice();
+  // A stack of hulls with no soldiers aboard cannot take ground, so it may only
+  // put in at its own shore (or a friendly stack) — never at a coast to seize.
+  if (!armyHasLandUnits(army.units)) {
+    return candidates.filter(
+      (id) => state.regions[id]?.ownerId === army.ownerId || !!armyAt(state, id, army.ownerId),
+    );
   }
-  return region.adjacency.slice();
+  return candidates;
 }
 
 /**
@@ -437,6 +451,11 @@ export function moveArmy(
   if (!enemyAtTarget && (target.ownerId === owner || friendlyAtTarget)) {
     return relocateOrMerge(state, army, targetRegionId);
   }
+
+  // Hulls cannot hold ground. A ships-only stack may sail, blockade, intercept
+  // and put in at its own ports, but taking a province needs soldiers aboard —
+  // otherwise a lone war cog sails the Baltic snapping up undefended coasts.
+  if (!armyHasLandUnits(army.units)) return state;
 
   // Attacking a rival nation's territory is an act of war.
   let working = state;
@@ -763,15 +782,25 @@ export function sailToSeaZone(
         ? "The attacking fleet was destroyed."
         : "The attacking fleet broke off and withdrew.",
   };
-  const log =
+  const lines = [
     `${attackerName} ${result.attackerWins ? "won" : "lost"} the fleet action in ${zoneName} ` +
-    `(losses ${armySize(result.attackerLosses)} vs ${armySize(result.defenderLosses)} warships).`;
+      `(losses ${armySize(result.attackerLosses)} vs ${armySize(result.defenderLosses)} warships).`,
+  ];
+  // A beaten fleet with no friendly port on this sea is struck from the board.
+  // Say so: survivors and anything they carried disappearing unexplained reads
+  // as a bug rather than as the cost of sailing without a harbour to run for.
+  const lost = (name: string, army: Army): string =>
+    `With no friendly port on ${zoneName}, ${name}'s surviving ${forceLog(army.units)} went down with the sea lane.`;
+  if (attackerRetreats && attackerPort === null) lines.push(lost(attackerName, army));
+  if (defenderRetreats && defenderPort === null) {
+    lines.push(lost(defenderNation?.name ?? "the enemy fleet", enemy));
+  }
   return {
     ...working,
     armies,
     rngState: rng.seed,
     battles: [...(working.battles ?? []), report],
-    log: appendLog(working, [log]),
+    log: appendLog(working, lines),
   };
 }
 

@@ -882,22 +882,9 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
       }
     }
 
-    const capitalId = s.nations.find((n) => n.id === nationId)?.capitalRegionId;
-    const holdingCapital = live.regionId === capitalId && regionIsThreatened(s, live.regionId, nationId);
-    if (!holdingCapital) {
-      const focus = null;
-      if (focus !== null) {
-        const muster = musterRegion(s, nationId, focus);
-        if (muster !== null) {
-          if (live.regionId === muster) continue; // already massing here — hold and build up
-          const toMuster = firstStepTowards(s, live.regionId, nationId, (rid) => rid === muster);
-          if (toMuster !== null) {
-            s = moveArmy(s, live.id, toMuster, rng);
-            continue;
-          }
-        }
-      }
-    }
+    // (The old per-army "walk toward the focus target's muster" pass lived here.
+    // `concentrationPlan` above replaced it with one nation-level plan; the loose
+    // version is gone rather than left behind as an unreachable branch.)
 
     // Defensible and already under threat here → garrison in place.
     if (regionIsThreatened(s, live.regionId, nationId)) continue;
@@ -1361,7 +1348,7 @@ function manageNavy(state: GameState, nationId: number, rng: Rng): GameState {
   const hasTrade = (state.routes ?? []).some((route) => route.ownerId === nationId);
   const desired = atWarNow || hasTrade || aggression >= 0.6 ? (atWarNow && aggression >= 0.7 ? 2 : 1) : 0;
   let s = state;
-  let fleets = () => s.armies.filter((a) => a.ownerId === nationId && armyIsFleet(a.units));
+  const fleets = (): Army[] => s.armies.filter((a) => a.ownerId === nationId && armyIsFleet(a.units));
 
   if (fleets().length < desired) {
     const port = s.regions

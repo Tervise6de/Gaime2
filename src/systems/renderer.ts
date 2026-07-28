@@ -332,7 +332,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   // Active trade overlay: routes whose lanes draw as merchant lines (trade lens
   // only). Not baked — drawn live each frame over the political layer.
   let tradeLanes: TradeRoute[] | null = null;
-  let mapMode: MapRenderMode = "strategy";
+  let mapMode: MapRenderMode = "province";
   // Composite of ocean+terrain+political: the per-frame cost is ONE blit, not
   // three. Recomposited (three offscreen blits, no re-drawing) when any part
   // rebuilds.
@@ -1784,11 +1784,15 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     }
 
     const capitals = capitalSet(s);
+    // On the full 74-province board fixed 15px nodes collide into one blob
+    // around the Baltic. Shrink the node (and its owner halo) on a dense map so
+    // the graph stays a graph — separate circles with links you can follow.
+    const radius = s.regions.length > 30 ? 10 : 15;
+    const halo = radius > 12 ? 5 : 3.5;
     for (const region of s.regions) {
       const p = proj.sites[region.id]!;
-      const radius = 15;
       context.beginPath();
-      context.arc(p.x, p.y, radius + 5, 0, Math.PI * 2);
+      context.arc(p.x, p.y, radius + halo, 0, Math.PI * 2);
       context.fillStyle = region.ownerId === null ? "rgba(14, 21, 25, 0.5)" : ownerColor(region.ownerId);
       context.globalAlpha = region.ownerId === null ? 0.55 : 0.7;
       context.fill();
@@ -1798,12 +1802,12 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       context.fillStyle = terrainFill(context, region.terrain, p.x, p.y, radius);
       context.fill();
       context.strokeStyle = region.ownerId === null ? "rgba(230, 218, 177, 0.7)" : ownerColor(region.ownerId);
-      context.lineWidth = region.ownerId === PLAYER_ID ? 4 : 3;
+      context.lineWidth = region.ownerId === PLAYER_ID ? 3.5 : 2.5;
       context.stroke();
 
       if (highlights.has(region.id)) {
         context.beginPath();
-        context.arc(p.x, p.y, radius + 10, 0, Math.PI * 2);
+        context.arc(p.x, p.y, radius + halo + 5, 0, Math.PI * 2);
         context.strokeStyle = HIGHLIGHT_COLOR;
         context.lineWidth = 3;
         context.setLineDash([6, 4]);
@@ -1812,7 +1816,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       }
       if (selected === region.id) {
         context.beginPath();
-        context.arc(p.x, p.y, radius + 10, 0, Math.PI * 2);
+        context.arc(p.x, p.y, radius + halo + 5, 0, Math.PI * 2);
         context.strokeStyle = SELECT_COLOR;
         context.lineWidth = 3;
         context.stroke();
@@ -2430,6 +2434,17 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     // labels. Rival banners stay visible (presence is public), just unnumbered.
     chipFade = regionLabelAlpha();
     const playerInLeague = inLeague(s, PLAYER_ID);
+    // Every fleet in a sea zone would otherwise be drawn on the zone's single
+    // label point, hiding all but the last one. Fan them out in a stable ring
+    // (ascending army id) so a contested sea reads as contested.
+    const berth = new Map<number, number>();
+    const berths = new Map<string, number>();
+    for (const army of [...s.armies].sort((a, b) => a.id - b.id)) {
+      if (army.seaZoneId === undefined || armySize(army.units) <= 0) continue;
+      const taken = berths.get(army.seaZoneId) ?? 0;
+      berth.set(army.id, taken);
+      berths.set(army.seaZoneId, taken + 1);
+    }
     for (const army of s.armies) {
       const size = armySize(army.units);
       if (size <= 0) continue;
@@ -2447,8 +2462,19 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       const p = sea ? projectXY(sea.x, sea.y) : project(region);
       // Token centre, lower-right of the region node so it clears the capital
       // star and the centred region name.
-      const cx = p.x + NODE_RADIUS - 5;
-      const cy = p.y + NODE_RADIUS - 3;
+      let cx = p.x + NODE_RADIUS - 5;
+      let cy = p.y + NODE_RADIUS - 3;
+      if (sea) {
+        // Spread co-located fleets around the zone marker: first ahead, then a
+        // widening ring, so overlapping cogs stay separately readable/clickable.
+        const slot = berth.get(army.id) ?? 0;
+        if (slot > 0) {
+          const ring = Math.ceil(slot / 6);
+          const angle = ((slot - 1) % 6) * (Math.PI / 3);
+          cx += Math.cos(angle) * 34 * ring;
+          cy += Math.sin(angle) * 26 * ring;
+        }
+      }
       const color = ownerColor(army.ownerId);
       const label = (mine || allied) && chipFade > 0 ? forceCompactLabel(army.units) : null;
       const atSea = armyAtSea(s, army);

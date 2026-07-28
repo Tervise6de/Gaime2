@@ -6,6 +6,50 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-28 — Review pass on the sea/map/AI batch (v0.105.0)
+
+A read-through of the last eight commits (functional sea zones → the military
+audit) found seven defects and fixed them.
+
+**The map opened in the wrong mode.** The map-mode switch shipped with the
+node-and-edge *Strategy* fallback as the default, so a fresh install — and every
+returning player who never opened Options — met the graph instead of the
+authored province chart the whole art pipeline exists to draw. Province is the
+default again; Strategy is opt-in and remembered. On the 74-province board its
+nodes also collided into one blob around the Baltic, so they now shrink on a
+dense map and the selection/highlight rings follow the node size.
+
+**Ships could conquer.** A fleet at sea can land at any coast its zone touches,
+and landing on an undefended province captured it — so one war cog with no
+soldiers aboard could sail the Baltic taking ports. Hulls cannot hold ground:
+`moveArmy` now refuses to enter a region the stack does not already hold when it
+carries no land units, and `reachableRegions` stops offering those landings, so
+the Land picker and move highlights only show what the sim will accept.
+
+**Fleets were drawn on top of each other.** Every fleet in a sea zone was painted
+at that zone's single label point, so a contested sea showed one cog and one
+tooltip. Co-located fleets now fan out in a stable ring by army id.
+
+**A beaten fleet vanished without a word.** A defeated fleet with no friendly
+port on that sea is struck from the board (correct — it has nowhere to run), but
+the log only said it lost the action, so survivors and their passengers
+disappeared unexplained. It now says what happened, for both sides.
+
+**Dead code in the rival planner.** `doMilitary` still carried the old
+per-army "walk toward the focus target" pass behind `const focus = null`, an
+unreachable branch left in when `concentrationPlan` replaced it. Removed, along
+with the now-unused capital lookup that only fed it, and the equally unreachable
+land-stack estimate in `intel.ts`.
+
+**UI honesty.** Musters join the stack already standing in the region, so raising
+a ship over a field army silently made that army a coast-locked fleet that can
+never dig in — the muster button now carries an ⚓ and says so, and the Armies
+ledger labels such a stack "in port · coast-locked fleet". "Targets in reach"
+marks a strike that would declare war, the blockade chip names the sea being
+held, and a ship's tooltip stops describing it as a 250-strong regiment.
+
+785 tests green (+3), typecheck and production build clean.
+
 ## 2026-07-27 - Military integrity, naval semantics and army controls
 
 A full military-system audit fixed deployment-delay bypasses, stale movement

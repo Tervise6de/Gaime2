@@ -234,6 +234,11 @@ units aboard, can fight an interception with the shared combat resolver, and can
 land at any coastal region touched by its current zone. Rival AI realms recruit
 war cogs, patrol their trade approaches and seek hostile sea lanes.
 
+**Hulls cannot hold ground (v0.105).** A stack with no soldiers aboard may sail,
+blockade, intercept and put in at its own ports, but it cannot enter — and so
+cannot take — a region its realm does not already hold. Taking a shore needs
+troops in the hold; otherwise a lone war cog would sweep up undefended ports.
+
 Trade routes derive the zones touched by their port/lane and stop paying when a
 hostile fleet occupies one of them. The route HUD calls this out as a blockade;
 the existing Sound and League disruptions remain separate reasons. Land armies

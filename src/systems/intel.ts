@@ -6,22 +6,17 @@
  * not their exact warship count. AI planning follows that same boundary.
  */
 
-import { NAVAL_UNIT_TYPES, UNITS, type UnitType } from "@/data/units";
+import { UNITS, type UnitType } from "@/data/units";
 import type { UnitCounts } from "@/systems/combat";
 import { emptyUnits, type Army, type GameState } from "@/systems/state";
 
-/** Fallback information equivalent of seeing a hostile fleet at sea. */
-export const PUBLIC_LAND_STACK_ESTIMATE = 4;
 /** A visible fleet is known to be a fleet, but not its exact warship count. */
 export const PUBLIC_FLEET_STACK_ESTIMATE = 1;
 
-function estimatedEnemyUnits(army: Army): UnitCounts {
+/** What a hostile sail on the horizon is worth as an estimate: a fleet is there. */
+function estimatedEnemyUnits(): UnitCounts {
   const units = emptyUnits();
-  if (army.seaZoneId !== undefined || NAVAL_UNIT_TYPES.some((type) => army.units[type] > 0)) {
-    units.war_cog = PUBLIC_FLEET_STACK_ESTIMATE;
-  } else {
-    units.infantry = PUBLIC_LAND_STACK_ESTIMATE;
-  }
+  units.war_cog = PUBLIC_FLEET_STACK_ESTIMATE;
   return units;
 }
 
@@ -34,7 +29,7 @@ function estimatedEnemyUnits(army: Army): UnitCounts {
 export function publicIntelUnits(state: GameState, observerId: number, army: Army): UnitCounts {
   void state;
   if (army.ownerId === observerId || army.seaZoneId === undefined) return { ...army.units };
-  return estimatedEnemyUnits(army);
+  return estimatedEnemyUnits();
 }
 
 export function publicIntelStrength(state: GameState, observerId: number, army: Army): number {

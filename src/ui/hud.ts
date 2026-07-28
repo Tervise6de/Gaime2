@@ -95,7 +95,7 @@ import { EPOCH_EVENTS } from "@/data/epochEvents";
 import { choiceEventImage } from "@/data/eventArt";
 import { KONTORE, type KontorId } from "@/data/kontore";
 import { SOUND } from "@/data/sound";
-import { routeOptions, regionGoodOutput, routeIncome, soundHolderId, activeEmbargoes, soundPreview, marketOutlook } from "@/systems/trade";
+import { blockadingSeaZones, routeOptions, regionGoodOutput, routeIncome, soundHolderId, activeEmbargoes, soundPreview, marketOutlook } from "@/systems/trade";
 import { canFoundLeague, canJoinLeague, leagueLeader, leagueDividendPool, isBoycotted } from "@/systems/league";
 import { inLeague } from "@/systems/state";
 import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
@@ -2016,20 +2016,32 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
           seaActions.append(sail);
         }
         if (atSea && sea) {
+          // Only landings the sim will actually accept: a fleet with no soldiers
+          // aboard can put in at its own shore but cannot take a foreign one.
+          const landings = reachableRegions(state, army);
           const landSelect = document.createElement("select");
           landSelect.className = "hud-army-land-select";
-          for (const regionId of sea.coastalRegions) {
+          for (const regionId of landings) {
             const landing = state.regions[regionId];
             if (!landing) continue;
+            const owner = state.nations.find((n) => n.id === landing.ownerId);
+            const whose = landing.ownerId === PLAYER_ID
+              ? "yours"
+              : landing.ownerId === null
+                ? "unclaimed"
+                : (owner?.name ?? "rival");
             const option = document.createElement("option");
             option.value = String(regionId);
-            option.textContent = `Land at ${landing.name}`;
+            option.textContent = `Land at ${landing.name} (${whose})`;
             landSelect.append(option);
           }
           const land = btn("Land", "hud-army-land", () => {
             callbacks.onLandFleet(army.id, Number(landSelect.value));
           });
-          land.title = "Land the fleet and any carried troops at the selected coastal region.";
+          land.disabled = landings.length === 0;
+          land.title = landings.length === 0
+            ? "No landing on this sea is open to this fleet — sail on, or bring soldiers aboard to take a shore."
+            : "Land the fleet and any carried troops at the selected coast. Landing on a rival's shore declares war.";
           seaActions.append(landSelect, land);
         }
         if (seaActions.childElementCount > 0) status.append(seaActions);
@@ -2944,8 +2956,13 @@ function tradeSection(state: GameState, region: Region, callbacks: HudCallbacks)
     const toll = rt.tollPaid
       ? ` <span class="hud-trade-toll" title="The Øresund Sound toll skims this Baltic→western route.">−${fmt(rt.tollPaid)}g Sound</span>`
       : "";
+    const blockading = rt.blockaded ? blockadingSeaZones(state, rt).map((z) => SEA_ZONES[z].name) : [];
     const worth = rt.blockaded
-      ? `<span class="hud-trade-severed" title="A hostile fleet is blockading one of this route's sea lanes.">blockaded</span>`
+      ? `<span class="hud-trade-severed" title="${escapeHtml(
+          blockading.length
+            ? `A hostile fleet holds the ${blockading.join(" and ")} — this route pays nothing until it is driven off.`
+            : "A hostile fleet is blockading one of this route's sea lanes.",
+        )}">blockaded${blockading.length ? ` (${escapeHtml(blockading[0]!)})` : ""}</span>`
       : rt.soundBlocked
       ? `<span class="hud-trade-severed" title="The Sound holder has closed the strait to you (war or embargo).">closed at the Sound</span>`
       : rt.leagueBlocked
@@ -3467,7 +3484,15 @@ function renderArmyMeta(state: GameState, region: Region, army: Army): HTMLEleme
   if (!armyIsAtSea(army) && inEnemyZoc(state, army.regionId, army.ownerId)) {
     parts.push("enemy zone of control");
   }
+  // A land stack that has taken a ship aboard is coast-locked and can no longer
+  // entrench. That is invisible in the strength read-out, so name it here.
+  if (!armyIsAtSea(army) && armyIsFleet(army.units)) {
+    parts.push(landUnitCount(army.units) > 0 ? "in port · coast-locked fleet" : "in port · fleet");
+  }
   meta.textContent = parts.join(" · ");
+  meta.title = !armyIsAtSea(army) && armyIsFleet(army.units)
+    ? "Ships in the stack make it a fleet: it moves only along the coast or by sea, and cannot fortify. Detach or disband the ships to free the soldiers."
+    : "";
   return meta;
 }
 
@@ -3663,6 +3688,21 @@ function renderCombatOdds(state: GameState, army: Army): HTMLElement {
           ? `, including ${forceLabel(defense!.reinforcementUnits)} rallying`
           : "") +
         `. Likely losses: ${forceLabel(preview.attackerLosses)} / ${forceLabel(preview.defenderLosses)}.`;
+    // A "capture" chip on a realm you are at peace with is an act of war, not a
+    // free province — flag it here as the region panel's Attack button does.
+    const holder = target.ownerId;
+    if (
+      holder !== null &&
+      holder !== PLAYER_ID &&
+      holder !== BARBARIAN_ID &&
+      !atWar(state, PLAYER_ID, holder)
+    ) {
+      const owner = state.nations.find((n) => n.id === holder);
+      const warn = el("span", "hud-odds-warn");
+      warn.textContent = "declares war";
+      warn.title = `Striking here declares war on ${owner?.name ?? "its ruler"}.`;
+      row.append(warn);
+    }
     row.append(chip);
     box.append(row);
     shown++;
@@ -3686,10 +3726,24 @@ function raiseUnitMenu(state: GameState, region: Region, callbacks: HudCallbacks
     const btn = document.createElement("button");
     btn.className = "hud-unit-btn";
     btn.disabled = !check.ok;
+    // Musters join the stack already standing here, so a ship raised over a field
+    // army makes that whole army a fleet — coast-locked and unable to dig in.
+    // That is a one-way change of what the stack *is*: say so before the click.
+    const standing = armyAt(state, region.id, PLAYER_ID);
+    const merges = !!standing && armySize(standing.units) > 0;
+    const convertsToFleet = merges && !!def.naval && !armyIsFleet(standing!.units);
+    const raiseLine = def.naval
+      ? `Builds one ${def.name} (launches next turn). `
+      : `Raises a ${soldiersDisplay(1)}-strong ${def.name} regiment (deploys next turn). `;
     btn.title = check.ok
-      ? `Raises a ${soldiersDisplay(1)}-strong ${def.name} regiment (deploys next turn). ` +
-        `${def.attack} atk / ${def.defense} def · ${def.upkeep}g upkeep${def.requires ? ` · needs ${def.requires}` : ""}`
+      ? raiseLine +
+        `${def.attack} atk / ${def.defense} def · ${def.upkeep}g upkeep${def.requires ? ` · needs ${def.requires}` : ""}` +
+        (merges ? `\nJoins the force already at ${region.name}, which holds until next turn.` : "") +
+        (convertsToFleet
+          ? `\n⚓ That force then counts as a fleet: it can only move along the coast and by sea, and cannot fortify.`
+          : "")
       : check.reason ?? "";
+    if (convertsToFleet) btn.classList.add("hud-unit-btn-converts");
     const cost = unitCost(playerNation(state), t, region.focus); // Garrison focus discounts musters
     const resourceLocked = !!def.requires && !access.has(def.requires);
     const costHtml = resourceLocked

@@ -2523,6 +2523,16 @@ body {
   white-space: nowrap;
 }
 
+.hud-odds-warn {
+  flex: 0 0 auto;
+  color: #d8a15c;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .hud-odds-chip {
   min-width: 42px;
   text-align: center;
@@ -2594,6 +2604,18 @@ body {
 .hud-unit-btn:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* Raising this ship would turn the field army standing here into a coast-locked
+   fleet — flag the button so the change of stance is visible before the click. */
+.hud-unit-btn-converts:not(:disabled) {
+  border-color: rgba(137, 194, 214, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(111, 168, 190, 0.18);
+}
+
+.hud-unit-btn-converts:not(:disabled) .hud-unit-name::after {
+  content: " ⚓";
+  color: #89c2d6;
 }
 
 .hud-unit-name {
@@ -4541,9 +4563,6 @@ a:focus-visible,
   flex: 0 0 190px;
 }
 
-.hud-map-mode-note {
-  margin-top: 2px;
-}
 
 .hud-opt-label {
   flex: 1;

@@ -576,12 +576,12 @@ function nowStamp(): number {
   return Date.now();
 }
 
+/** The authored province chart is the game's map; Strategy is an opt-in fallback. */
 function loadMapMode(): MapRenderMode {
   try {
-    const value = localStorage.getItem(MAP_MODE_KEY);
-    return value === "province" ? "province" : "strategy";
+    return localStorage.getItem(MAP_MODE_KEY) === "strategy" ? "strategy" : "province";
   } catch {
-    return "strategy";
+    return "province";
   }
 }
 

@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { createGame } from "@/systems/turn";
 import { emptyUnits, emptyWares, BARBARIAN_ID, PLAYER_ID, armySize, type GameState, type TradeRoute } from "@/systems/state";
-import { armyIsAtSea, armyIsFleet, moveArmy, sailToSeaZone } from "@/systems/military";
+import { armyIsAtSea, armyIsFleet, moveArmy, reachableRegions, sailToSeaZone } from "@/systems/military";
 import { routeBlockaded, routeDisrupted, stepTrade } from "@/systems/trade";
 import { runNationTurn } from "@/systems/ai";
 import { createRng } from "@/systems/rng";
 import { getTreaty } from "@/systems/diplomacy";
 import { UNITS, UNIT_TYPES } from "@/data/units";
+import { SEA_ZONES, SEA_ZONE_IDS } from "@/data/sea";
 
 function hansa(): GameState {
   const state = createGame({ seed: 17, playerFaction: "England" });
@@ -285,5 +286,54 @@ describe("functional naval layer", () => {
         0,
       );
     expect(landUnits).toBeGreaterThan(0);
+  });
+
+  it("refuses to let a ships-only fleet take an undefended coast", () => {
+    const state = hansa();
+    const shipsOnly: GameState = {
+      ...state,
+      armies: [{ id: 920, ownerId: PLAYER_ID, regionId: 0, units: { ...emptyUnits(), war_cog: 3 }, movesLeft: 2 }],
+    };
+    const atSea = sailToSeaZone(shipsOnly, 920, "north_sea");
+    const owner = atSea.regions[5]!.ownerId;
+    const tried = moveArmy(atSea, 920, 5);
+    expect(tried).toBe(atSea); // a no-op, not a silent conquest
+    expect(tried.regions[5]!.ownerId).toBe(owner);
+    // ...and the UI is not offered the illegal landing either.
+    expect(reachableRegions(atSea, atSea.armies[0]!)).not.toContain(5);
+  });
+
+  it("still lets a ships-only fleet put in at its own port", () => {
+    const state = hansa();
+    const home = state.regions.find((r) => r.ownerId === PLAYER_ID && r.terrain === "coast")!;
+    const shipsOnly: GameState = {
+      ...state,
+      armies: [{ id: 921, ownerId: PLAYER_ID, regionId: home.id, units: { ...emptyUnits(), war_cog: 2 }, movesLeft: 2 }],
+    };
+    const zone = SEA_ZONE_IDS.find((id) => SEA_ZONES[id].coastalRegions.includes(home.id))!;
+    const atSea = sailToSeaZone(shipsOnly, 921, zone);
+    expect(reachableRegions(atSea, atSea.armies[0]!)).toContain(home.id);
+    const landed = moveArmy(atSea, 921, home.id);
+    expect(landed.armies[0]!.seaZoneId).toBeUndefined();
+    expect(landed.armies[0]!.regionId).toBe(home.id);
+  });
+
+  it("says so in the log when a beaten fleet has no friendly port to run for", () => {
+    const state = hansa();
+    const enemyId = state.nations.find((n) => !n.isBarbarian && !n.isPlayer)!.id;
+    // The attacker's anchor is a barbarian coast, so no port on this sea is its own.
+    const withFleets: GameState = {
+      ...state,
+      treaties: { ...state.treaties, [`${Math.min(PLAYER_ID, enemyId)}-${Math.max(PLAYER_ID, enemyId)}`]: "war" },
+      armies: [
+        { id: 930, ownerId: PLAYER_ID, regionId: 5, units: { ...emptyUnits(), war_cog: 1 }, movesLeft: 2 },
+        { id: 931, ownerId: enemyId, regionId: 8, seaZoneId: "north_sea", units: { ...emptyUnits(), war_cog: 9 }, movesLeft: 0 },
+      ],
+      regions: state.regions.map((r) => (r.ownerId === PLAYER_ID && r.terrain === "coast" ? { ...r, ownerId: enemyId } : r)),
+    };
+    const after = sailToSeaZone(withFleets, 930, "north_sea");
+    if (!after.armies.some((a) => a.id === 930)) {
+      expect(after.log.some((line) => line.includes("no friendly port"))).toBe(true);
+    }
   });
 });
