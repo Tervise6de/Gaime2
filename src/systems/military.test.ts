@@ -314,8 +314,10 @@ describe("recruitment", () => {
     );
     expect(armyAt(next, 0, PLAYER_ID)!.units.infantry).toBe(1);
     expect(armyAt(next, 0, PLAYER_ID)!.movesLeft).toBe(0);
-    expect(armyAt(next, 0, PLAYER_ID)!.fortifying).toBe(false);
-    expect(armyAt(next, 0, PLAYER_ID)!.entrenchment).toBe(0);
+    // Reinforcing a dug-in garrison keeps the works it has earned: the muster
+    // costs the stack its turn, not three turns of entrenchment.
+    expect(armyAt(next, 0, PLAYER_ID)!.fortifying).toBe(true);
+    expect(armyAt(next, 0, PLAYER_ID)!.entrenchment).toBe(2);
     // Input not mutated.
     expect(g.nations[PLAYER_ID]!.stocks.gold).toBe(200);
   });

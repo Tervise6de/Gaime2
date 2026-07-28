@@ -70,13 +70,14 @@ import {
   unitDisplay,
 } from "@/ui/military";
 import { buildOptions, deriveAdvice, regionCanStartBuild } from "@/ui/advisor";
-import { previewCombat, forecastCombat } from "@/systems/combat";
+import { previewCombat, forecastCombat, siegePower } from "@/systems/combat";
 import {
   armyAt,
   anyArmyAt,
   armyIsAtSea,
   armyIsFleet,
   canRaiseUnit,
+  landAssaultForce,
   inEnemyZoc,
   marchEta,
   reachableRegions,
@@ -95,7 +96,7 @@ import { EPOCH_EVENTS } from "@/data/epochEvents";
 import { choiceEventImage } from "@/data/eventArt";
 import { KONTORE, type KontorId } from "@/data/kontore";
 import { SOUND } from "@/data/sound";
-import { blockadingSeaZones, routeOptions, regionGoodOutput, routeIncome, soundHolderId, activeEmbargoes, soundPreview, marketOutlook } from "@/systems/trade";
+import { routeBlockade, routeOptions, regionGoodOutput, routeIncome, soundHolderId, activeEmbargoes, soundPreview, marketOutlook } from "@/systems/trade";
 import { canFoundLeague, canJoinLeague, leagueLeader, leagueDividendPool, isBoycotted } from "@/systems/league";
 import { inLeague } from "@/systems/state";
 import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
@@ -999,7 +1000,10 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       const row = rows.get(route.good);
       if (!row) continue;
       row.routes += 1;
-      row.income += route.lastIncome ?? (route.disrupted || route.blockaded || route.soundBlocked || route.leagueBlocked ? 0 : routeIncome(state, route));
+      row.income += route.lastIncome ??
+        (route.disrupted || route.soundBlocked || route.leagueBlocked
+          ? 0
+          : routeIncome(state, route) * routeBlockade(state, route).incomeMult);
     }
 
     const activeRoutes = (state.routes ?? []).filter((r) => r.ownerId === PLAYER_ID);
@@ -2127,9 +2131,11 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
 
     const list = el("div", "hud-prod-list");
     attackers.forEach((army, i) => {
-      const preview = previewCombat(army.units, defense?.units ?? emptyUnits(), {
+      const assault = landAssaultForce(army.units);
+      const preview = previewCombat(assault.storm, defense?.units ?? emptyUnits(), {
         terrainDefense: TERRAIN[target.terrain].defense,
         fortification: target.fortification + (garrison?.entrenchment ?? 0),
+        supportSiege: siegePower(assault.offshore),
         attackerCommand: commanderAttack(army.commander),
         defenderCommand: commanderDefense(garrison?.commander),
       });
@@ -2151,7 +2157,7 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
       // Long odds get a plain-language reason so a doomed assault isn't a mystery.
       if (!preview.undefended && preview.winChance < 0.4) {
         const warn = el("div", "hud-attack-warn");
-        warn.innerHTML = `${glyphHtml("warning", "⚠")} ${escapeHtml(attackWarning(army, target))}`;
+        warn.innerHTML = `${glyphHtml("warning", "⚠")} ${escapeHtml(attackWarning(assault.storm, target))}`;
         row.append(warn);
       }
       list.append(row);
@@ -2391,6 +2397,9 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
                 ? escapeHtml(forceLabel(report.defenderReinforcementUnits))
                 : `${soldiersDisplay(report.defenderReinforcements)} soldiers`
             }`
+          : "") +
+        (report.attackerSupportUnits
+          ? ` · ⚓ ${escapeHtml(forceLabel(report.attackerSupportUnits))} bombarding from the water`
           : "");
     panel.append(setting);
 
@@ -2956,13 +2965,14 @@ function tradeSection(state: GameState, region: Region, callbacks: HudCallbacks)
     const toll = rt.tollPaid
       ? ` <span class="hud-trade-toll" title="The Øresund Sound toll skims this Baltic→western route.">−${fmt(rt.tollPaid)}g Sound</span>`
       : "";
-    const blockading = rt.blockaded ? blockadingSeaZones(state, rt).map((z) => SEA_ZONES[z].name) : [];
-    const worth = rt.blockaded
-      ? `<span class="hud-trade-severed" title="${escapeHtml(
-          blockading.length
-            ? `A hostile fleet holds the ${blockading.join(" and ")} — this route pays nothing until it is driven off.`
-            : "A hostile fleet is blockading one of this route's sea lanes.",
-        )}">blockaded${blockading.length ? ` (${escapeHtml(blockading[0]!)})` : ""}</span>`
+    const blockade = rt.blockaded ? routeBlockade(state, rt) : null;
+    const seas = blockade ? blockade.zones.map((z) => SEA_ZONES[z].name).join(" and ") : "";
+    const worth = blockade && blockade.status !== "clear"
+      ? `<span class="${blockade.status === "escorted" ? "hud-trade-toll" : "hud-trade-severed"}" title="${escapeHtml(
+          blockade.status === "escorted"
+            ? `A hostile fleet is on this route in the ${seas}, but your own hulls are covering it — the convoys fight through and land ${Math.round(blockade.incomeMult * 100)}% of the cargo.`
+            : `A hostile fleet holds the ${seas}. Only ${Math.round(blockade.incomeMult * 100)}% of this route's income slips through — sail an escort into that sea, or sink them.`,
+        )}">${blockade.status === "escorted" ? "escorted" : "blockaded"} (${escapeHtml(seas)}) · +${fmt(rt.lastIncome ?? 0)}g</span>`
       : rt.soundBlocked
       ? `<span class="hud-trade-severed" title="The Sound holder has closed the strait to you (war or embargo).">closed at the Sound</span>`
       : rt.leagueBlocked
@@ -3432,9 +3442,11 @@ function renderEnemyRegion(
     attackBtn.disabled = true;
     attackBtn.title = "No ready field force can legally reach this region.";
   } else if (attackers.length === 1) {
-    const preview = forecastCombat(attackers[0]!.units, defense?.units ?? emptyUnits(), {
+    const lead = landAssaultForce(attackers[0]!.units);
+    const preview = forecastCombat(lead.storm, defense?.units ?? emptyUnits(), {
       terrainDefense: TERRAIN[region.terrain].defense,
       fortification: region.fortification + (garrison?.entrenchment ?? 0),
+      supportSiege: siegePower(lead.offshore),
       attackerCommand: commanderAttack(attackers[0]!.commander),
       defenderCommand: commanderDefense(garrison?.commander),
     });
@@ -3670,9 +3682,11 @@ function renderCombatOdds(state: GameState, army: Army): HTMLElement {
     if (target.ownerId === PLAYER_ID) continue;
     const defense = regionDefense(state, targetId, PLAYER_ID);
     const garrison = defense?.garrison;
-    const preview = forecastCombat(army.units, defense?.units ?? emptyUnits(), {
+    const assault = landAssaultForce(army.units);
+    const preview = forecastCombat(assault.storm, defense?.units ?? emptyUnits(), {
       terrainDefense: TERRAIN[target.terrain].defense,
       fortification: target.fortification + (garrison?.entrenchment ?? 0),
+      supportSiege: siegePower(assault.offshore),
       attackerCommand: commanderAttack(army.commander),
       defenderCommand: commanderDefense(garrison?.commander),
     });
@@ -3776,13 +3790,13 @@ function oddsClass(chance: number): string {
  * reads as a choice, not a mystery. Militia-as-a-defensive-levy first (the classic
  * trap), then soft-hitting armies, then walls and ground.
  */
-function attackWarning(army: Army, target: Region): string {
-  const total = armySize(army.units) || 1;
-  if (army.units.militia / total >= 0.5) {
+function attackWarning(storm: Record<UnitType, number>, target: Region): string {
+  const total = armySize(storm) || 1;
+  if (storm.militia / total >= 0.5) {
     return "Militia are a defensive levy — weak on the attack. Lead with Infantry or Ranged.";
   }
   let atk = 0;
-  for (const t of UNIT_TYPES) atk += army.units[t] * UNITS[t].attack;
+  for (const t of UNIT_TYPES) atk += storm[t] * UNITS[t].attack;
   if (atk / total < 4) return "Your troops hit softly attacking — bring Infantry, Ranged or Cavalry.";
   if (target.fortification >= 2) return "The walls favour the defender — bring Siege to batter them down.";
   if (TERRAIN[target.terrain].defense >= 1.2) return "The defender holds strong, high ground here.";

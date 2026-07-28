@@ -50,6 +50,12 @@ export function sideStrength(
   return total;
 }
 
+/** Walls left standing once the assault's own siege and its offshore support
+    have battered them down. Never below zero. */
+export function effectiveFortification(ctx: CombatContext, attacker: UnitCounts): number {
+  return Math.max(0, ctx.fortification - siegePower(attacker) - (ctx.supportSiege ?? 0));
+}
+
 /** Total fortification levels a stack can strip when attacking. */
 export function siegePower(units: UnitCounts): number {
   let s = 0;
@@ -72,7 +78,7 @@ export function combatStrengths(
   defender: UnitCounts,
   ctx: CombatContext,
 ): CombatStrengths {
-  const effFort = Math.max(0, ctx.fortification - siegePower(attacker));
+  const effFort = effectiveFortification(ctx, attacker);
   const attack = sideStrength(attacker, defender, "attack") * (ctx.attackerCommand ?? 1);
   const defense =
     sideStrength(defender, attacker, "defense") *
@@ -210,6 +216,8 @@ export interface BattleReport {
   defenderReinforcements?: number;
   /** Exact rallied composition, so mixed coastal support is presented honestly. */
   defenderReinforcementUnits?: UnitCounts;
+  /** Hulls that stood offshore and bombarded rather than storming the walls. */
+  attackerSupportUnits?: UnitCounts;
 }
 
 export interface CombatResult {
@@ -231,6 +239,13 @@ export interface CombatContext {
   attackerCommand?: number;
   /** Strength multiplier from the defending garrison's commander (M4); 1 = unled. */
   defenderCommand?: number;
+  /**
+   * Fortification levels stripped by forces that support the assault without
+   * standing in the line — the fleet lying offshore, raking the walls. Its hulls
+   * never appear in `attacker`, so they neither add melee strength nor take
+   * casualties: a ship's contribution to a land fight is its guns (V0.106).
+   */
+  supportSiege?: number;
 }
 
 /** Opening-volley firepower: ranged attack + siege bombardment. */
@@ -303,7 +318,7 @@ export function resolveCombat(
     };
   }
 
-  const effFort = Math.max(0, ctx.fortification - siegePower(attacker));
+  const effFort = effectiveFortification(ctx, attacker);
   const atkCommand = ctx.attackerCommand ?? 1;
   const defCommand = ctx.defenderCommand ?? 1;
   let atk: UnitCounts = { ...attacker };
@@ -323,8 +338,10 @@ export function resolveCombat(
     let note = "Arrows and stones fly before the lines close.";
     if (aVolley > dVolley * 1.5) note = "Your volley tears into their line before the clash.";
     else if (dVolley > aVolley * 1.5) note = "Their volley thins your ranks on the approach.";
-    if (siegePower(attacker) > 0 && ctx.fortification > 0) {
-      note += effFort < ctx.fortification ? " Siege engines batter the walls." : "";
+    if (ctx.fortification > 0 && effFort < ctx.fortification) {
+      note += (ctx.supportSiege ?? 0) > 0
+        ? " Ships' guns rake the walls from the water."
+        : " Siege engines batter the walls.";
     }
     phases.push({ kind: "volley", round: 0, attackerLosses: atkHit, defenderLosses: defHit, note });
   }

@@ -6,6 +6,52 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-28 — The five open calls from the review, answered (v0.106.0)
+
+The review pass left five findings as design calls rather than fixes. All five
+are now closed.
+
+**A concentration is one front's plan, not a national stand-down.** A pending
+muster used to gate the *whole* attack loop: while one plan was assembling, no
+army of that realm attacked anywhere, so a stack standing next to an empty
+enemy province simply watched it. Now only the armies the plan actually reserves
+(the anvil and the stacks marching to it) hold back, and even they walk into an
+*undefended* province — that costs the muster nothing. Everyone else takes their
+own winnable target as before. The staging pass got the same treatment: an army
+that cannot join the plan falls through to defending, quelling or advancing
+instead of standing idle. The muster stack is now the strongest present rather
+than "exactly one", so a malformed state with two stacks in one region can no
+longer deadlock a realm's offensive forever.
+
+**Reinforcing a fort no longer razes it.** `raiseUnit` merges into the stack
+standing in the region and reset its entrenchment, so mustering one militia in a
+besieged fortress threw away three turns of works. The muster still costs the
+stack its turn (the deployment delay stands) but the trenches it has dug remain.
+
+**Blockades throttle instead of severing, and escorts answer them.** A hostile
+squadron on a route's sea cut it to zero with no counterplay but sinking the
+ships. A blockaded route now pays 20%, and covering *every* threatened sea with
+your own hulls (or a formal ally's, matching them hull for hull) fights the
+convoys through for 60%. `routeDisrupted` is land and treaties again; the route
+HUD names the sea and shows which of the two states it is in.
+
+**Ships support a landing, they do not storm it.** A war cog outfights infantry
+on paper (5/6 against 5/5), so a stack of one militia and ten cogs stormed a
+walled town with all ten hulls in the line. The storming party is now the
+stack's soldiers; the hulls stand off, strip the walls with their guns
+(`supportSiege`) and take no casualties — and they are still afloat afterwards.
+Every forecast the player is shown (region panel, attack chooser, targets in
+reach) uses the same split, so the odds on the button are the odds that get
+rolled, and the battle report names the squadron bombarding from the water.
+
+**The AI navy stops queueing in the North Sea.** Every realm scored zones the
+same way, so seven cogs converged on the Bruges lane, and because a zone's own
+score was never compared they re-sailed every turn. Zone value now also counts
+the realm's *own* ports, penalises hulls already sitting there, and a fleet only
+sails for a sea worth more than the one it holds.
+
+788 tests green (+3), typecheck and production build clean.
+
 ## 2026-07-28 — Review pass on the sea/map/AI batch (v0.105.0)
 
 A read-through of the last eight commits (functional sea zones → the military

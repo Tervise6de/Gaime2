@@ -22,8 +22,9 @@ import { KONTORE, KONTOR_IDS, type KontorId } from "@/data/kontore";
 import { SOUND } from "@/data/sound";
 import { SEA_ZONE_IDS, SEA_ZONES, type SeaZoneId } from "@/data/sea";
 import { round1, unrestPenalty, regionWareMult } from "@/systems/economy";
-import { atWar } from "@/systems/diplomacy";
+import { atWar, getTreaty } from "@/systems/diplomacy";
 import { armyIsAtSea, armyIsFleet } from "@/systems/military";
+import { UNITS, UNIT_TYPES } from "@/data/units";
 import { techTradeMult } from "@/systems/tech";
 import { kontorBlockedFor, leagueSeversRoute, isLeagueMonopoly } from "@/systems/league";
 import {
@@ -481,7 +482,9 @@ export function routeDisrupted(state: GameState, route: TradeRoute): boolean {
     const owner = state.regions[nodeId]?.ownerId ?? null;
     if (owner !== null && owner !== route.ownerId && atWar(state, route.ownerId, owner)) return true;
   }
-  return routeBlockaded(state, route);
+  // A blockade is not a severance: it throttles the route's income in
+  // `stepTrade` (see `routeBlockade`), and an escort can buy most of it back.
+  return false;
 }
 
 /** Sea zones a route plausibly crosses, derived from its ports and lane. */
@@ -506,9 +509,60 @@ export function blockadingSeaZones(state: GameState, route: TradeRoute): SeaZone
   );
 }
 
+/** What a hostile squadron on the lane costs a route that sails on regardless. */
+export const BLOCKADE_INCOME_MULT = 0.2;
+/** What it costs when the owner's own hulls are out there covering the convoy. */
+export const ESCORTED_INCOME_MULT = 0.6;
+
+export interface RouteBlockade {
+  /** "clear" — open water; "escorted" — contested but covered; "blockaded" — hunted. */
+  status: "clear" | "escorted" | "blockaded";
+  /** The sea zones on this route a hostile fleet is holding. */
+  zones: SeaZoneId[];
+  /** Share of this route's income that still gets through. */
+  incomeMult: number;
+}
+
+/**
+ * A blockade throttles a route rather than severing it: hulls at sea take a toll
+ * on the convoys, they do not close the ocean. Sailing an escort of your own into
+ * the same water — your fleet, or a formal ally's — turns a hunt into a running
+ * fight and most of the cargo still lands. That escort is the counterplay: the
+ * answer to an enemy squadron is your own, not the loss of the trade. Pure.
+ */
+export function routeBlockade(state: GameState, route: TradeRoute): RouteBlockade {
+  const zones = blockadingSeaZones(state, route);
+  if (zones.length === 0) return { status: "clear", zones, incomeMult: 1 };
+  const hullsIn = (zoneId: SeaZoneId, friendly: boolean): number =>
+    state.armies.reduce((sum, army) => {
+      if (!armyIsAtSea(army) || army.seaZoneId !== zoneId || !armyIsFleet(army.units)) return sum;
+      const own =
+        army.ownerId === route.ownerId ||
+        getTreaty(state, route.ownerId, army.ownerId) === "alliance";
+      if (own !== friendly) return sum;
+      if (!friendly && army.ownerId !== BARBARIAN_ID && !atWar(state, route.ownerId, army.ownerId)) {
+        return sum;
+      }
+      return sum + shipCount(army.units);
+    }, 0);
+  // Covered only where it is actually threatened: an escort in one sea does not
+  // protect the leg being hunted in another.
+  const covered = zones.every((zoneId) => hullsIn(zoneId, true) >= hullsIn(zoneId, false));
+  return covered
+    ? { status: "escorted", zones, incomeMult: ESCORTED_INCOME_MULT }
+    : { status: "blockaded", zones, incomeMult: BLOCKADE_INCOME_MULT };
+}
+
 /** True when a hostile fleet occupies one of the sea lanes this route needs. */
 export function routeBlockaded(state: GameState, route: TradeRoute): boolean {
   return blockadingSeaZones(state, route).length > 0;
+}
+
+/** Warship hulls in a stack (the blockade/escort weight of a fleet). */
+function shipCount(units: Record<string, number>): number {
+  let ships = 0;
+  for (const type of UNIT_TYPES) if (UNITS[type].naval) ships += units[type] ?? 0;
+  return ships;
 }
 
 // --- the Øresund Sound toll (trade as power) --------------------------------
@@ -662,10 +716,14 @@ export function stepTrade(state: GameState): GameState {
 
     // The League shuts a non-member (or a boycotted realm) out of its Kontore entirely.
     const leagueBlocked = leagueSeversRoute(state, route);
-    const blockaded = routeBlockaded(state, route);
+    const blockade = routeBlockade(state, route);
     const disrupted = routeDisrupted(state, route);
     const kontorClosed = !kontorOpen(state, route.toKontorId); // a shuttered Kontor takes no trade (A3)
-    let income = disrupted || leagueBlocked || kontorClosed ? 0 : routeIncome(state, route);
+    // Hostile hulls on the lane skim the convoy before the Sound ever sees it.
+    let income =
+      disrupted || leagueBlocked || kontorClosed
+        ? 0
+        : round1(routeIncome(state, route) * blockade.incomeMult);
 
     // The Øresund toll: the strait-holder skims a crossing route, or closes it.
     const eff = income > 0 ? soundEffect(state, route, income) : { toll: 0, blocked: false, holderId: null };
@@ -682,7 +740,16 @@ export function stepTrade(state: GameState): GameState {
     }
 
     if (income > 0) gain.set(route.ownerId, round1((gain.get(route.ownerId) ?? 0) + income));
-    nextRoutes.push({ ...route, lastIncome: income, disrupted: disrupted || soundBlocked || leagueBlocked || kontorClosed, blockaded, tollPaid, soundBlocked, leagueBlocked });
+    nextRoutes.push({
+      ...route,
+      lastIncome: income,
+      disrupted: disrupted || soundBlocked || leagueBlocked || kontorClosed,
+      blockaded: blockade.status !== "clear",
+      escorted: blockade.status === "escorted",
+      tollPaid,
+      soundBlocked,
+      leagueBlocked,
+    });
   }
 
   const nations =

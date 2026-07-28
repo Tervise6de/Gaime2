@@ -16,7 +16,7 @@
  */
 
 import { UNITS, UNIT_TYPES, type UnitType } from "@/data/units";
-import { SEA_ZONE_IDS, SEA_ZONES } from "@/data/sea";
+import { SEA_ZONE_IDS, SEA_ZONES, type SeaZoneId } from "@/data/sea";
 import { BUILDINGS, buildingFocusOk, buildingResourceOk, focusCapstone, type BuildingId } from "@/data/buildings";
 import type { TraitId } from "@/data/traits";
 import { TERRAIN, type StrategicResource, type TerrainId } from "@/data/terrain";
@@ -818,23 +818,28 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
     if (defender && defender.movesLeft > 0) s = moveArmy(s, defender.id, capitalPlan.step, rng);
   }
 
-  // One shared offensive plan gates the attack loop: stage first, then attack
-  // only from the assembled stack once the shared combat forecast is positive.
+  // One shared offensive plan gates the *reserved* armies: the assault stack and
+  // the ones marching to join it. It is a plan for one front, not a nation-wide
+  // stand-down — armies outside it still take their own winnable targets, and
+  // even a reserved army walks into an undefended province, which costs the
+  // muster nothing.
   const concentration = shouldConcentrate(s, nationId) ? concentrationPlan(s, nationId) : null;
+  const reserved = concentrationReserves(s, nationId, concentration);
   const actedOffensively = new Set<number>();
   const myArmies = () => s.armies.filter((a) => a.ownerId === nationId && !armyIsFleet(a.units));
   for (const army of [...myArmies()].sort((a, b) => armySize(b.units) - armySize(a.units))) {
     const live = s.armies.find((a) => a.id === army.id);
     if (!live || live.movesLeft <= 0) continue;
-    if (concentration && !concentration.ready) continue;
-    if (concentration?.ready) {
-      if (live.id !== concentration.assaultArmyId) continue;
+    if (concentration?.ready && live.id === concentration.assaultArmyId) {
       s = moveArmy(s, live.id, concentration.targetId, rng);
       actedOffensively.add(live.id);
       continue;
     }
     const target = bestTarget(s, live, nationId);
-    if (target !== null) s = moveArmy(s, live.id, target, rng);
+    if (target === null) continue;
+    if (reserved.has(live.id) && !isUndefendedTarget(s, target, nationId)) continue;
+    s = moveArmy(s, live.id, target, rng);
+    actedOffensively.add(live.id);
   }
 
   // Phase 2 — reposition idle armies (no winnable attack this turn):
@@ -864,22 +869,17 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
     // capital's own garrison — a realm keeps its seat of power defended.
     if (currentConcentration && !currentConcentration.ready) {
       const plan = currentConcentration;
-      if (
-        live.regionId === plan.musterId ||
-        !canStageEssentialDefender(
-          s,
-          live,
-          nationId,
-          plan.musterId,
-          plan.targetId,
-        )
-      ) continue;
-      const toMuster = firstStepTowards(s, live.regionId, nationId, (rid) => rid === plan.musterId);
-      if (toMuster !== null) {
-        s = moveArmy(s, live.id, toMuster, rng);
-        currentConcentration = concentrationPlan(s, nationId);
-        continue;
+      if (live.regionId === plan.musterId) continue; // the anvil holds and builds up
+      if (plan.stagingArmyIds.includes(live.id)) {
+        const toMuster = firstStepTowards(s, live.regionId, nationId, (rid) => rid === plan.musterId);
+        if (toMuster !== null) {
+          s = moveArmy(s, live.id, toMuster, rng);
+          currentConcentration = concentrationPlan(s, nationId);
+          continue;
+        }
       }
+      // Not part of this plan (or no route to the muster) — fall through and let
+      // it defend, quell or advance as usual rather than stand idle.
     }
 
     // (The old per-army "walk toward the focus target's muster" pass lived here.
@@ -1293,7 +1293,9 @@ export function concentrationPlan(state: GameState, nationId: number): Concentra
   if (musterId === null) return null;
 
   const atMuster = stationedArmies(state, musterId, nationId).sort((a, b) => armySize(b.units) - armySize(a.units) || a.id - b.id);
-  const assault = atMuster.length === 1 ? atMuster[0]! : null;
+  // One stack per owner/region is the invariant; if a malformed state ever holds
+  // two, lead with the strongest rather than letting the plan deadlock unready.
+  const assault = atMuster[0] ?? null;
   const defenders = targetDefenders(state, targetId, nationId);
   const target = state.regions[targetId]!;
   const force = assault?.units ?? emptyUnits();
@@ -1313,6 +1315,24 @@ export function concentrationPlan(state: GameState, nationId: number): Concentra
     .map((army) => army.id);
 
   return { targetId, musterId, assaultArmyId: assault?.id ?? null, stagingArmyIds, ready };
+}
+
+/** Armies a pending concentration holds back: the assault stack and its stagers. */
+export function concentrationReserves(
+  state: GameState,
+  nationId: number,
+  plan: ConcentrationPlan | null,
+): Set<number> {
+  const reserved = new Set<number>();
+  if (!plan || plan.ready) return reserved;
+  for (const id of plan.stagingArmyIds) reserved.add(id);
+  for (const army of stationedArmies(state, plan.musterId, nationId)) reserved.add(army.id);
+  return reserved;
+}
+
+/** No stack of another realm stands on this region — walking in simply takes it. */
+export function isUndefendedTarget(state: GameState, targetId: number, nationId: number): boolean {
+  return armySize(targetDefenders(state, targetId, nationId)) === 0;
 }
 
 export interface CapitalDefensePlan {
@@ -1362,30 +1382,61 @@ function manageNavy(state: GameState, nationId: number, rng: Rng): GameState {
     if (!live || live.movesLeft <= 0) continue;
     const choices = reachableSeaZones(s, live);
     if (choices.length === 0) continue;
-    const scored = choices.map((zoneId) => {
-      const zone = SEA_ZONES[zoneId];
-      const enemyShips = s.armies.filter(
-        (a) =>
-          armyIsAtSea(a) &&
-          a.seaZoneId === zoneId &&
-          armyIsFleet(a.units) &&
-          a.ownerId !== nationId &&
-          (a.ownerId === BARBARIAN_ID || atWar(s, nationId, a.ownerId)),
-      ).length;
-      const enemyPorts = zone.coastalRegions.filter((regionId) => {
-        const owner = s.regions[regionId]?.ownerId;
-        return owner !== undefined && owner !== null && owner !== nationId && owner !== BARBARIAN_ID && atWar(s, nationId, owner);
-      }).length;
-      const ownRoutes = (s.routes ?? []).filter((route) => route.ownerId === nationId &&
-        [route.fromRegionId, ...route.lane].some((regionId) => zone.coastalRegions.includes(regionId))).length;
-      return { zoneId, score: enemyShips * 100 + enemyPorts * 10 + ownRoutes };
-    }).sort((a, b) => b.score - a.score || SEA_ZONE_IDS.indexOf(a.zoneId) - SEA_ZONE_IDS.indexOf(b.zoneId));
+    const scored = choices
+      .map((zoneId) => ({ zoneId, score: seaZoneValue(s, nationId, zoneId, live.id) }))
+      .sort((a, b) => b.score - a.score || SEA_ZONE_IDS.indexOf(a.zoneId) - SEA_ZONE_IDS.indexOf(b.zoneId));
     const target = scored[0];
-    if (target && (atWarNow || target.score > 0 || live.seaZoneId === undefined)) {
+    if (!target) continue;
+    // Sail only for a *better* sea than the one already held. Comparing against
+    // the current zone keeps a patrol on station instead of circling every turn,
+    // and the crowding penalty inside the score sends the second cog elsewhere
+    // rather than piling every realm's navy onto the same lane.
+    const here = live.seaZoneId === undefined ? null : seaZoneValue(s, nationId, live.seaZoneId, live.id);
+    if (here === null ? target.score > 0 || atWarNow : target.score > here) {
       s = sailToSeaZone(s, live.id, target.zoneId, rng);
     }
   }
   return s;
+}
+
+/**
+ * What a sea zone is worth to one realm's navy this turn: hostile fleets to
+ * break first, then enemy ports to watch, then its own shores and trade lanes to
+ * cover — minus a crowding penalty for hulls already sitting there, so a navy
+ * spreads out instead of stacking on one label. Pure and deterministic.
+ */
+function seaZoneValue(state: GameState, nationId: number, zoneId: SeaZoneId, movingArmyId: number): number {
+  const zone = SEA_ZONES[zoneId];
+  let enemyShips = 0;
+  let ownShips = 0;
+  let neutralShips = 0;
+  for (const a of state.armies) {
+    if (!armyIsAtSea(a) || a.seaZoneId !== zoneId || !armyIsFleet(a.units) || a.id === movingArmyId) continue;
+    if (a.ownerId === nationId) ownShips++;
+    else if (a.ownerId === BARBARIAN_ID || atWar(state, nationId, a.ownerId)) enemyShips++;
+    else neutralShips++;
+  }
+  let enemyPorts = 0;
+  let homePorts = 0;
+  for (const regionId of zone.coastalRegions) {
+    const owner = state.regions[regionId]?.ownerId;
+    if (owner === undefined || owner === null) continue;
+    if (owner === nationId) homePorts++;
+    else if (owner !== BARBARIAN_ID && atWar(state, nationId, owner)) enemyPorts++;
+  }
+  const ownRoutes = (state.routes ?? []).filter(
+    (route) =>
+      route.ownerId === nationId &&
+      [route.fromRegionId, ...route.lane].some((regionId) => zone.coastalRegions.includes(regionId)),
+  ).length;
+  return (
+    enemyShips * 100 +
+    enemyPorts * 10 +
+    homePorts * 4 +
+    ownRoutes * 3 -
+    ownShips * 25 -
+    neutralShips * 2
+  );
 }
 
 function recruit(state: GameState, nationId: number, rng: Rng): GameState {

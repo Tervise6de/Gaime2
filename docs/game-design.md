@@ -239,6 +239,22 @@ blockade, intercept and put in at its own ports, but it cannot enter — and so
 cannot take — a region its realm does not already hold. Taking a shore needs
 troops in the hold; otherwise a lone war cog would sweep up undefended ports.
 
+**Ships support a landing, they do not storm it (v0.106).** In a land assault the
+storming party is the stack's *soldiers*. Its hulls stand off: they strip the
+walls with their guns (their siege power counts against the fortification) but
+add no melee strength and take no casualties, and they are still there when the
+assault is over. So an amphibious force is judged by the troops it lands, not by
+the tonnage that carried them. On defence a fleet in port still fights — sailors
+man their own walls; it is storming a hostile shore that needs soldiers.
+
+**Blockade and escort (v0.106).** A hostile squadron on a route's sea does not
+close the ocean, it throttles the traffic: the route pays 20% while it is hunted.
+Sail your own hulls (or a formal ally's) into every threatened sea and the convoy
+fights through for 60% — the answer to an enemy squadron is your own squadron,
+not the loss of the trade. The route HUD names the sea and the state
+("blockaded (Baltic Sea)" / "escorted"). Land-side severance — an enemy astride
+the road, the Sound closed, a League shut-out — still pays nothing at all.
+
 Trade routes derive the zones touched by their port/lane and stop paying when a
 hostile fleet occupies one of them. The route HUD calls this out as a blockade;
 the existing Sound and League disruptions remain separate reasons. Land armies

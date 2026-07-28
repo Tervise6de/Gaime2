@@ -375,7 +375,10 @@ export interface TradeRoute {
   soundBlocked?: boolean;
   /** Set when the Hanseatic League shut this route's owner out of the Kontor (no access / boycott) — paid 0. */
   leagueBlocked?: boolean;
+  /** A hostile fleet holds one of this route's sea lanes — income is throttled. */
   blockaded?: boolean;
+  /** Set with `blockaded` when the owner's own hulls cover the threatened lanes. */
+  escorted?: boolean;
 }
 
 /**

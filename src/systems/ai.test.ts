@@ -1253,3 +1253,43 @@ describe("AI region focus", () => {
     }
   });
 });
+
+describe("a pending concentration is one front's plan, not a national stand-down", () => {
+  const ENEMY = 3;
+  const buildTwoFronts = (): GameState =>
+    ({
+      turn: 50,
+      difficulty: "normal",
+      treaties: { "2-3": "war" },
+      rngState: 7,
+      nextArmyId: 20,
+      offers: [],
+      relations: {},
+      log: [],
+      nations: [
+        { id: RIVAL, name: "R", color: "#000", isPlayer: false, isBarbarian: false, alive: true, stocks: { gold: 0, food: 0, knowledge: 0 }, wares: emptyWares(), taxRate: 0.2, research: emptyResearch(), famine: false, bankrupt: false, personality: { archetype: "warlord", aggression: 0.9, expansion: 0.8, economy: 0.3, trustworthiness: 0.2 } },
+        { id: ENEMY, name: "E", color: "#fff", isPlayer: false, isBarbarian: false, alive: true, stocks: { gold: 0, food: 0, knowledge: 0 }, wares: emptyWares(), taxRate: 0.2, research: emptyResearch(), famine: false, bankrupt: false },
+      ],
+      regions: [
+        region({ id: 0, ownerId: RIVAL, adjacency: [1, 2] }),
+        region({ id: 1, ownerId: ENEMY, adjacency: [0, 2], population: 8 }), // the hard nut
+        region({ id: 2, ownerId: RIVAL, adjacency: [0, 1, 4] }),
+        region({ id: 3, ownerId: ENEMY, adjacency: [4], population: 3 }), // undefended, other front
+        region({ id: 4, ownerId: RIVAL, adjacency: [2, 3] }),
+      ],
+      armies: [
+        army({ id: 1, ownerId: RIVAL, regionId: 0, units: units({ infantry: 5 }), movesLeft: 1 }),
+        army({ id: 2, ownerId: RIVAL, regionId: 2, units: units({ infantry: 5 }), movesLeft: 1 }),
+        army({ id: 3, ownerId: RIVAL, regionId: 4, units: units({ infantry: 4 }), movesLeft: 1 }),
+        army({ id: 5, ownerId: ENEMY, regionId: 1, units: units({ infantry: 20 }), movesLeft: 0 }),
+      ],
+    }) as unknown as GameState;
+
+  it("still walks into a free province on another front while the muster gathers", () => {
+    const s = buildTwoFronts();
+    expect(concentrationPlan(s, RIVAL)?.ready).toBe(false); // the hard nut is not on yet
+    const after = runNationTurn(s, RIVAL, createRng(11));
+    expect(after.regions[3]!.ownerId).toBe(RIVAL); // the free province was taken anyway
+    expect(after.regions[1]!.ownerId).toBe(ENEMY); // ...and nobody threw themselves at the nut
+  });
+});

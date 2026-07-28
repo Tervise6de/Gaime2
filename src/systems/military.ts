@@ -29,7 +29,7 @@ import { recordChronicle, chronicleName } from "@/systems/chronicle";
 import { traitUnitCostMult } from "@/data/traits";
 import { focusUnitCostMult, type FocusId } from "@/data/focuses";
 import { createRng, type Rng } from "@/systems/rng";
-import { resolveCombat, type UnitCounts } from "@/systems/combat";
+import { resolveCombat, siegePower, type UnitCounts } from "@/systems/combat";
 import { soldiersDisplay } from "@/systems/format";
 import { atWar, declareWar, getTreaty } from "@/systems/diplomacy";
 import {
@@ -109,6 +109,21 @@ export function armyHasLandUnits(units: UnitCounts): boolean {
   return UNIT_TYPES.some((t) => !UNITS[t].naval && units[t] > 0);
 }
 
+/**
+ * Split a stack into the force that actually storms a land target and the hulls
+ * that stand off it. Shared by combat resolution and every UI forecast, so the
+ * odds the player is shown are the odds that get rolled. Pure.
+ */
+export function landAssaultForce(units: UnitCounts): { storm: UnitCounts; offshore: UnitCounts } {
+  const storm = emptyUnits();
+  const offshore = emptyUnits();
+  for (const t of UNIT_TYPES) {
+    if (UNITS[t].naval) offshore[t] = units[t];
+    else storm[t] = units[t];
+  }
+  return { storm, offshore };
+}
+
 /** An army moves at the pace of its slowest unit. */
 export function armyMoves(units: UnitCounts): number {
   let min = Infinity;
@@ -186,11 +201,11 @@ export function raiseUnit(
             ...a,
             units: { ...a.units, [unit]: a.units[unit] + 1 },
             // A newly mustered regiment is not combat-ready until next turn.
-            // Joining it to a veteran stack must not bypass that deployment delay.
+            // Joining it to a veteran stack must not bypass that deployment
+            // delay — but reinforcing a dug-in garrison must not fill in its own
+            // trenches either, so the entrenchment it has earned stands.
             movesLeft: 0,
             dest: null,
-            fortifying: false,
-            entrenchment: 0,
           }
         : a,
     );
@@ -499,13 +514,18 @@ export function moveArmy(
   // A dug-in garrison fights as if the region held extra fortification (M3); the
   // attacker's siege still strips it inside resolveCombat.
   const entrenchFort = target.fortification + (enemyAtTarget.entrenchment ?? 0);
+  // Only soldiers storm a shore. The stack's hulls lie offshore: they strip the
+  // walls with their guns (siege power) but never join the melee, so they add no
+  // attack strength and take no casualties in a land fight.
+  const { storm, offshore } = landAssaultForce(army.units);
   const rng = sharedRng ?? createRng(state.rngState);
   const result = resolveCombat(
-    army.units,
+    storm,
     combinedDefender,
     {
       terrainDefense: TERRAIN[target.terrain].defense,
       fortification: entrenchFort,
+      supportSiege: siegePower(offshore),
       // Commanders lead their side (M4): the attacker's own, the defence's garrison.
       attackerCommand: commanderAttack(army.commander),
       defenderCommand: commanderDefense(enemyAtTarget.commander),
@@ -550,6 +570,7 @@ export function moveArmy(
     defenderIsPlayer: !!defenderNation?.isPlayer,
     defenderReinforcements: reinforcements,
     defenderReinforcementUnits: reinforcementUnits,
+    attackerSupportUnits: armySize(offshore) > 0 ? offshore : undefined,
   };
 
   // Update the armies with survivors: attacker keeps its remainder; each rallied
@@ -559,7 +580,8 @@ export function moveArmy(
   defenders.forEach((d, i) => lossById.set(d.id, perDefenderLosses[i]));
   let armies = state.armies
     .map((a) => {
-      if (a.id === army.id) return { ...a, units: result.attackerRemaining };
+      // Survivors of the storming party, plus the hulls that never landed.
+      if (a.id === army.id) return { ...a, units: addUnits(result.attackerRemaining, offshore) };
       const loss = lossById.get(a.id);
       if (loss) {
         const spentMove = a.id !== enemyAtTarget.id; // the garrison in place holds; rallies march

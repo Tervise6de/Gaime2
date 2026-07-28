@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createGame } from "@/systems/turn";
 import { emptyUnits, emptyWares, BARBARIAN_ID, PLAYER_ID, armySize, type GameState, type TradeRoute } from "@/systems/state";
 import { armyIsAtSea, armyIsFleet, moveArmy, reachableRegions, sailToSeaZone } from "@/systems/military";
-import { routeBlockaded, routeDisrupted, stepTrade } from "@/systems/trade";
+import { routeBlockade, routeBlockaded, routeDisrupted, stepTrade } from "@/systems/trade";
 import { runNationTurn } from "@/systems/ai";
 import { createRng } from "@/systems/rng";
 import { getTreaty } from "@/systems/diplomacy";
@@ -199,10 +199,40 @@ describe("functional naval layer", () => {
       treaties: { ...state.treaties, [`${Math.min(PLAYER_ID, enemyId)}-${Math.max(PLAYER_ID, enemyId)}`]: "war" },
     };
     expect(routeBlockaded(blocked, route)).toBe(true);
-    expect(routeDisrupted(blocked, route)).toBe(true);
+    // A blockade throttles the lane; it is not a severance (an escort can buy
+    // most of the cargo back), so `routeDisrupted` stays about land and treaties.
+    expect(routeDisrupted(blocked, route)).toBe(false);
+    expect(routeBlockade(blocked, route).status).toBe("blockaded");
+    const open = stepTrade({ ...blocked, armies: [] }).routes?.[0]?.lastIncome ?? 0;
     const next = stepTrade(blocked);
     expect(next.routes?.[0]?.blockaded).toBe(true);
-    expect(next.routes?.[0]?.lastIncome).toBe(0);
+    expect(next.routes?.[0]?.escorted).toBe(false);
+    expect(next.routes?.[0]?.lastIncome).toBeLessThan(open);
+    expect(next.routes?.[0]?.lastIncome).toBeGreaterThan(0);
+  });
+
+  it("lets an escort of your own hulls fight most of the cargo through", () => {
+    const state = hansa();
+    const enemyId = state.nations.find((n) => !n.isBarbarian && !n.isPlayer)!.id;
+    const route: TradeRoute = { id: 78, ownerId: PLAYER_ID, good: "grain", fromRegionId: 0, toKontorId: "bruges", lane: [0, 5] };
+    const hunted: GameState = {
+      ...state,
+      routes: [route],
+      armies: [{ id: 904, ownerId: enemyId, regionId: 5, seaZoneId: "north_sea", units: { ...emptyUnits(), war_cog: 1 }, movesLeft: 0 }],
+      treaties: { ...state.treaties, [`${Math.min(PLAYER_ID, enemyId)}-${Math.max(PLAYER_ID, enemyId)}`]: "war" },
+    };
+    const escorted: GameState = {
+      ...hunted,
+      armies: [
+        ...hunted.armies,
+        { id: 905, ownerId: PLAYER_ID, regionId: 0, seaZoneId: "north_sea", units: { ...emptyUnits(), war_cog: 2 }, movesLeft: 0 },
+      ],
+    };
+    expect(routeBlockade(escorted, route).status).toBe("escorted");
+    const hunt = stepTrade(hunted).routes?.[0]?.lastIncome ?? 0;
+    const convoy = stepTrade(escorted).routes?.[0];
+    expect(convoy?.escorted).toBe(true);
+    expect(convoy?.lastIncome ?? 0).toBeGreaterThan(hunt);
   });
 
   it("gives an aggressive rival a working navy when it can afford one", () => {
@@ -335,5 +365,34 @@ describe("functional naval layer", () => {
     if (!after.armies.some((a) => a.id === 930)) {
       expect(after.log.some((line) => line.includes("no friendly port"))).toBe(true);
     }
+  });
+});
+
+describe("hulls support a landing, they do not storm it", () => {
+  it("keeps warships out of the melee and its casualties, but batters the walls", () => {
+    const state = hansa();
+    const enemyId = state.nations.find((n) => !n.isBarbarian && !n.isPlayer)!.id;
+    const target = 5;
+    const walled: GameState = {
+      ...state,
+      regions: state.regions.map((r) => (r.id === target ? { ...r, ownerId: enemyId, fortification: 3 } : r)),
+      treaties: { ...state.treaties, [`${Math.min(PLAYER_ID, enemyId)}-${Math.max(PLAYER_ID, enemyId)}`]: "war" },
+      armies: [
+        { id: 940, ownerId: PLAYER_ID, regionId: 0, seaZoneId: "north_sea" as const, units: { ...emptyUnits(), infantry: 4, war_cog: 6 }, movesLeft: 2 },
+        { id: 941, ownerId: enemyId, regionId: target, units: { ...emptyUnits(), infantry: 4 }, movesLeft: 0 },
+      ],
+    };
+    const after = moveArmy(walled, 940, target);
+    const report = after.battles?.at(-1);
+
+    // The storming party is the soldiers; the hulls are logged as support only.
+    expect(UNIT_TYPES.filter((t) => UNITS[t].naval).every((t) => report!.attackerStart[t] === 0)).toBe(true);
+    expect(report?.attackerSupportUnits?.war_cog).toBe(6);
+    // Their guns still strip the walls the assault would otherwise have to climb.
+    expect(report!.effectiveFort).toBeLessThan(report!.fortification);
+    // No cog is ever lost storming a beach.
+    expect(UNIT_TYPES.filter((t) => UNITS[t].naval).every((t) => report!.attackerLosses[t] === 0)).toBe(true);
+    const survivor = after.armies.find((a) => a.id === 940);
+    if (survivor) expect(survivor.units.war_cog).toBe(6);
   });
 });
