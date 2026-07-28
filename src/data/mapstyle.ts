@@ -143,4 +143,17 @@ export const OCEAN = {
   /** Named open-water area labels (the Baltic, the North Sea, the gulfs) — a
       faded steel-blue, wide-tracked serif, so the sea reads as regions. */
   seaLabel: "rgba(74, 108, 138, 0.42)",
+  /** Depth wash over each named sea: the shelf water of the Baltic basins and
+      the Kattegat runs pale and green, the Norwegian Sea's blue-water deep runs
+      cold and dark. Painted as soft blobs under the land, so the sea stops
+      being one flat blue and the zones fleets sail between become legible. */
+  shelfWash: "182, 214, 210",
+  deepWash: "96, 134, 172",
+  washAlpha: 0.52,
+  /** Portolan furniture: a compass rose in open water with rhumb lines fanning
+      out of it — the defining decoration of a 14th-century sea chart. Drawn in
+      the ocean layer, so the land paints over every line that runs ashore. */
+  rhumb: "rgba(96, 132, 164, 0.16)",
+  roseInk: "rgba(88, 118, 146, 0.5)",
+  roseFill: "rgba(232, 240, 244, 0.35)",
 } as const;

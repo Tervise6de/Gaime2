@@ -18,6 +18,14 @@ export interface SeaZone {
   neighbors: SeaZoneId[];
   /** Ports and islands from which this zone can be entered or landed in. */
   coastalRegions: number[];
+  /**
+   * How deep this water reads on the chart, 0 (a shoal you could wade) → 1
+   * (blue-water ocean), scaled from the real mean depths: the Kattegat ~23 m and
+   * the Baltic basins ~40–55 m are shelf water, the North Sea ~95 m is deeper,
+   * and the Norwegian Sea drops past 2,000 m. Presentation only — the renderer
+   * tints the water by it; no rule reads it.
+   */
+  depth: number;
 }
 
 export const SEA_ZONE_IDS: readonly SeaZoneId[] = [
@@ -37,6 +45,7 @@ export const SEA_ZONES: Record<SeaZoneId, SeaZone> = {
     y: 0.15,
     neighbors: ["north_sea"],
     coastalRegions: [27, 30, 32],
+    depth: 1,
   },
   north_sea: {
     id: "north_sea",
@@ -45,6 +54,7 @@ export const SEA_ZONES: Record<SeaZoneId, SeaZone> = {
     y: 0.6,
     neighbors: ["norwegian_sea", "kattegat"],
     coastalRegions: [0, 5, 8, 11, 16, 27, 30],
+    depth: 0.42,
   },
   kattegat: {
     id: "kattegat",
@@ -53,6 +63,7 @@ export const SEA_ZONES: Record<SeaZoneId, SeaZone> = {
     y: 0.485,
     neighbors: ["north_sea", "baltic_sea"],
     coastalRegions: [12, 13, 23, 26, 27, 33],
+    depth: 0.08,
   },
   baltic_sea: {
     id: "baltic_sea",
@@ -61,6 +72,7 @@ export const SEA_ZONES: Record<SeaZoneId, SeaZone> = {
     y: 0.63,
     neighbors: ["kattegat", "bothnia", "gulf_of_finland"],
     coastalRegions: [12, 13, 23, 26, 33, 39, 40, 43, 47, 49, 50, 55, 57, 66, 68, 73],
+    depth: 0.22,
   },
   bothnia: {
     id: "bothnia",
@@ -69,6 +81,7 @@ export const SEA_ZONES: Record<SeaZoneId, SeaZone> = {
     y: 0.27,
     neighbors: ["baltic_sea"],
     coastalRegions: [33, 40, 46],
+    depth: 0.13,
   },
   gulf_of_finland: {
     id: "gulf_of_finland",
@@ -77,6 +90,7 @@ export const SEA_ZONES: Record<SeaZoneId, SeaZone> = {
     y: 0.4,
     neighbors: ["baltic_sea"],
     coastalRegions: [40, 43, 47, 49, 50, 55],
+    depth: 0.12,
   },
 };
 

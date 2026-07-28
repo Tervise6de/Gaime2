@@ -6,6 +6,29 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-28 — The sea reads as water again (v0.107.0)
+
+Three passes on the open water, all inside the existing baked ocean layer, so
+the per-frame cost is unchanged (one blit).
+
+**Depth wash.** Every navigable sea now carries its own water, tinted by a
+`depth` value scaled from the real means — the Kattegat at ~23 m and the Baltic
+basins at ~40–55 m run pale and green as shelf water, the North Sea deeper, and
+the Norwegian Sea's 2,000 m drop cold and dark. Each wash is sized from the
+*median* distance to that sea's own shores (the Baltic's coastal list reaches
+into the gulfs; sizing on the farthest would have washed half the chart) and
+fades out, so neighbouring seas blend where they meet — there is no hard line in
+real water either. It also does gameplay work: fleets sail zone to zone and
+blockades bite per zone, and until now those zones were invisible.
+
+**Portolan furniture.** A compass rose sits out in the western ocean with
+sixteen rhumb lines fanning across the chart — the defining decoration of a
+14th-century sea chart. They are drawn under the landmass, so every line that
+runs ashore is painted over and only the sea keeps them.
+
+`depth` is presentation only; no rule reads it. 788 tests green, typecheck and
+production build clean.
+
 ## 2026-07-28 — The five open calls from the review, answered (v0.106.0)
 
 The review pass left five findings as design calls rather than fixes. All five

@@ -33,7 +33,7 @@ import {
   TERRAIN_TEXTURE_DENSITY,
 } from "@/data/mapstyle";
 import { armySize, BARBARIAN_ID, PLAYER_ID, type TradeRoute } from "@/systems/state";
-import { SEA_ZONES } from "@/data/sea";
+import { SEA_ZONE_IDS, SEA_ZONES } from "@/data/sea";
 import {
   UNREST_PENALTY_START,
   UNREST_REVOLT,
@@ -62,6 +62,10 @@ import {
 
 /** A border between two nations at war — the map's front line. */
 export const WAR_EDGE_COLOR = "rgba(232, 119, 107, 0.6)";
+/** Where the compass rose sits (map space) and its radius — out in the western
+    ocean, clear of the play area, with its rhumb lines fanning across the sea. */
+const ROSE = { x: 0.075, y: 0.3, r: 0.028 } as const;
+
 /** Seam between two regions inside the landmass (kept faint; owners add ink). */
 const CELL_EDGE_COLOR = "rgba(13, 15, 20, 0.38)";
 /** Marker layout radius: the footprint each region's marker stack occupies. */
@@ -538,6 +542,13 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     g.fillStyle = grad;
     g.fillRect(0, 0, w, h);
 
+    // Depth wash: each named sea gets its own water. The land is painted over
+    // this later, so a blob only ever shows where there is sea to show it.
+    drawDepthWash(g, s);
+
+    // Rhumb lines fanning from a compass rose — chart furniture, under the land.
+    drawPortolanLines(g);
+
     // Outer-world context: faded distant land framing the play area (drawn on
     // the water, under the active landmasses), so the map reads as a real
     // region of a larger world. Scripted maps only.
@@ -701,6 +712,98 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       g.fillText(lb.text.toUpperCase(), p.x, p.y);
       if ("letterSpacing" in plate) plate.letterSpacing = "0px";
     }
+  }
+
+  /**
+   * Depth wash: one soft blob per navigable sea, tinted by that sea's depth —
+   * the shelf water of the Kattegat and the Baltic basins pale and green, the
+   * Norwegian Sea's deep cold and dark. Each blob is sized from the spread of
+   * its own coastal regions, so it covers the water it names without any
+   * hand-tuned radius, and neighbouring washes blend where the seas meet
+   * (there is no hard line in the water either). Presentation only.
+   */
+  function drawDepthWash(g: CanvasRenderingContext2D, s: GameState): void {
+    if ((s.mapId ?? "hansa") !== "hansa") return;
+    g.save();
+    for (const zoneId of SEA_ZONE_IDS) {
+      const zone = SEA_ZONES[zoneId];
+      // Reach: the *typical* distance to its own shores, not the farthest — the
+      // Baltic's coastal list runs all the way into the gulfs, and sizing on that
+      // would wash half the chart. Bounded so no sea swallows its neighbours.
+      const spans = zone.coastalRegions
+        .map((regionId) => s.regions[regionId])
+        .filter((r): r is Region => !!r)
+        .map((r) => Math.hypot(r.x - zone.x, r.y - zone.y))
+        .sort((a, b) => a - b);
+      const median = spans.length ? spans[Math.floor(spans.length / 2)]! : 0.14;
+      const radius = Math.max(0.1, Math.min(0.26, median * 1.6));
+      const centre = projectXY(zone.x, zone.y);
+      const edge = projectXY(zone.x + radius, zone.y);
+      const px = Math.max(1, Math.abs(edge.x - centre.x));
+      const rgb = zone.depth >= 0.5 ? OCEAN.deepWash : OCEAN.shelfWash;
+      // Deep water carries its tint further out; a shallow gulf fades quickly.
+      const strength = OCEAN.washAlpha * (zone.depth >= 0.5 ? 0.55 + zone.depth * 0.45 : 0.75);
+      const wash = g.createRadialGradient(centre.x, centre.y, px * 0.08, centre.x, centre.y, px);
+      wash.addColorStop(0, `rgba(${rgb}, ${strength.toFixed(3)})`);
+      wash.addColorStop(0.62, `rgba(${rgb}, ${(strength * 0.45).toFixed(3)})`);
+      wash.addColorStop(1, `rgba(${rgb}, 0)`);
+      g.fillStyle = wash;
+      g.beginPath();
+      g.arc(centre.x, centre.y, px, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.restore();
+  }
+
+  /**
+   * A compass rose out in the western ocean with 16 rhumb lines running from it
+   * across the chart — the standard furniture of a portolan, and the cheapest
+   * honest way to make open water read as *charted* rather than empty. The lines
+   * are baked into the ocean layer, so the landmass paints over every one that
+   * runs ashore and only the sea keeps them.
+   */
+  function drawPortolanLines(g: CanvasRenderingContext2D): void {
+    const centre = projectXY(ROSE.x, ROSE.y);
+    const unit = projectXY(ROSE.x + ROSE.r, ROSE.y).x - centre.x;
+    const span = Math.hypot(canvas.clientWidth, canvas.clientHeight) * 1.2;
+    g.save();
+    g.lineWidth = 1;
+    g.strokeStyle = OCEAN.rhumb;
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      g.beginPath();
+      g.moveTo(centre.x, centre.y);
+      g.lineTo(centre.x + Math.cos(a) * span, centre.y + Math.sin(a) * span);
+      g.stroke();
+    }
+    // The rose itself: eight points, alternating long and short, over a disc.
+    g.beginPath();
+    g.arc(centre.x, centre.y, unit, 0, Math.PI * 2);
+    g.fillStyle = OCEAN.roseFill;
+    g.fill();
+    g.strokeStyle = OCEAN.roseInk;
+    g.lineWidth = 1.2;
+    g.stroke();
+    g.beginPath();
+    g.arc(centre.x, centre.y, unit * 0.34, 0, Math.PI * 2);
+    g.stroke();
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 - Math.PI / 2;
+      const long = i % 2 === 0;
+      const tip = unit * (long ? 1.5 : 0.92);
+      const wing = unit * 0.2;
+      g.beginPath();
+      g.moveTo(centre.x + Math.cos(a) * tip, centre.y + Math.sin(a) * tip);
+      g.lineTo(centre.x + Math.cos(a + Math.PI / 2) * wing, centre.y + Math.sin(a + Math.PI / 2) * wing);
+      g.lineTo(centre.x + Math.cos(a - Math.PI / 2) * wing, centre.y + Math.sin(a - Math.PI / 2) * wing);
+      g.closePath();
+      g.fillStyle = long ? OCEAN.roseInk : OCEAN.roseFill;
+      g.fill();
+      g.strokeStyle = OCEAN.roseInk;
+      g.lineWidth = 0.8;
+      g.stroke();
+    }
+    g.restore();
   }
 
   /**

@@ -247,6 +247,13 @@ assault is over. So an amphibious force is judged by the troops it lands, not by
 the tonnage that carried them. On defence a fleet in port still fights — sailors
 man their own walls; it is storming a hostile shore that needs soldiers.
 
+**Drawing the sea (v0.107).** Each zone carries a `depth` (0 shoal → 1 blue
+water, scaled from the real mean depths), and the renderer washes its water with
+it — pale green shelf over the Kattegat and the Baltic basins, cold dark over the
+Norwegian Sea — so the zones fleets sail between and blockades bite in are
+visible rather than implied. A compass rose and its rhumb lines sit in the
+western ocean, drawn under the landmass. All presentation: no rule reads `depth`.
+
 **Blockade and escort (v0.106).** A hostile squadron on a route's sea does not
 close the ocean, it throttles the traffic: the route pays 20% while it is hunted.
 Sail your own hulls (or a formal ally's) into every threatened sea and the convoy
