@@ -1,6 +1,6 @@
 {
   "name": "sea-of-coin",
-  "version": "0.116.0",
+  "version": "0.117.0",
   "description": "Sea of Coin: a browser strategy game about Hanseatic trade power.",
   "type": "module",
   "author": "GAIME Studio",
@@ -18,6 +18,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.20.1",
+    "happy-dom": "^20.0.0",
     "typescript": "^5.6.3",
     "vite": "^5.4.10",
     "vitest": "^4.1.10"

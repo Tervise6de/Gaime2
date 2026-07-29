@@ -24,6 +24,14 @@ skip ahead. Each milestone must leave the game runnable and testable.
   state and emits intents (never mutates the sim); `data/` is serialisable
   content so balancing is editing tables, not code.
 - **Tests:** systems are unit-tested with Vitest (`npm test`). Keep them green.
+- **Copy that carries a rule is code.** When a sentence is the only place the
+  game explains a rule, it belongs in `src/ui/copy.ts` as a pure function and is
+  tested like any other. Text composed inline inside a DOM builder cannot be
+  asserted, which is how v0.115 shipped a movement rule with no word of it
+  anywhere in the interface.
+- **The HUD is testable.** `src/ui/hud.test.ts` mounts the real `createHud`
+  under happy-dom (`// @vitest-environment happy-dom`) and reads what the player
+  reads. Add a case there whenever a rule gains — or loses — its explanation.
 
 ## Releases
 - **Bump `package.json` minor version with every user-visible batch pushed to

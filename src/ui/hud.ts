@@ -89,6 +89,7 @@ import {
 } from "@/systems/military";
 import { campaignBlurb, planCampaign } from "@/systems/campaign";
 import { QUARTER_LABEL, townsIn } from "@/data/towns";
+import { embarkNote, waterNote } from "@/ui/copy";
 import { TREATY_BREAK, TRUCE_TURNS, tributeStakes, truceTurnsLeft, getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, nationPower, opinionReasons, foreignRelations, casusBelli, CASUS_BELLI, TRIBUTE_DEMAND, atWar } from "@/systems/diplomacy";
 import { nationScore, victoryProgress, victoryRaces, endGameSummary } from "@/systems/victory";
 import { GOODS, GOOD_IDS, contentmentWares, type GoodId } from "@/data/goods";
@@ -100,7 +101,7 @@ import { KONTORE, type KontorId } from "@/data/kontore";
 import { SOUND } from "@/data/sound";
 import { routeBlockade, routeOptions, regionGoodOutput, routeIncome, soundHolderId, activeEmbargoes, soundPreview, marketOutlook } from "@/systems/trade";
 import { canFoundLeague, canJoinLeague, leagueLeader, leagueDividendPool, isBoycotted } from "@/systems/league";
-import { inLeague, landNeighbours } from "@/systems/state";
+import { inLeague } from "@/systems/state";
 import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
 import type { TurnSummary } from "@/systems/summary";
 import { deriveAlerts, type Alert } from "@/ui/alerts";
@@ -2052,19 +2053,17 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
           seaActions.append(landSelect, land);
         }
         if (seaActions.childElementCount > 0) status.append(seaActions);
-      } else if (!armyIsAtSea(army) && (region.seaLinks?.length ?? 0) > 0) {
+      } else {
         // Soldiers standing on a shore with water on the far side. The rule is
         // easy to hit and impossible to guess: this stack cannot cross until a
         // warship joins it, at which point the Sail buttons appear right here.
-        const hint = el("p", "hud-army-embark");
-        const shipHere = canRaiseUnit(state, region.id, "war_cog", PLAYER_ID);
-        hint.innerHTML =
-          `${glyphHtml("warning", "⚓")} These soldiers cannot cross open water. ` +
-          (shipHere.ok
-            ? `Raise a War-Cog here and it joins this stack — then sail, and land on the far shore.`
-            : `Bring them to a port with warships (the two merge into one stack), then sail and land.`);
-        hint.title = "A stack that holds at least one warship can sail. Landing on a rival's shore is an assault: the soldiers storm it while the hulls stand offshore.";
-        status.append(hint);
+        const embark = embarkNote(state, army, canRaiseUnit(state, region.id, "war_cog", PLAYER_ID).ok);
+        if (embark) {
+          const hint = el("p", "hud-army-embark");
+          hint.innerHTML = `${glyphHtml("warning", "⚓")} ${escapeHtml(embark.text)}`;
+          hint.title = embark.title;
+          status.append(hint);
+        }
       }
       const moveBtn = btn("Move ▸", "hud-army-move", () => {
         closeArmies();
@@ -2928,17 +2927,15 @@ function renderRegion(
   // have no road between them, and a rule the map does not explain reads as a
   // bug — so the panel names the crossings, and says outright when a province
   // can only be reached by sea.
-  const wet = (region.seaLinks ?? []).filter((id) => state.regions[id]);
-  if (wet.length > 0) {
+  const water = waterNote(state, region.id);
+  if (water) {
     const line = el("p", "hud-region-water");
-    const landRoads = landNeighbours(state, region.id).length;
-    const names = wet.map((id) => escapeHtml(state.regions[id]!.name)).join(", ");
-    line.innerHTML =
-      landRoads === 0
-        ? `${glyphHtml("warning", "⚓")} <strong>An island.</strong> No land road anywhere — ${names} lie across open water. Soldiers reach it only by sea: put them in a stack with warships, sail, and land.`
-        : `${glyphHtml("warning", "⚓")} Across water: ${names}. Trade crosses freely; armies need a hull.`;
-    line.title =
-      "Open-water borders. A trade lane is carried by ship and crosses them; an army has to embark — sail a stack holding warships and soldiers into the sea beyond, then land on the far shore.";
+    // "An island." leads in bold when there is no land road at all.
+    const [lead, ...rest] = water.text.split(". ");
+    line.innerHTML = water.island
+      ? `${glyphHtml("warning", "⚓")} <strong>${escapeHtml(lead!)}.</strong> ${escapeHtml(rest.join(". "))}`
+      : `${glyphHtml("warning", "⚓")} ${escapeHtml(water.text)}`;
+    line.title = water.title;
     container.append(line);
   }
 

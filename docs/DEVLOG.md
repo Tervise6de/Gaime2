@@ -6,6 +6,48 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-29 — The interface gets tests (v0.117.0)
+
+The last entry ended by naming the structural version of its own bug: every
+assertion in this project stopped at the systems boundary, so `hud.ts` — five
+thousand lines, and the only place most rules are ever explained — had no
+coverage at all. That is why a movement rule could ship with no word of it in
+the interface. This closes it.
+
+**Rule-bearing copy is now code.** `src/ui/copy.ts` holds pure functions that
+produce the sentences which *are* part of a rule: the region panel's water note
+(island vs. across-water), the reason a move order was refused, and what a land
+stack on a shore needs before it can cross. `GameState` in, string out, no DOM,
+no markup — the DOM builders in `hud.ts` and the intent handlers in `main.ts`
+call them instead of composing text inline. This follows the pattern
+`ui/advisor.ts`, `ui/military.ts` and `ui/alerts.ts` already set; the difference
+is that the text nobody could test now lives there too.
+
+`src/ui/copy.test.ts` covers it — 14 cases, including one that walks all 74
+provinces and asserts the copy agrees with `landNeighbours`/`seaLinks` for every
+one, so the sentence cannot drift from the rule as the map changes.
+
+**And the HUD itself mounts in tests.** happy-dom joins the devDependencies, and
+`src/ui/hud.test.ts` runs the real `createHud` against a real board and reads
+what the player would read: the water lines, the four-strand victory readout
+with its per-strand tooltips, the League towns and staples in a province, the
+legend's explanation of the sea-crossing line, and two smoke cases that a fresh
+board and a busy mid-game board both render without throwing.
+
+**Verified by breaking it.** With the water note suppressed and the legend line
+reverted to "Sea lane" — a faithful reproduction of the v0.115 state — exactly
+three tests fail, and the three are the right ones. Restored, all pass. The
+assertions are scoped to the panel under test, so a failure prints the region
+panel rather than the entire interface.
+
+Tests: 880 passing (60 files), up from 858.
+
+The working agreement in `CLAUDE.md` gained two lines to keep it that way: copy
+that carries a rule goes in `ui/copy.ts` and is tested; the HUD test gets a case
+whenever a rule gains or loses its explanation.
+
+---
+
 ## 2026-07-29 — Telling the player where the water is (v0.116.0)
 
 v0.115 made the sea a real obstacle and verified it only in the simulator. A
