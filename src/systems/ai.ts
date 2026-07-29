@@ -23,6 +23,7 @@ import { TERRAIN, type StrategicResource, type TerrainId } from "@/data/terrain"
 import type { FocusId } from "@/data/focuses";
 import { previewCombat, sideStrength, type UnitCounts } from "@/systems/combat";
 import { publicIntelUnits, publicNationPower } from "@/systems/intel";
+import { strategyProfile } from "@/systems/strategy";
 import {
   appointCommander,
   canRaiseUnit,
@@ -100,6 +101,9 @@ export function runNationTurn(state: GameState, nationId: number, rng: Rng): Gam
 
 /** A realm with the trade to want the League's leadership — routes or a Kontor. */
 function wantsLeagueSeat(state: GameState, nationId: number): boolean {
+  // A realm playing for the network wants the seat before it has the trade to
+  // justify it — the seat is a fifth of Hansa control on its own.
+  if (strategyProfile(state.nations.find((n) => n.id === nationId)).seeksLeague) return true;
   return (state.routes ?? []).some((r) => r.ownerId === nationId) || kontoreHeldBy(state, nationId) >= 1;
 }
 
@@ -146,10 +150,20 @@ function manageLeague(state: GameState, nationId: number): GameState {
  * (and realms already at the cap) do nothing.
  */
 function manageTrade(state: GameState, nationId: number): GameState {
+  const nation = state.nations.find((n) => n.id === nationId);
   if (nationId === BARBARIAN_ID) return state;
   let s = state;
   const mine = () => (s.routes ?? []).filter((r) => r.ownerId === nationId);
-  if (mine().length >= MAX_ROUTES_PER_NATION) return s;
+  // A realm playing for the network fills its book; a conqueror runs a few
+  // routes to pay for the army and no more.
+  const routeTarget = Math.max(
+    1,
+    Math.min(
+      MAX_ROUTES_PER_NATION,
+      Math.round(MAX_ROUTES_PER_NATION * strategyProfile(nation).routes),
+    ),
+  );
+  if (mine().length >= routeTarget) return s;
 
   // Route ranking only needs hop counts. Build one reverse BFS per Kontor rather
   // than running laneFor for every region × good × Kontor candidate. The exact
@@ -179,7 +193,7 @@ function manageTrade(state: GameState, nationId: number): GameState {
   const already = (c: Cand): boolean =>
     mine().some((r) => r.fromRegionId === c.regionId && r.good === c.good && r.toKontorId === c.kontorId);
   for (const c of cands) {
-    if (mine().length >= MAX_ROUTES_PER_NATION) break;
+    if (mine().length >= routeTarget) break;
     if (already(c)) continue;
     s = createRoute(s, nationId, c.regionId, c.good, c.kontorId);
   }
@@ -608,7 +622,10 @@ function doDiplomacy(state: GameState, nationId: number, rng: Rng): GameState {
   const others = state.nations.filter(
     (n) => !n.isBarbarian && n.alive && n.id !== nationId,
   );
-  const myPower = publicNationPower(state, nationId, nationId);
+  // A conqueror opens wars at a slimmer edge than its temperament alone would;
+  // a merchant wants a decisive one before it risks its lanes.
+  const appetite = strategyProfile(state.nations.find((n) => n.id === nationId)).warAppetite;
+  const myPower = publicNationPower(state, nationId, nationId) * appetite;
   const leaderId = runawayLeader(state, nationId);
   // A realm already struggling to hold itself together (a province in open
   // revolt) puts new wars of *conquest* on hold until it restores order — quell
@@ -1367,7 +1384,11 @@ function manageNavy(state: GameState, nationId: number, rng: Rng): GameState {
     (other) => !other.isBarbarian && other.id !== nationId && atWar(state, nationId, other.id),
   );
   const hasTrade = (state.routes ?? []).some((route) => route.ownerId === nationId);
-  const desired = atWarNow || hasTrade || aggression >= 0.6 ? (atWarNow && aggression >= 0.7 ? 2 : 1) : 0;
+  const plan = strategyProfile(nation);
+  const desired =
+    (atWarNow || hasTrade || aggression >= 0.6 ? (atWarNow && aggression >= 0.7 ? 2 : 1) : 0) +
+    // Lanes are the fifth of Hansa control a fleet can actually take and hold.
+    plan.navy;
   let s = state;
   const fleets = (): Army[] => s.armies.filter((a) => a.ownerId === nationId && armyIsFleet(a.units));
 
@@ -1462,9 +1483,14 @@ function recruit(state: GameState, nationId: number, rng: Rng): GameState {
   // bigger host (drawn on by ongoing upkeep) instead of piling up unused. Capped and
   // aggression-scaled, so a peaceful realm's hoard doesn't militarise.
   const wealthLevies = Math.min(8, Math.max(0, Math.floor((nation.stocks.gold - 400) / 600)));
-  const wanted =
-    3 + Math.round(aggression * 6) + (atWarNow ? 3 : 0) + (nation.trait === "martial" ? 3 : 0) +
-    Math.round(aggression * wealthLevies);
+  // The plan sets the size of the host: a conqueror keeps a third again more
+  // under arms than its temperament alone would ask for; a realm playing the
+  // ledger keeps less and spends the difference on the network.
+  const plan = strategyProfile(nation);
+  const wanted = Math.round(
+    (3 + Math.round(aggression * 6) + (atWarNow ? 3 : 0) + (nation.trait === "martial" ? 3 : 0) +
+      Math.round(aggression * wealthLevies)) * plan.army,
+  );
   if (myUnits >= wanted) return state;
   if (nation.stocks.gold < 30) return state;
 
@@ -1641,7 +1667,11 @@ export function bestTarget(state: GameState, army: { id: number; regionId: numbe
         (isCapital ? capitalValue : 0) +
         (isReclaim ? RECLAIM_VALUE : 0) +
         // Merchant-minded realms want the Kontor most, but nobody ignores it.
-        (isKontor ? KONTOR_VALUE * (0.6 + (p?.economy ?? 0.5) * 0.8) : 0);
+        (isKontor
+          ? KONTOR_VALUE *
+            (0.6 + (p?.economy ?? 0.5) * 0.8) *
+            strategyProfile(state.nations.find((n) => n.id === nationId)).kontorPrize
+          : 0);
       const score = atk - def + value + (isBarb ? 2 : 5);
       if (score > bestScore) {
         bestScore = score;

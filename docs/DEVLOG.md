@@ -6,6 +6,42 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-29 — Rivals now play for something (v0.111.0)
+
+The trade race had no antagonist: rivals contested the Kontore only by accident,
+and nobody on the board was *going for* anything. Rivals had a temperament and
+nothing else, so every game played out the same way.
+
+Temperament and plan are now separate things. **Temperament** stays fixed and
+historical — Sweden's kings are warlike in every game. **Strategy** is the
+victory a realm is chasing (`conquest`, `commerce`, `prestige`), rolled fresh
+each game from the seeded RNG, weighted by temperament but never locked by it.
+In the shipped seeds a warlord Sweden is playing the long game and a builder
+Estonia is going for the throat — which is the whole point of rolling it.
+
+It is re-read every turn against the board: a merchant boxed out of the Kontore
+with a big army turns conqueror, a warlord whose host is spent but whose ports
+are rich turns to trade. Two brakes stop realms dithering — a challenger must
+win by `SWITCH_MARGIN`, and a fresh plan gets `MIN_DWELL` turns of grace, waived
+only for a realm at war and losing. Measured over six 160-turn autoplays: 6–10
+course changes a game, and the opening spread differs every seed.
+
+A plan is play, not a label. It scales the standing-army target (a conqueror
+keeps a third again more under arms), war appetite, what a Kontor town is worth
+as a conquest prize (double, for a merchant), the route book a realm works
+toward, the hulls it floats to hold its lanes, and whether it wants a League
+seat before it has trade to justify one. The Diplomacy screen reports each
+court's aim, colour-coded, since intentions are read from conduct.
+
+**Honest limit:** rivals now *contest* the trade race — the top networker
+reached 56% against the 60% threshold — but no AI has yet won it. A commerce
+realm takes a Kontor town only when it already borders one; marching a campaign
+across the map to seize Novgorod is a bigger piece of work (staged offensives
+against a distant objective) and is the next thing to build if the race should
+be something a rival can win outright rather than merely deny you.
+
+818 tests green (+11), typecheck and production build clean.
+
 ## 2026-07-29 — The game admits what it is about (v0.110.0)
 
 Three changes, all aimed at one gap: the game has far more systems than it

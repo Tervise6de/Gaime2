@@ -35,6 +35,7 @@ import { stepTrade, seedKontore, nationalWareOutput, nationFoodOutput, hasSaltAc
 import { resolveContentment, contentmentUnrest, luxuryAppetite, drawFoodReserve } from "@/systems/prosperity";
 import { stepLeague } from "@/systems/league";
 import { tickHansaHold } from "@/systems/hansa";
+import { assignStrategies, reassessStrategies } from "@/systems/strategy";
 import { scheduleEpochs, stepEpochs } from "@/systems/epochs";
 import { nextPopulation } from "@/systems/population";
 import { nextUnrest } from "@/systems/stability";
@@ -219,6 +220,13 @@ function createScriptedGame(map: ScriptedMap, regions: Region[], options: NewGam
   for (const n of nations) {
     if (!n.isBarbarian) n.ruler = generateRuler(rng, n.personality?.archetype);
   }
+
+  // Roll what each rival is playing *for* this game. Temperament is fixed and
+  // historical; the plan is not, so no two games open with the same board of
+  // intentions (systems/strategy.ts).
+  const planned = assignStrategies(nations, rng);
+  nations.length = 0;
+  nations.push(...planned);
 
   // Ownership + capitals + a starting army per realm.
   const ownerOf = new Map<number, number>();
@@ -874,6 +882,9 @@ function updateOutcome(state: GameState): GameState {
   // The trade race is measured before anything else is judged: a realm's grip
   // on the network is read from the board this turn just resolved.
   state = tickHansaHold(state);
+  // ...and every rival re-reads the board and decides whether its plan is still
+  // the best one available to it.
+  state = reassessStrategies(state);
   const nations = state.nations.map((n) => {
     if (n.isBarbarian) return n;
     const holds = state.regions.some((r) => r.ownerId === n.id);

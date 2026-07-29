@@ -20,6 +20,7 @@ import { SOUND } from "@/data/sound";
 import { SEA_ZONE_IDS } from "@/data/sea";
 import { UNITS, UNIT_TYPES } from "@/data/units";
 import { COMMANDER_TRAIT_IDS } from "@/data/commanders";
+import { AI_STRATEGIES } from "@/systems/strategy";
 
 const SAVE_VERSION = 1;
 /**
@@ -291,7 +292,17 @@ export function deserializeGame(json: string): GameState | null {
     // wares record is completed to the full ware set so a save from before a ware
     // existed doesn't read that slot as undefined (→ NaN) in ware arithmetic.
     for (const n of s.nations) {
-      if (n) n.wares = { ...emptyWares(), ...(n.wares ?? {}) };
+      if (!n) continue;
+      n.wares = { ...emptyWares(), ...(n.wares ?? {}) };
+      // A rival's strategy is a small enum the AI branches on; a save carrying
+      // anything else (hand-edited, or from before strategies existed) must not
+      // hand `strategyProfile` an unknown key. A rival without one re-rolls to
+      // the neutral plan and is re-read on its next turn like any other.
+      if (n.strategy !== undefined && !AI_STRATEGIES.includes(n.strategy)) delete n.strategy;
+      const since = Number(n.strategySince);
+      if (n.strategySince !== undefined) {
+        n.strategySince = Number.isFinite(since) ? Math.max(0, Math.floor(since)) : 0;
+      }
     }
     // Renown (R6) needs no back-fill: nationScore and the HUD read it as `?? 0`, and
     // the turn pipeline stamps it on each living realm — so a pre-R6 save simply

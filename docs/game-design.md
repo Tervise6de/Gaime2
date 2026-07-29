@@ -60,6 +60,32 @@ play (they peak at 43–51%), so the trade win is a deliberate path rather than 
 accident — but rivals now covet Kontor towns (`KONTOR_VALUE` in `ai.ts`), so the
 race is contested.
 
+## Rival AI — temperament and plan (v0.111)
+
+A rival has two separate things, and conflating them is why every game used to
+play the same way.
+
+**Temperament** (`data/personalities.ts`) is what a realm is *like*: how readily
+it wars, how far it trusts, how much it builds. It is fixed and historical —
+Sweden's kings are warlike in every game, Lübeck's council mercantile.
+
+**Strategy** (`systems/strategy.ts`) is what it is *playing for* — one of the
+three victories: `conquest`, `commerce` or `prestige`. It is rolled fresh at the
+start of every game, weighted by temperament but never locked by it, so a
+warlord Sweden can spend this game building and a builder Estonia can go for the
+throat. And it is re-read every turn: a merchant boxed out of the Kontore with a
+big army will turn conqueror; a warlord whose host is spent but whose ports are
+rich will turn to trade. Switching is sticky on purpose — a challenger must beat
+the incumbent plan by `SWITCH_MARGIN` and a fresh plan gets `MIN_DWELL` turns of
+grace — except for a realm at war and losing, which is allowed to panic.
+
+A plan is play, not a label. It scales the standing-army target, the appetite
+for opening a war, what a Kontor town is worth as a conquest prize, how many
+trade routes the realm works toward, how many hulls it floats, and whether it
+wants a League seat before it has trade to protect. The Diplomacy screen reports
+each court's aim ("Our factors report: Lübeck is playing for the Hansa…"), since
+a realm's intentions are read from its conduct.
+
 ## Characters
 
 Characters should stay light. They are there to make politics memorable, not to

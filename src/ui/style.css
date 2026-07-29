@@ -2979,6 +2979,32 @@ body {
   color: var(--muted);
 }
 
+/* What a rival court is playing for — reported, since aims are read from
+   conduct. Colour-coded by aim so a table of rivals scans at a glance. */
+.hud-diplo-aim {
+  margin: 5px 0 0;
+  padding: 5px 9px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  font-style: italic;
+  background: rgba(8, 14, 20, 0.32);
+  border-left: 2px solid var(--panel-border);
+  border-radius: 0 4px 4px 0;
+}
+
+.hud-diplo-aim.conquest {
+  border-left-color: #e8776b;
+}
+
+.hud-diplo-aim.commerce {
+  border-left-color: var(--accent);
+}
+
+.hud-diplo-aim.prestige {
+  border-left-color: #63c7d6;
+}
+
 .hud-diplo-status {
   display: flex;
   justify-content: space-between;

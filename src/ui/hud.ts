@@ -105,6 +105,7 @@ import { deriveAlerts, type Alert } from "@/ui/alerts";
 import { researchFrontier, recommendedTech, isBuildingUnlockedFor, committedPath, isPathRejected, nextNodeInPath, pathDoneCount } from "@/systems/tech";
 import { eraIndexForTurn, eraByIndex } from "@/data/eras";
 import { ARCHETYPE_LABEL } from "@/data/personalities";
+import { STRATEGY_BLURB, STRATEGY_LABEL } from "@/systems/strategy";
 import { eraForTurn, yearForTurn } from "@/data/eras";
 import { TRAITS } from "@/data/traits";
 import { TECHS, CATEGORIES, PATHS, CATEGORY_IDS, type TechId, type ResearchCategory, type DoctrinePathId } from "@/data/techs";
@@ -4476,6 +4477,18 @@ function renderDiplomacy(
     if (rival.trait) arch.title = TRAITS[rival.trait].blurb;
     head.append(sw, nm, arch);
     card.append(head);
+
+    // What this court is *playing for*. Temperament is what a realm is like;
+    // this is what it wants, it is rolled fresh each game, and it changes — so
+    // it is the single most useful line on the card for deciding how to treat
+    // them. A realm's aims are read from its conduct, so this is stated as
+    // report, not fact.
+    if (rival.strategy) {
+      const aim = el("p", "hud-diplo-aim " + rival.strategy);
+      aim.textContent = `Our factors report: ${rival.name} ${STRATEGY_BLURB[rival.strategy]}.`;
+      aim.title = `${STRATEGY_LABEL[rival.strategy]} — held since turn ${rival.strategySince ?? "?"}. Courts change their minds as the board changes.`;
+      card.append(aim);
+    }
 
     const status = el("div", "hud-diplo-status");
     const relSpan = el("span", "hud-diplo-rel");

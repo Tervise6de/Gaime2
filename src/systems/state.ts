@@ -24,6 +24,7 @@ import type { ChronicleEntry } from "@/systems/chronicle";
 import type { TechId } from "@/data/techs";
 import type { TraitId } from "@/data/traits";
 import type { SeaZoneId } from "@/data/sea";
+import type { AiStrategy } from "@/systems/strategy";
 
 /**
  * How many lines the chronicle keeps. The log is a sliding window, so this is
@@ -551,6 +552,15 @@ export interface Nation {
    * stormed or a lane blockaded resets it to 0. Absent on legacy saves.
    */
   hansaHold?: number;
+  /**
+   * The victory this computer realm is playing for (systems/strategy.ts) —
+   * rolled fresh each game and re-read as the board changes, so a merchant
+   * boxed out of the Kontore can turn conqueror. Undefined for the player, the
+   * barbarians and legacy saves.
+   */
+  strategy?: AiStrategy;
+  /** Turn the current strategy was adopted (for the anti-dithering dwell). */
+  strategySince?: number;
   /** Temporary effects with a per-turn countdown (undefined = none / legacy saves). */
   modifiers?: NationModifier[];
 }
