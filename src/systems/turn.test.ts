@@ -23,6 +23,7 @@ import { DEFAULT_MAP_OPTIONS } from "@/systems/mapgen";
 import { BUILDINGS } from "@/data/buildings";
 import { createRng } from "@/systems/rng";
 import {
+  LOG_CAP,
   PLAYER_ID,
   BARBARIAN_ID,
   UNREST_REVOLT,
@@ -412,8 +413,33 @@ describe("resolveTurn", () => {
   it("keeps the log bounded", () => {
     let s = createGame({ seed: 1 });
     for (let i = 0; i < 100; i++) s = resolveTurn(s);
-    expect(s.log.length).toBeLessThanOrEqual(50);
+    expect(s.log.length).toBeLessThanOrEqual(LOG_CAP);
   }, 15_000); // Naval AI and blockade checks make the full Hansa turn heavier.
+
+  it("spends the chronicle on the player's own affairs, not rival bookkeeping", () => {
+    let s = createGame({ seed: 1 });
+    const appended: string[] = [];
+    for (let i = 0; i < 30; i++) {
+      const prev = s.log;
+      s = resolveTurn(s);
+      // Lines added since the last snapshot, allowing for the window sliding.
+      for (let shift = 0; shift <= prev.length; shift++) {
+        const kept = prev.slice(shift);
+        if (kept.every((l, k) => s.log[k] === l)) {
+          appended.push(...s.log.slice(kept.length));
+          break;
+        }
+      }
+    }
+    // Measured before the cull: 9.8 lines a turn, so the player's own turn
+    // summary was evicted from a 50-line window inside five turns.
+    expect(appended.length / 30).toBeLessThan(6);
+    // A rival's internal affairs never reach the chronicle.
+    expect(appended.some((l) => /researched/.test(l) && !/^Turn /.test(l))).toBe(false);
+    expect(appended.some((l) => /is now led by/.test(l) && !/^Your /.test(l))).toBe(false);
+    // ...while the player's own turn summary always does.
+    expect(appended.filter((l) => l.startsWith("Turn ")).length).toBeGreaterThanOrEqual(28);
+  }, 15_000);
 
   it("grows player population over a calm game", () => {
     let s = setTaxRate(createGame({ seed: 3, rivals: 0 }), 0);

@@ -18,6 +18,8 @@ import { recordChronicle, chronicleName } from "@/systems/chronicle";
 import { publicNationPower } from "@/systems/intel";
 import {
   BARBARIAN_ID,
+  LOG_CAP,
+  PLAYER_ID,
   GIFT_RELATION,
   HOSTILE_THRESHOLD,
   RELATION_MAX,
@@ -352,7 +354,9 @@ export function declareWar(state: GameState, a: number, b: number, cb?: CasusBel
     : CASUS_BELLI[reason].justified
       ? ` (${CASUS_BELLI[reason].label.toLowerCase()})!`
       : "!";
-  next = { ...next, log: [...next.log, `${name(next, a)} declared war on ${name(next, b)}${suffix}`].slice(-50) };
+  if (courtsWeHearOf(next, a, b)) {
+    next = { ...next, log: [...next.log, `${name(next, a)} declared war on ${name(next, b)}${suffix}`].slice(-LOG_CAP) };
+  }
   if (!newWar) return next;
   // Chronicle beat (E2): a betrayal and an honest war are different stories.
   if (broke) {
@@ -379,7 +383,22 @@ export function makePeace(state: GameState, a: number, b: number): GameState {
   if (next.opinions?.[key]) {
     next = { ...next, opinions: { ...next.opinions, [key]: next.opinions[key]!.filter((e) => e.reason !== "war") } };
   }
-  return { ...next, log: [...next.log, `${name(next, a)} and ${name(next, b)} made peace.`].slice(-50) };
+  if (!courtsWeHearOf(next, a, b)) return next;
+  return { ...next, log: [...next.log, `${name(next, a)} and ${name(next, b)} made peace.`].slice(-LOG_CAP) };
+}
+
+/**
+ * Whether two courts' business would reach ours. Our own affairs always do; so
+ * does anything between realms we border or are already fighting — a war on the
+ * next river is news, a war between two realms a sea away is not, and with
+ * sixteen realms on the board the far ones alone filled the chronicle faster
+ * than the player could read it.
+ */
+function courtsWeHearOf(state: GameState, a: number, b: number): boolean {
+  if (a === PLAYER_ID || b === PLAYER_ID) return true;
+  return [a, b].some(
+    (id) => atWar(state, PLAYER_ID, id) || sharedBorders(state, PLAYER_ID, id) > 0,
+  );
 }
 
 export function setPact(
@@ -391,7 +410,10 @@ export function setPact(
   let next = setTreaty(state, a, b, status);
   next = recordOpinion(next, a, b, status === "alliance" ? +20 : +10, status);
   const label = status === "alliance" ? "an alliance" : "a non-aggression pact";
-  return { ...next, log: [...next.log, `${name(next, a)} and ${name(next, b)} signed ${label}.`].slice(-50) };
+  // A pact is a sealed instrument between two courts, not a proclamation; we
+  // learn of one only when we are a party to it.
+  if (a !== PLAYER_ID && b !== PLAYER_ID) return next;
+  return { ...next, log: [...next.log, `${name(next, a)} and ${name(next, b)} signed ${label}.`].slice(-LOG_CAP) };
 }
 
 /** Transfer gold as a gift, improving relations. */
@@ -406,7 +428,10 @@ export function gift(state: GameState, from: number, to: number, gold: number): 
   let next: GameState = { ...state, nations };
   const bump = Math.min(25, Math.round(gold * GIFT_RELATION));
   next = recordOpinion(next, from, to, bump, "gift");
-  return { ...next, log: [...next.log, `${name(next, from)} gifted ${gold}g to ${name(next, to)}.`].slice(-50) };
+  // Purse-to-purse diplomacy between two other courts is not proclaimed; only
+  // gifts we send or receive reach our chancery.
+  if (from !== PLAYER_ID && to !== PLAYER_ID) return next;
+  return { ...next, log: [...next.log, `${name(next, from)} gifted ${gold}g to ${name(next, to)}.`].slice(-LOG_CAP) };
 }
 
 /**
@@ -541,7 +566,7 @@ export function playerPropose(
     if (type === "peace") return makePeace(state, proposer, target);
     return setPact(state, proposer, target, type);
   }
-  return { ...state, log: [...state.log, `${name(state, target)} refused your ${type}.`].slice(-50) };
+  return { ...state, log: [...state.log, `${name(state, target)} refused your ${type}.`].slice(-LOG_CAP) };
 }
 
 /** Gold a player tribute demand asks for (mirrors the fixed gift size). */
@@ -566,10 +591,10 @@ export function playerDemandTribute(state: GameState, target: number, gold = TRI
     });
     let next: GameState = { ...state, nations };
     next = adjustRelation(next, player, target, -6); // paid, but resentful
-    return { ...next, log: [...next.log, `${name(next, target)} yields ${pay}g to your demand.`].slice(-50) };
+    return { ...next, log: [...next.log, `${name(next, target)} yields ${pay}g to your demand.`].slice(-LOG_CAP) };
   }
   const refused = adjustRelation(state, player, target, -6); // affronted by the threat
-  return { ...refused, log: [...refused.log, `${name(refused, target)} scorns your demand for tribute.`].slice(-50) };
+  return { ...refused, log: [...refused.log, `${name(refused, target)} scorns your demand for tribute.`].slice(-LOG_CAP) };
 }
 
 // --- call to arms (allies join your wars) -----------------------------------
@@ -641,10 +666,10 @@ export function callToArms(
   if (wouldJoinWar(state, ally, requester, enemy)) {
     const next = declareWar(state, ally, enemy);
     const line = `${name(next, ally)} answered ${name(next, requester)}'s call to arms against ${name(next, enemy)}!`;
-    return { ...next, log: [...next.log, line].slice(-50) };
+    return { ...next, log: [...next.log, line].slice(-LOG_CAP) };
   }
   const line = `${name(state, ally)} declined the call to arms.`;
-  return { ...state, log: [...state.log, line].slice(-50) };
+  return { ...state, log: [...state.log, line].slice(-LOG_CAP) };
 }
 
 // --- kept-the-peace goodwill: enduring peace builds trust -------------------

@@ -29,7 +29,8 @@ board with 74 provinces and 16 historical realms.
 4. Use league actions, tolls, boycotts, gifts, treaties and war to protect or
    disrupt trade.
 5. Research technologies that strengthen economy, arms, stability and trade.
-6. Win by domination or by leading the end-game prestige score.
+6. Win by becoming the Hansa — its Kontore, wares, League and lanes — or, the
+   slower way, by domination or the end-game prestige score.
 
 ## Removed Directions
 
@@ -39,14 +40,25 @@ Hansa-specific trade conflict.
 
 ## Victory
 
+- **Hansa control (v0.110):** hold 60% of the trading world for six running
+  turns. Control is four strands, weighted (`systems/hansa.ts`): the **Kontore**
+  (0.35 — hold the town outright, or trade there for a third of the credit),
+  your share of everything the network **carries** (0.30, by income, not route
+  count), your **League** standing (0.20 — outside it, in it, or Alderman), and
+  the **sea lanes** (0.15 — the coasts you hold and the water your hulls can
+  deny). The hold is the point: a Kontor stormed or a lane blockaded resets the
+  clock, so the race rewards keeping a network, not touching a number once.
 - **Domination:** control enough of the authored Hansa world to become the
   decisive territorial power.
 - **Prestige score:** if the game reaches its turn limit, the strongest realm by
   regions, economy, tech and prestige wins.
 
-Future victory work should make a Hansa-control race more explicit: Kontor
-coverage, sea-lane value, league leadership and trade share should matter more
-than raw land count.
+Trade is checked first, so a merchant who has held the network is not beaten to
+the post by a conqueror crossing the land threshold on the same turn. Measured
+over five 120-turn autoplays, no AI realm reached the threshold by incidental
+play (they peak at 43–51%), so the trade win is a deliberate path rather than an
+accident — but rivals now covet Kontor towns (`KONTOR_VALUE` in `ai.ts`), so the
+race is contested.
 
 ## Characters
 

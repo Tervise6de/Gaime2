@@ -25,6 +25,16 @@ import type { TechId } from "@/data/techs";
 import type { TraitId } from "@/data/traits";
 import type { SeaZoneId } from "@/data/sea";
 
+/**
+ * How many lines the chronicle keeps. The log is a sliding window, so this is
+ * also "how far back the player can read" — which is only worth anything if the
+ * lines are worth keeping. Each emitter decides whether its line is something
+ * the player's chancery would actually hear: our own affairs, our frontier, and
+ * public acts between courts (war, peace, a realm falling). A rival's research,
+ * its officer appointments, its patrols and its private gifts are not.
+ */
+export const LOG_CAP = 60;
+
 /** Owner id 0 is always the human player. */
 export const PLAYER_ID = 0;
 /** Barbarians hold the neutral regions you conquer (M3; no diplomacy yet). */
@@ -462,6 +472,14 @@ export interface FiredEpochNote {
   year: number;
   /** The event's headline with its place filled in ("… Åbo lose near half …"). */
   headline: string;
+  /**
+   * What it actually did to the board, measured as it was applied — "Lübeck:
+   * 2,100 dead", "12 timber burned", "Bruges Kontor shut". An event whose
+   * consequences are invisible teaches the player to dismiss the card; these
+   * are the consequences, in the numbers the sim really used. Absent on saves
+   * from before the effects were reported.
+   */
+  effects?: string[];
 }
 
 export interface ResourceStocks {
@@ -527,6 +545,12 @@ export interface Nation {
    * Counts toward the prestige score; never decays. Absent/0 on legacy saves.
    */
   renown?: number;
+  /**
+   * Consecutive turns this realm has held `HANSA_VICTORY` of the trading world
+   * (systems/hansa.ts). The Hansa win needs it held, not touched — a Kontor
+   * stormed or a lane blockaded resets it to 0. Absent on legacy saves.
+   */
+  hansaHold?: number;
   /** Temporary effects with a per-turn countdown (undefined = none / legacy saves). */
   modifiers?: NationModifier[];
 }

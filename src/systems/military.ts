@@ -33,6 +33,7 @@ import { resolveCombat, siegePower, type UnitCounts } from "@/systems/combat";
 import { soldiersDisplay } from "@/systems/format";
 import { atWar, declareWar, getTreaty } from "@/systems/diplomacy";
 import {
+  LOG_CAP,
   BARBARIAN_ID,
   CONQUEST_UNREST,
   MAX_ENTRENCH,
@@ -278,8 +279,10 @@ export function fortifyArmy(state: GameState, armyId: number): GameState {
   );
   const owner = state.nations.find((n) => n.id === army.ownerId);
   const where = state.regions[army.regionId]?.name ?? "the field";
-  const who = owner?.isPlayer ? "Your army" : `${owner?.name ?? "A rival"}'s army`;
-  return { ...state, armies, log: appendLog(state, [`${who} dug in at ${where}.`]) };
+  // Only our own orders are worth a line; a rival entrenching somewhere is
+  // routine and unobservable.
+  if (!owner?.isPlayer) return { ...state, armies };
+  return { ...state, armies, log: appendLog(state, [`Your army dug in at ${where}.`]) };
 }
 
 /**
@@ -296,8 +299,9 @@ export function appointCommander(state: GameState, armyId: number, sharedRng?: R
   const armies = state.armies.map((a) => (a.id === armyId ? { ...a, commander } : a));
   const owner = state.nations.find((n) => n.id === army.ownerId);
   const where = state.regions[army.regionId]?.name ?? "the field";
-  const who = owner?.isPlayer ? "Your" : `${owner?.name ?? "A rival"}'s`;
-  const line = `${who} army at ${where} is now led by ${commanderTitle(commander)} (martial ${commander.martial}).`;
+  // Whom a rival puts at the head of a column is its own affair.
+  if (!owner?.isPlayer) return { ...state, armies, rngState: rng.seed };
+  const line = `Your army at ${where} is now led by ${commanderTitle(commander)} (martial ${commander.martial}).`;
   return { ...state, armies, rngState: rng.seed, log: appendLog(state, [line]) };
 }
 
@@ -373,7 +377,7 @@ export function applyDefection(state: GameState): GameState {
     log = [
       ...log,
       `${commanderTitle(a.commander!)} turns his coat, seizing ${r.name} from ${former?.isPlayer ? "your realm" : (former?.name ?? "its ruler")}!`,
-    ].slice(-50);
+    ].slice(-LOG_CAP);
   }
   let next: GameState = { ...state, armies, regions, log };
   for (const a of defectors) {
@@ -614,6 +618,20 @@ export function moveArmy(
   return next;
 }
 
+/** Whether a rival fleet entering `seaZoneId` is a sail the player would sight:
+    it belongs to a realm at war with them, on a sea their own trade crosses or
+    their own coast touches. */
+function hostileSailNearPlayer(state: GameState, ownerId: number, seaZoneId: SeaZoneId): boolean {
+  if (ownerId !== BARBARIAN_ID && !atWar(state, PLAYER_ID, ownerId)) return false;
+  const zone = SEA_ZONES[seaZoneId];
+  if (zone.coastalRegions.some((id) => state.regions[id]?.ownerId === PLAYER_ID)) return true;
+  return (state.routes ?? []).some(
+    (route) =>
+      route.ownerId === PLAYER_ID &&
+      [route.fromRegionId, ...route.lane].some((id) => zone.coastalRegions.includes(id)),
+  );
+}
+
 /** Extract the warships that actually fight in a sea battle; transported land
  * units remain aboard and are carried through as passengers. */
 function navalUnits(units: UnitCounts): UnitCounts {
@@ -707,11 +725,17 @@ export function sailToSeaZone(
         : a,
     );
     const owner = state.nations.find((n) => n.id === army.ownerId);
-    return {
-      ...state,
-      armies,
-      log: appendLog(state, [`${owner?.isPlayer ? "Your" : owner?.name ?? "A rival"} fleet sailed into ${SEA_ZONES[seaZoneId].name}.`]),
-    };
+    // Our own sailings, and hostile sails sighted on a sea we trade through.
+    // A neutral rival shifting patrols is not something a Kontor would report.
+    const ours = owner?.isPlayer;
+    if (!ours && !hostileSailNearPlayer(state, army.ownerId, seaZoneId)) {
+      return { ...state, armies };
+    }
+    const who = ours ? "Your" : `${owner?.name ?? "A rival"}`;
+    const line = ours
+      ? `Your fleet sailed into ${SEA_ZONES[seaZoneId].name}.`
+      : `${who} warships were sighted in ${SEA_ZONES[seaZoneId].name}.`;
+    return { ...state, armies, log: appendLog(state, [line]) };
   }
 
   // Peaceful and allied fleets may share a zone. War must be declared through
@@ -1283,7 +1307,21 @@ function occupyAndCapture(state: GameState, army: Army, target: Region): GameSta
   let next = advanceInto(state, army.id, target.id);
   next = captureRegion(next, target.id, army.ownerId);
   const name = state.nations.find((n) => n.id === army.ownerId)?.name ?? "Army";
+  // A province changing hands is news when it is ours, taken from us, or on
+  // our frontier. A rival mopping up the far side of the map is not — it was
+  // the single loudest line in the chronicle (1.4 per turn) and told the
+  // player nothing they could act on.
+  if (!nearPlayer(next, target.id, army.ownerId)) return next;
   return { ...next, log: appendLog(next, [`${name} occupied ${target.name}.`]) };
+}
+
+/** Whether a region's fate is the player's business: theirs, or on their border. */
+function nearPlayer(state: GameState, regionId: number, actorId: number): boolean {
+  if (actorId === PLAYER_ID) return true;
+  const region = state.regions[regionId];
+  if (!region) return false;
+  if (region.ownerId === PLAYER_ID || region.priorOwnerId === PLAYER_ID) return true;
+  return region.adjacency.some((id) => state.regions[id]?.ownerId === PLAYER_ID);
 }
 
 /** Move an army into a region and spend its move (entering an enemy ZoC halts it). */
@@ -1347,7 +1385,7 @@ export function totalUpkeep(state: GameState, ownerId: number): number {
 }
 
 function appendLog(state: GameState, lines: string[]): string[] {
-  return [...state.log, ...lines].slice(-50);
+  return [...state.log, ...lines].slice(-LOG_CAP);
 }
 
 function round1(v: number): number {

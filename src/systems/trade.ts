@@ -28,6 +28,7 @@ import { UNITS, UNIT_TYPES } from "@/data/units";
 import { techTradeMult } from "@/systems/tech";
 import { kontorBlockedFor, leagueSeversRoute, isLeagueMonopoly } from "@/systems/league";
 import {
+  LOG_CAP,
   BARBARIAN_ID,
   MAX_ROUTES_PER_NATION,
   PLAYER_ID,
@@ -768,7 +769,7 @@ export function stepTrade(state: GameState): GameState {
   if (playerGain > 0) log.push(`Trade routes carried +${playerGain}g to the Kontore.`);
   if (playerToll > 0) log.push(`The Øresund Sound toll gathered +${playerToll}g from passing trade.`);
 
-  return { ...state, routes: nextRoutes, nations, log: log.slice(-50) };
+  return { ...state, routes: nextRoutes, nations, log: log.slice(-LOG_CAP) };
 }
 
 // --- setup ------------------------------------------------------------------

@@ -2325,6 +2325,18 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     const happened = el("p", "hud-epoch-headline");
     happened.textContent = note.headline;
     panel.append(happened);
+
+    // What it actually cost. Without this the card is a story with no
+    // consequence, and the player learns to dismiss it unread.
+    if (note.effects?.length) {
+      const toll = el("ul", "hud-epoch-effects");
+      for (const effect of note.effects) {
+        const li = document.createElement("li");
+        li.textContent = effect;
+        toll.append(li);
+      }
+      panel.append(toll);
+    }
     if (def?.description) {
       const desc = el("p", "hud-epoch-desc");
       desc.textContent = def.description;
@@ -2597,23 +2609,35 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
     advisorBox.style.display = advice.length ? "flex" : "none";
     for (const item of advice) {
       const glyph =
-        item.kind === "research"
-          ? glyphHtml("book", "📖")
-          : item.kind === "build"
-            ? glyphHtml("hammer", "🔨")
-            : glyphHtml("flag", "⚑");
+        item.kind === "trade"
+          ? glyphHtml("ledger", "▤")
+          : item.kind === "research"
+            ? glyphHtml("book", "📖")
+            : item.kind === "build"
+              ? glyphHtml("hammer", "🔨")
+              : glyphHtml("flag", "⚑");
       const chip = btn("", "hud-advice-chip " + item.kind, () => {
-        if (item.kind === "research") openTechTree();
+        // The trade chip jumps to a province that could open a route today —
+        // the fastest path from "I have no trade" to a route on the board.
+        if (item.kind === "trade") {
+          const first = item.regionIds[0];
+          if (first !== undefined) {
+            callbacks.onSelectRegion(first);
+            openRegionScreen(first);
+          }
+        } else if (item.kind === "research") openTechTree();
         else if (item.kind === "build") openProduction();
         else openArmies();
       });
       chip.innerHTML = `${glyph} ${escapeHtml(item.label)}`;
       chip.title =
-        item.kind === "research"
-          ? "Pick a technology — your banked knowledge pours straight into it."
-          : item.kind === "build"
-            ? "Open the production overview and put the idle slots to work."
-            : "Open the armies overview — every stack that can still act.";
+        item.kind === "trade"
+          ? "Your realm carries nothing to the Kontore yet. Open a province that produces a demanded ware and press its ware → Kontor button: that route pays every turn."
+          : item.kind === "research"
+            ? "Pick a technology — your banked knowledge pours straight into it."
+            : item.kind === "build"
+              ? "Open the production overview and put the idle slots to work."
+              : "Open the armies overview — every stack that can still act.";
       advisorBox.append(chip);
     }
 
@@ -4028,7 +4052,12 @@ function renderVictoryProgress(elm: HTMLElement, state: GameState): void {
     const card = el("div", "hud-vrace" + (race.alarm ? " alarm" : ""));
     const head = el("div", "hud-vrace-head");
     const title = el("span", "hud-vrace-title");
-    title.innerHTML = `${glyphHtml("victory", "🏆")} ${escapeHtml(race.title)}`;
+    // Each path wears its own mark: the balance for trade power, crossed swords
+    // for conquest, the wreath for the score at the deadline.
+    const mark: Parameters<typeof glyphHtml>[0] =
+      race.kind === "hansa" ? "scales" : race.kind === "domination" ? "attack" : "victory";
+    const fallback = race.kind === "hansa" ? "⚖" : race.kind === "domination" ? "⚔" : "🏆";
+    title.innerHTML = `${glyphHtml(mark, fallback)} ${escapeHtml(race.title)}`;
     const goal = el("span", "hud-vrace-goal");
     goal.textContent = race.goal;
     head.append(title, goal);

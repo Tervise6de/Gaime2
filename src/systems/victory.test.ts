@@ -138,7 +138,8 @@ describe("victoryProgress", () => {
 describe("victoryRaces", () => {
   it("reports the live paths with you and the leading rival", () => {
     const races = victoryRaces(createGame({ seed: 3, rivals: 3 }));
-    expect(races.map((r) => r.kind)).toEqual(["domination", "prestige"]);
+    // Trade leads the list: it is the path the game is about.
+    expect(races.map((r) => r.kind)).toEqual(["hansa", "domination", "prestige"]);
     for (const r of races) {
       expect(r.you.fraction).toBeGreaterThanOrEqual(0);
       expect(r.you.fraction).toBeLessThanOrEqual(1);

@@ -3,6 +3,7 @@ import { buildOptions, deriveAdvice, regionCanStartBuild } from "@/ui/advisor";
 import { createGame, queueBuilding, chooseResearch } from "@/systems/turn";
 import { researchFrontier } from "@/systems/tech";
 import { PLAYER_ID } from "@/systems/state";
+import { createRoute, routeOptions } from "@/systems/trade";
 
 describe("end-turn advisor", () => {
   it("flags unchosen research, idle regions and restless armies on turn 1", () => {
@@ -40,5 +41,24 @@ describe("end-turn advisor", () => {
     for (const rid of armyIds) {
       expect(g.armies.some((a) => a.ownerId === PLAYER_ID && a.regionId === rid)).toBe(true);
     }
+  });
+});
+
+describe("the opening objective", () => {
+  it("stands until the realm carries something to a Kontor", () => {
+    const g = createGame({ seed: 9 });
+    const chip = deriveAdvice(g).find((a) => a.kind === "trade");
+    expect(chip).toBeDefined();
+    expect(chip!.label).toMatch(/trade route/i);
+    // It points at provinces that could open one this turn.
+    expect(chip!.regionIds.length).toBeGreaterThan(0);
+    for (const id of chip!.regionIds) {
+      expect(routeOptions(g, id, PLAYER_ID).length).toBeGreaterThan(0);
+    }
+    // Once a route is running, the objective is met and the chip is gone.
+    const first = chip!.regionIds[0]!;
+    const opt = routeOptions(g, first, PLAYER_ID)[0]!;
+    const trading = createRoute(g, PLAYER_ID, first, opt.good, opt.toKontorId);
+    expect(deriveAdvice(trading).some((a) => a.kind === "trade")).toBe(false);
   });
 });

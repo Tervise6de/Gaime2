@@ -17,6 +17,7 @@ import {
 } from "@/systems/state";
 import { GOODS } from "@/data/goods";
 import { luxuryAppetite, resolveContentment } from "@/systems/prosperity";
+import { HANSA_HOLD_TURNS, HANSA_VICTORY, hansaControl, hansaWinner } from "@/systems/hansa";
 
 /** Prestige earned per gold of luxury-ware trade income — the Hansa's wealth as renown. */
 const LUXURY_PRESTIGE_WEIGHT = 2;
@@ -77,7 +78,7 @@ export function victoryProgress(state: GameState, id: number): VictoryProgress {
 
 /** One victory path as a legible race: your standing vs the leading rival's. */
 export interface VictoryRace {
-  kind: "domination" | "prestige";
+  kind: "hansa" | "domination" | "prestige";
   title: string;
   /** What winning this path takes. */
   goal: string;
@@ -119,7 +120,33 @@ export function victoryRaces(state: GameState): VictoryRace[] {
   const limit = state.turnLimit === undefined ? TURN_LIMIT : state.turnLimit;
   const endless = limit === null;
 
+  const pHansa = hansaControl(state, PLAYER_ID);
+  const rHansa = topRival((n) => hansaControl(state, n.id).total);
+  const playerHold = state.nations[PLAYER_ID]?.hansaHold ?? 0;
+  const rivalHold = rHansa ? (rHansa.n.hansaHold ?? 0) : 0;
+  const holdNote = (hold: number): string =>
+    hold > 0 ? ` · held ${hold}/${HANSA_HOLD_TURNS}` : "";
+
   return [
+    {
+      // The path the game is actually about, so it leads the list.
+      kind: "hansa",
+      title: "Hansa control",
+      goal: `Hold ${Math.round(HANSA_VICTORY * 100)}% of the trading world for ${HANSA_HOLD_TURNS} turns`,
+      you: {
+        value: `${Math.round(pHansa.total * 100)}%${holdNote(playerHold)}`,
+        fraction: Math.min(1, pHansa.total / HANSA_VICTORY),
+      },
+      rival: rHansa
+        ? {
+            name: rHansa.n.name,
+            value: `${Math.round(rHansa.v * 100)}%${holdNote(rivalHold)}`,
+            fraction: Math.min(1, rHansa.v / HANSA_VICTORY),
+          }
+        : null,
+      // A rival at the threshold with the clock running is the real alarm.
+      alarm: !!rHansa && (rivalHold > 0 || rHansa.v >= HANSA_VICTORY - 0.1),
+    },
     {
       kind: "domination",
       title: "Domination",
@@ -154,6 +181,13 @@ export interface VictoryCheck {
 export function checkVictory(state: GameState): VictoryCheck | null {
   const total = state.regions.filter((r) => r.ownerId !== null).length || 1;
   const contenders = state.nations.filter((n) => !n.isBarbarian && n.alive);
+
+  // The trade path is checked first: a realm that has held the network for the
+  // full run of turns has already won the game the setting is actually about,
+  // and should not be beaten to the post by a conqueror crossing the land
+  // threshold on the same turn.
+  const merchant = hansaWinner(state);
+  if (merchant !== null) return decide(merchant, "Hansa control");
 
   for (const n of contenders) {
     const held = state.regions.filter((r) => r.ownerId === n.id).length;

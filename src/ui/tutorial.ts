@@ -19,7 +19,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     target: null,
     title: "Welcome, ruler",
-    body: "You lead one realm among rivals. Grow your economy, keep your people content, and win by conquest or prestige. This quick tour points out the essentials — you can skip it any time.",
+    body: "You lead one realm among sixteen on the Baltic and the North Sea. This is a game about trade before it is a game about armies: the surest way to win is to become the Hansa — to hold its Kontore, carry its wares and command its sea lanes. This quick tour points out the essentials; you can skip it any time.",
   },
   {
     target: ".hud-topbar",
@@ -35,6 +35,21 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     target: "#game-canvas",
     title: "The world map",
     body: "Your realm carries the widest, brightest border — that's always you. Click any region to inspect and develop it; zoom with the wheel or pinch, drag to pan. Armies (coloured badges) move between adjacent regions to expand or attack.",
+  },
+  {
+    target: ".hud-topbar-left",
+    title: "Your realm makes wares",
+    body: "Every province yields the real commodities of the era — grain and herring, timber and iron, furs, wax and amber. Click one of your regions and read its Exports. Those wares are your hand: what you hold decides what you can build, arm and, above all, sell.",
+  },
+  {
+    target: "#game-canvas",
+    title: "Open your first trade route",
+    body: "A Kontor is a great foreign trading post — Novgorod, Bergen, Bruges, London — and it pays gold for the wares it wants. Click one of your producing regions, find Trade, and press a ware → Kontor button. The route pays every turn from now on, and the gold shows in your treasury next turn. That single click is the game's engine.",
+  },
+  {
+    target: ".hud-navbtn",
+    title: "The race you are actually in",
+    body: "Politics shows three ways to win. Hansa control is the one this world is built for: hold the Kontore, carry the most wares, lead the League and command the sea lanes. Conquest works too — but it is the slow road, and every rival will fight you for the land.",
   },
   {
     target: ".hud-navbtn-research",

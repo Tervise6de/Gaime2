@@ -34,6 +34,7 @@ import { advanceConstruction } from "@/systems/construction";
 import { stepTrade, seedKontore, nationalWareOutput, nationFoodOutput, hasSaltAccess } from "@/systems/trade";
 import { resolveContentment, contentmentUnrest, luxuryAppetite, drawFoodReserve } from "@/systems/prosperity";
 import { stepLeague } from "@/systems/league";
+import { tickHansaHold } from "@/systems/hansa";
 import { scheduleEpochs, stepEpochs } from "@/systems/epochs";
 import { nextPopulation } from "@/systems/population";
 import { nextUnrest } from "@/systems/stability";
@@ -57,6 +58,7 @@ import { fireEvent } from "@/systems/events";
 import { checkVictory, nationScore } from "@/systems/victory";
 import { createRng, type Rng } from "@/systems/rng";
 import {
+  LOG_CAP,
   BANKRUPTCY_UNREST,
   WAR_WEARY_TURNS,
   WAR_WEARY_MAX_STACKS,
@@ -415,7 +417,7 @@ export function applySecession(state: GameState): GameState {
     log = [
       ...log,
       `${state.regions[id]!.name} rises in revolt under ${commanderTitle(pretender)}, seceding from ${former?.isPlayer ? "your realm" : (former?.name ?? "its ruler")}.`,
-    ].slice(-50);
+    ].slice(-LOG_CAP);
     chronicled.push({ id, pretender: commanderTitle(pretender), former: formerId });
   }
   let next: GameState = { ...state, regions, armies, nextArmyId, log, rngState: rng.seed };
@@ -753,10 +755,10 @@ export function advanceNationEconomy(state: GameState, nationId: number): GameSt
       `Turn ${state.turn} — +${flow.gold}g (−${upkeep} upkeep) +${waresProduced} wares ` +
       `+${flow.knowledge}k, food ${fmtSigned(round1(flow.food + foodFromWares))}. Treasury ${stocks.gold}g.` +
       (notes.length ? ` ${notes.join("; ")}.` : "");
-    log = [...state.log, entry].slice(-50);
-  } else if (step.completed) {
-    log = [...state.log, `${nation.name} researched ${TECHS[step.completed].name}.`].slice(-50);
+    log = [...state.log, entry].slice(-LOG_CAP);
   }
+  // A rival's doctrine is discovered when its effects are met in the field, not
+  // announced to every court the turn it is finished.
 
   return { ...state, nations, regions, armies, log };
 }
@@ -847,7 +849,8 @@ export function resolveTurn(state: GameState): GameState {
 function victoryChronicle(outcome: string, kind: string): string {
   const won = outcome === "victory";
   const how =
-    kind === "domination" ? "by dominion over the land"
+    kind === "Hansa control" ? "as master of the Hansa — its Kontore, its wares, its lanes"
+    : kind === "domination" ? "by dominion over the land"
     : "on the ledger of prestige when the age closed";
   return won
     ? `Your realm was judged the greatest power ${how}. The chronicle is complete.`
@@ -868,6 +871,9 @@ function fireEvents(state: GameState, rng: Rng): GameState {
 
 /** Mark eliminated nations, then apply the victory/defeat conditions. */
 function updateOutcome(state: GameState): GameState {
+  // The trade race is measured before anything else is judged: a realm's grip
+  // on the network is read from the board this turn just resolved.
+  state = tickHansaHold(state);
   const nations = state.nations.map((n) => {
     if (n.isBarbarian) return n;
     const holds = state.regions.some((r) => r.ownerId === n.id);
@@ -876,7 +882,7 @@ function updateOutcome(state: GameState): GameState {
 
   const newlyDead = nations.filter((n, i) => state.nations[i]!.alive && !n.alive && !n.isBarbarian);
   let log = state.log;
-  for (const n of newlyDead) log = [...log, `${n.name} has been eliminated.`].slice(-50);
+  for (const n of newlyDead) log = [...log, `${n.name} has been eliminated.`].slice(-LOG_CAP);
 
   let withNations: GameState = { ...state, nations, log };
   // Chronicle beat (E2): the fall of a realm.

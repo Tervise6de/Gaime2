@@ -63,6 +63,7 @@ import { eraIndexForTurn } from "@/data/eras";
 import { TECHS, type TechId, type ResearchCategory } from "@/data/techs";
 import type { Rng } from "@/systems/rng";
 import {
+  LOG_CAP,
   BARBARIAN_ID,
   DIFFICULTY,
   FORT_PER_LEVEL,
@@ -770,7 +771,7 @@ function demandTribute(state: GameState, from: number, playerId: number, gold: n
   const next = addOffer(state, from, playerId, "tribute", gold);
   if (next === state) return state; // a demand already stands (dedup)
   const name = state.nations.find((n) => n.id === from)?.name ?? "A rival";
-  return { ...next, log: [...next.log, `${name} demands ${gold}g in tribute — pay, or risk war.`].slice(-50) };
+  return { ...next, log: [...next.log, `${name} demands ${gold}g in tribute — pay, or risk war.`].slice(-LOG_CAP) };
 }
 
 // --- military ---------------------------------------------------------------
@@ -1633,11 +1634,14 @@ export function bestTarget(state: GameState, army: { id: number; regionId: numbe
       // Reclaiming our own breakaway land (a seceded or defected region that
       // still remembers us) is a priority — close the defection loop (E5).
       const isReclaim = target.priorOwnerId === nationId;
+      const isKontor = KONTOR_IDS.some((id) => KONTORE[id].regionId === target.id);
       const value =
         target.population * REGION_POP_VALUE +
         (target.resource ? resourceValue : 0) +
         (isCapital ? capitalValue : 0) +
-        (isReclaim ? RECLAIM_VALUE : 0);
+        (isReclaim ? RECLAIM_VALUE : 0) +
+        // Merchant-minded realms want the Kontor most, but nobody ignores it.
+        (isKontor ? KONTOR_VALUE * (0.6 + (p?.economy ?? 0.5) * 0.8) : 0);
       const score = atk - def + value + (isBarb ? 2 : 5);
       if (score > bestScore) {
         bestScore = score;
@@ -1656,6 +1660,14 @@ const RESOURCE_VALUE = 6;
 const CAPITAL_VALUE = 10;
 /** Weight for retaking a region that broke away from us (seceded/defected). */
 const RECLAIM_VALUE = 9;
+/**
+ * A Kontor town is the richest prize on the board and the fixed point of the
+ * trade race (systems/hansa.ts): whoever holds Novgorod, Bergen, Bruges or
+ * London holds a quarter of the network. Rivals must covet them, or the trade
+ * victory has no antagonist — measured before this, no AI realm ever pushed
+ * past ~50% control because it took Kontor towns only by accident.
+ */
+const KONTOR_VALUE = 14;
 
 // --- small helpers ----------------------------------------------------------
 

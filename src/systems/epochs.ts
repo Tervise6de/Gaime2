@@ -12,7 +12,9 @@
  */
 
 import type { Rng } from "@/systems/rng";
+import { KONTORE } from "@/data/kontore";
 import {
+  LOG_CAP,
   MIN_POPULATION,
   UNREST_MAX,
   PLAYER_ID,
@@ -23,6 +25,7 @@ import {
 import { EPOCH_EVENTS, type EpochEventDef } from "@/data/epochEvents";
 import { BASE_YEAR, YEARS_PER_TURN, yearForTurn } from "@/data/eras";
 import { round1 } from "@/systems/economy";
+import { popDisplay } from "@/systems/format";
 
 /** Inverse of yearForTurn: the (≥1) game turn a calendar year falls on. */
 export function turnForYear(year: number): number {
@@ -68,15 +71,27 @@ export function stepEpochs(state: GameState, rng: Rng): GameState {
  * AND record a structured note the HUD surfaces as a notification. `filled` is the
  * event's headline with its {place} resolved.
  */
-function announce(state: GameState, def: EpochEventDef, filled: string): GameState {
+function announce(
+  state: GameState,
+  def: EpochEventDef,
+  filled: string,
+  effects: string[] = [],
+): GameState {
   const year = yearForTurn(state.turn);
-  const note: FiredEpochNote = { id: def.id, year, headline: filled };
+  const note: FiredEpochNote = { id: def.id, year, headline: filled, effects };
+  // The log carries the consequence, not just the headline: a line that says
+  // only "a great fire took Lübeck" leaves the player to guess what changed.
+  const tail = effects.length ? ` (${effects.join("; ")})` : "";
   return {
     ...state,
-    log: [...state.log, `⚑ ${year} — ${filled}`].slice(-50),
+    log: [...state.log, `⚑ ${year} — ${filled}${tail}`].slice(-LOG_CAP),
     firedEpochs: [...(state.firedEpochs ?? []), note],
   };
 }
+
+/** Population is carried in thousands; report it the way the HUD does. */
+const lostPeople = (before: number, after: number): string =>
+  `${popDisplay(round1(before - after))} lost`;
 
 const bumpUnrest = (u: number, by: number): number => Math.min(UNREST_MAX, u + by);
 const cull = (pop: number, loss: number): number => round1(Math.max(MIN_POPULATION, pop * (1 - loss)));
@@ -99,7 +114,16 @@ function applyEpoch(state: GameState, def: EpochEventDef, rng: Rng): GameState {
       const regions = state.regions.map((r) =>
         hit.has(r.id) ? { ...r, population: cull(r.population, eff.popLoss), unrest: bumpUnrest(r.unrest, eff.unrest) } : r,
       );
-      return announce({ ...state, regions }, def, def.headline.replace("{place}", place));
+      const dead = state.regions.reduce(
+        (sum, r) => (hit.has(r.id) ? sum + (r.population - regions[r.id]!.population) : sum),
+        0,
+      );
+      const struck = state.regions.filter((r) => hit.has(r.id)).map((r) => r.name);
+      return announce({ ...state, regions }, def, def.headline.replace("{place}", place), [
+        `${struck.join(", ")} struck`,
+        `${popDisplay(round1(dead))} dead`,
+        `unrest +${eff.unrest} in each`,
+      ]);
     }
     case "trade_boom": {
       // A windfall to every realm, scaled by how much land (and thus trade) it holds.
@@ -108,7 +132,11 @@ function applyEpoch(state: GameState, def: EpochEventDef, rng: Rng): GameState {
         const owned = state.regions.filter((r) => r.ownerId === n.id).length;
         return owned > 0 ? { ...n, stocks: { ...n.stocks, gold: round1(n.stocks.gold + owned * eff.goldPerRegion) } } : n;
       });
-      return announce({ ...state, nations }, def, def.headline);
+      const mine = state.regions.filter((r) => r.ownerId === PLAYER_ID).length;
+      return announce({ ...state, nations }, def, def.headline, [
+        `+${eff.goldPerRegion}g per province to every realm`,
+        mine > 0 ? `+${round1(mine * eff.goldPerRegion)}g to your treasury` : "your realm holds no land to gain by it",
+      ]);
     }
     case "pirates": {
       // A raid on one of the player's shores: gold lost, that province unsettled.
@@ -122,7 +150,11 @@ function applyEpoch(state: GameState, def: EpochEventDef, rng: Rng): GameState {
       const regions = coast
         ? state.regions.map((r) => (r.id === coast.id ? { ...r, unrest: bumpUnrest(r.unrest, eff.unrest) } : r))
         : state.regions;
-      return announce({ ...state, nations, regions }, def, def.headline.replace("{place}", place));
+      const purse = state.nations[PLAYER_ID]?.stocks.gold ?? 0;
+      return announce({ ...state, nations, regions }, def, def.headline.replace("{place}", place), [
+        `−${round1(Math.min(purse, eff.goldLoss))}g from your treasury`,
+        coast ? `${coast.name}: unrest +${eff.unrest}` : "no shore of yours to raid",
+      ]);
     }
     case "great_fire": {
       // Fire guts the busiest wharf-town: people lost, its owner's stockpiled
@@ -141,13 +173,28 @@ function applyEpoch(state: GameState, def: EpochEventDef, rng: Rng): GameState {
           ? { ...n, wares: { ...n.wares, timber: round1(Math.max(0, n.wares.timber - eff.wareLoss)) } }
           : n,
       );
-      return announce({ ...state, regions, nations }, def, def.headline.replace("{place}", town.name));
+      const owner = state.nations.find((n) => n.id === town.ownerId);
+      const burned = Math.min(owner?.wares.timber ?? 0, eff.wareLoss);
+      return announce({ ...state, regions, nations }, def, def.headline.replace("{place}", town.name), [
+        `${town.name}: ${lostPeople(town.population, regions[town.id]!.population)}`,
+        `${town.name}: unrest +${eff.unrest}`,
+        burned > 0
+          ? `${round1(burned)} timber burned in ${owner?.isPlayer ? "your stores" : (owner?.name ?? "the town")}'s wharves`
+          : "the wharves held no timber to burn",
+      ]);
     }
     case "kontor_closed": {
       // Only bites where the Kontor exists and is open (else the history is moot).
       if (!state.kontore || !state.kontore.some((k) => k.id === eff.kontor && k.open)) return state;
       const kontore = state.kontore.map((k) => (k.id === eff.kontor ? { ...k, open: false, holderId: null } : k));
-      return announce({ ...state, kontore }, def, def.headline);
+      const cut = (state.routes ?? []).filter((r) => r.toKontorId === eff.kontor);
+      const ours = cut.filter((r) => r.ownerId === PLAYER_ID);
+      const lost = round1(ours.reduce((sum, r) => sum + (r.lastIncome ?? 0), 0));
+      return announce({ ...state, kontore }, def, def.headline, [
+        `${KONTORE[eff.kontor].name} shut — it takes no trade`,
+        cut.length > 0 ? `${cut.length} route${cut.length === 1 ? "" : "s"} bound there now pay nothing` : "no route ran there",
+        ours.length > 0 ? `${ours.length} of them yours, worth ${lost}g a turn` : "none of them yours",
+      ]);
     }
     default:
       return state;

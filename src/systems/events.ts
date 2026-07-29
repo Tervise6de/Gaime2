@@ -11,6 +11,7 @@
 
 import type { Rng } from "@/systems/rng";
 import {
+  LOG_CAP,
   BARBARIAN_ID,
   GRANARY_CAP,
   MIN_POPULATION,
@@ -1081,18 +1082,18 @@ export function fireEvent(state: GameState, nationId: number, rng: Rng): GameSta
         prompt: chosen.choice.prompt,
         options: chosen.choice.options.map((o) => ({ id: o.id, label: o.label, detail: o.detail })),
       };
-      return { ...state, pendingChoice, log: [...state.log, `A decision awaits — ${chosen.choice.prompt}`].slice(-50) };
+      return { ...state, pendingChoice, log: [...state.log, `A decision awaits — ${chosen.choice.prompt}`].slice(-LOG_CAP) };
     }
     const pick = chosen.choice.aiPick(state, nationId);
     const opt = chosen.choice.options.find((o) => o.id === pick) ?? chosen.choice.options[0]!;
     const outcome = opt.apply(state, nationId);
     if (!outcome) return state;
-    return { ...outcome.state, log: [...outcome.state.log, `${prefix}${outcome.message}`].slice(-50) };
+    return { ...outcome.state, log: [...outcome.state.log, `${prefix}${outcome.message}`].slice(-LOG_CAP) };
   }
 
   const result = chosen.apply?.(state, nationId, rng);
   if (!result) return state;
-  return { ...result.state, log: [...result.state.log, `${prefix}${result.message}`].slice(-50) };
+  return { ...result.state, log: [...result.state.log, `${prefix}${result.message}`].slice(-LOG_CAP) };
 }
 
 /**
@@ -1108,7 +1109,7 @@ export function resolveChoice(state: GameState, optionId: string): GameState {
   if (!opt) return { ...state, pendingChoice: undefined };
   const outcome = opt.apply(state, PLAYER_ID);
   const base = outcome ? outcome.state : state;
-  const log = outcome ? [...base.log, outcome.message].slice(-50) : base.log;
+  const log = outcome ? [...base.log, outcome.message].slice(-LOG_CAP) : base.log;
   return { ...base, pendingChoice: undefined, log };
 }
 

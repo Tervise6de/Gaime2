@@ -91,6 +91,38 @@ describe("stepEpochs", () => {
     expect(next.kontore!.find((k) => k.id === "novgorod")!.open).toBe(false);
   });
 
+  it("reports what each event actually cost, in the numbers it used", () => {
+    // The complaint this answers: "the fire fired, but nothing visibly changed".
+    // The effects were always real — they were simply never told to the player.
+    const g = createGame({ seed: 5, mapId: "hansa" });
+    const fire: GameState = { ...g, epochs: [{ id: "great_fire", fireTurn: 1 }] };
+    const burned = stepEpochs(fire, rng(3));
+    const note = burned.firedEpochs![0]!;
+    expect(note.effects?.length).toBeGreaterThan(0);
+    // The toll names the town, its dead and its unrest — and the log carries it,
+    // so a muted-notice player still sees the consequence.
+    expect(note.effects!.join(" ")).toMatch(/lost/);
+    expect(note.effects!.join(" ")).toMatch(/unrest \+\d/);
+    expect(burned.log.at(-1)).toContain(note.effects![0]!);
+    // And the numbers are the ones the board really took.
+    const struck = burned.regions.find((r) => note.effects![0]!.startsWith(`${r.name}:`))!;
+    expect(struck.population).toBeLessThan(g.regions[struck.id]!.population);
+    expect(struck.unrest).toBeGreaterThan(g.regions[struck.id]!.unrest);
+  });
+
+  it("tells a shut Kontor's cost in routes, not just in prose", () => {
+    const g = createGame({ seed: 8, mapId: "hansa" });
+    const s: GameState = {
+      ...g,
+      epochs: [{ id: "novgorod_closed", fireTurn: 1 }],
+      routes: [{ id: 0, ownerId: 0, good: "furs", fromRegionId: 62, toKontorId: "novgorod", lane: [62], lastIncome: 12 }],
+    };
+    const next = stepEpochs(s, rng(1));
+    const effects = next.firedEpochs![0]!.effects!.join(" ");
+    expect(effects).toMatch(/1 route bound there now pay/);
+    expect(effects).toMatch(/12g a turn/);
+  });
+
   it("is a no-op when there is no schedule (legacy saves)", () => {
     const g = createGame({ seed: 5, mapId: "hansa" });
     const s: GameState = { ...g, epochs: undefined };

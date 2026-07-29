@@ -12,9 +12,10 @@ import { BUILDINGS, BUILDING_IDS, buildingFocusOk, type BuildingId } from "@/dat
 import { isBuildingUnlockedFor, researchFrontier } from "@/systems/tech";
 import { eraIndexForTurn } from "@/data/eras";
 import { PLAYER_ID, playerNation, type GameState } from "@/systems/state";
+import { routeOptions } from "@/systems/trade";
 
 export interface Advice {
-  kind: "research" | "build" | "army";
+  kind: "trade" | "research" | "build" | "army";
   /** Chip label, e.g. "2 regions building nothing". */
   label: string;
   /** Regions to jump to (idle regions, or the idle armies' regions). */
@@ -25,6 +26,24 @@ export interface Advice {
 export function deriveAdvice(state: GameState): Advice[] {
   const advice: Advice[] = [];
   const player = playerNation(state);
+
+  // The opening objective. A realm with no route at all is not yet playing the
+  // game this world is about, and the tour is long gone by the time that
+  // matters — so the chip stands until the first route is open, and points at
+  // a province that could open one today.
+  const myRoutes = (state.routes ?? []).filter((r) => r.ownerId === PLAYER_ID).length;
+  if (myRoutes === 0) {
+    const sources = state.regions
+      .filter((r) => r.ownerId === PLAYER_ID && routeOptions(state, r.id, PLAYER_ID).length > 0)
+      .map((r) => r.id);
+    if (sources.length > 0) {
+      advice.push({
+        kind: "trade",
+        label: "No trade route — open your first",
+        regionIds: sources,
+      });
+    }
+  }
 
   // Research idle — and there is an age-appropriate tech to pick.
   if (!player.research.current && researchFrontier(player.research.done, eraIndexForTurn(state.turn)).length > 0) {

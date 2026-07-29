@@ -25,6 +25,7 @@ import { KONTORE, KONTOR_IDS, type KontorId } from "@/data/kontore";
 import { atWar, adjustRelation } from "@/systems/diplomacy";
 import { round1 } from "@/systems/economy";
 import {
+  LOG_CAP,
   BARBARIAN_ID,
   PLAYER_ID,
   inLeague,
@@ -100,7 +101,7 @@ export function foundLeague(state: GameState, ownerId: number): GameState {
   if (!canFoundLeague(state, ownerId)) return state;
   const league = { members: [ownerId], foundedTurn: state.turn, boycotts: [] };
   const who = ownerId === PLAYER_ID ? "You found" : `${nameOf(state, ownerId)} founds`;
-  return { ...state, league, log: [...state.log, `${who} the Hanseatic League.`].slice(-50) };
+  return { ...state, league, log: [...state.log, `${who} the Hanseatic League.`].slice(-LOG_CAP) };
 }
 
 /** Join the League. No-op unless eligible (at peace with all members). Pure. */
@@ -108,7 +109,7 @@ export function joinLeague(state: GameState, ownerId: number): GameState {
   if (!state.league || !canJoinLeague(state, ownerId)) return state;
   const members = [...state.league.members, ownerId];
   const who = ownerId === PLAYER_ID ? "You join" : `${nameOf(state, ownerId)} joins`;
-  return { ...state, league: { ...state.league, members }, log: [...state.log, `${who} the Hanseatic League.`].slice(-50) };
+  return { ...state, league: { ...state.league, members }, log: [...state.log, `${who} the Hanseatic League.`].slice(-LOG_CAP) };
 }
 
 /** Leave the League (relations cool with former partners). Dissolves it if it empties. Pure. */
@@ -122,7 +123,7 @@ function removeMember(state: GameState, ownerId: number, penalty: number, verb: 
   const remaining = league.members.filter((m) => m !== ownerId);
   let next: GameState = { ...state, league: remaining.length === 0 ? undefined : { ...league, members: remaining } };
   for (const m of remaining) next = adjustRelation(next, ownerId, m, penalty); // cool with those left behind
-  return { ...next, log: [...next.log, `${verb} the Hanseatic League.`].slice(-50) };
+  return { ...next, log: [...next.log, `${verb} the Hanseatic League.`].slice(-LOG_CAP) };
 }
 
 // --- collective boycott ------------------------------------------------------
@@ -150,7 +151,7 @@ export function setLeagueBoycott(state: GameState, ownerId: number, targetId: nu
     // The cut-off realm resents the whole League.
     for (const m of league.members) next = adjustRelation(next, targetId, m, BOYCOTT_RELATION_HIT);
     const log = `The Hanseatic League declares a boycott of ${nameOf(state, targetId)} — each member levies ${BOYCOTT_LEVY}g (Pfundzoll).`;
-    next = { ...next, log: [...next.log, log].slice(-50) };
+    next = { ...next, log: [...next.log, log].slice(-LOG_CAP) };
   }
   return next;
 }
@@ -242,7 +243,7 @@ export function stepLeague(state: GameState): GameState {
   // 0) Prune the dead from the roll. If no living member remains, the League is gone.
   const members = league.members.filter((m) => nationById(state, m)?.alive ?? false);
   if (members.length === 0) {
-    return { ...state, league: undefined, log: [...state.log, "The Hanseatic League dissolves — no realms remain to uphold it."].slice(-50) };
+    return { ...state, league: undefined, log: [...state.log, "The Hanseatic League dissolves — no realms remain to uphold it."].slice(-LOG_CAP) };
   }
   const workingLeague = { ...league, members };
 
@@ -269,7 +270,7 @@ export function stepLeague(state: GameState): GameState {
   }
   const playerShare = members.includes(PLAYER_ID) ? share : 0;
   if (playerShare > 0) {
-    next = { ...next, log: [...next.log, `The Hanseatic League's Kontore paid you a +${playerShare}g dividend.`].slice(-50) };
+    next = { ...next, log: [...next.log, `The Hanseatic League's Kontore paid you a +${playerShare}g dividend.`].slice(-LOG_CAP) };
   }
   return next;
 }

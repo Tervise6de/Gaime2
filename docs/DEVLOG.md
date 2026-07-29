@@ -6,6 +6,55 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-29 — The game admits what it is about (v0.110.0)
+
+Three changes, all aimed at one gap: the game has far more systems than it
+shows, and the ones it shows point at conquest.
+
+**A win condition for trade.** Victory was domination or a turn-limit score, so
+conquest read as the answer to a game whose first design pillar is "trade
+first" — every Kontor, route, League vote and blockade was flavour hung off a
+war game. `systems/hansa.ts` scores the four things the League actually had
+(§3: "no state, no standing army, no permanent navy, no common treasury"): the
+Kontore held or traded with, the share of everything the network carries, League
+standing, and the sea lanes' coasts and deniable water. Hold 60% of that for six
+running turns and you have made yourself the Hansa. The hold is the mechanism —
+a Kontor stormed or a lane blockaded resets the clock — so the race is about
+keeping a network, not touching a number.
+
+Calibration was measured, not guessed: over five 120-turn autoplays no AI realm
+crossed the line by incidental play (they peak at 43–51%), so the path is
+deliberate rather than accidental. To give the race an antagonist, rivals now
+covet Kontor towns directly (`KONTOR_VALUE`), weighted by how mercantile the
+archetype is. Trade is checked before domination, so a merchant who has held the
+network is not beaten to the post on the same turn by a conqueror.
+
+**A chronicle worth reading.** Measured across five autoplays, the log took
+**9.8 lines a turn against a 50-line cap** — the player's own turn summary was
+evicted inside five turns, drowned by rival bookkeeping. The rule now is what a
+chancery would actually hear: our own affairs, our frontier, and public acts
+between courts. A rival's research, its officer appointments, its patrols and
+its private gifts are not; a war between two realms a sea away is not. That is
+**4.2 lines a turn**, the top line is the player's own summary, and the window
+(now a named `LOG_CAP`, raised to 60) holds about fourteen turns instead of five.
+
+**Events that say what they cost.** The playtest note was "the fire fired, but
+nothing visibly changed". The effects were always real — population culled,
+timber burned, unrest spiked — and simply never reported. Every epoch event now
+measures what it did as it applied it and carries that in the note and the log:
+"Lübeck: 2.1k lost", "12 timber burned", "3 routes bound there now pay nothing,
+1 of them yours, worth 14g a turn". The card lists them under the headline.
+
+**And the tour teaches the subject.** The seven-step tutorial covered treasury,
+tax, map, research, diplomacy and end turn, and never said *route*, *Kontor*,
+*ware* or *League*. It now walks from "your realm makes wares" to opening a real
+route to a Kontor to the race that route feeds. The tour is skippable and soon
+forgotten, so the opening objective outlives it: a gold advisor chip — "No trade
+route — open your first" — that stands until the realm carries something
+somewhere, and jumps to a province that could open one today.
+
+807 tests green (+16), typecheck and production build clean.
+
 ## 2026-07-28 — The top bar becomes joinery (v0.109.0)
 
 The six nav squares were the one part of the HUD that could have belonged to any
