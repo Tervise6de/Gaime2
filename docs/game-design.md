@@ -86,6 +86,52 @@ wants a League seat before it has trade to protect. The Diplomacy screen reports
 each court's aim ("Our factors report: Lübeck is playing for the Hansa…"), since
 a realm's intentions are read from its conduct.
 
+## Campaigns — a rival's war aim (v0.113)
+
+A rival's offensive horizon used to be one province deep: both target scorers
+only weighed regions *adjacent to land it already held*, so a merchant playing
+for the Hansa took a Kontor town if and only if it happened to border one. The
+four Kontore are each a rival capital and three of them are nowhere near most
+realms, so realms could want the network and have no way to go and get it.
+
+A campaign (`systems/campaign.ts`) gives one realm one distant prize and a road
+to it. The objective is chosen by prize ÷ distance — a Kontor town for a realm
+playing commerce, a rival seat as well for one playing conquest, and nothing at
+all for one playing prestige, which builds rather than marches. The road is a
+Dijkstra path priced by what each province costs to cross: own ground 1,
+barbarian 3, a realm already at war 4, a plain peace 9, a non-aggression pact
+15, a sworn truce 22, an alliance 26 — so the planner prefers the long way round
+to a betrayal, and will not draw a line over a truce it has already promised not
+to break. Roads dearer than `MAX_ROAD_COST` are refused as fantasies.
+
+The first province on the road the realm does not own is that turn's war aim.
+It gets a prize weight in `bestTarget` and `focusTarget` that outranks the
+ordinary terms, so the existing concentration machinery masses against it — the
+staging is what makes this a campaign rather than a teleport. Idle armies march
+toward it instead of the nearest border. And a realm will open a **war of
+passage** on the peace standing in its way, at a wider power edge than a war of
+hatred needs (`CAMPAIGN_WAR_CAUTION`), never against a truce or a pact. An aim
+survives a change of plan for `CAMPAIGN_DWELL` turns — the levy is raised and
+the host is on the road — and is dropped the moment the prize is taken. The
+Diplomacy card reports it: "Their host is marching on the Kontor at Novgorod,
+by way of Riga."
+
+**Measured, over twelve 160-turn autoplays.** Campaigns work: Novgorod fell to
+Finland, Lithuania, Estonia and Poland across the seeds, Bergen to Denmark, and
+half again as many Kontor towns change hands (46 against 31). The board is
+livelier — realms at war on about 2.0% of realm-pairs an average turn against
+1.1% without campaigns — and the trade leader's ceiling is unchanged at ~40%.
+
+**What this does not do, and why.** It does not make the Hansa race winnable for
+a rival, and the reason is not the marching. The leader's control breaks down
+the same way in every seed: Kontore ~43, League 100, **wares ~11, lanes ~0**.
+The two strands conquest cannot touch are worth 0.45 of the 0.6 threshold —
+ware share is one realm's slice of route income split fifteen ways, and lane
+control wants held coasts and uncontested hulls across six seas. Holding all
+four Kontore and leading the League comes to about 0.55. So the trade victory as
+weighted today is, for anyone, a Kontor-conquest victory with a trade veneer;
+the next real work on it is the strand weights or the threshold, not the AI.
+
 ## Diplomacy — a word is worth something (v0.112)
 
 Two things made the diplomacy layer read as arbitrary, and both are about the

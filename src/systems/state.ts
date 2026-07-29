@@ -561,6 +561,13 @@ export interface Nation {
   strategy?: AiStrategy;
   /** Turn the current strategy was adopted (for the anti-dithering dwell). */
   strategySince?: number;
+  /**
+   * The distant prize this realm is marching at (systems/campaign.ts) and the
+   * turn it took the aim. A strategy says what *kind* of prize is worth having;
+   * a campaign names one and holds the realm to it long enough to fight its way
+   * there. Undefined for the player, the barbarians and legacy saves.
+   */
+  campaign?: { objectiveId: number; since: number };
   /** Temporary effects with a per-turn countdown (undefined = none / legacy saves). */
   modifiers?: NationModifier[];
 }

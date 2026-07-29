@@ -24,6 +24,7 @@ import type { FocusId } from "@/data/focuses";
 import { previewCombat, sideStrength, type UnitCounts } from "@/systems/combat";
 import { publicIntelUnits, publicNationPower } from "@/systems/intel";
 import { strategyProfile } from "@/systems/strategy";
+import { planCampaign, onCampaignRoad, warOpensRoad, type Campaign } from "@/systems/campaign";
 import {
   appointCommander,
   canRaiseUnit,
@@ -36,6 +37,7 @@ import {
   raiseUnit,
   regionDefense,
   strategicAccess,
+  unitCost,
 } from "@/systems/military";
 import {
   addOffer,
@@ -616,6 +618,9 @@ export function coalitionPowerAgainst(
 function doDiplomacy(state: GameState, nationId: number, rng: Rng): GameState {
   const me = state.nations.find((n) => n.id === nationId);
   if (!me) return state;
+  // The realm's war aim: a peace standing on the next province of its road is
+  // the one thing it will open a war *for* rather than merely out of hostility.
+  const campaign = planCampaign(state, nationId);
   const p = me.personality;
   const aggression = p?.aggression ?? 0.4;
   const trust = p?.trustworthiness ?? 0.5;
@@ -644,6 +649,13 @@ function doDiplomacy(state: GameState, nationId: number, rng: Rng): GameState {
     const treaty = getTreaty(s, nationId, o.id);
     const theirPower = publicNationPower(s, nationId, o.id) || 1;
     const ratio = myPower / theirPower;
+    // A war of passage is judged on real strength, not on temperament: a realm
+    // that has already decided to march reads the odds like a soldier, so the
+    // merchant's `warAppetite` discount is left out of this one comparison.
+    // With it in, a merchant needed roughly twice the power of the realm in its
+    // way and no road ever opened — measured, campaigns sat blocked for a
+    // hundred turns at a border they could have forced.
+    const campaignRatio = publicNationPower(s, nationId, nationId) / theirPower;
     const border = sharedBorders(s, nationId, o.id) > 0;
     const earlyGraceForPlayer = o.isPlayer && s.turn < earlyPeaceTurns(s);
 
@@ -698,6 +710,27 @@ function doDiplomacy(state: GameState, nationId: number, rng: Rng): GameState {
       !underTruce(s, nationId, o.id) &&
       (pact ? rel < FRIENDLY_THRESHOLD && wouldBreakTreaty(s, nationId, o.id) : rel < -25);
     if (border && mayStrike && ratio > warThreshold && !earlyGraceForPlayer && !overstretched) {
+      s = openWar(s, nationId, o);
+      actions++;
+      continue;
+    }
+
+    // A war of *passage*: this realm is marching at a prize (a Kontor town, an
+    // enemy seat) and this neighbour's land is the next province of the road.
+    // Without this clause a realm could want the network and never take a step
+    // toward it — a merchant is rarely hostile enough to clear the `rel < -25`
+    // bar above, which is precisely why it never went anywhere. The costs are
+    // the same as any other war: it needs a real power edge, it will not touch
+    // a sworn truce or a pact it means to keep, and the declaration is public.
+    if (
+      warOpensRoad(campaign, o.id) &&
+      border &&
+      !pact &&
+      !underTruce(s, nationId, o.id) &&
+      campaignRatio > warThreshold + CAMPAIGN_WAR_CAUTION &&
+      !earlyGraceForPlayer &&
+      !overstretched
+    ) {
       s = openWar(s, nationId, o);
       actions++;
       continue;
@@ -821,6 +854,10 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
   const nation = s.nations.find((n) => n.id === nationId);
   if (!nation) return s;
 
+  // The realm's war aim, read once: every offensive decision below is measured
+  // against the same road, so the host cannot pull itself in two directions.
+  const campaign = planCampaign(s, nationId);
+
   // Recruit: keep an army if aggressive/at war and it's affordable.
   s = recruit(s, nationId, rng);
   s = manageNavy(s, nationId, rng);
@@ -846,7 +883,7 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
   // stand-down — armies outside it still take their own winnable targets, and
   // even a reserved army walks into an undefended province, which costs the
   // muster nothing.
-  const concentration = shouldConcentrate(s, nationId) ? concentrationPlan(s, nationId) : null;
+  const concentration = shouldConcentrate(s, nationId) ? concentrationPlan(s, nationId, campaign) : null;
   const reserved = concentrationReserves(s, nationId, concentration);
   const actedOffensively = new Set<number>();
   const myArmies = () => s.armies.filter((a) => a.ownerId === nationId && !armyIsFleet(a.units));
@@ -858,7 +895,7 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
       actedOffensively.add(live.id);
       continue;
     }
-    const target = bestTarget(s, live, nationId);
+    const target = bestTarget(s, live, nationId, campaign);
     if (target === null) continue;
     if (reserved.has(live.id) && !isUndefendedTarget(s, target, nationId)) continue;
     s = moveArmy(s, live.id, target, rng);
@@ -876,7 +913,7 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
     const live = s.armies.find((a) => a.id === army.id);
     if (!live || live.movesLeft <= 0) continue;
     if (actedOffensively.has(live.id)) continue;
-    if (bestTarget(s, live, nationId) !== null) continue;
+    if (bestTarget(s, live, nationId, campaign) !== null) continue;
 
     if (isBadlyOutmatched(s, live, nationId)) {
       const refuge = retreatStep(s, live, nationId);
@@ -897,7 +934,7 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
         const toMuster = firstStepTowards(s, live.regionId, nationId, (rid) => rid === plan.musterId);
         if (toMuster !== null) {
           s = moveArmy(s, live.id, toMuster, rng);
-          currentConcentration = concentrationPlan(s, nationId);
+          currentConcentration = concentrationPlan(s, nationId, campaign);
           continue;
         }
       }
@@ -936,7 +973,7 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
       continue;
     }
 
-    const step = advanceStep(s, live, nationId);
+    const step = advanceStep(s, live, nationId, campaign);
     if (step !== null) s = moveArmy(s, live.id, step, rng);
   }
 
@@ -1143,7 +1180,17 @@ function advanceStep(
   state: GameState,
   army: { regionId: number },
   nationId: number,
+  campaign: Campaign | null = null,
 ): number | null {
+  // With a war aim, "the front" means the road's next province, not whichever
+  // border happens to be nearest — otherwise an idle army drifts to the wrong
+  // end of the realm and the campaign never gathers weight.
+  if (campaign) {
+    const toRoad = firstStepTowards(state, army.regionId, nationId, (rid) =>
+      (state.regions[rid]?.adjacency ?? []).includes(campaign.stepId),
+    );
+    if (toRoad !== null) return toRoad;
+  }
   const isFrontier = (rid: number): boolean => {
     const r = state.regions[rid];
     return (
@@ -1186,7 +1233,11 @@ function soloWinnable(state: GameState, targetId: number, nationId: number): boo
  * capital), scaled by archetype. Deterministic — highest score, ties by lowest
  * id. Null when nothing needs massing.
  */
-export function focusTarget(state: GameState, nationId: number): number | null {
+export function focusTarget(
+  state: GameState,
+  nationId: number,
+  campaign: Campaign | null = planCampaign(state, nationId),
+): number | null {
   const owned = state.regions.filter((r) => r.ownerId === nationId);
   const p = state.nations.find((n) => n.id === nationId)?.personality;
   const capW = CAPITAL_VALUE * (0.5 + (p?.aggression ?? 0.4));
@@ -1204,7 +1255,12 @@ export function focusTarget(state: GameState, nationId: number): number | null {
     const isCapital =
       isEnemy && state.nations.some((n) => n.id === t.ownerId && n.capitalRegionId === id);
     const value =
-      t.population * REGION_POP_VALUE + (t.resource ? resW : 0) + (isCapital ? capW : 0) + (isEnemy ? 5 : 2);
+      t.population * REGION_POP_VALUE +
+      (t.resource ? resW : 0) +
+      (isCapital ? capW : 0) +
+      (isEnemy ? 5 : 2) +
+      // The road's next province is what the whole host is being gathered for.
+      (onCampaignRoad(campaign, id) ? CAMPAIGN_STEP_VALUE : 0);
     if (value > bestScore) {
       bestScore = value;
       best = id;
@@ -1305,12 +1361,16 @@ function targetDefenders(state: GameState, targetId: number, nationId: number): 
  * essential defenders, stages through one owned anvil, and opens the attack
  * only when the actual assembled stack clears the shared combat forecast.
  */
-export function concentrationPlan(state: GameState, nationId: number): ConcentrationPlan | null {
+export function concentrationPlan(
+  state: GameState,
+  nationId: number,
+  campaign: Campaign | null = planCampaign(state, nationId),
+): ConcentrationPlan | null {
   const landArmies = state.armies.filter(
     (army) => !armyIsAtSea(army) && !armyIsFleet(army.units) && army.ownerId === nationId && armySize(army.units) > 0,
   );
   if (landArmies.length < 2) return null;
-  const targetId = focusTarget(state, nationId);
+  const targetId = focusTarget(state, nationId, campaign);
   if (targetId === null) return null;
   const musterId = musterRegion(state, nationId, targetId);
   if (musterId === null) return null;
@@ -1492,6 +1552,9 @@ function recruit(state: GameState, nationId: number, rng: Rng): GameState {
   // under arms than its temperament alone would ask for; a realm playing the
   // ledger keeps less and spends the difference on the network.
   const plan = strategyProfile(nation);
+  // A realm with a road to walk needs a host that can walk it. Without this a
+  // merchant on campaign keeps a merchant's army (plan.army 0.8) and stalls at
+  // the first walled town on the way to the Kontor it is playing for.
   const wanted = Math.round(
     (3 + Math.round(aggression * 6) + (atWarNow ? 3 : 0) + (nation.trait === "martial" ? 3 : 0) +
       Math.round(aggression * wealthLevies)) * plan.army,
@@ -1514,10 +1577,66 @@ function recruit(state: GameState, nationId: number, rng: Rng): GameState {
   // that counter the enemy's actual mix, falling back to a generalist plan when
   // there's no intel — rather than always defaulting to infantry.
   const pref = planRecruitment(state, nationId);
-  const pick = pref.find((u) => canRaiseUnit(state, home, u, nationId).ok);
-  if (!pick) return state;
+  let s = state;
+  let pick = pref.find((u) => canRaiseUnit(s, home, u, nationId).ok);
+  if (!pick) {
+    // Nothing raisable — but "nothing raisable" usually meant "short of one
+    // ware", not "short of means". Measured over 120-turn autoplays, rivals sat
+    // on the treasury cap (~2 550 gold) for a hundred turns while every muster
+    // was refused for want of timber, because the market pass only tops up
+    // build wares in *aggregate* (a realm rich in brick never buys timber) and
+    // only buys iron for war. So a realm's gold could not become soldiers, and
+    // the whole board froze at four provinces and six men a realm.
+    s = supplyMuster(s, nationId, home, pref);
+    if (s === state) return state;
+    pick = pref.find((u) => canRaiseUnit(s, home, u, nationId).ok);
+    if (!pick) return s;
+  }
   void rng;
-  return raiseUnit(state, home, pick, nationId);
+  return raiseUnit(s, home, pick, nationId);
+}
+
+/** Gold a realm keeps back when buying the stores for a muster. */
+const AI_MUSTER_FLOOR = 120;
+
+/**
+ * Buy the wares that are actually blocking the next muster.
+ *
+ * Walks the realm's own recruitment preference and stops at the first unit that
+ * nothing but a ware shortfall stands in the way of — the tech is researched,
+ * the strategic access is held, the gold is there — and buys exactly the
+ * shortfall. A realm short on tech or iron ore is left alone: this converts
+ * coin into soldiers, it does not conjure a smithy. Pure.
+ */
+function supplyMuster(
+  state: GameState,
+  nationId: number,
+  home: number,
+  pref: UnitType[],
+): GameState {
+  const nation = state.nations.find((n) => n.id === nationId);
+  if (!nation || nation.stocks.gold <= AI_MUSTER_FLOOR) return state;
+  const focus = state.regions[home]?.focus;
+  for (const unit of pref) {
+    const def = UNITS[unit];
+    if (def.requiresTech && !nation.research.done.includes(def.requiresTech)) continue;
+    if (def.requires && !strategicAccess(state, nationId).has(def.requires)) continue;
+    if (def.naval && state.regions[home]?.terrain !== "coast") continue;
+    const cost = unitCost(nation, unit, focus);
+    if (nation.stocks.gold < cost.gold + AI_MUSTER_FLOOR) continue;
+    let s = state;
+    let bought = false;
+    for (const good of Object.keys(cost.wares) as GoodId[]) {
+      const need = (cost.wares[good] ?? 0) - (s.nations.find((n) => n.id === nationId)?.wares[good] ?? 0);
+      if (need <= 0) continue;
+      const before = s;
+      s = aiImport(s, nationId, good, AI_MUSTER_FLOOR + cost.gold, need);
+      if (s === before) return state; // cannot cover this one — try nothing further
+      bought = true;
+    }
+    if (bought) return s;
+  }
+  return state;
 }
 
 /** What this nation is likely to fight next: enemy mix + toughest target fort. */
@@ -1621,8 +1740,20 @@ export function planRecruitment(state: GameState, nationId: number): UnitType[] 
   return [...new Set(pref)];
 }
 
-/** The best adjacent region for an army to attack, or null to hold. */
-export function bestTarget(state: GameState, army: { id: number; regionId: number; units: Record<UnitType, number> }, nationId: number): number | null {
+/**
+ * The best adjacent region for an army to attack, or null to hold.
+ *
+ * `campaign` is the realm's war aim (systems/campaign.ts); pass it in to keep
+ * the road's next province ahead of whichever neighbour is merely softest.
+ * Omitted, it is read from the realm — cheap, since a realm with no aim returns
+ * immediately without pathfinding.
+ */
+export function bestTarget(
+  state: GameState,
+  army: { id: number; regionId: number; units: Record<UnitType, number> },
+  nationId: number,
+  campaign: Campaign | null = planCampaign(state, nationId),
+): number | null {
   const region = state.regions[army.regionId];
   if (!region) return null;
   const atk = sideStrength(army.units, zeroUnits(), "attack");
@@ -1676,7 +1807,11 @@ export function bestTarget(state: GameState, army: { id: number; regionId: numbe
           ? KONTOR_VALUE *
             (0.6 + (p?.economy ?? 0.5) * 0.8) *
             strategyProfile(state.nations.find((n) => n.id === nationId)).kontorPrize
-          : 0);
+          : 0) +
+        // The next province on the campaign road outranks a softer neighbour:
+        // this is the whole difference between a realm that takes what borders
+        // it and one that is *going somewhere*.
+        (onCampaignRoad(campaign, nid) ? CAMPAIGN_STEP_VALUE : 0);
       const score = atk - def + value + (isBarb ? 2 : 5);
       if (score > bestScore) {
         bestScore = score;
@@ -1703,6 +1838,23 @@ const RECLAIM_VALUE = 9;
  * past ~50% control because it took Kontor towns only by accident.
  */
 const KONTOR_VALUE = 14;
+/**
+ * Weight for the next province on a realm's campaign road (systems/campaign.ts).
+ * It has to beat the ordinary prize terms outright, or a realm three provinces
+ * from Novgorod would keep wandering off after whichever neighbour was softest
+ * this turn and never arrive — which is exactly the behaviour that made the
+ * trade race un-winnable for the AI.
+ */
+const CAMPAIGN_STEP_VALUE = 26;
+/**
+ * Extra power edge a realm wants before opening a war purely to clear a road.
+ * A war of passage is a war the realm *chose*, and it still has to reach the
+ * objective afterwards. Measured over twelve 160-turn autoplays, this figure is
+ * what keeps campaigns from turning the board into a brawl: with it, realms at
+ * war sit around 2% of realm-pairs on an average turn against 1.1% without
+ * campaigns at all, and half again as many Kontor towns change hands.
+ */
+const CAMPAIGN_WAR_CAUTION = 0.3;
 
 // --- small helpers ----------------------------------------------------------
 

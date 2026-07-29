@@ -6,6 +6,55 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-29 — Rivals march somewhere (v0.113.0)
+
+The last entry closed with a claim: that staged offensives at a distant
+objective were the piece of work that would let a rival win the trade race.
+Half of that was right, and the measurements say the other half was wrong.
+
+**Built: campaigns.** A rival now takes one distant prize and a road to it —
+Kontor towns for a realm playing commerce, rival seats as well for a conqueror,
+nothing for a builder. The road is priced by what each province costs to cross
+(own ground cheapest, an alliance dearest, a sworn truce all but impassable), so
+the planner prefers the long way round to a betrayal. The road's next province
+gets a prize weight that outranks the ordinary terms, so the massing machinery
+that already existed gathers a host against it, one province per conquest, and
+idle armies march toward the road rather than the nearest border. A realm will
+open a *war of passage* on a peace standing in its way, at a wider power edge
+than a war of hatred needs. The Diplomacy card says where a host is pointed.
+
+**Fixed along the way: gold that could not become soldiers.** Rivals were
+sitting on the treasury cap — 2 555 gold, for a hundred turns — while every
+muster was refused for want of four timber, because the market pass tops up
+build wares only in aggregate (a realm rich in brick never buys timber) and
+buys iron only for war. `supplyMuster` now covers the exact shortfall blocking
+the next levy.
+
+**Measured, twelve 160-turn autoplays, campaigns on against off.** Campaigns
+work as a mechanism: Novgorod fell to Finland, Lithuania, Estonia and Poland
+across the seeds, Bergen to Denmark, and Kontor towns change hands half again as
+often (46 against 31). War runs at 2.0% of realm-pairs an average turn against
+1.1% without them. Peak rival Hansa control: **40.6% off, 39.1% on** — unchanged
+inside the noise.
+
+**So the claim was wrong, and here is the number that shows it.** The leader's
+control breaks down the same way in every seed: Kontore ~43, League 100, wares
+~11, lanes ~0. The two strands no amount of marching touches are worth 0.45 of
+the 0.6 threshold — ware share is one realm's slice of route income split
+fifteen ways, and lane control wants held coasts *and* uncontested hulls across
+six seas. Holding all four Kontore and leading the League comes to ~0.55. The
+trade victory as weighted today is a Kontor-conquest victory with a trade
+veneer, for the player as much as for a rival.
+
+Tests: 838 passing (56 files), including 12 new in `systems/campaign.test.ts`.
+
+Next: the trade race is a balance problem, not an AI one — the strand weights
+(`HANSA_WEIGHTS`) or the 0.6 threshold, measured against what a well-played
+*player* realm can actually reach. That is the work that would give the race a
+winner.
+
+---
+
 ## 2026-07-29 — Diplomacy that keeps its word (v0.112.0)
 
 Two small, contained fixes against the same complaint: the diplomacy layer felt

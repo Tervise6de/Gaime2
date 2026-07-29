@@ -87,6 +87,7 @@ import {
   totalUpkeep,
   unitCost,
 } from "@/systems/military";
+import { campaignBlurb, planCampaign } from "@/systems/campaign";
 import { TREATY_BREAK, TRUCE_TURNS, tributeStakes, truceTurnsLeft, getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, nationPower, opinionReasons, foreignRelations, casusBelli, CASUS_BELLI, TRIBUTE_DEMAND, atWar } from "@/systems/diplomacy";
 import { nationScore, victoryProgress, victoryRaces, endGameSummary } from "@/systems/victory";
 import { GOODS, GOOD_IDS, contentmentWares, type GoodId } from "@/data/goods";
@@ -4514,6 +4515,18 @@ function renderDiplomacy(
       aim.textContent = `Our factors report: ${rival.name} ${STRATEGY_BLURB[rival.strategy]}.`;
       aim.title = `${STRATEGY_LABEL[rival.strategy]} — held since turn ${rival.strategySince ?? "?"}. Courts change their minds as the board changes.`;
       card.append(aim);
+    }
+
+    // ...and where its host is actually pointed. A plan is an intention; a
+    // campaign is a march with an address, and the province it comes through
+    // next is exactly what the player needs to know — whether to garrison the
+    // border, or to get to the Kontor first.
+    const march = campaignBlurb(state, planCampaign(state, rival.id));
+    if (march) {
+      const line = el("p", "hud-diplo-march");
+      line.textContent = `Their host ${march}.`;
+      line.title = "Read from troop movements and the roads their levies take. Objectives change, but not quickly.";
+      card.append(line);
     }
 
     const status = el("div", "hud-diplo-status");

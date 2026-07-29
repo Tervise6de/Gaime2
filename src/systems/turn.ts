@@ -36,6 +36,7 @@ import { resolveContentment, contentmentUnrest, luxuryAppetite, drawFoodReserve 
 import { stepLeague } from "@/systems/league";
 import { tickHansaHold } from "@/systems/hansa";
 import { assignStrategies, reassessStrategies } from "@/systems/strategy";
+import { reassessCampaigns } from "@/systems/campaign";
 import { scheduleEpochs, stepEpochs } from "@/systems/epochs";
 import { nextPopulation } from "@/systems/population";
 import { nextUnrest } from "@/systems/stability";
@@ -885,6 +886,9 @@ function updateOutcome(state: GameState): GameState {
   // ...and every rival re-reads the board and decides whether its plan is still
   // the best one available to it.
   state = reassessStrategies(state);
+  // ...and, having settled on a kind of prize, each names the one it is
+  // actually marching at and the road it will take to reach it.
+  state = reassessCampaigns(state);
   const nations = state.nations.map((n) => {
     if (n.isBarbarian) return n;
     const holds = state.regions.some((r) => r.ownerId === n.id);
