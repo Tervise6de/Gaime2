@@ -58,7 +58,7 @@ describe("hansaControl", () => {
     expect(cut).toBeLessThan(open);
   });
 
-  it("measures wares as a share of what the whole network earns, not route count", () => {
+  it("measures wares against the strongest rival merchant, not against the whole world", () => {
     const g = board();
     const routes: TradeRoute[] = [
       { id: 0, ownerId: PLAYER_ID, good: "iron", fromRegionId: 8, toKontorId: "london", lane: [8, 0], lastIncome: 30 },
@@ -66,9 +66,27 @@ describe("hansaControl", () => {
       { id: 2, ownerId: RIVAL, good: "grain", fromRegionId: 18, toKontorId: "bruges", lane: [18, 5], lastIncome: 10 },
     ];
     const s = { ...g, routes };
-    // Outnumbered two routes to one, but carrying more: 30 of 50.
+    // Outnumbered two routes to one, but carrying more: 30 against their 20.
     expect(hansaControl(s, PLAYER_ID).wares).toBeCloseTo(0.6, 5);
     expect(hansaControl(s, RIVAL).wares).toBeCloseTo(0.4, 5);
+
+    // The point of the change: adding more *small* merchants must not dilute a
+    // leading trader. Share-of-the-world did exactly that, and in a sixteen-realm
+    // game it pinned even a perfect route book near 7%.
+    const crowd: TradeRoute[] = [];
+    for (let i = 0; i < 10; i++) {
+      crowd.push({ id: 10 + i, ownerId: 3 + i, good: "grain", fromRegionId: 18, toKontorId: "bruges", lane: [18, 5], lastIncome: 10 });
+    }
+    expect(hansaControl({ ...g, routes: [...routes, ...crowd] }, PLAYER_ID).wares).toBeCloseTo(0.6, 5);
+
+    // Level with the best rival is half the strand; nobody else trading is all of it.
+    const level: TradeRoute[] = [
+      { id: 0, ownerId: PLAYER_ID, good: "iron", fromRegionId: 8, toKontorId: "london", lane: [8, 0], lastIncome: 20 },
+      { id: 1, ownerId: RIVAL, good: "grain", fromRegionId: 14, toKontorId: "bruges", lane: [14, 5], lastIncome: 20 },
+    ];
+    expect(hansaControl({ ...g, routes: level }, PLAYER_ID).wares).toBeCloseTo(0.5, 5);
+    expect(hansaControl({ ...g, routes: [level[0]!] }, PLAYER_ID).wares).toBe(1);
+    expect(hansaControl({ ...g, routes: [] }, PLAYER_ID).wares).toBe(0);
   });
 
   it("scores League standing as outside / member / Alderman", () => {
@@ -113,6 +131,40 @@ describe("hansaControl", () => {
     expect(hansaControl(withFleet, PLAYER_ID).lanes).toBeGreaterThan(hansaControl(ports, PLAYER_ID).lanes);
     // ...and an enemy squadron in the same water takes that back.
     expect(hansaControl(contested, PLAYER_ID).lanes).toBeCloseTo(hansaControl(ports, PLAYER_ID).lanes, 5);
+  });
+
+  it("judges lanes on the seas a realm actually works, over a floor of three", () => {
+    const g = board();
+    const zone = SEA_ZONES.north_sea;
+    // Every port on one sea, and a fleet holding it: total command of one water.
+    const oneSea: GameState = {
+      ...g,
+      regions: g.regions.map((r) =>
+        zone.coastalRegions.includes(r.id)
+          ? { ...r, ownerId: PLAYER_ID }
+          : r.ownerId === PLAYER_ID
+            ? { ...r, ownerId: RIVAL } // nothing on any other water
+            : r,
+      ),
+      armies: [
+        { id: 900, ownerId: PLAYER_ID, regionId: zone.coastalRegions[0]!, seaZoneId: "north_sea", units: { ...emptyUnits(), war_cog: 2 }, movesLeft: 1 },
+      ],
+    };
+    const narrow = hansaControl(oneSea, PLAYER_ID).lanes;
+    // Worth far more than the old all-six average allowed — that formula gave
+    // a sixth at most for total command of one water, so it punished geography
+    // rather than play and no Baltic realm could ever score here...
+    expect(narrow).toBeGreaterThan(1 / 6);
+    // ...but not the whole strand either: the floor of three seas means the
+    // full mark still belongs to a realm whose hulls range widely.
+    expect(narrow).toBeLessThan(0.7);
+
+    // A realm with no coast at all scores nothing, and cannot divide by zero.
+    const landlocked: GameState = {
+      ...g,
+      regions: g.regions.map((r) => (r.ownerId === PLAYER_ID ? { ...r, ownerId: RIVAL } : r)),
+    };
+    expect(hansaControl(landlocked, PLAYER_ID).lanes).toBe(0);
   });
 
   it("names the realm with the firmest grip", () => {

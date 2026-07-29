@@ -34,8 +34,18 @@ import { armyIsAtSea, armyIsFleet } from "@/systems/military";
 
 /** Control needed to be *the* Hansa. */
 export const HANSA_VICTORY = 0.6;
-/** Consecutive turns it must be held — a network, not a moment. */
-export const HANSA_HOLD_TURNS = 6;
+/**
+ * Consecutive turns it must be held — a network, not a moment.
+ *
+ * Twelve, not six. With the strands reshaped so the race is actually winnable
+ * (see `wareShare` and `laneControl`), six turns let a realm that founded the
+ * League and held two Kontore close the game at turn 26, before a player could
+ * plausibly answer it. Twelve is a window the board can react in: storm a
+ * Kontor, blockade a lane, boycott the leader — any of which resets the count.
+ * Measured over twelve autoplays, this moves the average Hansa win from turn 34
+ * to turn 45 without making the race unwinnable.
+ */
+export const HANSA_HOLD_TURNS = 12;
 
 /**
  * What each strand is worth. The Kontore lead because they are the network's
@@ -51,6 +61,13 @@ export const HANSA_WEIGHTS = {
 
 /** Credit for trading at a Kontor you do not own — access, not possession. */
 const KONTOR_ACCESS_CREDIT = 0.35;
+
+/**
+ * Seas a realm must work before its lane strand is judged on its own waters
+ * alone. Below this, holding one sea completely is worth a fraction of the
+ * strand — a coastal town is not a naval power.
+ */
+const LANE_MIN_SEAS = 3;
 
 export interface HansaControl {
   /** Kontore held (full) or traded with (partial), 0..1. */
@@ -100,19 +117,37 @@ function kontorControl(state: GameState, nationId: number): number {
 }
 
 /**
- * Your share of everything the network earns. Income, not route count: six
- * routes of salt to a shuttered Kontor are not trade power. A world with no
- * trade at all gives nobody credit for it.
+ * How far you out-trade the *next-best merchant*, not what slice of the world
+ * you hold. Income, not route count: six routes of salt to a shuttered Kontor
+ * are not trade power.
+ *
+ * This used to be `mine / everyone's`, and that was the single worst number in
+ * the game. In a sixteen-realm world the structural average is 6.7%, so a realm
+ * running a full route book of the richest goods on the board measured 7% —
+ * against a strand worth 0.3 of a 0.6 threshold. Measured over twelve 160-turn
+ * autoplays with a scripted trade player, perfect trade play scored 7 here and
+ * 100 on the game's second turn, when it was briefly the only realm with a
+ * route at all. It described how many rivals existed, not how well you traded.
+ *
+ * Now it is measured against the single strongest rival merchant: level with
+ * them is half the strand, twice their income is two thirds, and being the only
+ * realm still trading is all of it. That is a target a merchant can play toward
+ * — richer goods, longer lanes, a monopoly on a staple, the trade doctrines —
+ * and one that stays exactly as hard however many realms are on the board.
  */
 function wareShare(state: GameState, nationId: number): number {
   let mine = 0;
-  let all = 0;
+  const theirs = new Map<number, number>();
   for (const route of state.routes ?? []) {
     const income = Math.max(0, route.lastIncome ?? 0);
-    all += income;
     if (route.ownerId === nationId) mine += income;
+    else theirs.set(route.ownerId, (theirs.get(route.ownerId) ?? 0) + income);
   }
-  return all <= 0 ? 0 : clamp01(mine / all);
+  if (mine <= 0) return 0;
+  const best = Math.max(0, ...theirs.values());
+  // Nobody else trades at all: you are the network, as far as wares go.
+  if (best <= 0) return 1;
+  return clamp01(mine / (mine + best));
 }
 
 /** Outside the League, inside it, or its Alderman. */
@@ -122,14 +157,26 @@ function leagueStanding(state: GameState, nationId: number): number {
 }
 
 /**
- * The seas, one at a time: two thirds for the share of the zone's held ports
- * that are yours (a lane is worked from its harbours), one third for being able
- * to deny the water — your hulls there, with no hostile fleet contesting them.
+ * The seas you actually work, one at a time: two thirds for the share of the
+ * zone's held ports that are yours (a lane is worked from its harbours), one
+ * third for being able to deny the water — your hulls there, with no hostile
+ * fleet contesting them.
+ *
+ * Averaged over your *home waters* — the seas you have a coast on — rather than
+ * over all six. The old all-six average punished geography rather than play: a
+ * Baltic power holding every port it could physically reach was capped near
+ * two sixths, and measured, a well-played coastal realm scored 13 out of 100 on
+ * this strand with a fleet at sea. `LANE_MIN_SEAS` keeps the reward honest at
+ * the other end — one sea held completely is a third of the strand, not all of
+ * it, so the full mark still means a realm whose hulls range widely.
  */
 function laneControl(state: GameState, nationId: number): number {
   let sum = 0;
+  let seas = 0;
   for (const zoneId of SEA_ZONE_IDS) {
     const zone = SEA_ZONES[zoneId];
+    if (!zone.coastalRegions.some((rid) => state.regions[rid]?.ownerId === nationId)) continue;
+    seas += 1;
     let mine = 0;
     let held = 0;
     for (const regionId of zone.coastalRegions) {
@@ -149,7 +196,8 @@ function laneControl(state: GameState, nationId: number): number {
     }
     sum += ports * 0.66 + (ours && !hostile ? 0.34 : 0);
   }
-  return clamp01(sum / SEA_ZONE_IDS.length);
+  if (seas === 0) return 0;
+  return clamp01(sum / Math.max(LANE_MIN_SEAS, seas));
 }
 
 /** The realm with the firmest grip on the network, or null on an empty board. */

@@ -86,6 +86,82 @@ wants a League seat before it has trade to protect. The Diplomacy screen reports
 each court's aim ("Our factors report: Lübeck is playing for the Hansa…"), since
 a realm's intentions are read from its conduct.
 
+## The trade race, rebalanced (v0.114)
+
+v0.113 closed with a measurement: rivals peaked at ~40% of the trade race
+whatever their armies did, because the two strands conquest cannot touch were
+pinned near zero. This is the fix, and it starts with the instrument.
+
+### The yardstick: a scripted player (`systems/scripted.ts`)
+
+Every autoplay until now left the player's realm inert, so no number described
+what a realm *played well* can reach — which is the only thing that can set a
+victory threshold. `playScriptedTurn` is a competent, trade-first player as one
+pure turn of intents: beeline the League charter, raise the Hanse Hall, keep the
+route book full and pruned, found or join the League, end every war (one open
+war with a member bars you from the League for good), keep a hull in every sea
+it has a coast on, garrison and no more. It ships because it is unit-tested and
+every future balance question wants a yardstick.
+
+### What it measured
+
+Twelve 160-turn autoplays, scripted player against the live rival AI:
+
+| strand | weight | perfect trade play | why |
+| --- | --- | --- | --- |
+| Kontore | 0.35 | 0.35 | route access to all four; holding a town needs an army |
+| Wares | 0.30 | **0.07** | share of *everyone's* route income, split fifteen ways |
+| League | 0.20 | 0.55 | a seat; the Alderman's chair wants the most Kontore held |
+| Sea lanes | 0.15 | **0.13** | averaged over all six seas, including ones it cannot reach |
+
+Total: **25%** against a 60% threshold. The trade victory could not be won by
+trading. Both weak strands were "share of the whole world" measures in a
+sixteen-realm game, so they described how many rivals existed rather than how
+well anyone traded.
+
+### The two reshaped strands
+
+**Wares** is now measured against the single strongest rival merchant:
+`mine / (mine + best)`. Level with them is half the strand, twice their income
+two thirds, sole survivor all of it. Adding more small merchants to the board no
+longer dilutes a leading trader, and the bar stays exactly as hard however many
+realms there are.
+
+**Sea lanes** are now judged over a realm's *home waters* — the seas it has a
+coast on — averaged over `max(seas, LANE_MIN_SEAS=3)`. The old all-six average
+punished geography rather than play: a Baltic power holding every port it could
+physically reach was capped near two sixths. The floor of three keeps the top
+end honest — total command of one water is a third of the strand, not all of it.
+
+Kontore and League are unchanged: they are absolute measures and they worked.
+
+### Threshold and hold
+
+`HANSA_VICTORY` stays at 60%; `HANSA_HOLD_TURNS` goes 6 → **12**. With the
+strands fixed, six turns let a realm that founded the League while holding two
+Kontore close the game at turn 26. Twelve is a window the board can answer in —
+storm a Kontor, blockade a lane, boycott the leader, and the count resets.
+
+### Where that leaves the race
+
+Twelve seeds, threshold 60% / hold 12:
+
+- scripted trade player peaks at **43%** (k31 w38 l59 s24) — good trade play is
+  most of the way, and still needs a Kontor town or the Alderman's chair
+- best single rival peaks at **53%**, and passes 60% in some seeds
+- the race now **decides 3 of 12 games**, average turn 45, and both sides win
+  it — one player Hansa victory and two rival ones across the twelve
+
+Before this change it decided none, ever.
+
+### Reading it
+
+The Politics panel's Hansa card now breaks into its four strands, each showing
+what it contributes against what it could (`Kontore 12 / 35`), with a hover line
+on what would move it. One percentage says you are losing; four strands with
+their weights say whether to buy a hull, open a route, raise a Hall or storm a
+town.
+
 ## Campaigns — a rival's war aim (v0.113)
 
 A rival's offensive horizon used to be one province deep: both target scorers

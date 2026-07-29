@@ -4076,6 +4076,29 @@ function renderVictoryProgress(elm: HTMLElement, state: GameState): void {
       warn.innerHTML = `${glyphHtml("warning", "⚠")} ${escapeHtml(race.rival.name)} is closing on this victory.`;
       card.append(warn);
     }
+
+    // The trade race broken into its four strands. One percentage says you are
+    // losing; four strands with their weights say whether to buy a hull, open a
+    // route, raise a Hall or storm a town.
+    if (race.strands?.length) {
+      const table = el("div", "hud-vrace-strands");
+      for (const strand of race.strands) {
+        const row = el("div", "hud-vrace-strand");
+        const name = el("span", "hud-vrace-strand-name");
+        name.textContent = strand.label;
+        const bar = el("div", "hud-vrace-strand-bar");
+        const fill = el("div", "hud-vrace-strand-fill");
+        fill.style.width = `${Math.round(Math.max(0, Math.min(1, strand.value)) * 100)}%`;
+        bar.append(fill);
+        const worth = el("span", "hud-vrace-strand-worth");
+        // What it is adding to the total, against the most it could add.
+        worth.textContent = `${Math.round(strand.contribution * 100)} / ${Math.round(strand.ceiling * 100)}`;
+        row.append(name, bar, worth);
+        row.title = strand.hint;
+        table.append(row);
+      }
+      card.append(table);
+    }
     elm.append(card);
   }
 }

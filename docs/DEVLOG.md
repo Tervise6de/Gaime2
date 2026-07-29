@@ -6,6 +6,60 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-29 — The trade race can be won (v0.114.0)
+
+Last entry ended by saying the trade race was a balance problem, not an AI one,
+and that the work was to measure it against what a well-played *player* realm
+can reach. Nobody had ever measured that, because every autoplay this project
+has run left the player's realm sitting on its hands.
+
+**So the first thing built was the yardstick.** `systems/scripted.ts` is a
+competent trade-first player as one pure turn of intents: beeline the League
+charter, raise the Hanse Hall, keep the route book full and pruned, found or
+join the League, end every war, keep a hull in every sea it has a coast on,
+garrison and no more. Writing it turned up three things worth knowing on their
+own: one open war with a League member bars you from the League permanently
+(`canJoinLeague` wants peace with every member), a realm that misses the
+founding is shut out of every Kontor the League then holds, and the rival AI's
+build order never raises a Hanse Hall.
+
+**What it measured, twelve 160-turn autoplays.** Perfect trade play reached
+**25%** of a 60% threshold. Strand by strand: Kontore 0.35 of 0.35 (route
+access to all four), League 0.55 of 1 (a seat), and then the two that were
+broken — **wares 0.07** and **lanes 0.13**. Both were "share of the whole world"
+measures in a sixteen-realm game: ware share was one realm's slice of route
+income split fifteen ways, and lane control averaged over all six seas including
+the ones a realm cannot reach. They described how many rivals existed, not how
+well anyone traded. The trade victory could not be won by trading.
+
+**Fixed.** Wares is now measured against the single strongest rival merchant —
+level is half the strand, twice their income two thirds. Lanes are judged over a
+realm's home waters, averaged over at least three seas, so a Baltic power can
+score and a one-port realm still cannot max it. Kontore and League are untouched;
+they are absolute measures and they worked.
+
+**Then the hold, not the threshold.** With the strands fixed, 60% was suddenly
+reachable — too reachable: a realm that founded the League holding two Kontore
+closed the game at turn 26. `HANSA_HOLD_TURNS` goes 6 → 12, which is a window
+the board can answer in and moves the average Hansa win to turn 45.
+
+**Where it lands.** Twelve seeds: the scripted trade player peaks at 43%, the
+best rival at 53%, and the race now decides 3 of 12 games — one player victory,
+two rival ones. Before this it decided none, ever.
+
+**And made legible.** The Politics panel's Hansa card breaks into its four
+strands, each showing what it contributes against what it could (`Kontore
+12 / 35`) with a hover line on what would move it.
+
+Tests: 845 passing (57 files), including 6 new in `systems/scripted.test.ts` and
+reshaped strand tests in `systems/hansa.test.ts`.
+
+Next: the scripted player is now the project's yardstick — it should grow a
+conquest variant, so "what can a well-played war game reach" gets the same
+treatment the trade game just got.
+
+---
+
 ## 2026-07-29 — Rivals march somewhere (v0.113.0)
 
 The last entry closed with a claim: that staged offensives at a distant

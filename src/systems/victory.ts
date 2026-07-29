@@ -13,11 +13,15 @@ import {
   DOMINATION_FRACTION,
   PLAYER_ID,
   TURN_LIMIT,
+  inLeague,
   type GameState,
 } from "@/systems/state";
 import { GOODS } from "@/data/goods";
 import { luxuryAppetite, resolveContentment } from "@/systems/prosperity";
-import { HANSA_HOLD_TURNS, HANSA_VICTORY, hansaControl, hansaWinner } from "@/systems/hansa";
+import { HANSA_HOLD_TURNS, HANSA_VICTORY, HANSA_WEIGHTS, hansaControl, hansaWinner } from "@/systems/hansa";
+import { KONTORE, KONTOR_IDS } from "@/data/kontore";
+import { SEA_ZONES, SEA_ZONE_IDS } from "@/data/sea";
+import { leagueLeader } from "@/systems/league";
 
 /** Prestige earned per gold of luxury-ware trade income — the Hansa's wealth as renown. */
 const LUXURY_PRESTIGE_WEIGHT = 2;
@@ -87,6 +91,83 @@ export interface VictoryRace {
   rival: { name: string; value: string; fraction: number } | null;
   /** A rival is dangerously close to this win — surface a warning. */
   alarm: boolean;
+  /** For the Hansa path: the four strands, so the player can see which is weak. */
+  strands?: HansaStrand[];
+}
+
+/** One strand of the trade race, with what it is worth and what would move it. */
+export interface HansaStrand {
+  label: string;
+  /** This realm's standing on the strand, 0..1. */
+  value: number;
+  /** Points of the total this strand is currently contributing, 0..1. */
+  contribution: number;
+  /** The most it could contribute if the strand were held outright. */
+  ceiling: number;
+  /** One line on what would raise it, read from the board. */
+  hint: string;
+}
+
+/**
+ * The trade race, strand by strand: what each is worth, what you have of it,
+ * and the one thing that would move it. A single "38%" tells a player they are
+ * losing but not what to do about it; four strands with weights tell them
+ * whether to buy a hull, open a route or storm a town. Pure.
+ */
+export function hansaStrands(state: GameState, nationId: number): HansaStrand[] {
+  const c = hansaControl(state, nationId);
+  const traded = KONTOR_IDS.filter((id) =>
+    (state.routes ?? []).some((r) => r.ownerId === nationId && r.toKontorId === id && !r.disrupted),
+  ).length;
+  const held = KONTOR_IDS.filter((id) => state.regions[KONTORE[id].regionId]?.ownerId === nationId).length;
+  const seas = SEA_ZONE_IDS.filter((id) =>
+    SEA_ZONES[id].coastalRegions.some((rid) => state.regions[rid]?.ownerId === nationId),
+  ).length;
+  const inLeagueNow = inLeague(state, nationId);
+  const alderman = leagueLeader(state) === nationId;
+  return [
+    {
+      label: "Kontore",
+      value: c.kontore,
+      contribution: c.kontore * HANSA_WEIGHTS.kontore,
+      ceiling: HANSA_WEIGHTS.kontore,
+      hint:
+        held === KONTOR_IDS.length
+          ? "All four are yours."
+          : `You hold ${held} and trade at ${traded}. Holding a Kontor town counts near three times trading at one.`,
+    },
+    {
+      label: "Wares",
+      value: c.wares,
+      contribution: c.wares * HANSA_WEIGHTS.wares,
+      ceiling: HANSA_WEIGHTS.wares,
+      hint:
+        c.wares >= 0.5
+          ? "You out-earn every rival merchant. Widen the lead with richer goods and longer lanes."
+          : "Measured against the strongest rival merchant — richer goods, longer lanes and a staple monopoly all count.",
+    },
+    {
+      label: "League",
+      value: c.league,
+      contribution: c.league * HANSA_WEIGHTS.league,
+      ceiling: HANSA_WEIGHTS.league,
+      hint: alderman
+        ? "You are Alderman."
+        : inLeagueNow
+          ? "A seat is half the strand; the Alderman's chair — most Kontore held — is all of it."
+          : "Raise a Hanse Hall to found the League, or join the one that stands.",
+    },
+    {
+      label: "Sea lanes",
+      value: c.lanes,
+      contribution: c.lanes * HANSA_WEIGHTS.lanes,
+      ceiling: HANSA_WEIGHTS.lanes,
+      hint:
+        seas === 0
+          ? "You hold no coast. A port is where a lane begins."
+          : `Counted over the ${seas} sea${seas === 1 ? "" : "s"} you have a coast on, and at least three. Ports you hold, and hulls no enemy contests.`,
+    },
+  ];
 }
 
 /**
@@ -146,6 +227,7 @@ export function victoryRaces(state: GameState): VictoryRace[] {
         : null,
       // A rival at the threshold with the clock running is the real alarm.
       alarm: !!rHansa && (rivalHold > 0 || rHansa.v >= HANSA_VICTORY - 0.1),
+      strands: hansaStrands(state, PLAYER_ID),
     },
     {
       kind: "domination",
