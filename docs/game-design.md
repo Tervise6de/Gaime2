@@ -86,6 +86,32 @@ wants a League seat before it has trade to protect. The Diplomacy screen reports
 each court's aim ("Our factors report: Lübeck is playing for the Hansa…"), since
 a realm's intentions are read from its conduct.
 
+## Diplomacy — a word is worth something (v0.112)
+
+Two things made the diplomacy layer read as arbitrary, and both are about the
+game withholding information or consequence rather than about the numbers.
+
+**A peace binds for a term.** Ending a war swears a truce of `TRUCE_TURNS` (10)
+turns, held in `GameState.truceUntil` per realm pair. Inside it the AI will not
+open a fresh war — checked both in `wouldBreakTreaty` and, crucially, at the
+`mayStrike` gate in `systems/ai.ts`, which on a plain peace never consulted the
+treaty test at all. The player *may* break it, and is charged for it: −12 with
+the injured realm and −14 with every third court, which is the steepest
+third-party mark in `TREATY_BREAK` — a broken truce is a public act. The
+diplomacy card shows the turns remaining and the declare-war dialog quotes the
+exact costs before the player commits. Measured over three 120-turn autoplays
+war is still ordinary business: 0.4–2.4% of realm pairs at war on an average
+turn, 0.8–1.5% cooling under truce, 3–5 concurrent wars at the peak.
+
+**A demand states its case.** A tribute demand used to be one line and two
+buttons, so paying or refusing was a coin-flip. `tributeStakes()` now returns
+the reason (their power edge, the shared border, their regard for you), what
+paying does, and what refusing does — every figure computed from the same
+mechanics the buttons run, so the card cannot promise what the sim will not do.
+The war warning is shown only when refusing would really put the demanding realm
+past its own war test (border + hostility + a power ratio over `1.5 −
+aggression`). Buttons read "Pay" / "Refuse", not "Accept" / "Reject".
+
 ## Characters
 
 Characters should stay light. They are there to make politics memorable, not to

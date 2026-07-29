@@ -87,7 +87,7 @@ import {
   totalUpkeep,
   unitCost,
 } from "@/systems/military";
-import { getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, nationPower, opinionReasons, foreignRelations, casusBelli, CASUS_BELLI, TRIBUTE_DEMAND, atWar } from "@/systems/diplomacy";
+import { TREATY_BREAK, TRUCE_TURNS, tributeStakes, truceTurnsLeft, getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, nationPower, opinionReasons, foreignRelations, casusBelli, CASUS_BELLI, TRIBUTE_DEMAND, atWar } from "@/systems/diplomacy";
 import { nationScore, victoryProgress, victoryRaces, endGameSummary } from "@/systems/victory";
 import { GOODS, GOOD_IDS, contentmentWares, type GoodId } from "@/data/goods";
 import { marketBuyPrice, marketSellPrice } from "@/systems/market";
@@ -4446,15 +4446,41 @@ function renderDiplomacy(
     const box = el("div", "hud-offer");
     const text =
       offer.type === "tribute"
-        ? `${from} demands ${offer.gold ?? 0}g tribute.`
+        ? `${from} demands ${offer.gold ?? 0}g in tribute.`
         : offer.type === "peace" && offer.gold
           ? `${from} sues for peace, offering ${offer.gold}g in reparations.`
           : `${from} offers ${offer.type === "nap" ? "a non-aggression pact" : offer.type}.`;
     box.append(line(text, "hud-offer-text"));
+
+    // A demand with no stated cause or consequence is a coin-flip. Lay out why
+    // it was made and what each answer actually does — all read from the same
+    // mechanics the buttons run, so the card cannot overpromise.
+    if (offer.type === "tribute") {
+      const stakes = tributeStakes(state, offer);
+      const why = el("div", "hud-offer-stakes" + (stakes.warRisk ? " risk" : ""));
+      why.append(line(stakes.reason, "hud-offer-why"));
+      const table = el("div", "hud-offer-outcomes");
+      const outcome = (label: string, body: string, cls: string): HTMLElement => {
+        const rowEl = el("div", "hud-offer-outcome " + cls);
+        const lab = el("span", "hud-offer-outcome-label");
+        lab.textContent = label;
+        const txt = el("span", "hud-offer-outcome-text");
+        txt.textContent = body;
+        rowEl.append(lab, txt);
+        return rowEl;
+      };
+      table.append(
+        outcome("Pay", stakes.ifPaid, "pay"),
+        outcome("Refuse", stakes.ifRefused, stakes.warRisk ? "refuse risk" : "refuse"),
+      );
+      why.append(table);
+      box.append(why);
+    }
+
     const row = el("div", "hud-offer-actions");
     row.append(
-      btn("Accept", "hud-diplo-btn accept", () => callbacks.onAcceptOffer(offer.id)),
-      btn("Reject", "hud-diplo-btn", () => callbacks.onRejectOffer(offer.id)),
+      btn(offer.type === "tribute" ? "Pay" : "Accept", "hud-diplo-btn accept", () => callbacks.onAcceptOffer(offer.id)),
+      btn(offer.type === "tribute" ? "Refuse" : "Reject", "hud-diplo-btn", () => callbacks.onRejectOffer(offer.id)),
     );
     box.append(row);
     container.append(box);
@@ -4572,6 +4598,15 @@ function renderDiplomacy(
       card.append(why);
     }
 
+    const truceLeft = truceTurnsLeft(state, PLAYER_ID, rival.id);
+    if (truceLeft > 0) {
+      const truceNote = el("p", "hud-diplo-truce");
+      truceNote.textContent =
+        `Truce sworn — binding for ${truceLeft} more turn${truceLeft === 1 ? "" : "s"}. Neither of you may march without breaking your word.`;
+      truceNote.title = `Ending a war swears a truce for ${TRUCE_TURNS} turns. A rival will not break one; you may, at −${TREATY_BREAK.truce.thirdParty} standing with every other court.`;
+      card.append(truceNote);
+    }
+
     const actions = el("div", "hud-diplo-actions");
     if (treaty === "war") {
       actions.append(btn("Sue for peace", "hud-diplo-btn", () => callbacks.onMakePeace(rival.id)));
@@ -4582,10 +4617,17 @@ function renderDiplomacy(
           const justification = cb.justified
             ? `You have a just cause — ${cb.label.toLowerCase()} — so other realms won't hold this war against you.`
             : `You have no just cause (${cb.label.toLowerCase()}): every other realm's opinion of you will sour.`;
+          // A truce sworn to end the last war is a word: say what tearing it up
+          // costs *before* the click, not in the log afterwards.
+          const truce = truceTurnsLeft(state, PLAYER_ID, rival.id);
+          const truceWarning = truce > 0
+            ? ` You swore a truce with ${rival.name} that still has ${truce} turn${truce === 1 ? "" : "s"} to run —` +
+              ` breaking it is treachery: −${TREATY_BREAK.truce.bilateral} with them and −${TREATY_BREAK.truce.thirdParty} with every other court.`
+            : "";
           void confirmAction({
-            title: `Declare war on ${rival.name}?`,
-            body: `War severs treaties, blocks hostile trade lanes, and can't be called off this turn. ${justification}`,
-            confirmLabel: "Declare war",
+            title: truce > 0 ? `Break the truce with ${rival.name}?` : `Declare war on ${rival.name}?`,
+            body: `War severs treaties, blocks hostile trade lanes, and can't be called off this turn. ${justification}${truceWarning}`,
+            confirmLabel: truce > 0 ? "Break the truce" : "Declare war",
             danger: true,
           }).then((ok) => {
             if (ok) callbacks.onDeclareWar(rival.id);

@@ -6,6 +6,40 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-29 — Diplomacy that keeps its word (v0.112.0)
+
+Two small, contained fixes against the same complaint: the diplomacy layer felt
+arbitrary because it hid both its rules and its consequences.
+
+**War → peace → war is no longer free.** Ending a war now swears a ten-turn
+truce. Inside it a rival will not re-declare — and the fix that mattered was not
+the treaty check but the *other* gate: `doDiplomacy` only consults
+`wouldBreakTreaty` when a NAP or alliance exists, so on a plain peace the truce
+was invisible to the war planner. The first version of the test passed while the
+behaviour was unchanged; the shipped test runs `runNationTurn` on a board built
+to invite a war and asserts the rival leaves it alone until the truce lapses.
+The player can still break it, and pays the steepest third-party mark in the
+table (−12 bilateral, −14 with every other court) — the confirm dialog quotes
+both numbers first. War is still ordinary business: over three 120-turn
+autoplays, 0.4–2.4% of realm pairs at war on an average turn, 3–5 concurrent
+wars at the peak.
+
+**A demand now states its case.** "Sweden demands 30g tribute" with Accept and
+Reject told the player nothing about why, or what either answer would do.
+`tributeStakes()` lays out the reason (power edge, shared border, their regard),
+what paying buys, and what refusing costs — each figure read from the mechanics
+the buttons actually run, so the card cannot overpromise. The invasion warning
+appears only when refusing would genuinely carry them past their own war test.
+Buttons read Pay / Refuse.
+
+Tests: 826 passing (55 files), including 8 new in `systems/truce.test.ts`.
+
+Next: the honest gap from v0.111 is unchanged — a commerce AI still only takes a
+Kontor town it already borders, so staged offensives at a distant objective is
+the piece of work that would let a rival actually win the trade race.
+
+---
+
 ## 2026-07-29 — Rivals now play for something (v0.111.0)
 
 The trade race had no antagonist: rivals contested the Kontore only by accident,

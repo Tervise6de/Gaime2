@@ -17,6 +17,7 @@ import { UNITS, type UnitType } from "@/data/units";
 import { recordChronicle, chronicleName } from "@/systems/chronicle";
 import { publicNationPower } from "@/systems/intel";
 import {
+  type DiplomaticOffer,
   BARBARIAN_ID,
   LOG_CAP,
   PLAYER_ID,
@@ -263,10 +264,32 @@ export function casusBelli(state: GameState, a: number, b: number): CasusBelli {
  * the oath-breaker harder with *every other* court (`thirdParty`, the reputation
  * cost that makes coalitions form against a serial betrayer). See `declareWar`.
  */
-export const TREATY_BREAK: Record<"nap" | "alliance", { bilateral: number; thirdParty: number }> = {
+export const TREATY_BREAK: Record<"nap" | "alliance" | "truce", { bilateral: number; thirdParty: number }> = {
+  // A truce is the least of the three instruments and the most public: it ends a
+  // war in front of everyone, so tearing it up costs more abroad than at home.
+  truce: { bilateral: 12, thirdParty: 14 },
   nap: { bilateral: 15, thirdParty: 10 },
   alliance: { bilateral: 30, thirdParty: 18 },
 };
+
+/**
+ * How long the peace that ends a war binds both parties. Long enough that "sue
+ * for peace, rebuild, declare again" is a decision with a price rather than a
+ * free move, short enough that a war can genuinely resume within a game.
+ */
+export const TRUCE_TURNS = 10;
+
+/** Turns left on the pair's binding truce (0 when none, or while at war). */
+export function truceTurnsLeft(state: GameState, a: number, b: number): number {
+  if (atWar(state, a, b)) return 0;
+  const until = state.truceUntil?.[pairKey(a, b)];
+  return until === undefined ? 0 : Math.max(0, until - state.turn);
+}
+
+/** Whether a binding truce currently holds between the pair. */
+export function underTruce(state: GameState, a: number, b: number): boolean {
+  return truceTurnsLeft(state, a, b) > 0;
+}
 
 /**
  * Whether AI nation `aggressor` would break its standing pact with `target` to
@@ -280,6 +303,10 @@ export const TREATY_BREAK: Record<"nap" | "alliance", { bilateral: number; third
  * break through the UI). Used by the rival AI's opportunistic-war logic.
  */
 export function wouldBreakTreaty(state: GameState, aggressor: number, target: number): boolean {
+  // A rival keeps a truce it swore. The player may tear one up — their word is
+  // theirs to spend — but a court that ends a war and marches again ten turns
+  // later is the arbitrariness this rule exists to remove.
+  if (underTruce(state, aggressor, target)) return false;
   const treaty = getTreaty(state, aggressor, target);
   if (treaty !== "nap" && treaty !== "alliance") return true; // no word to keep
   const me = state.nations.find((n) => n.id === aggressor);
@@ -330,11 +357,22 @@ export function declareWar(state: GameState, a: number, b: number, cb?: CasusBel
       : null;
   // A genuinely new war is a chronicle beat; re-affirming an active war is not.
   const newWar = prevTreaty !== "war";
+  // A truce sworn to end the last war is a word like any other: breaking it is
+  // treachery, and it is what stops war → peace → war being free.
+  const brokeTruce = newWar && !broke && underTruce(state, a, b);
   let next = setTreaty(state, a, b, "war");
+  next = clearTruce(next, a, b);
   next = clearPeaceSince(next, a, b); // swords drawn — the peace clock stops
   next = recordOpinion(next, a, b, -RELATION_WAR_HIT, "war");
   if (broke) {
     const cost = TREATY_BREAK[broke];
+    next = recordOpinion(next, a, b, -cost.bilateral, "betrayal");
+    for (const c of next.nations) {
+      if (c.isBarbarian || !c.alive || c.id === a || c.id === b) continue;
+      next = recordOpinion(next, a, c.id, -cost.thirdParty, "broken_word");
+    }
+  } else if (brokeTruce) {
+    const cost = TREATY_BREAK.truce;
     next = recordOpinion(next, a, b, -cost.bilateral, "betrayal");
     for (const c of next.nations) {
       if (c.isBarbarian || !c.alive || c.id === a || c.id === b) continue;
@@ -351,7 +389,9 @@ export function declareWar(state: GameState, a: number, b: number, cb?: CasusBel
   }
   const suffix = broke
     ? `, breaking ${broke === "alliance" ? "their alliance" : "a non-aggression pact"}!`
-    : CASUS_BELLI[reason].justified
+    : brokeTruce
+      ? ", breaking the truce that ended their last war!"
+      : CASUS_BELLI[reason].justified
       ? ` (${CASUS_BELLI[reason].label.toLowerCase()})!`
       : "!";
   if (courtsWeHearOf(next, a, b)) {
@@ -359,6 +399,13 @@ export function declareWar(state: GameState, a: number, b: number, cb?: CasusBel
   }
   if (!newWar) return next;
   // Chronicle beat (E2): a betrayal and an honest war are different stories.
+  if (brokeTruce) {
+    return recordChronicle(
+      next,
+      "betrayal",
+      `${chronicleName(next, a)} tore up the truce with ${chronicleName(next, b)} and marched again.`,
+    );
+  }
   if (broke) {
     return recordChronicle(
       next,
@@ -377,6 +424,11 @@ export function declareWar(state: GameState, a: number, b: number, cb?: CasusBel
 export function makePeace(state: GameState, a: number, b: number): GameState {
   let next = setTreaty(state, a, b, "peace");
   next = setPeaceSince(next, a, b, next.turn); // a fresh peace clock starts now
+  // Ending a war swears a truce for a term. Both sides are bound by it.
+  next = {
+    ...next,
+    truceUntil: { ...(next.truceUntil ?? {}), [pairKey(a, b)]: next.turn + TRUCE_TURNS },
+  };
   next = recordOpinion(next, a, b, +10, "peace");
   // Peace lifts the war grudge, so relations can recover instead of staying pinned.
   const key = pairKey(a, b);
@@ -539,12 +591,71 @@ export function acceptOffer(state: GameState, offerId: number): GameState {
   return next;
 }
 
+/** Relations lost when a tribute demand is refused (applied by `rejectOffer`). */
+export const TRIBUTE_REFUSAL_HIT = 10;
+
+export interface TributeStakes {
+  /** Why this court thinks it can demand: the power edge and the cold blood. */
+  reason: string;
+  /** What paying does, in the numbers the accept path will really apply. */
+  ifPaid: string;
+  /** What refusing does, and what it moves them toward. */
+  ifRefused: string;
+  /** True when refusing would put them within reach of their war threshold. */
+  warRisk: boolean;
+}
+
+/**
+ * The case behind a tribute demand, told honestly.
+ *
+ * A demand the player cannot reason about is noise: they can only guess whether
+ * paying is prudent or craven. Every figure here is computed from the same
+ * mechanics the buttons run — the gift's relation bump (`gift`), the refusal
+ * penalty (`rejectOffer`), and the power ratio and hostility the rival's own
+ * war test reads — so the card cannot promise what the sim will not do. Pure.
+ */
+export function tributeStakes(state: GameState, offer: DiplomaticOffer): TributeStakes {
+  const from = state.nations.find((n) => n.id === offer.from);
+  const gold = offer.gold ?? 0;
+  const rel = getRelation(state, offer.to, offer.from);
+  const theirs = nationPower(state, offer.from);
+  const mine = nationPower(state, offer.to) || 1;
+  const ratio = theirs / mine;
+  const edge =
+    ratio >= 2 ? "far stronger than you" : ratio >= 1.5 ? "much stronger than you" : "stronger than you";
+  const borders = sharedBorders(state, offer.to, offer.from) > 0;
+  const name = from?.name ?? "They";
+
+  // Paying is a gift: the same bump, the same cap.
+  const bump = Math.min(25, Math.round(gold * GIFT_RELATION));
+  // Refusing costs relations, and their war test wants hostility *and* an edge.
+  const after = rel - TRIBUTE_REFUSAL_HIT;
+  const aggression = from?.personality?.aggression ?? 0.5;
+  const warThreshold = 1.5 - aggression;
+  const warRisk = borders && after < -25 && ratio > warThreshold;
+
+  return {
+    reason:
+      `${name} is ${edge}${borders ? " and shares your border" : ""}` +
+      `${rel < 0 ? `, and holds you in ${rel <= -30 ? "open hostility" : "poor regard"} (${rel})` : ""}.`,
+    ifPaid:
+      `You lose ${gold}g. Their regard rises ${bump > 0 ? `+${bump}` : "little"}` +
+      `${bump > 0 ? ` (to about ${Math.min(100, rel + bump)})` : ""} — the usual price of buying a year's quiet.`,
+    ifRefused:
+      `You keep the gold. Their regard falls ${TRIBUTE_REFUSAL_HIT} (to about ${Math.max(-100, after)})` +
+      (warRisk
+        ? ", which takes them past the point where a realm of their strength and temper starts weighing invasion."
+        : ". They are not yet placed to make good on it."),
+    warRisk,
+  };
+}
+
 export function rejectOffer(state: GameState, offerId: number): GameState {
   const offer = state.offers.find((o) => o.id === offerId);
   if (!offer) return state;
   let next = removeOffer(state, offerId);
   // Refusing a tribute demand sours relations.
-  if (offer.type === "tribute") next = adjustRelation(next, offer.from, offer.to, -10);
+  if (offer.type === "tribute") next = adjustRelation(next, offer.from, offer.to, -TRIBUTE_REFUSAL_HIT);
   return next;
 }
 
@@ -714,6 +825,15 @@ export function keptPeaceGoodwill(state: GameState, a: number, b: number): numbe
 /** Start a fresh peace clock for the pair (a war just ended). */
 function setPeaceSince(state: GameState, a: number, b: number, turn: number): GameState {
   return { ...state, peaceSince: { ...(state.peaceSince ?? {}), [pairKey(a, b)]: turn } };
+}
+
+/** Drop the pair's truce (it has just been ended, honoured or torn up). */
+function clearTruce(state: GameState, a: number, b: number): GameState {
+  const key = pairKey(a, b);
+  if (state.truceUntil?.[key] === undefined) return state;
+  const truceUntil = { ...state.truceUntil };
+  delete truceUntil[key];
+  return { ...state, truceUntil };
 }
 
 /** Stop the peace clock for the pair (war declared) — goodwill can't accrue at war. */

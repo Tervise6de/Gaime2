@@ -3208,6 +3208,77 @@ body {
   margin: 0 0 6px;
 }
 
+/* The case behind a demand: why it was made, and what each answer costs. */
+.hud-offer-stakes {
+  margin: 6px 0 8px;
+  padding: 8px 10px;
+  background: rgba(8, 14, 20, 0.36);
+  border-left: 2px solid rgba(226, 180, 90, 0.45);
+  border-radius: 0 5px 5px 0;
+}
+
+.hud-offer-stakes.risk {
+  border-left-color: var(--negative);
+}
+
+.hud-offer-why {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.45;
+  font-style: italic;
+}
+
+.hud-offer-outcomes {
+  display: grid;
+  gap: 4px;
+}
+
+.hud-offer-outcome {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.hud-offer-outcome-label {
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+
+.hud-offer-outcome.pay .hud-offer-outcome-label {
+  color: var(--accent);
+}
+
+.hud-offer-outcome.refuse .hud-offer-outcome-label {
+  color: #8fc7a0;
+}
+
+.hud-offer-outcome.risk .hud-offer-outcome-label {
+  color: var(--negative);
+}
+
+.hud-offer-outcome-text {
+  color: var(--fg);
+}
+
+/* A truce standing between two realms — stated on the card, not just at the
+   moment of clicking Declare war. */
+.hud-diplo-truce {
+  margin: 6px 0 0;
+  padding: 5px 9px;
+  color: #9fc9d8;
+  font-size: 11px;
+  line-height: 1.4;
+  background: rgba(8, 20, 26, 0.4);
+  border-left: 2px solid #63c7d6;
+  border-radius: 0 4px 4px 0;
+}
+
 .hud-offer-actions {
   display: flex;
   gap: 6px;

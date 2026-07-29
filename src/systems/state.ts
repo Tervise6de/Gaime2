@@ -695,6 +695,13 @@ export interface GameState {
    * read as peace-since-founding, which is the correct default.
    */
   peaceSince?: Record<string, number>;
+  /**
+   * Turn until which each pair's peace is *binding* (pair key → turn). Set when
+   * a war ends: swords may be drawn again after it, and can be drawn during it,
+   * but breaking a sworn truce is treachery every court remembers. Absent on
+   * legacy saves, which simply have no truce running.
+   */
+  truceUntil?: Record<string, number>;
   /** Offers from AI nations awaiting the player's response. */
   offers: DiplomaticOffer[];
   nextOfferId: number;

@@ -52,6 +52,7 @@ import {
   sharedBorders,
   wouldBreakTreaty,
   wouldJoinWar,
+  underTruce,
 } from "@/systems/diplomacy";
 import { researchFrontier, selectTech, isBuildingUnlockedFor, nextNodeInPath, isPathRejected } from "@/systems/tech";
 import { createRoute, distanceFactor, distanceMapToKontor, regionSources } from "@/systems/trade";
@@ -689,9 +690,13 @@ function doDiplomacy(state: GameState, nationId: number, rng: Rng): GameState {
     // reputation cost). A warm partnership (rel ≥ friendly) is safe even from a
     // schemer. This is C4's treaty-breaking: characterful betrayal, self-punished.
     const pact = treaty === "nap" || treaty === "alliance";
-    const mayStrike = pact
-      ? rel < FRIENDLY_THRESHOLD && wouldBreakTreaty(s, nationId, o.id)
-      : rel < -25;
+    // A truce sworn to end the last war binds a rival absolutely: it is the rule
+    // that closes the war → peace → war loop, and `wouldBreakTreaty` alone does
+    // not cover it (that is only consulted where a *pact* exists, not a plain
+    // peace). The player may still tear one up — at a price stated up front.
+    const mayStrike =
+      !underTruce(s, nationId, o.id) &&
+      (pact ? rel < FRIENDLY_THRESHOLD && wouldBreakTreaty(s, nationId, o.id) : rel < -25);
     if (border && mayStrike && ratio > warThreshold && !earlyGraceForPlayer && !overstretched) {
       s = openWar(s, nationId, o);
       actions++;
