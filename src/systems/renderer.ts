@@ -50,7 +50,7 @@ import { regionCapacity } from "@/systems/population";
 import { popCompact, popDisplay } from "@/systems/format";
 import { forceCompactLabel, forceLabel } from "@/ui/military";
 import { computeVoronoiCells, pointInPolygon, type Point, type VoronoiCell } from "@/systems/voronoi";
-import { graphEdges, type MapRenderMode } from "@/systems/mapview";
+import { graphEdges, seaCrossingEdges, type MapRenderMode } from "@/systems/mapview";
 import { RIVERS } from "@/data/rivers";
 import { scriptedMap } from "@/data/maps/types";
 import {
@@ -425,19 +425,19 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     // geometry (which disagrees with the authored data at a dozen borders).
     // Maps that draw no distinction fall back to the midpoint-in-water test.
     const lanes: [Point, Point][] = [];
-    const authored = s.regions.some((r) => (r.seaLinks?.length ?? 0) > 0);
-    for (const region of s.regions) {
-      for (const nid of authored ? (region.seaLinks ?? []) : region.adjacency) {
-        if (region.id >= nid) continue;
-        const other = s.regions[nid];
-        if (!other) continue;
-        if (!authored) {
-          if (!shape) continue;
+    const authored = seaCrossingEdges(s.regions);
+    if (authored.length > 0) {
+      for (const [a, b] of authored) lanes.push([sites[a]!, sites[b]!]);
+    } else if (shape) {
+      for (const region of s.regions) {
+        for (const nid of region.adjacency) {
+          if (region.id >= nid) continue;
+          const other = s.regions[nid];
+          if (!other) continue;
           const mx = (region.x + other.x) / 2;
           const my = (region.y + other.y) / 2;
-          if (pointInIsland(shape, mx, my)) continue;
+          if (!pointInIsland(shape, mx, my)) lanes.push([sites[region.id]!, sites[other.id]!]);
         }
-        lanes.push([sites[region.id]!, sites[other.id]!]);
       }
     }
 

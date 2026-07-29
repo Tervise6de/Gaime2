@@ -6,6 +6,70 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-29 — The rest of the interface (v0.118.0)
+
+v0.117 built the capability and covered the HUD's rule-bearing text. This
+finishes the sweep: the five UI modules that had no tests at all now have them,
+and every suite was checked by breaking the code it covers.
+
+**The title menu** (`ui/title.test.ts`, 8 cases). It is a promise gating the
+whole game, so the failures that matter are never resolving and resolving
+without a config. Also pinned: the two-step guard that stops a live game being
+discarded by one stray click, that backing out disarms it again, and that the
+overlay clears itself on both teardown paths — the reduce-motion one and the
+620 ms animated one, driven with fake timers rather than waited on.
+
+**The new-game form** (`ui/newgame.test.ts`, 10 cases). Its real contract is
+that `readConfig()` must start a game, so the tests feed it to `createGame`
+rather than checking the shape and hoping. Plus prefs round-tripping through a
+store that may hold anything an older build wrote, and a nonsense difficulty
+falling back to something playable.
+
+**The confirm dialog** (`ui/confirm.test.ts`, 8 cases). Every resolution path,
+the backdrop, the no-stacking guard, and that a caller's words are set as text
+rather than markup.
+
+**The icon helpers** (`ui/icons.test.ts`, 10 cases). These are the project's
+main `innerHTML` sink and the fallback text is sometimes a realm or region name,
+so the escaping is now pinned — along with the contract that the game renders
+identically with an all-null art registry.
+
+**The display settings** (`ui/settings.test.ts`, 7 cases). Every getter is a
+`try`/`catch` around `localStorage`, which is the shape of code that silently
+stops working. The tests break storage and check the answers stay right —
+including that the opt-*out* preferences (turn report, combat report, event
+notices) stay ON when the store is unavailable, so a player in private browsing
+does not quietly lose the things that explain the game.
+
+**The renderer** (`systems/renderer.test.ts`, 5 cases). Three thousand lines of
+canvas, and nothing had ever touched it. happy-dom has no canvas and no
+`Path2D`, so both are stubbed; the tests then paint real boards — the opening
+position, a board played 25 turns, a fleet at sea with a spent stack and an
+eliminated realm, every lens, both map modes, the trade overlay — and assert
+the renderer survives and draws.
+
+Its rule-bearing geometry moved out to where it can be tested properly:
+`seaCrossingEdges` now lives in `systems/mapview.ts` beside `graphEdges`, with
+6 cases of its own including one that checks the derived edges match the
+authored crossings on the real board.
+
+**Every suite was verified by mutation**, and two were weak until that showed
+it. The confirm test for a leaked keydown listener passed with the listener
+leaking — a stale dialog's `close` is idempotent, so the leak is invisible from
+outside; it now counts `addEventListener`/`removeEventListener` calls instead.
+And a renderer frame that throws was being swallowed by the scheduler, so four
+of five tests passed against a deliberately crashing frame; the RAF callback is
+now wrapped and any error inside a frame fails the test. With that in place, a
+throwing frame fails all five.
+
+Tests: 935 passing (66 files), up from 880.
+
+Still uncovered: `main.ts`'s wiring (a bootstrap, awkward to mount) and
+`ui/fullscreen.ts` (three lines over a browser API that happy-dom does not
+implement).
+
+---
+
 ## 2026-07-29 — The interface gets tests (v0.117.0)
 
 The last entry ended by naming the structural version of its own bug: every
