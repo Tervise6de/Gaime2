@@ -32,6 +32,8 @@ import {
   moveArmy,
   armyIsAtSea,
   armyIsFleet,
+  armyHasLandUnits,
+  landAssaultForce,
   reachableSeaZones,
   sailToSeaZone,
   raiseUnit,
@@ -79,6 +81,7 @@ import {
   nationInstability,
   armySize,
   clampTax,
+  landNeighbours,
   emptyUnits,
   type Army,
   type GameState,
@@ -845,7 +848,7 @@ function shouldConcentrate(state: GameState, nationId: number): boolean {
   }
   if (landArmies < 2) return false;
   return state.regions.some(
-    (region) => region.ownerId === nationId && region.adjacency.some((id) => isAttackable(state, id, nationId)),
+    (region) => region.ownerId === nationId && landNeighbours(state, region.id).some((id) => isAttackable(state, id, nationId)),
   );
 }
 
@@ -977,6 +980,18 @@ function doMilitary(state: GameState, nationId: number, rng: Rng): GameState {
     if (step !== null) s = moveArmy(s, live.id, step, rng);
   }
 
+  // Phase 2b — over the water: sail a loaded stack toward an island prize, or
+  // storm the beach if it is already standing off it. Nothing else can reach
+  // England, Zealand, Gotland or Ösel now that the crossings are real.
+  const landing = amphibiousPlan(s, nationId, campaign);
+  if (landing) {
+    s = landing.ready
+      ? moveArmy(s, landing.armyId, landing.targetId, rng)
+      : sailToSeaZone(s, landing.armyId, landing.zoneId, rng);
+  } else {
+    s = boardForInvasion(s, nationId, campaign, rng);
+  }
+
   // Phase 3 — dig in: an army that ended the phase idle (still had a move) on a
   // threatened owned region holds the line, so entrench it (M3). Entrenchment
   // then deepens each turn it keeps the ground.
@@ -995,7 +1010,8 @@ function adjacentThreats(state: GameState, regionId: number, nationId: number): 
   const region = state.regions[regionId];
   if (!region) return [];
   const out: Army[] = [];
-  for (const nb of region.adjacency) {
+  // Only by land: a stack across a strait threatens nothing until it lands.
+  for (const nb of landNeighbours(state, regionId)) {
     for (const a of state.armies) {
       if (armyIsAtSea(a) || a.regionId !== nb) continue;
       if (a.ownerId === nationId || a.ownerId === null || a.ownerId === BARBARIAN_ID) continue;
@@ -1098,7 +1114,7 @@ export function retreatStep(state: GameState, army: Army, nationId: number): num
   );
   let best: number | null = null;
   let bestThreat = hereThreat;
-  for (const nb of here.adjacency) {
+  for (const nb of landNeighbours(state, army.regionId)) {
     const r = state.regions[nb];
     if (!r || r.ownerId !== nationId) continue; // retreat only into our own land
     // Pressure the army would face there next turn.
@@ -1107,7 +1123,7 @@ export function retreatStep(state: GameState, army: Army, nationId: number): num
       const ar = state.regions[a.regionId];
       if (!ar || a.ownerId === nationId || a.ownerId === null || a.ownerId === BARBARIAN_ID) continue;
       if (!atWar(state, nationId, a.ownerId)) continue;
-      if (ar.adjacency.includes(nb)) {
+      if (landNeighbours(state, a.regionId).includes(nb)) {
         threat = Math.max(threat, sideStrength(publicIntelUnits(state, nationId, a), army.units, "attack"));
       }
     }
@@ -1137,7 +1153,7 @@ function firstStepTowards(
   const queue: { node: number; first: number | null }[] = [{ node: start, first: null }];
   while (queue.length) {
     const { node, first } = queue.shift()!;
-    for (const nb of state.regions[node]!.adjacency) {
+    for (const nb of landNeighbours(state, node)) {
       if (visited.has(nb)) continue;
       const nbR = state.regions[nb];
       if (!nbR || nbR.ownerId !== nationId) continue; // march only through own land
@@ -1187,14 +1203,14 @@ function advanceStep(
   // end of the realm and the campaign never gathers weight.
   if (campaign) {
     const toRoad = firstStepTowards(state, army.regionId, nationId, (rid) =>
-      (state.regions[rid]?.adjacency ?? []).includes(campaign.stepId),
+      landNeighbours(state, rid).includes(campaign.stepId),
     );
     if (toRoad !== null) return toRoad;
   }
   const isFrontier = (rid: number): boolean => {
     const r = state.regions[rid];
     return (
-      !!r && r.ownerId === nationId && r.adjacency.some((n) => isAttackable(state, n, nationId))
+      !!r && r.ownerId === nationId && landNeighbours(state, rid).some((n) => isAttackable(state, n, nationId))
     );
   };
   return firstStepTowards(state, army.regionId, nationId, isFrontier);
@@ -1215,7 +1231,7 @@ function soloWinnable(state: GameState, targetId: number, nationId: number): boo
   for (const a of state.armies) {
     if (a.ownerId !== nationId || armyIsAtSea(a) || armyIsFleet(a.units)) continue;
     const ar = state.regions[a.regionId];
-    if (!ar || !ar.adjacency.includes(targetId)) continue;
+    if (!ar || !landNeighbours(state, a.regionId).includes(targetId)) continue;
     const atk = sideStrength(a.units, zeroUnits(), "attack");
     const def = armySize(defenders) > 0
       ? sideStrength(defenders, a.units, "defense") * 1.2 +
@@ -1244,7 +1260,7 @@ export function focusTarget(
   const resW = RESOURCE_VALUE * (0.5 + (p?.economy ?? 0.5));
   const candidates = new Set<number>();
   for (const r of owned) {
-    for (const nb of r.adjacency) if (isAttackable(state, nb, nationId)) candidates.add(nb);
+    for (const nb of landNeighbours(state, r.id)) if (isAttackable(state, nb, nationId)) candidates.add(nb);
   }
   let best: number | null = null;
   let bestScore = -Infinity;
@@ -1279,7 +1295,7 @@ export function musterRegion(state: GameState, nationId: number, focusId: number
   if (!focus) return null;
   let best: number | null = null;
   let bestForce = -1;
-  for (const nb of [...focus.adjacency].sort((a, b) => a - b)) {
+  for (const nb of landNeighbours(state, focusId).slice().sort((a, b) => a - b)) {
     const r = state.regions[nb];
     if (!r || r.ownerId !== nationId) continue;
     const force = state.armies
@@ -1335,7 +1351,12 @@ function canStageEssentialDefender(
   if (army.regionId === capitalId) return false;
   const current = state.regions[army.regionId];
   const muster = state.regions[musterId];
-  return !!current?.adjacency.includes(targetId) && !!muster?.adjacency.includes(targetId);
+  return (
+    !!current &&
+    !!muster &&
+    landNeighbours(state, current.id).includes(targetId) &&
+    landNeighbours(state, muster.id).includes(targetId)
+  );
 }
 
 function offensiveMargin(state: GameState, nationId: number): number {
@@ -1437,6 +1458,142 @@ export function capitalDefensePlan(state: GameState, nationId: number): CapitalD
     .sort((a, b) => armySize(b.army.units) - armySize(a.army.units) || a.army.id - b.army.id);
   const best = candidates[0];
   return best ? { capitalId: capital.id, armyId: best.army.id, step: best.step } : null;
+}
+
+export interface AmphibiousPlan {
+  /** The mixed stack — hulls to sail, soldiers to storm. */
+  armyId: number;
+  /** The coastal region to land on. */
+  targetId: number;
+  /** A sea zone the stack can reach that touches the target. */
+  zoneId: SeaZoneId;
+  /** At sea in that zone already: land this turn instead of sailing. */
+  ready: boolean;
+}
+
+/**
+ * Whether any land a realm holds borders `regionId` by land — i.e. whether the
+ * army can simply walk there. Anything it cannot walk to and still wants must
+ * be taken from the water.
+ */
+function reachableOverland(state: GameState, regionId: number, nationId: number): boolean {
+  return state.regions.some(
+    (r) => r.ownerId === nationId && landNeighbours(state, r.id).includes(regionId),
+  );
+}
+
+/**
+ * The realm's amphibious operation this turn, if it has one.
+ *
+ * Once the sea became a real obstacle (data/maps/hansa.ts `seaCrossings`),
+ * England, Zealand, Gotland and Ösel became islands — which is the period's
+ * actual geography, and would also have made four realms permanently
+ * unconquerable if the rivals had no way to cross. This is that way: a stack
+ * holding both hulls and soldiers sails to a sea zone touching the prize, and
+ * lands on it. `moveArmy` already resolves the landing as an assault with the
+ * ships standing offshore (`landAssaultForce`), so nothing new happens in
+ * combat — the AI simply now reaches for it.
+ *
+ * Deterministic: the richest reachable prize, ties by lowest region id.
+ */
+export function amphibiousPlan(
+  state: GameState,
+  nationId: number,
+  campaign: Campaign | null = planCampaign(state, nationId),
+): AmphibiousPlan | null {
+  const p = state.nations.find((n) => n.id === nationId)?.personality;
+  const stacks = state.armies.filter(
+    (a) =>
+      a.ownerId === nationId &&
+      a.movesLeft > 0 &&
+      armyIsFleet(a.units) &&
+      armyHasLandUnits(a.units) &&
+      armySize(a.units) > 0,
+  );
+  if (stacks.length === 0) return null;
+
+  let best: AmphibiousPlan | null = null;
+  let bestScore = 0;
+  for (const target of state.regions) {
+    if (target.terrain !== "coast") continue; // a landing needs a shore
+    if (!isAttackable(state, target.id, nationId)) continue;
+    if (reachableOverland(state, target.id, nationId)) continue; // just walk
+    const isKontor = KONTOR_IDS.some((id) => KONTORE[id].regionId === target.id);
+    const isCapital = state.nations.some((n) => n.id === target.ownerId && n.capitalRegionId === target.id);
+    const value =
+      target.population * REGION_POP_VALUE +
+      (isKontor ? KONTOR_VALUE * strategyProfile(state.nations.find((n) => n.id === nationId)).kontorPrize : 0) +
+      (isCapital ? CAPITAL_VALUE * (0.5 + (p?.aggression ?? 0.4)) : 0) +
+      (onCampaignRoad(campaign, target.id) || campaign?.objectiveId === target.id ? CAMPAIGN_STEP_VALUE : 0);
+    if (value <= bestScore) continue;
+
+    // A landing is only worth ordering if the stack can actually take the beach.
+    const defenders = targetDefenders(state, target.id, nationId);
+    for (const stack of [...stacks].sort((a, b) => armySize(b.units) - armySize(a.units) || a.id - b.id)) {
+      const { storm } = landAssaultForce(stack.units);
+      if (armySize(storm) === 0) continue;
+      const forecast = previewCombat(storm, defenders, {
+        terrainDefense: TERRAIN[target.terrain].defense,
+        fortification:
+          target.fortification + (regionDefense(state, target.id, nationId)?.garrison.entrenchment ?? 0),
+      });
+      if (forecast.attack <= forecast.defense * offensiveMargin(state, nationId)) continue;
+      const zones = reachableSeaZones(state, stack).filter((zoneId) =>
+        SEA_ZONES[zoneId].coastalRegions.includes(target.id),
+      );
+      const here = stack.seaZoneId;
+      if (here !== undefined && SEA_ZONES[here].coastalRegions.includes(target.id)) {
+        best = { armyId: stack.id, targetId: target.id, zoneId: here, ready: true };
+        bestScore = value;
+        break;
+      }
+      const zone = zones[0];
+      if (zone === undefined) continue;
+      best = { armyId: stack.id, targetId: target.id, zoneId: zone, ready: false };
+      bestScore = value;
+      break;
+    }
+  }
+  return best;
+}
+
+/**
+ * March a spare land stack to a port where hulls are waiting, so the realm can
+ * form the mixed stack an amphibious operation needs. Only bothers when there is
+ * something across the water actually worth taking.
+ */
+function boardForInvasion(state: GameState, nationId: number, campaign: Campaign | null, rng: Rng): GameState {
+  // Something over the water we want, and no stack yet able to carry troops to it.
+  const wants = state.regions.some(
+    (r) =>
+      r.terrain === "coast" &&
+      isAttackable(state, r.id, nationId) &&
+      !reachableOverland(state, r.id, nationId) &&
+      (onCampaignRoad(campaign, r.id) ||
+        campaign?.objectiveId === r.id ||
+        KONTOR_IDS.some((id) => KONTORE[id].regionId === r.id)),
+  );
+  if (!wants) return state;
+  const port = state.armies.find(
+    (a) => a.ownerId === nationId && !armyIsAtSea(a) && armyIsFleet(a.units) && !armyHasLandUnits(a.units),
+  );
+  if (!port) return state;
+  const soldiers = state.armies
+    .filter(
+      (a) =>
+        a.ownerId === nationId &&
+        !armyIsAtSea(a) &&
+        !armyIsFleet(a.units) &&
+        a.movesLeft > 0 &&
+        armySize(a.units) > 0 &&
+        !isEssentialDefender(state, a, nationId),
+    )
+    .sort((a, b) => armySize(b.units) - armySize(a.units) || a.id - b.id);
+  for (const army of soldiers) {
+    const step = firstStepTowards(state, army.regionId, nationId, (rid) => rid === port.regionId);
+    if (step !== null) return moveArmy(state, army.id, step, rng);
+  }
+  return state;
 }
 
 /** Raise and move a small navy: rivals patrol their trade approaches and seek
@@ -1655,7 +1812,7 @@ function assessThreat(state: GameState, nationId: number): ThreatProfile {
   const targetIds = new Set<number>();
   let maxTargetFort = 0;
   for (const r of owned) {
-    for (const nb of r.adjacency) {
+    for (const nb of landNeighbours(state, r.id)) {
       if (isAttackable(state, nb, nationId)) {
         targetIds.add(nb);
         maxTargetFort = Math.max(maxTargetFort, state.regions[nb]!.fortification);
@@ -1671,7 +1828,7 @@ function assessThreat(state: GameState, nationId: number): ThreatProfile {
     if (!hostile) continue;
     if (armyIsAtSea(a)) continue;
     const onTarget = targetIds.has(a.regionId);
-    const nearOurLand = state.regions[a.regionId]?.adjacency.some((n) => ownedIds.has(n));
+    const nearOurLand = landNeighbours(state, a.regionId).some((n) => ownedIds.has(n));
     if (onTarget || nearOurLand) {
       const visible = publicIntelUnits(state, nationId, a);
       for (const t of UNIT_TYPES) composition[t] += visible[t];
@@ -1767,7 +1924,7 @@ export function bestTarget(
 
   let best: number | null = null;
   let bestScore = 0;
-  for (const nid of region.adjacency) {
+  for (const nid of landNeighbours(state, army.regionId)) {
     const target = state.regions[nid];
     if (!target || target.ownerId === nationId) continue;
 

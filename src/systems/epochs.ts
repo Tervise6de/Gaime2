@@ -13,6 +13,7 @@
 
 import type { Rng } from "@/systems/rng";
 import { KONTORE } from "@/data/kontore";
+import { GOODS } from "@/data/goods";
 import {
   LOG_CAP,
   MIN_POPULATION,
@@ -194,6 +195,21 @@ function applyEpoch(state: GameState, def: EpochEventDef, rng: Rng): GameState {
         `${KONTORE[eff.kontor].name} shut — it takes no trade`,
         cut.length > 0 ? `${cut.length} route${cut.length === 1 ? "" : "s"} bound there now pay nothing` : "no route ran there",
         ours.length > 0 ? `${ours.length} of them yours, worth ${lost}g a turn` : "none of them yours",
+      ]);
+    }
+    case "staple_glut": {
+      // A lasting shift in what the good fetches on the lanes. Compounds if the
+      // history ever repeats itself, and is felt by every realm at once —
+      // nobody's salt is worth what it was.
+      const before = state.goodGlut?.[eff.good] ?? 1;
+      const glut = { ...(state.goodGlut ?? {}), [eff.good]: round1(before * eff.valueMult) };
+      const mine = (state.routes ?? []).filter((r) => r.ownerId === PLAYER_ID && r.good === eff.good);
+      const drop = Math.round((1 - eff.valueMult) * 100);
+      return announce({ ...state, goodGlut: glut }, def, def.headline, [
+        `${GOODS[eff.good].name} now fetches ${drop}% less on every lane`,
+        mine.length > 0
+          ? `${mine.length} of your route${mine.length === 1 ? "" : "s"} carr${mine.length === 1 ? "ies" : "y"} it`
+          : "you run no route in it",
       ]);
     }
     default:

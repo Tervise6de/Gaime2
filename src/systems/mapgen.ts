@@ -107,6 +107,15 @@ export function generateMap(seed: number, optionsOrMapId?: MapGenOptions | strin
   const rng = createRng(seed);
   const sites: Site[] = map.regions.map((r) => ({ x: r.x, y: r.y }));
   const adjacency = voronoiAdjacency(sites, SCRIPTED_ADJ_MAX);
+  // Which of those links are open water (data/maps/types.ts `seaCrossings`).
+  // Only pairs the Voronoi actually joined count — an authored crossing between
+  // regions that never became neighbours is simply inert.
+  const seaLinks: number[][] = map.regions.map(() => []);
+  for (const [a, b] of map.seaCrossings ?? []) {
+    if (!adjacency[a]?.includes(b)) continue;
+    seaLinks[a]!.push(b);
+    seaLinks[b]!.push(a);
+  }
   const regions: Region[] = map.regions.map((r, i) => ({
     id: i,
     name: r.name,
@@ -119,6 +128,7 @@ export function generateMap(seed: number, optionsOrMapId?: MapGenOptions | strin
     buildings: [],
     construction: null,
     adjacency: adjacency[i]!.slice().sort((a, b) => a - b),
+    seaLinks: seaLinks[i]!.slice().sort((a, b) => a - b),
     x: r.x,
     y: r.y,
   }));

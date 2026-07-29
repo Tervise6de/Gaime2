@@ -9,6 +9,9 @@ export const EPOCH_EVENT_IMAGES: Record<string, string> = {
   victual_brothers: "/event-art/storm-at-sea.jpg",
   great_fire: "/event-art/city-fire.jpg",
   novgorod_closed: "/event-art/novgorod-furs.jpg",
+  // Placeholder: a market scene stands in until the Bay salt fleet is painted
+  // (docs/event-art-brief.md).
+  bay_salt: "/event-art/trade-inspection.jpg",
 };
 
 export const CHOICE_EVENT_IMAGES: Record<string, string> = {

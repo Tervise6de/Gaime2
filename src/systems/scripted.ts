@@ -59,6 +59,7 @@ import {
   MAX_ROUTES_PER_NATION,
   PLAYER_ID,
   armySize,
+  landNeighbours,
   type GameState,
   type Region,
 } from "@/systems/state";
@@ -331,7 +332,7 @@ function scriptDefence(state: GameState, nationId: number, rng?: Rng): GameState
     // Otherwise fall back on the capital, so the seat is never left empty.
     const home = capitalRegion(s, nationId);
     if (!home || live.regionId === home.id) continue;
-    const step = here?.adjacency.find((id) => s.regions[id]?.ownerId === nationId);
+    const step = landNeighbours(s, live.regionId).find((id) => s.regions[id]?.ownerId === nationId);
     if (step !== undefined) s = moveArmy(s, live.id, step, rng);
   }
   return s;

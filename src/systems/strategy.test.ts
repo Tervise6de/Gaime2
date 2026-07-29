@@ -11,7 +11,7 @@ import {
 import { createGame, resolveTurn } from "@/systems/turn";
 import { createRng } from "@/systems/rng";
 import { KONTORE, KONTOR_IDS } from "@/data/kontore";
-import { PLAYER_ID, emptyUnits, type GameState, type Nation } from "@/systems/state";
+import { PLAYER_ID, emptyUnits, landNeighbours, type GameState, type Nation } from "@/systems/state";
 
 const rivals = (g: GameState): Nation[] => g.nations.filter((n) => !n.isBarbarian && !n.isPlayer);
 
@@ -78,7 +78,12 @@ describe("reading the board", () => {
 
   it("rates conquest highest for a realm with a host and soft neighbours", () => {
     const g = createGame({ seed: 6 });
-    const RIVAL = rivals(g)[0]!.id;
+    // A realm with somewhere to march: soft neighbours are read over *land*
+    // now, so the island realms are no use for this reading (see below).
+    const RIVAL = rivals(g).find((n) => {
+      const owned = g.regions.filter((r) => r.ownerId === n.id);
+      return owned.some((r) => landNeighbours(g, r.id).some((nb) => g.regions[nb]?.ownerId !== n.id));
+    })!.id;
     const home = g.regions.find((r) => r.ownerId === RIVAL)!;
     const armed: GameState = {
       ...g,
@@ -88,6 +93,25 @@ describe("reading the board", () => {
     };
     const scores = strategyViability(armed, RIVAL);
     expect(scores.conquest).toBeGreaterThan(scores.commerce);
+  });
+
+  it("rates conquest low for an island realm, however big its host", () => {
+    // England shares no land border with anyone (data/maps/hansa.ts
+    // `seaCrossings`), so an army it raises has nowhere to walk. A realm in
+    // that position should be reading the ledger, not the sword — which is
+    // both the right play and what the Hansa's island member actually did.
+    const g = createGame({ seed: 6 });
+    const england = g.nations.find((n) => n.name === "England")!.id;
+    const owned = g.regions.filter((r) => r.ownerId === england);
+    expect(owned.every((r) => landNeighbours(g, r.id).every((nb) => g.regions[nb]?.ownerId === england))).toBe(true);
+    const home = owned[0]!;
+    const armed: GameState = {
+      ...g,
+      armies: [
+        { id: 901, ownerId: england, regionId: home.id, units: { ...emptyUnits(), infantry: 14 }, movesLeft: 1 },
+      ],
+    };
+    expect(strategyViability(armed, england).conquest).toBeLessThan(strategyViability(armed, england).commerce);
   });
 });
 

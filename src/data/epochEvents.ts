@@ -13,6 +13,7 @@
 
 import { epochEventImage } from "@/data/eventArt";
 import type { KontorId } from "@/data/kontore";
+import type { GoodId } from "@/data/goods";
 
 /** What an epoch event does when it fires (a data descriptor; logic in epochs.ts). */
 export type EpochEffect =
@@ -20,7 +21,8 @@ export type EpochEffect =
   | { kind: "trade_boom"; goldPerRegion: number }
   | { kind: "pirates"; goldLoss: number; unrest: number }
   | { kind: "great_fire"; popLoss: number; wareLoss: number; unrest: number }
-  | { kind: "kontor_closed"; kontor: KontorId };
+  | { kind: "kontor_closed"; kontor: KontorId }
+  | { kind: "staple_glut"; good: GoodId; valueMult: number };
 
 export interface EpochEventDef {
   id: string;
@@ -104,6 +106,19 @@ export const EPOCH_EVENTS: readonly EpochEventDef[] = [
     icon: "🔥",
     description:
       "The crowded, timber-built wharves of the Hansa — above all Bergen's Bryggen — burned again and again. A great fire could gut a town's warehouses and homes in a single night: the price of packing a port tight with wooden gable-houses.",
+  },
+  {
+    id: "bay_salt",
+    name: "Bay Salt",
+    image: epochEventImage("bay_salt"),
+    year: 1400, // Atlantic bay salt undercuts Lüneburg from about 1400 (§5)
+    windowYears: 25,
+    chance: 0.7,
+    effect: { kind: "staple_glut", good: "salt", valueMult: 0.6 },
+    headline: "Fleets return from the Bay laden with cheap salt — {place}'s pans are undersold.",
+    icon: "🧂",
+    description:
+      "Ships begin returning from the Bay of Bourgneuf on the Atlantic coast with salt evaporated by the sun rather than boiled over Lüneburg's fires — coarser, but far cheaper and available in bulk. The Wendish towns' hold on the white gold, and the fortune Lüneburg was built on, never fully recovers.",
   },
   {
     id: "novgorod_closed",

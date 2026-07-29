@@ -178,9 +178,9 @@ export const GOODS: Record<GoodId, GoodDef> = {
     glyph: "🟤",
     roles: ["arms", "luxury"],
     value: 5,
-    // Mined, not gathered: bare mountains yield copper only once a Mine works it
-    // (data/buildings.ts). Cast into ordnance and sold as a luxury metal (Falun).
-    source: { baseOutput: 1 },
+    // Falun's copper mountain is a place, not a terrain (data/staples.ts, and
+    // the `copper` deposit at Bergslagen); a Mine works it anywhere else.
+    source: { resource: "copper", baseOutput: 2 },
     demandedAt: ["bruges", "bergen"],
   },
   salt: {

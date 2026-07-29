@@ -26,6 +26,7 @@ import { generateMap, type MapGenOptions } from "@/systems/mapgen";
 import { scriptedMap } from "@/data/maps/types";
 import type { ScriptedMap } from "@/data/maps/types";
 import { KONTORE } from "@/data/kontore";
+import { HANSA_STAPLES } from "@/data/staples";
 import { SOUND } from "@/data/sound";
 import type { StrategicResource } from "@/data/terrain";
 import { GOOD_IDS, type GoodId } from "@/data/goods";
@@ -276,26 +277,31 @@ function createScriptedGame(map: ScriptedMap, regions: Region[], options: NewGam
   // Kraków) and amber (the Samland shore at Königsberg, and Curonian Kurland).
   // Activates the resource layer that the scripted Hansa map otherwise leaves bare.
   const HANSA_RESOURCES: Record<number, StrategicResource> = {
-    34: "iron", 72: "iron", // Bergslagen, Silesia
+    29: "iron", 72: "iron", // Oppland (Norwegian mountain iron), Silesia
+    34: "copper", // Bergslagen — Falun and the copper mountain, Sweden's other metal
     25: "horses", 70: "horses", // Jutland, Masovia
     15: "salt", 71: "salt", // Brunswick (Lüneburg), Kraków (Wieliczka)
     68: "amber", 52: "amber", // Königsberg (Samland), Kurland
   };
   const resourceFor = (r: Region): StrategicResource | null =>
     sizedTowns ? HANSA_RESOURCES[r.id] ?? null : r.resource;
+  // What each place was *known for*, over and above what its ground gives
+  // (data/staples.ts): Bergen's stockfish, Scania's herring, Lüneburg's salt.
+  const staplesFor = (r: Region): Region["staples"] =>
+    sizedTowns ? HANSA_STAPLES[r.id] : undefined;
 
   // Lay out regions: owned (fort + home focus on capitals) or Free-Tribe held.
   const laidOut: Region[] = regions.map((r) => {
     const owner = ownerOf.get(r.id);
     if (owner !== undefined) {
       const isCapital = capitalSet.has(r.id);
-      return { ...r, ownerId: owner, resource: resourceFor(r), fortification: isCapital ? 1 : 0, focus: isCapital ? capitalFocus.get(r.id) : undefined, ...townSizing(r, isCapital) };
+      return { ...r, ownerId: owner, resource: resourceFor(r), staples: staplesFor(r), fortification: isCapital ? 1 : 0, focus: isCapital ? capitalFocus.get(r.id) : undefined, ...townSizing(r, isCapital) };
     }
     const fort = rng.int(0, 2);
     const garrison = { ...emptyUnits(), militia: rng.int(1, 2) };
     if (rng.next() < 0.35) garrison.infantry = 1;
     armies.push({ id: nextArmyId++, ownerId: BARBARIAN_ID, regionId: r.id, units: garrison, movesLeft: 0 });
-    return { ...r, ownerId: BARBARIAN_ID, resource: resourceFor(r), fortification: fort, ...townSizing(r, false) };
+    return { ...r, ownerId: BARBARIAN_ID, resource: resourceFor(r), staples: staplesFor(r), fortification: fort, ...townSizing(r, false) };
   });
 
   // National traits come from each realm's faction (a scenario may pin the

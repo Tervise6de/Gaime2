@@ -15,7 +15,7 @@ import { createGame } from "@/systems/turn";
 import { createRng } from "@/systems/rng";
 import { declareWar, makePeace, atWar } from "@/systems/diplomacy";
 import { KONTORE } from "@/data/kontore";
-import { PLAYER_ID, type GameState } from "@/systems/state";
+import { PLAYER_ID, landNeighbours, type GameState } from "@/systems/state";
 
 const NOVGOROD_REGION = KONTORE.novgorod.regionId;
 
@@ -134,38 +134,45 @@ describe("the plan on this board", () => {
   });
 
   it("puts the road's province ahead of a richer one off it", () => {
-    // A two-hop road: Estonia is playing for Prussia's seat, and the first
-    // province it has to take on the way is Gotland's, not the prize itself.
-    const PRUSSIA_SEAT = 66;
-    const GOTLAND = 9;
+    // A two-hop *land* road: Lübeck is playing for Danzig, and the first
+    // province it has to take on the way is Poland's Stettin, not the prize.
+    const DANZIG = 66;
     const base = game(40);
+    // Realm ids shift with the seed (the human takes one of the faction slots),
+    // so look them up by name rather than pinning a number.
+    const LUBECK = base.nations.find((n) => n.name === "Lübeck")!.id;
+    const POLAND = base.nations.find((n) => n.name === "Poland")!.id;
     const withAim: GameState = {
       ...base,
       nations: base.nations.map((n) =>
-        n.id === ESTONIA
-          ? { ...n, strategy: "conquest" as const, campaign: { objectiveId: PRUSSIA_SEAT, since: 30 } }
+        n.id === LUBECK
+          ? { ...n, strategy: "conquest" as const, campaign: { objectiveId: DANZIG, since: 30 } }
           : n,
       ),
       armies: [],
     };
-    const atWarG = declareWar(withAim, ESTONIA, GOTLAND);
-    const plan = planCampaign(atWarG, ESTONIA)!;
+    const atWarG = declareWar(withAim, LUBECK, POLAND);
+    const plan = planCampaign(atWarG, LUBECK)!;
     expect(plan.stepId).not.toBe(plan.objectiveId); // the road really has a middle
     expect(onCampaignRoad(plan, plan.stepId)).toBe(true);
 
     const frontier = atWarG.regions.find(
-      (r) => r.ownerId === ESTONIA && r.adjacency.includes(plan.stepId),
+      (r) => r.ownerId === LUBECK && landNeighbours(atWarG, r.id).includes(plan.stepId),
     )!;
     // A fatter province on the same frontier, off the road: without a campaign
     // this is plainly the better prize, and taking it instead is exactly the
     // wandering that used to stop realms ever arriving anywhere.
-    const lureId = frontier.adjacency.find(
-      (id) => id !== plan.stepId && atWarG.regions[id]?.ownerId !== ESTONIA,
+    const lureId = landNeighbours(atWarG, frontier.id).find(
+      (id) => id !== plan.stepId && atWarG.regions[id]?.ownerId !== LUBECK,
     )!;
     const g: GameState = {
       ...atWarG,
       regions: atWarG.regions.map((r) =>
-        r.id === lureId ? { ...r, ownerId: GOTLAND, population: r.population + 12, fortification: 0 } : r,
+        r.id === lureId
+          ? { ...r, ownerId: POLAND, population: r.population + 6, fortification: 0 }
+          : r.id === plan.stepId
+            ? { ...r, fortification: 0 }
+            : r,
       ),
     };
     const units = { ...base.armies[0]!.units };
@@ -173,8 +180,8 @@ describe("the plan on this board", () => {
     units.infantry = 14;
     const army = { id: 9001, regionId: frontier.id, units };
 
-    expect(bestTarget(g, army, ESTONIA, null)).toBe(lureId);
-    expect(bestTarget(g, army, ESTONIA, plan)).toBe(plan.stepId);
+    expect(bestTarget(g, army, LUBECK, null)).toBe(lureId);
+    expect(bestTarget(g, army, LUBECK, plan)).toBe(plan.stepId);
 
     // The massing plan reads the same road. Two stacks too small to take either
     // province alone, so `focusTarget` has something to mass against at all.
@@ -187,8 +194,8 @@ describe("the plan on this board", () => {
         { ...base.armies[0]!, id: 9002, regionId: frontier.id, units: small },
       ],
     };
-    expect(focusTarget(massed, ESTONIA, null)).toBe(lureId);
-    expect(focusTarget(massed, ESTONIA, plan)).toBe(plan.stepId);
+    expect(focusTarget(massed, LUBECK, null)).toBe(lureId);
+    expect(focusTarget(massed, LUBECK, plan)).toBe(plan.stepId);
   });
 
   it("tells the player where a rival's host is pointed", () => {

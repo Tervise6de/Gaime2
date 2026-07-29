@@ -86,6 +86,112 @@ wants a League seat before it has trade to protect. The Diplomacy screen reports
 each court's aim ("Our factors report: Lübeck is playing for the Hansa…"), since
 a realm's intentions are read from its conduct.
 
+## The map as it was (v0.115)
+
+An audit of the board against `hansa times.md` found the land solid — real
+Natural Earth borders, the right extent, a projection with its standard parallel
+at 59.8°N, resources placed by someone who checked — and the *water* and the
+*towns* wrong, which are the two things the Hanseatic League actually was. Five
+of the six findings are fixed here.
+
+### The sea is an obstacle (`seaCrossings`)
+
+Adjacency comes from the Voronoi of province centroids with a link cap of about
+550 km, so Gotland bordered Danzig and London bordered Bruges. Right for a trade
+lane; wrong for an army, which could walk from Sweden to Prussia by way of
+Gotland without a hull.
+
+`data/maps/hansa.ts` now names the 42 crossings that are open water. They are
+authored, not computed: measuring how much of each centroid line falls on land
+gives a draft, but the populations overlap badly (real crossings run 0.09-0.82
+on land, real land borders 0.64-1.00) because a line between two inland
+provinces can clip a lake and a line across the Channel can clip Kent. So the
+measurement produced the candidates and geography decided each one.
+
+Adjacency keeps them — a lane is carried by ship and must cross — but
+`landNeighbours()` does not, and every land rule reads that instead: movement,
+detachments, march orders, zone of control, battle reinforcement, retreat,
+muster, the campaign road, the AI's targeting and the conquest half of strategy
+viability. The land graph is now five components: the continent, **England**,
+**Zealand**, **Gotland** and **Osel**.
+
+Which would have made four realms unconquerable, so rivals learned to invade:
+`amphibiousPlan` sails a stack that holds both hulls and soldiers to a sea zone
+touching a coastal prize and lands on it, and `boardForInvasion` marches a spare
+stack to a port where hulls are waiting. `moveArmy` already resolved a landing
+as an assault with the ships standing offshore, so combat is unchanged. Measured
+over six 160-turn autoplays, London fell to Flanders twice and Zealand to Sweden
+once — islands are hard, not safe.
+
+**Measured**, eight seeds, crossings on against off: war **1.37%** of realm
+pairs per turn against 1.07%, provinces changing hands 7.5 a game against 8.9,
+realms alive unchanged. The sea concentrates war on land frontiers; it does not
+make the world inert.
+
+### The sea zones say where the water is
+
+Hamburg was on the Kattegat and absent from the North Sea — the Elbe mouth is a
+North Sea port and always was. Lubeck was on the Kattegat (it is on the Baltic),
+Stockholm too (700 km away), and Riga, Osel and the Wiek were in the Gulf of
+Finland (they are on the Gulf of Riga). All corrected, and every zone now lists
+only provinces that are actually `coast` — the game's own definition of a port.
+
+### Places carry their trades (`data/staples.ts`)
+
+Goods were sourced from terrain alone, so any coast made stockfish and the
+Scanian herring market, the Flemish cloth halls and the Wendish export breweries
+were nowhere. A **staple** is what a place was known for over and above its
+ground: it lets a province source a good the terrain would refuse, and adds to
+what it ships. Bergen's stockfish, Scania's herring, Lueneburg's salt, Danzig's
+grain, the Novgorod furs and wax, Falun's copper, English wool, Flemish cloth.
+
+### Two commodities got their geography back
+
+**Copper** had no place on the map at all — it came from a Mine anywhere. It is
+now a strategic deposit at **Bergslagen**, which is Falun and the Stora
+Kopparberg; iron moved to the Norwegian mountains (Oppland) and stays in
+Silesia. **Bay salt** — the Atlantic salt that undercut Lueneburg from about
+1400 — cannot be on the map, since Bourgneuf is in France, so it is an epoch
+event: `staple_glut` applies a lasting multiplier to what a good fetches on
+every lane (`GameState.goodGlut`, read by `goodTradeValue`). Salt falls 40%, for
+everyone.
+
+### The League is its towns (`data/towns.ts`)
+
+Thirty-six real member towns, each in the province that contains it — so
+**Stralsund**, whose 1370 peace is the League's defining moment, is on the map;
+so is **Lueneburg**; so is the whole **Westphalian** group (Dortmund, Soest,
+Muenster, Osnabrueck, Deventer, Kampen), a third of the League with no ground
+here before. They carry a Diet weight (Lubeck 3, quarter-leaders 2, the rest 1)
+and show in the region panel with a line each on why they mattered.
+
+They also decide the **Alderman**: precedence is now `townWeight + 4 x Kontore
+held`, not Kontore alone with ties falling to whoever founded the League. That
+old rule handed the chair — and a fifth of the trade race — to the first realm
+to raise a Hall. (A first pass used towns alone and parked the chair permanently
+with whichever realm starts on the Saxon towns; the Kontor term is what makes it
+contestable by the realm actually winning the network.)
+
+### What it did to the race
+
+Twelve seeds, threshold unchanged at 60% / hold 12: the race decides **4 of 12**
+games (was 3), average turn 39, and the winner is always a realm that has taken
+Kontor towns — in these seeds, Flanders holding Bruges and London, peaking at
+62-64%. The scripted *pacifist* trade player now tops out at **40-46%** from any
+realm and no longer wins, because the Alderman's chair is no longer free with
+the founding. That is the honest consequence: **the trade victory now requires
+at least one Kontor town**, which for most realms means one amphibious
+operation. Thematically that is the Hansa — its power was the Kontore — but it
+is a real narrowing of the pure-trade path, and if it should be widened again
+the lever is the League strand, not the geography.
+
+### Not fixed
+
+Estonia and Finland are still sovereign realms with capitals and armies; neither
+existed as a state in 1250-1550 (Estonia was Danish then Livonian Order, Finland
+Swedish). Left alone deliberately — it is a playable-roster decision, not a
+geography error.
+
 ## The trade race, rebalanced (v0.114)
 
 v0.113 closed with a measurement: rivals peaked at ~40% of the trade race

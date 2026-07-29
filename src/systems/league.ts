@@ -22,6 +22,7 @@
  */
 
 import { KONTORE, KONTOR_IDS, type KontorId } from "@/data/kontore";
+import { HANSA_TOWNS } from "@/data/towns";
 import { atWar, adjustRelation } from "@/systems/diplomacy";
 import { round1 } from "@/systems/economy";
 import {
@@ -53,20 +54,56 @@ export function kontoreHeldBy(state: GameState, nationId: number): number {
 }
 
 /**
- * The Alderman — the member holding the most Kontore (ties break to the earliest in
- * the member list, i.e. the founder's precedence). null if there is no League or it
- * is empty. Recomputed from live ownership, so it shifts as Kontore change hands. Pure.
+ * The weight of League towns a realm holds (data/towns.ts) — Lübeck, Hamburg,
+ * Stralsund, Danzig, Visby, Riga and the rest, counted where they actually sit.
+ * Pure.
+ */
+export function townWeightHeldBy(state: GameState, nationId: number): number {
+  let sum = 0;
+  for (const town of HANSA_TOWNS) {
+    if (state.regions[town.regionId]?.ownerId === nationId) sum += town.weight;
+  }
+  return sum;
+}
+
+/**
+ * What a Kontor is worth against a town in the Diet's reckoning. High, because
+ * the Kontore were the League's power abroad and the reason it existed — but
+ * finite, because Lübeck led the Hansa for three centuries holding none.
+ */
+export const KONTOR_PRECEDENCE = 4;
+
+/** A member's standing in the Diet: the towns it holds, and the Kontore. */
+export function leagueStandingOf(state: GameState, nationId: number): number {
+  return townWeightHeldBy(state, nationId) + KONTOR_PRECEDENCE * kontoreHeldBy(state, nationId);
+}
+
+/**
+ * The Alderman — precedence in the Diet.
+ *
+ * Read from the **League towns** a member holds and the **Kontore** it has taken
+ * (`leagueStandingOf`). That is the way round the Hansa actually worked: the
+ * Diet was the towns, and the towns' weight is where precedence started — but a
+ * realm that has seized the great Kontore has the League's overseas power in its
+ * hands and the chair follows it.
+ *
+ * (It used to be Kontore alone, with ties falling to whoever founded the League,
+ * which handed the chair — and a fifth of the trade race — to the first realm to
+ * raise a Hall. A first pass at fixing that used towns alone, and parked the
+ * chair permanently with the realm that happens to start on the Saxon towns,
+ * whether or not it was contesting anything.) Recomputed from live ownership, so
+ * the chair moves as towns and Kontore change hands. Pure.
  */
 export function leagueLeader(state: GameState): number | null {
   const members = state.league?.members ?? [];
   if (members.length === 0) return null;
   let best = members[0]!;
-  let bestN = kontoreHeldBy(state, best);
+  let bestScore = leagueStandingOf(state, best);
   for (const m of members) {
-    const n = kontoreHeldBy(state, m);
-    if (n > bestN) {
+    const score = leagueStandingOf(state, m);
+    if (score > bestScore) {
       best = m;
-      bestN = n;
+      bestScore = score;
     }
   }
   return best;

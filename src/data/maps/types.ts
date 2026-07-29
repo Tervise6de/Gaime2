@@ -50,6 +50,12 @@ export interface ScriptedMap {
   islets?: Coord[][];
   /** Fixed regions, in author order (index === region id). */
   regions: ScriptedRegion[];
+  /**
+   * Region pairs whose shared "border" is open water. Adjacency still links them
+   * — a trade lane is carried by ship and must cross — but an army cannot march
+   * over one: it has to embark. Pairs are unordered and given once.
+   */
+  seaCrossings?: [number, number][];
   /** Starting realms; every region should belong to exactly one. The human
       plays one of these (chosen in setup, or picked from the seed). */
   factions: ScriptedFaction[];

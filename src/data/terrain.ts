@@ -19,7 +19,7 @@ export type TerrainId = "plains" | "forest" | "hills" | "mountains" | "coast";
  * "white gold" that preserves fish, amber the Baltic luxury — seeded on the Hansa
  * map.
  */
-export type StrategicResource = "iron" | "horses" | "salt" | "amber";
+export type StrategicResource = "iron" | "horses" | "salt" | "amber" | "copper";
 
 /** Display metadata for each strategic resource (map marker, region panel, legend). */
 export const STRATEGIC_RESOURCES: Record<StrategicResource, { label: string; glyph: string; tip: string }> = {
@@ -27,6 +27,11 @@ export const STRATEGIC_RESOURCES: Record<StrategicResource, { label: string; gly
     label: "Iron",
     glyph: "⚒",
     tip: "Iron deposit — a strategic resource: advanced units (Ranged, Siege) need iron, and it trades as a good.",
+  },
+  copper: {
+    label: "Copper",
+    glyph: "🟤",
+    tip: "Copper mountain — Falun's ore: cast into ordnance and sold west as a luxury metal.",
   },
   horses: {
     label: "Horses",

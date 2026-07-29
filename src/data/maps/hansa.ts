@@ -14,6 +14,46 @@
 import type { ScriptedMap } from "@/data/maps/types";
 import { HANSA_PROVINCES, HANSA_LAND, HANSA_CONTEXT } from "@/data/maps/hansa-geo";
 
+/**
+ * Where the map's "borders" are actually open water.
+ *
+ * Adjacency is derived from the Voronoi of the province centroids with a link
+ * cap of ~550 km, which is generous enough that Gotland ends up bordering
+ * Danzig and London bordering Bruges. That is right for a *trade lane* — the
+ * Hansa's goods crossed exactly those waters — and wrong for an army, which
+ * used to be able to walk from Sweden to Prussia by way of Gotland without a
+ * hull. In a game about a league whose whole power was the sea, the sea cost
+ * nothing to cross.
+ *
+ * These are the crossings. They are authored rather than computed: measuring
+ * how much of each centroid-to-centroid line falls on land gives a first draft,
+ * but the two populations overlap badly (real crossings run 0.09–0.82 of the
+ * line on land, real land borders 0.64–1.00), because a line between two inland
+ * provinces can clip a lake and a line across the Channel can clip Kent. So the
+ * measurement produced the candidate list and geography decided each one.
+ *
+ * The effect is the map the period had: England, Gotland, Ösel and Zealand are
+ * islands, the Danish straits are straits, and the Baltic must be sailed.
+ */
+export const HANSA_SEA_CROSSINGS: [number, number][] = [
+  // The Channel and the North Sea — England to the Low Countries and Frisia.
+  [0, 5], [1, 5], [1, 7], [3, 5], [3, 8], [3, 11], [4, 11],
+  // The German Bight and the Danish isles.
+  [11, 24], [12, 23], [14, 23], [14, 26], [23, 24], [23, 25], [23, 26],
+  // The Skagerrak and the Kattegat.
+  [24, 28], [25, 26], [25, 28], [25, 36], [28, 36],
+  // The southern Baltic — Scania and Småland to the Wendish and Prussian shore.
+  [26, 66], [26, 73], [37, 66],
+  // The Åland sea and the Bothnian approaches.
+  [33, 40], [33, 41], [38, 41],
+  // Gotland, an island in the middle of everything.
+  [33, 39], [35, 39], [37, 39], [39, 50], [39, 52], [39, 57], [39, 66],
+  // The Gulf of Finland and the Estonian islands.
+  [33, 50], [40, 47], [40, 49], [40, 50], [43, 47], [43, 48], [49, 50], [49, 52], [50, 52],
+  // The Bay of Gdańsk.
+  [57, 66],
+];
+
 export const HANSA_MAP: ScriptedMap = {
   id: "hansa",
   name: "The Hanseatic World",
@@ -22,6 +62,7 @@ export const HANSA_MAP: ScriptedMap = {
   land: HANSA_LAND,
   regions: HANSA_PROVINCES,
   context: HANSA_CONTEXT,
+  seaCrossings: HANSA_SEA_CROSSINGS,
   // Sixteen historical realms of the Hanseatic world, each on its home ground.
   // Every province belongs to exactly one; indices match hansa-geo.ts order.
   factions: [

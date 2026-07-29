@@ -44,7 +44,8 @@ export const SEA_ZONES: Record<SeaZoneId, SeaZone> = {
     x: 0.235,
     y: 0.15,
     neighbors: ["north_sea"],
-    coastalRegions: [27, 30, 32],
+    // Bergen and Hålogaland — the stockfish coast north of the Naze.
+    coastalRegions: [30, 32],
     depth: 1,
   },
   north_sea: {
@@ -53,7 +54,11 @@ export const SEA_ZONES: Record<SeaZoneId, SeaZone> = {
     x: 0.315,
     y: 0.6,
     neighbors: ["norwegian_sea", "kattegat"],
-    coastalRegions: [0, 5, 8, 11, 16, 27, 30],
+    // London on the Thames, Bruges and Holland on the Flemish shore, Frisia,
+    // Bremen on the Weser and **Hamburg on the Elbe** — which the old table left
+    // out of the North Sea entirely while listing it on the Kattegat. Oslo and
+    // Bergen close the northern end.
+    coastalRegions: [0, 5, 8, 11, 13, 16, 27, 30],
     depth: 0.42,
   },
   kattegat: {
@@ -62,7 +67,11 @@ export const SEA_ZONES: Record<SeaZoneId, SeaZone> = {
     x: 0.452,
     y: 0.485,
     neighbors: ["north_sea", "baltic_sea"],
-    coastalRegions: [12, 13, 23, 26, 27, 33],
+    // The Danish waters proper: Zealand, Scania and the Norwegian shore of the
+    // Skagerrak (Jutland and Funen are coastal in life but plains on this board,
+    // and only coast provinces are ports). Lübeck sits on the Baltic and Hamburg
+    // on the North Sea; neither belongs here, and Stockholm is 700 km away.
+    coastalRegions: [23, 26, 27],
     depth: 0.08,
   },
   baltic_sea: {
@@ -71,7 +80,10 @@ export const SEA_ZONES: Record<SeaZoneId, SeaZone> = {
     x: 0.585,
     y: 0.63,
     neighbors: ["kattegat", "bothnia", "gulf_of_finland"],
-    coastalRegions: [12, 13, 23, 26, 33, 39, 40, 43, 47, 49, 50, 55, 57, 66, 68, 73],
+    // The Wendish shore (Lübeck, Stettin), the Prussian and Livonian coast,
+    // Gotland and Ösel, the Swedish east coast, and Scania on its Baltic side.
+    // Hamburg is not on the Baltic and never was.
+    coastalRegions: [12, 23, 26, 33, 39, 40, 47, 49, 50, 55, 57, 66, 68, 73],
     depth: 0.22,
   },
   bothnia: {
@@ -80,6 +92,8 @@ export const SEA_ZONES: Record<SeaZoneId, SeaZone> = {
     x: 0.66,
     y: 0.27,
     neighbors: ["baltic_sea"],
+    // The gulf between Sweden and Finland: Stockholm, the Finnish south-west,
+    // and the Ostrobothnian shore at its head.
     coastalRegions: [33, 40, 46],
     depth: 0.13,
   },
@@ -89,7 +103,10 @@ export const SEA_ZONES: Record<SeaZoneId, SeaZone> = {
     x: 0.815,
     y: 0.4,
     neighbors: ["baltic_sea"],
-    coastalRegions: [40, 43, 47, 49, 50, 55],
+    // The gulf itself: the Finnish south coast and the Estonian north coast.
+    // Riga, Ösel and the Wiek lie on the Gulf of Riga, out in the Baltic — the
+    // old table had them here, several hundred kilometres from this water.
+    coastalRegions: [40, 43, 47],
     depth: 0.12,
   },
 };

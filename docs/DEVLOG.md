@@ -6,6 +6,74 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-29 — The map as it was (v0.115.0)
+
+An audit of the board against `hansa times.md` said the land was the strongest
+part of the game's history — real Natural Earth borders, the right extent, a
+projection whose standard parallel sits at 59.8N, resources placed by someone
+who had checked — and that the *water* and the *towns* were wrong, which are the
+two things the Hanseatic League actually was. Five of the six findings are fixed.
+
+**The sea is an obstacle.** Adjacency comes from a Voronoi with a ~550 km link
+cap, so Gotland bordered Danzig and London bordered Bruges, and an army could
+walk from Sweden to Prussia without a hull. The 42 open-water crossings are now
+named in the map data — authored, not computed, because the geometric test does
+not separate the two populations cleanly (real crossings run 0.09-0.82 of the
+centroid line on land, real land borders 0.64-1.00: a line between two inland
+provinces can clip a lake and a line across the Channel can clip Kent). Trade
+lanes still cross them; nothing that marches does. The land graph is now the
+continent plus four islands: England, Zealand, Gotland and Osel.
+
+**So rivals learned to invade.** Four unconquerable realms would have been a
+worse error than the one being fixed, so `amphibiousPlan` sails a stack holding
+both hulls and soldiers to a sea zone touching a coastal prize and lands on it.
+Combat needed nothing new — `moveArmy` already resolved a landing as an assault
+with the ships standing offshore. Over six autoplays London fell to Flanders
+twice and Zealand to Sweden once.
+
+**And the world did not go quiet.** Eight seeds, crossings on against off: war
+1.37% of realm pairs per turn against 1.07%, provinces changing hands 7.5 a game
+against 8.9. The sea concentrates war on land frontiers rather than ending it.
+
+**Three data corrections.** Hamburg is back on the North Sea, where the Elbe
+mouth has always been (the old table had it on the Kattegat and out of the North
+Sea entirely); Lubeck and Stockholm are off the Kattegat; Riga, Osel and the
+Wiek are off the Gulf of Finland. Copper became a real deposit at Bergslagen —
+Falun and the copper mountain — where before it came from a Mine anywhere and
+had no place on the map at all. And Bay salt, the Atlantic salt that undercut
+Lueneburg from about 1400, is now an epoch event that cuts what salt fetches on
+every lane by 40%, since Bourgneuf is in France and cannot be a province.
+
+**Places carry their trades.** `data/staples.ts` gives Bergen its stockfish,
+Scania its herring, Lueneburg its salt, Danzig its grain, Novgorod its furs and
+wax — a province can now source a good its terrain would refuse, and ships more
+of what it was known for. Before this, any coast made stockfish and the Scanian
+herring market did not exist.
+
+**The League got its towns.** Thirty-six real members, each in the province that
+contains it — Stralsund, whose 1370 peace is the League's defining moment;
+Lueneburg; the whole Westphalian group, a third of the League with no ground here
+before. They show in the region panel, and they decide the Alderman: precedence
+is town weight plus four per Kontor, not Kontore alone with ties falling to
+whoever founded the League. (A first pass used towns alone and parked the chair
+permanently with Saxony in all six test seeds — the Kontor term is what makes it
+contestable.)
+
+**What it cost.** The race still decides 4 of 12 games, average turn 39, but the
+winner is now always a realm that has taken Kontor towns, and the scripted
+pacifist trade player tops out at 40-46% and no longer wins — the chair is no
+longer free with the founding. The trade victory now wants at least one Kontor
+town, which for most realms means one amphibious operation. That is the Hansa,
+and it is also a real narrowing of the pure-trade path; if it should be widened
+the lever is the League strand, not the geography.
+
+Tests: 857 passing (58 files), including 11 new in `systems/geography.test.ts`.
+
+Not fixed, deliberately: Estonia and Finland are still sovereign realms, which
+neither was in 1250-1550. That is a playable-roster call, not a map error.
+
+---
+
 ## 2026-07-29 — The trade race can be won (v0.114.0)
 
 Last entry ended by saying the trade race was a balance problem, not an AI one,

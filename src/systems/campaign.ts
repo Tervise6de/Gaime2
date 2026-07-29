@@ -33,7 +33,7 @@
  */
 
 import { KONTORE, KONTOR_IDS } from "@/data/kontore";
-import { BARBARIAN_ID, type GameState, type Nation } from "@/systems/state";
+import { BARBARIAN_ID, landNeighbours, type GameState, type Nation } from "@/systems/state";
 import { atWar, getTreaty, underTruce } from "@/systems/diplomacy";
 import { strategyProfile } from "@/systems/strategy";
 import { UNITS, UNIT_TYPES } from "@/data/units";
@@ -122,7 +122,9 @@ export function campaignRoad(
     if (node === null) break;
     if (node === objectiveId) break;
     settled.add(node);
-    for (const nb of state.regions[node]!.adjacency) {
+    // The road is a march: open water is not a step, it is a landing, and a
+    // campaign that plans through the Baltic plans something it cannot do.
+    for (const nb of landNeighbours(state, node)) {
       if (settled.has(nb)) continue;
       const step = stepCost(state, nationId, nb);
       if (!Number.isFinite(step)) continue;

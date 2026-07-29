@@ -21,7 +21,7 @@ import type { UnitType } from "@/data/units";
 import type { BuildingId } from "@/data/buildings";
 
 /** Resource ids carrying art: stockpiles, HUD metrics, and strategic resources. */
-export type ResourceArtId = "gold" | "food" | "materials" | "knowledge" | "stability" | "iron" | "horses" | "salt" | "amber";
+export type ResourceArtId = "gold" | "food" | "materials" | "knowledge" | "stability" | "iron" | "horses" | "salt" | "amber" | "copper";
 
 /** UI glyph vocabulary — one designed set replacing the emoji grab-bag. */
 export type GlyphId =
@@ -113,6 +113,10 @@ export const RESOURCE_ART: Record<ResourceArtId, string | null> = {
   salt: ico(
     '<path d="M3.4 19.6c1.4-6.4 4.6-10 8.6-10s7.2 3.6 8.6 10z"/>',
     { fill: true },
+  ),
+  // Copper — an ingot bar seen in three-quarter view (Falun's ore, cast and shipped).
+  copper: ico(
+    '<path d="M4.6 13.4l3-3.2h9l3 3.2-3 3.2h-9z"/><path d="M7.6 10.2l3 3.2h9M10.6 13.4l-3 3.2"/>',
   ),
   // Amber — a faceted teardrop gem.
   amber: ico(

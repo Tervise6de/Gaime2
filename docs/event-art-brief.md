@@ -16,6 +16,12 @@ them directly with no runtime fetch and no database dependency.
 | `plague-streets.jpg` | Plague and emergency grain-relief beats |
 | `trade-inspection.jpg` | Trade booms, monopolies and charters |
 
+## Wanted
+
+| Event | Wants | Standing in |
+|---|---|---|
+| `bay_salt` (Bay Salt, c. 1400) | A salt fleet putting in — sacks and heaps of coarse Atlantic salt coming ashore against a northern quay, Lüneburg's boiling-houses idle behind | `trade-inspection.jpg` |
+
 ## Adding More
 
 Use landscape 16:9 images, no baked-in text, and keep the files local unless

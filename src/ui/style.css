@@ -1721,6 +1721,25 @@ body {
 }
 
 /* At-a-glance stat row under the region title: defence / unrest / garrison. */
+.hud-region-towns,
+.hud-region-staples {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.hud-region-towns .hud-town,
+.hud-region-staples .hud-staple {
+  cursor: help;
+  border-bottom: 1px dotted rgba(216, 162, 74, 0.4);
+}
+
+.hud-region-staples {
+  color: var(--accent);
+  opacity: 0.85;
+}
+
 .hud-region-stats {
   display: flex;
   gap: 6px;

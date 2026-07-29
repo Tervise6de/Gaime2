@@ -28,7 +28,7 @@
  */
 
 import type { Personality } from "@/systems/state";
-import { BARBARIAN_ID, DOMINATION_FRACTION, TURN_LIMIT, type GameState, type Nation } from "@/systems/state";
+import { BARBARIAN_ID, DOMINATION_FRACTION, TURN_LIMIT, landNeighbours, type GameState, type Nation } from "@/systems/state";
 import type { Rng } from "@/systems/rng";
 import { hansaControl, HANSA_VICTORY } from "@/systems/hansa";
 import { nationScore } from "@/systems/victory";
@@ -112,7 +112,7 @@ export function strategyViability(state: GameState, nationId: number): Record<Ai
   let soft = 0;
   let borders = 0;
   for (const region of owned) {
-    for (const nb of region.adjacency) {
+    for (const nb of landNeighbours(state, region.id)) {
       const other = state.regions[nb];
       if (!other || other.ownerId === nationId || other.ownerId === null) continue;
       borders += 1;

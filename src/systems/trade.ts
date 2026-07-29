@@ -58,7 +58,9 @@ export function regionSources(region: Region, good: GoodId): boolean {
   // An industry building (workshop → timber, mine → iron …) also lets a region
   // source — and therefore trade — the ware it produces.
   const byBuilding = region.buildings.some((b) => (BUILDINGS[b].wareYield?.[good] ?? 0) > 0);
-  return byTerrain || byResource || byBuilding;
+  // A place's own trade: Bergen ships stockfish whatever its terrain says.
+  const byStaple = (region.staples ?? []).some((st) => st.good === good);
+  return byTerrain || byResource || byBuilding || byStaple;
 }
 
 /** The raw (pre-unrest, pre-multiplier) ware output of a region: terrain/resource
@@ -69,6 +71,7 @@ function regionWareBase(region: Region, good: GoodId): number {
   const byResource = src.resource !== undefined && region.resource === src.resource;
   let base = byTerrain || byResource ? src.baseOutput : 0;
   for (const b of region.buildings) base += BUILDINGS[b].wareYield?.[good] ?? 0;
+  for (const st of region.staples ?? []) if (st.good === good) base += st.amount;
   return base;
 }
 
@@ -440,6 +443,14 @@ function doctrineTradeFactor(state: GameState, ownerId: number): number {
 }
 
 /**
+ * What a good currently fetches on the lanes: its table value, times any lasting
+ * shift the epochs have applied (`GameState.goodGlut`). Pure.
+ */
+export function goodTradeValue(state: GameState, good: GoodId): number {
+  return GOODS[good].value * (state.goodGlut?.[good] ?? 1);
+}
+
+/**
  * The gold a route `ownerId` would earn if founded now: base income times the
  * market it would *join* (this route added to supply, and its owner counted as a
  * supplier). Lets the open-route UI show the gold you'd actually keep, not a
@@ -456,7 +467,7 @@ export function projectedRouteIncome(
   const scar = scarcityFrom(routes + 1); // this route joins the market
   const sole = owners.size === 0 || (owners.size === 1 && owners.has(ownerId));
   const mono = sole ? MONOPOLY_PREMIUM : 1;
-  return round1(GOODS[good].value * distanceFactor(laneLength) * scar * mono * saltFishFactor(state, good, ownerId) * doctrineTradeFactor(state, ownerId));
+  return round1(goodTradeValue(state, good) * distanceFactor(laneLength) * scar * mono * saltFishFactor(state, good, ownerId) * doctrineTradeFactor(state, ownerId));
 }
 
 /**
@@ -464,7 +475,7 @@ export function projectedRouteIncome(
  * distance premium, times the scarcity, monopoly and salted-fish premiums. Pure.
  */
 export function routeIncome(state: GameState, route: TradeRoute): number {
-  const base = GOODS[route.good].value * distanceFactor(route.lane.length);
+  const base = goodTradeValue(state, route.good) * distanceFactor(route.lane.length);
   return round1(base * scarcityFactor(state, route) * monopolyFactor(state, route) * saltFishFactor(state, route.good, route.ownerId) * doctrineTradeFactor(state, route.ownerId));
 }
 

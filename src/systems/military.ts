@@ -45,6 +45,8 @@ import {
   armySize,
   emptyUnits,
   canAfford,
+  isSeaCrossing,
+  landNeighbours,
   spendWares,
   type Army,
   type GameState,
@@ -245,7 +247,7 @@ export function reachableRegions(state: GameState, army: Army): number[] {
       ? SEA_ZONES[army.seaZoneId].coastalRegions.slice()
       : armyIsFleet(army.units)
         ? region.adjacency.filter((id) => state.regions[id]?.terrain === "coast")
-        : region.adjacency.slice();
+        : landNeighbours(state, region.id).slice();
   // A stack of hulls with no soldiers aboard cannot take ground, so it may only
   // put in at its own shore (or a friendly stack) — never at a coast to seize.
   if (!armyHasLandUnits(army.units)) {
@@ -422,7 +424,8 @@ function isHostileOwner(state: GameState, ownerId: number, other: number): boole
 export function inEnemyZoc(state: GameState, regionId: number, ownerId: number): boolean {
   const region = state.regions[regionId];
   if (!region) return false;
-  return region.adjacency.some((nb) =>
+  // A stack across open water pins nothing: it would have to land first.
+  return landNeighbours(state, region.id).some((nb) =>
     state.armies.some(
       (a) => !armyIsAtSea(a) && a.regionId === nb && armySize(a.units) > 0 && isHostileOwner(state, ownerId, a.ownerId),
     ),
@@ -455,6 +458,12 @@ export function moveArmy(
   // While at sea, the old anchor port is only a map/rendering reference. Its
   // land adjacency must not become a back door to a coast outside this zone.
   if (armyIsAtSea(army) ? !canLandFromSea : !from.adjacency.includes(targetRegionId)) return state;
+  // The border is open water: this is a crossing, not a march. A fleet may sail
+  // it (hulls travel coast to coast); soldiers must embark and land from a sea
+  // zone, which is the `canLandFromSea` path above.
+  if (!armyIsAtSea(army) && !armyIsFleet(army.units) && isSeaCrossing(state, army.regionId, targetRegionId)) {
+    return state;
+  }
   // A fleet may only sail to another coastal region; it cannot march inland.
   if (armyIsFleet(army.units) && target.terrain !== "coast") return state;
 
@@ -877,7 +886,7 @@ function nextHopTowardWhere(
   while (queue.length) {
     const n = queue.shift()!;
     if (n === destId) break;
-    for (const m of [...(regions[n]?.adjacency ?? [])].sort((a, b) => a - b)) {
+    for (const m of landNeighbours(state, n).slice().sort((a, b) => a - b)) {
       const candidate = regions[m];
       if (!seen.has(m) && candidate && passable(candidate)) {
         seen.add(m);
@@ -1004,6 +1013,7 @@ export function moveDetachment(
   const from = state.regions[army.regionId];
   const target = state.regions[targetRegionId];
   if (!from || !target || !from.adjacency.includes(targetRegionId)) return state;
+  if (isSeaCrossing(state, army.regionId, targetRegionId)) return state; // needs a hull
   // Detachments manoeuvre within your realm; capture/attack uses moveArmy.
   if (target.ownerId !== army.ownerId) return state;
 
@@ -1177,6 +1187,8 @@ function ralliedDefenders(
     if (armyIsAtSea(a)) return false;
     if (a.ownerId === BARBARIAN_ID || a.ownerId === attackerOwnerId) return false;
     if (!target.adjacency.includes(a.regionId)) return false;
+    // ...and not from across open water: a relief force has to land first.
+    if (isSeaCrossing(state, target.id, a.regionId) && !armyIsFleet(a.units)) return false;
     // A port-bound fleet can support another coast, but cannot magically cross
     // its coast-only movement restriction to reinforce an inland battle.
     if (armyIsFleet(a.units) && target.terrain !== "coast") return false;

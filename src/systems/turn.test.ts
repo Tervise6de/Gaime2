@@ -748,7 +748,11 @@ describe("hansa strategic resources (Plan 3B)", () => {
     expect(resources.has("amber")).toBe(true);
     // Königsberg (region 68) is the Samland amber coast; Bergslagen (34) the ore.
     expect(g.regions[68]!.resource).toBe("amber");
-    expect(g.regions[34]!.resource).toBe("iron");
+    // Bergslagen is Falun's copper mountain — Sweden's other metal, and the one
+    // the Hansa carried west. Iron sits in the Norwegian mountains and Silesia.
+    expect(g.regions[34]!.resource).toBe("copper");
+    expect(g.regions[29]!.resource).toBe("iron");
+    expect(g.regions[72]!.resource).toBe("iron");
   });
 });
 

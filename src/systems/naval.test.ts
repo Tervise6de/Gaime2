@@ -181,8 +181,11 @@ describe("functional naval layer", () => {
       ],
     };
 
-    // Hamburg (13) is adjacent to the old Lübeck anchor but is not a North Sea port.
-    const next = moveArmy(withFleet, 903, 13);
+    // Rostock (14) borders the old Lübeck anchor by land but sits on the Baltic,
+    // not the North Sea. (Hamburg used to serve for this — until the sea table
+    // was corrected and the Elbe mouth was restored to the North Sea, where it
+    // has always been.)
+    const next = moveArmy(withFleet, 903, 14);
 
     expect(next).toBe(withFleet);
     expect(next.armies[0]!.seaZoneId).toBe("north_sea");

@@ -88,6 +88,7 @@ import {
   unitCost,
 } from "@/systems/military";
 import { campaignBlurb, planCampaign } from "@/systems/campaign";
+import { QUARTER_LABEL, townsIn } from "@/data/towns";
 import { TREATY_BREAK, TRUCE_TURNS, tributeStakes, truceTurnsLeft, getRelation, getTreaty, wouldJoinWar, warTargetsFor, wouldAccept, nationPower, opinionReasons, foreignRelations, casusBelli, CASUS_BELLI, TRIBUTE_DEMAND, atWar } from "@/systems/diplomacy";
 import { nationScore, victoryProgress, victoryRaces, endGameSummary } from "@/systems/victory";
 import { GOODS, GOOD_IDS, contentmentWares, type GoodId } from "@/data/goods";
@@ -2909,6 +2910,32 @@ function renderRegion(
   if (region.focus) bits.push(`${FOCUSES[region.focus].icon} ${escapeHtml(FOCUSES[region.focus].label)}`);
   meta.innerHTML = bits.join(" · ");
   container.append(title, meta);
+
+  // The League's own towns in this province, and what the place trades. A
+  // province is an abstraction; these are the places inside it that the Hansa
+  // was actually made of, and the goods those places were known for.
+  const towns = townsIn(region.id);
+  if (towns.length > 0) {
+    const line = el("p", "hud-region-towns");
+    line.innerHTML =
+      `${glyphHtml("scales", "⚖")} ` +
+      towns
+        .map((t) => `<span class="hud-town" title="${escapeHtml(t.note)}">${escapeHtml(t.name)}</span>`)
+        .join(" · ");
+    line.title = `League towns here — ${QUARTER_LABEL[towns[0]!.quarter]} quarter. The Diet was the towns; holding them is what precedence in the League is read from.`;
+    container.append(line);
+  }
+  if (region.staples?.length) {
+    const line = el("p", "hud-region-staples");
+    line.innerHTML = region.staples
+      .map(
+        (st) =>
+          `<span class="hud-staple" title="${escapeHtml(st.note)}">${GOODS[st.good].glyph} ${escapeHtml(GOODS[st.good].name)}</span>`,
+      )
+      .join(" · ");
+    line.title = "What this place is known for, over and above what its ground yields.";
+    container.append(line);
+  }
 
   // At-a-glance stat row: defence, unrest state, garrison strength.
   const stats = el("div", "hud-region-stats");

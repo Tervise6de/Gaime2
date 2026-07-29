@@ -304,8 +304,22 @@ export interface Region {
    * province's build order and leave it. Optional/absent = no queue (legacy saves).
    */
   buildQueue?: BuildingId[];
+  /**
+   * Goods this *place* is known for, beyond what its terrain yields
+   * (data/staples.ts) — Bergen's stockfish, Scania's herring, Lüneburg's salt.
+   * Absent on maps that draw no distinction, and on legacy saves.
+   */
+  staples?: { good: GoodId; amount: number; note: string }[];
   /** Ids of adjacent regions (the pure logic graph). */
   adjacency: number[];
+  /**
+   * The subset of `adjacency` reached only across open water (data/maps/*
+   * `seaCrossings`). Trade lanes cross these freely — the Hansa's goods went by
+   * ship — but an army cannot march over one; it has to embark. Absent or empty
+   * on maps that draw no distinction, and on legacy saves, where every border is
+   * walkable as before.
+   */
+  seaLinks?: number[];
   /**
    * Consecutive turns this region has sat in full revolt (unrest ≥ revolt
    * threshold) without a friendly garrison. At SECESSION_REVOLT_TURNS the region
@@ -725,6 +739,11 @@ export interface GameState {
   outcome: "playing" | "defeat" | "victory";
   /** How the game was decided (for the banner), e.g. "domination". */
   victoryKind?: string;
+  /**
+   * Lasting multipliers on what goods fetch on the lanes, set by the epochs (see
+   * `GoodGlut`). Absent on a fresh board and on legacy saves.
+   */
+  goodGlut?: GoodGlut;
   /** Human-readable turn log, newest last. */
   log: string[];
   /**
@@ -779,6 +798,37 @@ export function emptyResearch(): Research {
 export function playerNation(state: GameState): Nation {
   return state.nations[PLAYER_ID]!;
 }
+
+/**
+ * Whether the border between two regions is open water — a crossing an army
+ * must sail, not march. Symmetric, and false for anything that is not actually
+ * adjacent. Pure; the single question every land-movement rule asks.
+ */
+export function isSeaCrossing(state: GameState, fromId: number, toId: number): boolean {
+  return state.regions[fromId]?.seaLinks?.includes(toId) ?? false;
+}
+
+/**
+ * A region's neighbours an army can march to: adjacency minus the water. This
+ * is the graph every land rule should read — movement, pathfinding, threat,
+ * reinforcement, zone of control — while trade lanes and the renderer keep
+ * using the full `adjacency`.
+ */
+export function landNeighbours(state: GameState, regionId: number): number[] {
+  const region = state.regions[regionId];
+  if (!region) return [];
+  const water = region.seaLinks;
+  if (!water || water.length === 0) return region.adjacency;
+  return region.adjacency.filter((id) => !water.includes(id));
+}
+
+/**
+ * A lasting shift in what a good fetches on the trade lanes, as a multiplier on
+ * its value (systems/trade.ts `goodTradeValue`). Set by the historical epochs —
+ * cheap Atlantic bay salt undercutting Lüneburg from about 1400 is the one this
+ * was built for. Absent = every good trades at its table value.
+ */
+export type GoodGlut = Partial<Record<GoodId, number>>;
 
 /** Look up a nation by id. */
 export function nationById(state: GameState, id: number): Nation | undefined {
