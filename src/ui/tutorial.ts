@@ -34,7 +34,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     target: "#game-canvas",
     title: "The world map",
-    body: "Your realm carries the widest, brightest border — that's always you. Click any region to inspect and develop it; zoom with the wheel or pinch, drag to pan. Armies (coloured badges) move between adjacent regions to expand or attack.",
+    body: "Your realm carries the widest, brightest border — that's always you. Click any region to inspect and develop it; zoom with the wheel or pinch, drag to pan. Armies (coloured badges) march between adjacent regions — but not over a dashed blue line: that border is open water. Trade crosses it freely; soldiers need a warship in the stack, and England, Zealand, Gotland and Ösel can be reached no other way.",
   },
   {
     target: ".hud-topbar-left",

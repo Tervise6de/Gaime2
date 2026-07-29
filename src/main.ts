@@ -13,6 +13,7 @@ import {
 import {
   appointCommander,
   armyIsAtSea,
+  armyIsFleet,
   cancelMarch,
   disbandUnits,
   fortifyArmy,
@@ -39,7 +40,7 @@ import { buyWare, sellWare } from "@/systems/market";
 import { foundLeague, joinLeague, leaveLeague, setLeagueBoycott } from "@/systems/league";
 import { saveToLocal, loadFromLocal, hasLocalSave, clearLocalSave, serializeGame, deserializeGame } from "@/systems/save";
 import { summarizeTurn, type TurnSummary } from "@/systems/summary";
-import { PLAYER_ID, BARBARIAN_ID, type GameState } from "@/systems/state";
+import { PLAYER_ID, BARBARIAN_ID, isSeaCrossing, landNeighbours, type Army, type GameState } from "@/systems/state";
 import { confirmAction } from "@/ui/confirm";
 import { createHud } from "@/ui/hud";
 import { showMainMenu } from "@/ui/title";
@@ -377,7 +378,7 @@ function main(): void {
             : orderMarch(state, armyId, regionId);
           selectedRegion = regionId;
           moveArmyId = null;
-          if (state === before) hud.toast("No route there — the army can't reach that region.");
+          if (state === before) hud.toast(noRouteReason(state, army, regionId));
           else commit();
         };
         const target = state.regions[regionId];
@@ -538,6 +539,43 @@ function main(): void {
     renderer.setLens(lensColorsFor(state, activeLens));
     // The trade lens also draws the live merchant lanes; other views clear them.
     renderer.setTradeLanes(activeLens === "trade" ? (state.routes ?? []) : null);
+  }
+
+  /**
+   * Why an order was refused, in the player's terms.
+   *
+   * Since the sea became a real obstacle (data/maps/hansa.ts `seaCrossings`) the
+   * commonest refusal is "that border is water", and a generic "no route" reads
+   * as a bug rather than a rule — the two provinces are plainly touching on the
+   * map. Name the water, and say what it would take.
+   */
+  function noRouteReason(s: GameState, army: Army, destId: number): string {
+    const dest = s.regions[destId];
+    if (!dest) return "No route there — the army can't reach that region.";
+    if (armyIsFleet(army.units) && dest.terrain !== "coast") {
+      return `${dest.name} is inland — a fleet can only put in at a port.`;
+    }
+    // Directly across the water from where it stands.
+    if (isSeaCrossing(s, army.regionId, destId)) {
+      return `${dest.name} lies across open water — soldiers need a hull. Put them in a stack with warships, sail to the sea beyond, then land.`;
+    }
+    // Or on ground with no land road at all from here (an island, or cut off).
+    if (!landReachable(s, army.regionId, destId)) {
+      return `No land road to ${dest.name} — it can only be reached by sea. Sail a stack carrying warships and soldiers, then land from the water.`;
+    }
+    return `No route to ${dest.name} — the army can't reach it this way.`;
+  }
+
+  /** Whether a march could ever get from one region to another over land. */
+  function landReachable(s: GameState, fromId: number, toId: number): boolean {
+    const seen = new Set([fromId]);
+    const queue = [fromId];
+    while (queue.length) {
+      const n = queue.shift()!;
+      if (n === toId) return true;
+      for (const nb of landNeighbours(s, n)) if (!seen.has(nb)) { seen.add(nb); queue.push(nb); }
+    }
+    return false;
   }
 
   function highlights(): number[] {

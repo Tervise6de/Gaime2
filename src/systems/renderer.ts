@@ -419,19 +419,25 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     for (const p of blobPaths) land.addPath(p);
     const isletsPx = (shape?.islets ?? []).map((b) => b.map((v) => projectXY(v.x, v.y)));
 
-    // Sea lanes: game-adjacent pairs whose midpoint lies in open water — the
-    // visual reminder that armies may still cross (archipelago straits).
+    // Sea crossings: the borders that are open water. Trade lanes cross them
+    // and armies cannot — so this is the one map line that carries a rule, and
+    // it is drawn from the game's own `seaLinks` rather than re-derived from
+    // geometry (which disagrees with the authored data at a dozen borders).
+    // Maps that draw no distinction fall back to the midpoint-in-water test.
     const lanes: [Point, Point][] = [];
-    if (shape) {
-      for (const region of s.regions) {
-        for (const nid of region.adjacency) {
-          if (region.id >= nid) continue;
-          const other = s.regions[nid];
-          if (!other) continue;
+    const authored = s.regions.some((r) => (r.seaLinks?.length ?? 0) > 0);
+    for (const region of s.regions) {
+      for (const nid of authored ? (region.seaLinks ?? []) : region.adjacency) {
+        if (region.id >= nid) continue;
+        const other = s.regions[nid];
+        if (!other) continue;
+        if (!authored) {
+          if (!shape) continue;
           const mx = (region.x + other.x) / 2;
           const my = (region.y + other.y) / 2;
-          if (!pointInIsland(shape, mx, my)) lanes.push([sites[region.id]!, sites[other.id]!]);
+          if (pointInIsland(shape, mx, my)) continue;
         }
+        lanes.push([sites[region.id]!, sites[other.id]!]);
       }
     }
 
@@ -593,7 +599,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     }
     g.setLineDash([]);
 
-    // Sea lanes under the land so their on-land ends tuck beneath the terrain.
+    // Sea crossings under the land so their on-land ends tuck beneath the
+    // terrain. Dashed, because the line is a ferry rather than a road: goods
+    // cross it and soldiers need a hull.
     g.setLineDash([2, 7]);
     g.lineWidth = 1.6;
     g.strokeStyle = OCEAN.lane;

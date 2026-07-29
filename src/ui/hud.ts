@@ -100,7 +100,7 @@ import { KONTORE, type KontorId } from "@/data/kontore";
 import { SOUND } from "@/data/sound";
 import { routeBlockade, routeOptions, regionGoodOutput, routeIncome, soundHolderId, activeEmbargoes, soundPreview, marketOutlook } from "@/systems/trade";
 import { canFoundLeague, canJoinLeague, leagueLeader, leagueDividendPool, isBoycotted } from "@/systems/league";
-import { inLeague } from "@/systems/state";
+import { inLeague, landNeighbours } from "@/systems/state";
 import { MANUAL_SLOTS, slotInfo, type SaveSlot } from "@/systems/save";
 import type { TurnSummary } from "@/systems/summary";
 import { deriveAlerts, type Alert } from "@/ui/alerts";
@@ -2052,6 +2052,19 @@ export function createHud(root: HTMLElement, callbacks: HudCallbacks): Hud {
           seaActions.append(landSelect, land);
         }
         if (seaActions.childElementCount > 0) status.append(seaActions);
+      } else if (!armyIsAtSea(army) && (region.seaLinks?.length ?? 0) > 0) {
+        // Soldiers standing on a shore with water on the far side. The rule is
+        // easy to hit and impossible to guess: this stack cannot cross until a
+        // warship joins it, at which point the Sail buttons appear right here.
+        const hint = el("p", "hud-army-embark");
+        const shipHere = canRaiseUnit(state, region.id, "war_cog", PLAYER_ID);
+        hint.innerHTML =
+          `${glyphHtml("warning", "⚓")} These soldiers cannot cross open water. ` +
+          (shipHere.ok
+            ? `Raise a War-Cog here and it joins this stack — then sail, and land on the far shore.`
+            : `Bring them to a port with warships (the two merge into one stack), then sail and land.`);
+        hint.title = "A stack that holds at least one warship can sail. Landing on a rival's shore is an assault: the soldiers storm it while the hulls stand offshore.";
+        status.append(hint);
       }
       const moveBtn = btn("Move ▸", "hud-army-move", () => {
         closeArmies();
@@ -2910,6 +2923,24 @@ function renderRegion(
   if (region.focus) bits.push(`${FOCUSES[region.focus].icon} ${escapeHtml(FOCUSES[region.focus].label)}`);
   meta.innerHTML = bits.join(" · ");
   container.append(title, meta);
+
+  // Where the water is. Two provinces can plainly touch on the map and still
+  // have no road between them, and a rule the map does not explain reads as a
+  // bug — so the panel names the crossings, and says outright when a province
+  // can only be reached by sea.
+  const wet = (region.seaLinks ?? []).filter((id) => state.regions[id]);
+  if (wet.length > 0) {
+    const line = el("p", "hud-region-water");
+    const landRoads = landNeighbours(state, region.id).length;
+    const names = wet.map((id) => escapeHtml(state.regions[id]!.name)).join(", ");
+    line.innerHTML =
+      landRoads === 0
+        ? `${glyphHtml("warning", "⚓")} <strong>An island.</strong> No land road anywhere — ${names} lie across open water. Soldiers reach it only by sea: put them in a stack with warships, sail, and land.`
+        : `${glyphHtml("warning", "⚓")} Across water: ${names}. Trade crosses freely; armies need a hull.`;
+    line.title =
+      "Open-water borders. A trade lane is carried by ship and crosses them; an army has to embark — sail a stack holding warships and soldiers into the sea beyond, then land on the far shore.";
+    container.append(line);
+  }
 
   // The League's own towns in this province, and what the place trades. A
   // province is an abstraction; these are the places inside it that the Hansa
@@ -4056,7 +4087,10 @@ function buildLegend(): HTMLElement {
   row(line("#9a5b53"), "Free towns — independent holdings, faint brown wash, no rim");
   row('<span class="hud-legend-hatch"></span>', "Unclaimed land — darkened with hatching, free to take");
   row(line(WAR_EDGE_COLOR), "War front — a border between two nations at war");
-  row(line(OCEAN.lane), "Sea lane — regions connected across water (armies may cross)");
+  row(
+    line(OCEAN.lane),
+    "Sea crossing — a border that is open water. Trade lanes cross it; armies cannot, and must sail",
+  );
 
   section("Selection");
   row(ring("#f4d27a"), "Selected region");

@@ -1721,6 +1721,32 @@ body {
 }
 
 /* At-a-glance stat row under the region title: defence / unrest / garrison. */
+.hud-army-embark {
+  margin: 5px 0 0;
+  padding: 4px 8px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--muted);
+  background: rgba(52, 106, 138, 0.16);
+  border-left: 2px solid #4f92b8;
+  border-radius: 0 4px 4px 0;
+}
+
+.hud-region-water {
+  margin: 5px 0 0;
+  padding: 5px 9px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--muted);
+  background: rgba(52, 106, 138, 0.16);
+  border-left: 2px solid #4f92b8;
+  border-radius: 0 4px 4px 0;
+}
+
+.hud-region-water strong {
+  color: #8fc7e4;
+}
+
 .hud-region-towns,
 .hud-region-staples {
   margin: 4px 0 0;

@@ -57,6 +57,23 @@ describe("the sea is an obstacle", () => {
     expect(islands.some((c) => c.includes(LONDON) && c.length === 5)).toBe(true);
   });
 
+  it("gives the region panel what it needs to say 'island' or 'across water'", () => {
+    const g = board();
+    // The panel picks its wording from exactly these two reads, so pin them:
+    // no land road at all → "An island"; some land road → "Across water: …".
+    for (const island of [VISBY, ZEALAND, OSEL]) {
+      expect(landNeighbours(g, island).length).toBe(0);
+      expect((g.regions[island]!.seaLinks ?? []).length).toBeGreaterThan(0);
+    }
+    // A coastal province with both: Scania keeps its Swedish land border and
+    // still has water between it and Zealand, Danzig and Stettin.
+    expect(landNeighbours(g, SCANIA).length).toBeGreaterThan(0);
+    expect((g.regions[SCANIA]!.seaLinks ?? []).length).toBeGreaterThan(0);
+    // ...and an inland province has nothing to say at all.
+    const inland = g.regions.find((r) => r.terrain === "forest" && (r.seaLinks?.length ?? 0) === 0)!;
+    expect(inland.seaLinks ?? []).toEqual([]);
+  });
+
   it("refuses a march over water, and still lets a fleet sail it", () => {
     const g = board();
     expect(g.regions[LONDON]!.adjacency).toContain(BRUGES); // still neighbours

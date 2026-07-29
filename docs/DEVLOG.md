@@ -6,6 +6,51 @@ what changed and why, the test count after, and ideas for next time. See
 
 ---
 
+## 2026-07-29 — Telling the player where the water is (v0.116.0)
+
+v0.115 made the sea a real obstacle and verified it only in the simulator. A
+grep afterwards found no reference to `isSeaCrossing`, `landNeighbours` or
+`seaLinks` anywhere under `src/ui/` — so the rule existed and nothing in the
+game said so. Two provinces looked adjacent because they *were* adjacent; one
+of them simply could not be marched to, and the move failed with a generic "no
+route there". That reads as a bug, not a rule. This fixes the gap.
+
+**The map draws the crossings from the data.** The renderer already drew dashed
+sea lanes, but from its own midpoint-in-water test — which disagrees with the
+authored crossings at a dozen borders — and its comment said the line was "the
+visual reminder that armies may still cross". Now it reads `region.seaLinks`,
+and the legend calls it what it is: "Sea crossing — a border that is open water.
+Trade lanes cross it; armies cannot, and must sail."
+
+**The refusal names the reason.** `noRouteReason` replaces the generic toast:
+the destination lies across open water, or has no land road from here at all,
+or is inland and this is a fleet — and each says what it would take instead.
+
+**The region panel says it before you try.** A province with water borders lists
+them; a province with no land road at all says outright that it is an island and
+how soldiers reach it. Verified in the browser on Norrland ("Across water:
+Satakunta. Trade crosses freely; armies need a hull"), and the island branch's
+two conditions are pinned by test.
+
+**The army panel says what a crossing needs.** Soldiers standing on a shore with
+water beyond now get told they cannot cross until a warship joins the stack —
+and, when a cog can be raised where they stand, that raising one merges it into
+this stack and the Sail buttons appear.
+
+**And the tutorial's map step mentions it**, including that England, Zealand,
+Gotland and Ösel can be reached no other way.
+
+Tests: 858 passing (58 files).
+
+A note on process: the browser sweep that verified the crossing panel could not
+reach the island provinces — the region modal opens on click and swallows the
+next one — so the island wording is pinned by a unit test on its inputs rather
+than a screenshot. The deeper gap it exposes is that HUD text has no test
+coverage at all, which is why a rule could ship without a word of UI in the
+first place.
+
+---
+
 ## 2026-07-29 — The map as it was (v0.115.0)
 
 An audit of the board against `hansa times.md` said the land was the strongest
